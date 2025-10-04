@@ -1,0 +1,20 @@
+{
+  "name": "kota-db",
+  "version": "0.1.0",
+  "description": "KotaDB indexing and API service built with Bun + TypeScript.",
+  "private": true,
+  "type": "module",
+  "module": "src/index.ts",
+  "scripts": {
+    "dev": "bun --watch src/index.ts",
+    "start": "bun run src/index.ts",
+    "test": "bun test",
+    "check": "bunx tsc --noEmit"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "@types/node": "^22.9.0",
+    "bun-types": "^1.1.10",
+    "typescript": "^5.9.3"
+  }
+}

@@ -1,0 +1,20 @@
+app = "kota-db"
+
+kill_signal = "SIGINT"
+kill_timeout = 5
+primary_region = "iad"
+
+[env]
+  NODE_ENV = "production"
+
+[http_service]
+  auto_start_machines = true
+  auto_stop_machines = true
+  force_https = true
+  internal_port = 3000
+  min_machines_running = 1
+
+[[vm]]
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 512

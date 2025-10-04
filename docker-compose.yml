@@ -1,0 +1,29 @@
+version: "3.8"
+
+services:
+  dev:
+    build:
+      context: .
+      target: base
+    command: bun --watch src/index.ts
+    volumes:
+      - .:/app
+      - bun_cache:/root/.cache/bun
+    environment:
+      NODE_ENV: development
+    ports:
+      - "3000:3000"
+
+  home:
+    build:
+      context: .
+      target: base
+    command: bun run src/index.ts
+    environment:
+      NODE_ENV: production
+    ports:
+      - "3100:3000"
+    restart: unless-stopped
+
+volumes:
+  bun_cache:
