@@ -8,7 +8,7 @@ import re
 import subprocess
 import sys
 from pathlib import Path
-from typing import Any, Dict, List, Optional, Tuple
+from typing import Any, Dict, List, Optional, Sequence, Tuple
 
 if __package__ is None or __package__ == "":
     import sys
@@ -31,6 +31,7 @@ load_dotenv(project_root() / ".env")
 
 # Resolve Claude CLI path (defaults to "claude").
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")
+COMMANDS_ROOT = project_root() / ".claude" / "commands"
 
 
 def check_claude_installed() -> Optional[str]:
@@ -95,20 +96,56 @@ def get_claude_env() -> Dict[str, str]:
     return {key: value for key, value in env.items() if value is not None}
 
 
-def save_prompt(prompt: str, adw_id: str, agent_name: str = "ops") -> None:
+def save_prompt(
+    prompt: str,
+    adw_id: str,
+    agent_name: str = "ops",
+    slash_command: Optional[str] = None,
+) -> None:
     """Persist the raw prompt for later auditing."""
 
-    match = re.match(r"^(/\w+)", prompt)
-    if not match:
-        return
+    command_name = slash_command.lstrip("/") if slash_command else None
 
-    command_name = match.group(1)[1:]
+    if not command_name:
+        match = re.search(r"/(\w+)", prompt)
+        if not match:
+            return
+        command_name = match.group(1)
     prompt_dir = run_logs_dir(adw_id) / agent_name / "prompts"
     prompt_dir.mkdir(parents=True, exist_ok=True)
     prompt_file = prompt_dir / f"{command_name}.txt"
     with open(prompt_file, "w", encoding="utf-8") as handle:
         handle.write(prompt)
     print(f"Saved prompt to: {prompt_file}")
+
+
+def command_template_path(slash_command: str) -> Path:
+    """Return the on-disk path for a slash command template."""
+
+    if not slash_command.startswith("/"):
+        raise ValueError(f"Invalid slash command: {slash_command}")
+
+    command_name = slash_command[1:]
+    path = COMMANDS_ROOT / f"{command_name}.md"
+    if not path.exists():
+        raise FileNotFoundError(f"Prompt template not found for {slash_command} at {path}")
+    return path
+
+
+def render_slash_command_prompt(slash_command: str, args: Sequence[str]) -> str:
+    """Load a slash command template and substitute positional arguments."""
+
+    template_path = command_template_path(slash_command)
+    content = template_path.read_text(encoding="utf-8")
+
+    for index, value in enumerate(args, start=1):
+        content = content.replace(f"${index}", value)
+
+    if "$ARGUMENTS" in content:
+        joined_arguments = "\n\n".join(arg for arg in args if arg)
+        content = content.replace("$ARGUMENTS", joined_arguments)
+
+    return content
 
 
 def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
@@ -118,7 +155,7 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     if error_msg:
         return AgentPromptResponse(output=error_msg, success=False, session_id=None)
 
-    save_prompt(request.prompt, request.adw_id, request.agent_name)
+    save_prompt(request.prompt, request.adw_id, request.agent_name, request.slash_command)
 
     output_path = Path(request.output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
@@ -172,7 +209,11 @@ def execute_template(request: AgentTemplateRequest) -> AgentPromptResponse:
     run_dir.mkdir(parents=True, exist_ok=True)
     output_file = run_dir / "raw_output.jsonl"
 
-    prompt = f"{request.slash_command} {' '.join(request.args)}"
+    try:
+        prompt = render_slash_command_prompt(request.slash_command, request.args)
+    except FileNotFoundError as exc:
+        return AgentPromptResponse(output=str(exc), success=False, session_id=None)
+
     prompt_request = AgentPromptRequest(
         prompt=prompt,
         adw_id=request.adw_id,
@@ -180,5 +221,6 @@ def execute_template(request: AgentTemplateRequest) -> AgentPromptResponse:
         model=request.model,
         dangerously_skip_permissions=True,
         output_file=str(output_file),
+        slash_command=request.slash_command,
     )
     return prompt_claude_code(prompt_request)

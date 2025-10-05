@@ -121,6 +121,7 @@ class AgentPromptRequest(BaseModel):
     model: Literal["sonnet", "opus"] = "sonnet"
     dangerously_skip_permissions: bool = False
     output_file: str
+    slash_command: Optional[str] = None
 
 
 class AgentPromptResponse(BaseModel):
