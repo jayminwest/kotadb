@@ -127,7 +127,7 @@ async function dispatchMethod(
 
 				const toolParams =
 					"arguments" in params ? params.arguments : undefined;
-				const result = handleToolCall(db, params.name, toolParams);
+				const result = handleToolCall(db, params.name, toolParams, id);
 				return success(id, result);
 			}
 

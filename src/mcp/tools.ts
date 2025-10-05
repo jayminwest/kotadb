@@ -151,9 +151,13 @@ function isListRecentParams(
 /**
  * Execute search_code tool
  */
-export function executeSearchCode(db: Database, params: unknown): unknown {
+export function executeSearchCode(
+	db: Database,
+	params: unknown,
+	requestId: string | number
+): unknown {
 	if (!isSearchParams(params)) {
-		throw invalidParams(0, "Invalid parameters for search_code tool");
+		throw invalidParams(requestId, "Invalid parameters for search_code tool");
 	}
 
 	const results = searchFiles(db, params.term, {
@@ -173,9 +177,13 @@ export function executeSearchCode(db: Database, params: unknown): unknown {
 /**
  * Execute index_repository tool
  */
-export function executeIndexRepository(db: Database, params: unknown): unknown {
+export function executeIndexRepository(
+	db: Database,
+	params: unknown,
+	requestId: string | number
+): unknown {
 	if (!isIndexParams(params)) {
-		throw invalidParams(0, "Invalid parameters for index_repository tool");
+		throw invalidParams(requestId, "Invalid parameters for index_repository tool");
 	}
 
 	const indexRequest: IndexRequest = {
@@ -207,9 +215,10 @@ export function executeIndexRepository(db: Database, params: unknown): unknown {
 export function executeListRecentFiles(
 	db: Database,
 	params: unknown,
+	requestId: string | number
 ): unknown {
 	if (!isListRecentParams(params)) {
-		throw invalidParams(0, "Invalid parameters for list_recent_files tool");
+		throw invalidParams(requestId, "Invalid parameters for list_recent_files tool");
 	}
 
 	const limit =
@@ -262,15 +271,16 @@ export function handleToolCall(
 	db: Database,
 	toolName: string,
 	params: unknown,
+	requestId: string | number
 ): unknown {
 	switch (toolName) {
 		case "search_code":
-			return executeSearchCode(db, params);
+			return executeSearchCode(db, params, requestId);
 		case "index_repository":
-			return executeIndexRepository(db, params);
+			return executeIndexRepository(db, params, requestId);
 		case "list_recent_files":
-			return executeListRecentFiles(db, params);
+			return executeListRecentFiles(db, params, requestId);
 		default:
-			throw invalidParams(0, `Unknown tool: ${toolName}`);
+			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}
 }

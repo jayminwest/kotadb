@@ -54,8 +54,20 @@ export function createRouter(db: Database): Router {
         return json({ results: listRecentFiles(db, limit) });
       }
 
-      if (request.method === "POST" && pathname === "/mcp") {
-        return handleMcpRequest(db, request);
+      if (pathname === "/mcp") {
+        if (request.method === "POST") {
+          return handleMcpRequest(db, request);
+        }
+
+        if (request.method === "GET") {
+          return json(
+            { error: "Server does not support MCP SSE streams yet" },
+            405,
+            { Allow: "POST" }
+          );
+        }
+
+        return json({ error: "Method not allowed" }, 405, { Allow: "POST" });
       }
 
       return json({ error: "Not found" }, 404);
@@ -112,11 +124,12 @@ async function runIndexingWorkflow(db: Database, request: IndexRequest, runId: n
   updateIndexRunStatus(db, runId, "completed");
 }
 
-function json(payload: unknown, status = 200): Response {
+function json(payload: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(payload, null, 2), {
     status,
     headers: {
-      "content-type": "application/json"
+      "content-type": "application/json",
+      ...extraHeaders
     }
   });
 }
