@@ -14,9 +14,10 @@ Use the variables to create a Git branch following KotaDB conventions, then outp
 - Ensure the branch name is ≤ 80 characters.
 
 ## Run
-1. `git checkout main`
-2. `git pull`
-3. `git checkout -b <branch_name>`
+1. `git fetch --all --prune`
+2. `git checkout develop`
+3. `git pull origin develop`
+4. `git checkout -b <branch_name>`
 
 ## Report
 Return only the branch name.

@@ -41,13 +41,16 @@ fi
 
 git fetch --prune origin "${REPO_REF}" >/dev/null 2>&1 || git fetch --prune origin >/dev/null 2>&1
 
+git reset --hard >/dev/null 2>&1 || true
+git clean -fd >/dev/null 2>&1 || true
+
 if git show-ref --quiet "refs/heads/${REPO_REF}"; then
-  git checkout "${REPO_REF}"
+  git checkout -f "${REPO_REF}"
 else
-  git checkout -B "${REPO_REF}" "origin/${REPO_REF}" 2>/dev/null || git checkout "origin/${REPO_REF}" -B "${REPO_REF}"
+  git checkout -B "${REPO_REF}" "origin/${REPO_REF}" 2>/dev/null || git checkout -f "origin/${REPO_REF}" -B "${REPO_REF}"
 fi
 
-git reset --hard "origin/${REPO_REF}"
+git reset --hard "origin/${REPO_REF}" >/dev/null 2>&1
 
 if [[ -n "${GITHUB_PAT:-}" ]]; then
   export GH_TOKEN="${GH_TOKEN:-$GITHUB_PAT}"
@@ -56,6 +59,10 @@ fi
 git config --global user.email "${GIT_AUTHOR_EMAIL:-bot@kotadb.local}"
 git config --global user.name "${GIT_AUTHOR_NAME:-KotaDB ADW Bot}"
 git config --global pull.rebase false
+
+if [[ -f "bun.lock" || -f "package.json" ]]; then
+  bun install --frozen-lockfile >/dev/null 2>&1 || bun install >/dev/null 2>&1
+fi
 
 export ISSUE_NUMBER
 export ADW_ID

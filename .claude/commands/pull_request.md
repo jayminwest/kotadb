@@ -17,13 +17,15 @@ Create a GitHub pull request for the work on `<branch_name>`.
   - Validation checklist referencing the commands executed
   - `Closes #<issue_number>`
   - `ADW ID: <adw_id>`
+- Treat `develop` as the base branch for diffs and PR creation.
 
 ## Run
-1. `git diff origin/main...HEAD --stat`
-2. `git log origin/main..HEAD --oneline`
-3. `git diff origin/main...HEAD --name-only`
-4. `git push -u origin <branch_name>`
-5. `gh pr create --title "<title>" --body "<body>" --base main`
+1. `git status --short`
+2. `git diff origin/develop...HEAD --stat`
+3. `git log origin/develop..HEAD --oneline`
+4. `git diff origin/develop...HEAD --name-only`
+5. `git push -u origin HEAD`
+6. `gh pr create --title "<title>" --body "<body>" --base develop`
 
 ## Report
 Return only the PR URL.

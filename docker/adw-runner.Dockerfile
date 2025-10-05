@@ -32,8 +32,10 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash
-RUN ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
-    && ln -sf /root/.bun/bin/bunx /usr/local/bin/bunx
+RUN cp /root/.bun/bin/bun /usr/local/bin/bun \
+    && cp /root/.bun/bin/bunx /usr/local/bin/bunx \
+    && chmod +x /usr/local/bin/bun /usr/local/bin/bunx
+RUN chown -R adw:adw /root/.bun
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
