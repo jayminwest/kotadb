@@ -87,7 +87,7 @@ uv run adws/adw_plan_build.py 1234 deadbeef
   - Runs the workflow when an issue has no comments or the latest comment is exactly `adw`.
 - **Webhook server** – `PORT=8001 uv run adws/trigger_webhook.py`
   - Exposes `POST /gh-webhook` for GitHub Issues & Issue Comment events and `GET /health` for liveness checks.
-  - Launches `adw_plan_build.py` in the background with a generated ADW ID and reports log locations under `logs/kota-db-ts/<env>/<run_id>/`.
+  - Containerised deployments use `docker run` to launch an isolated runner per issue (see below).
 
 ## Validation Defaults
 Automation expects the following commands to succeed unless the plan specifies extras:
@@ -104,3 +104,68 @@ Copy `.env.sample` to `.env` and populate:
 - Optional: `CLAUDE_CODE_PATH`, `GITHUB_PAT`, `E2B_API_KEY`
 
 Restrict production/staging secrets to approved environments. Use the `ADW_ENV` environment variable to scope log directories and credential suffixing.
+
+## Containerised Deployment
+
+Two container images orchestrate the automation:
+
+- `docker/adw-webhook.Dockerfile` builds the FastAPI webhook service. It requires Docker socket access to launch sandboxed runs and persists automation logs under `.adw_logs/`.
+- `docker/adw-runner.Dockerfile` builds an execution environment containing Python, uv, Bun, Node (Claude CLI), and the GitHub CLI. Each workflow executes inside this container, starting from a clean clone of the repository.
+
+### Build the images
+
+```bash
+docker compose build adw_runner adw_webhook
+```
+
+The compose file publishes the runner image locally as `kotadb-adw-runner:latest`; the webhook image references it via `ADW_RUNNER_IMAGE`.
+
+### Run the webhook 24/7
+
+```bash
+# start the webhook and keep it running
+docker compose up -d adw_webhook
+
+# view logs / health
+docker compose logs -f adw_webhook
+curl http://localhost:3000/health
+```
+
+The service mounts `/var/run/docker.sock` and a persisted `adw_logs` volume so issue runs remain sandboxed yet auditable. Cloudflare Tunnel can forward traffic to port `3000` as before.
+
+### Boot-time restart (systemd example)
+
+Create `/etc/systemd/system/adw-webhook.service`:
+
+```
+[Unit]
+Description=KotaDB ADW Webhook
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/srv/kotadb
+ExecStart=/usr/bin/docker compose up -d adw_webhook
+ExecStop=/usr/bin/docker compose down adw_webhook
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+```
+
+Enable and start:
+
+```bash
+sudo systemctl enable --now adw-webhook.service
+```
+
+### Environment variables
+
+- `ADW_RUNNER_IMAGE` – Docker image tag for the per-run container (defaults to `kotadb-adw-runner:latest`).
+- `ADW_GIT_REF` – Git branch checked out before each run (default `main`).
+- `ADW_REPO_URL` – Optional explicit Git URL override (falls back to the image's embedded remote).
+- `ADW_RUNNER_AUTO_PULL` – Set to `false` to skip `docker pull` checks before each run.
+
+Secrets such as `ANTHROPIC_API_KEY` and `GITHUB_PAT` must still be available in the webhook container environment (e.g. via `.env`, Docker secrets, or a secrets manager). The runner receives them per invocation through `docker run -e`.

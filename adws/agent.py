@@ -10,18 +10,24 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Tuple
 
+if __package__ is None or __package__ == "":
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from dotenv import load_dotenv
 
-from data_types import (
+from adws.data_types import (
     AgentPromptRequest,
     AgentPromptResponse,
     AgentTemplateRequest,
     ClaudeCodeResultMessage,
 )
-from utils import run_logs_dir
+from adws.utils import project_root, run_logs_dir
 
 # Load environment variables for local execution contexts.
-load_dotenv()
+load_dotenv(project_root() / ".env")
 
 # Resolve Claude CLI path (defaults to "claude").
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")
@@ -125,7 +131,14 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
 
     try:
         with open(output_path, "w", encoding="utf-8") as handle:
-            result = subprocess.run(cmd, stdout=handle, stderr=subprocess.PIPE, text=True, env=env)
+            result = subprocess.run(
+                cmd,
+                stdout=handle,
+                stderr=subprocess.PIPE,
+                text=True,
+                env=env,
+                cwd=project_root(),
+            )
     except subprocess.TimeoutExpired:
         error = "Error: Claude Code command timed out"
         print(error, file=sys.stderr)

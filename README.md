@@ -1,8 +1,8 @@
 # KotaDB
 
-KotaDB is the indexing and query layer for Kota's code intelligence platform. This project exposes a
+KotaDB is the indexing and query layer for CLI Agents like Claude Code and Codex. This project exposes a
 lightweight HTTP interface for triggering repository indexing jobs and performing code search backed by
-SQLite. The long-term goal is to power AI developer workflows via the `adws/` automation scripts.
+SQLite. Development is done autonomously through AI developer workflows via the `adws/` automation scripts.
 
 ## Getting Started
 

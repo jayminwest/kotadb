@@ -1,5 +1,3 @@
-version: "3.8"
-
 services:
   dev:
     build:
@@ -25,5 +23,34 @@ services:
       - "3100:3000"
     restart: unless-stopped
 
+  adw_runner:
+    build:
+      context: .
+      dockerfile: docker/adw-runner.Dockerfile
+    image: kotadb-adw-runner:latest
+    command: ["sleep", "infinity"]
+
+  adw_webhook:
+    build:
+      context: .
+      dockerfile: docker/adw-webhook.Dockerfile
+    image: kotadb-adw-webhook:latest
+    depends_on:
+      adw_runner:
+        condition: service_started
+    env_file:
+      - .env
+    environment:
+      PORT: ${PORT:-3000}
+      ADW_RUNNER_IMAGE: ${ADW_RUNNER_IMAGE:-kotadb-adw-runner:latest}
+      ADW_GIT_REF: ${ADW_GIT_REF:-main}
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - adw_logs:/app/.adw_logs
+    ports:
+      - "3000:3000"
+    restart: unless-stopped
+
 volumes:
   bun_cache:
+  adw_logs:

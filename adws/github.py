@@ -9,11 +9,18 @@ import subprocess
 import sys
 from typing import Dict, List, Optional
 
+if __package__ is None or __package__ == "":
+    import sys
+    from pathlib import Path
+
+    sys.path.append(str(Path(__file__).resolve().parent.parent))
+
 from dotenv import load_dotenv
 
-from data_types import GitHubIssue, GitHubIssueListItem
+from adws.data_types import GitHubIssue, GitHubIssueListItem
+from adws.utils import project_root
 
-load_dotenv()
+load_dotenv(project_root() / ".env")
 
 
 def get_github_env() -> Optional[dict[str, str]]:

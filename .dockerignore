@@ -1,0 +1,14 @@
+.git
+.gitignore
+.adw_logs
+adws/.adw_logs
+adws/__pycache__
+__pycache__
+node_modules
+data/
+logs/
+*.pyc
+*.pyo
+*.swp
+*.tmp
+*.log
