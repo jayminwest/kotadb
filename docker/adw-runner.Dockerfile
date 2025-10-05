@@ -3,8 +3,8 @@
 FROM python:3.12-slim AS runner
 
 ENV DEBIAN_FRONTEND=noninteractive \
-    UV_CACHE_DIR=/root/.cache/uv \
-    PATH="/root/.local/bin:/root/.bun/bin:/usr/local/bin:/usr/bin:/bin"
+    UV_CACHE_DIR=/home/adw/.cache/uv \
+    PATH="/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin:/root/.bun/bin:/root/.local/bin"
 
 RUN apt-get update \
     && apt-get install -y --no-install-recommends \
@@ -14,10 +14,15 @@ RUN apt-get update \
         gnupg \
         unzip \
         bash \
+        passwd \
     && rm -rf /var/lib/apt/lists/*
+
+RUN useradd --create-home --shell /bin/bash --uid 1000 adw
 
 # Install uv
 RUN curl -LsSf https://astral.sh/uv/install.sh | sh
+RUN mv /root/.local/bin/uv /usr/local/bin/uv \
+    && mv /root/.local/bin/uvx /usr/local/bin/uvx
 
 # Install Node.js 20 for Claude CLI
 RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
@@ -27,6 +32,8 @@ RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
 
 # Install Bun
 RUN curl -fsSL https://bun.sh/install | bash
+RUN ln -sf /root/.bun/bin/bun /usr/local/bin/bun \
+    && ln -sf /root/.bun/bin/bunx /usr/local/bin/bunx
 
 # Install GitHub CLI
 RUN curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg \
@@ -49,8 +56,20 @@ COPY . /workspace
 # Ensure git metadata permissions remain accessible
 RUN git config --global --add safe.directory /workspace
 
+RUN chown -R adw:adw /workspace
+
+RUN mkdir -p /home/adw/.cache/uv && chown -R adw:adw /home/adw/.cache
+
 # Lightweight entrypoint script to execute a single ADW run
 COPY adws/scripts/run-adw.sh /usr/local/bin/run-adw
-RUN chmod +x /usr/local/bin/run-adw
+RUN chmod +x /usr/local/bin/run-adw && chown adw:adw /usr/local/bin/run-adw
+
+# Switch to non-root user for runtime safety
+USER adw
+ENV HOME=/home/adw
+
+WORKDIR /workspace
+
+RUN git config --global --add safe.directory /workspace
 
 ENTRYPOINT ["/usr/local/bin/run-adw"]

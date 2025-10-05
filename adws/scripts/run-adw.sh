@@ -2,6 +2,10 @@
 
 set -euo pipefail
 
+if [[ "${ADW_RUNNER_DEBUG:-0}" == "1" ]]; then
+  set -x
+fi
+
 ISSUE_NUMBER="${1:-${ISSUE_NUMBER:-}}"
 ADW_ID="${2:-${ADW_ID:-}}"
 
@@ -16,11 +20,22 @@ if [[ -z "${ADW_ID}" ]]; then
 fi
 
 REPO_REF="${ADW_GIT_REF:-main}"
-REPO_URL="${ADW_REPO_URL:-}" 
+REPO_URL="${ADW_REPO_URL:-}"
 
 cd /workspace
 
-if [[ -n "${REPO_URL}" ]]; then
+if [[ -z "${REPO_URL}" ]]; then
+  REPO_URL="$(git remote get-url origin 2>/dev/null || echo "")"
+fi
+
+if [[ -n "${GITHUB_PAT:-}" ]]; then
+  if [[ -n "${REPO_URL}" && "${REPO_URL}" == https://* ]]; then
+    AUTH_URL="https://${GITHUB_PAT}@${REPO_URL#https://}"
+    git remote set-url origin "${AUTH_URL}"
+  else
+    git remote set-url origin "https://${GITHUB_PAT}@github.com/${GITHUB_REPOSITORY:-kotadb/kotadb}.git"
+  fi
+elif [[ -n "${REPO_URL}" ]]; then
   git remote set-url origin "${REPO_URL}"
 fi
 
