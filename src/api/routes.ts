@@ -11,6 +11,7 @@ import {
   searchFiles,
   updateIndexRunStatus
 } from "./queries";
+import { handleMcpRequest } from "@mcp/handler";
 
 export interface Router {
   handle: (request: Request) => Promise<Response> | Response;
@@ -51,6 +52,10 @@ export function createRouter(db: Database): Router {
       if (request.method === "GET" && pathname === "/files/recent") {
         const limit = Number(searchParams.get("limit") ?? "10");
         return json({ results: listRecentFiles(db, limit) });
+      }
+
+      if (request.method === "POST" && pathname === "/mcp") {
+        return handleMcpRequest(db, request);
       }
 
       return json({ error: "Not found" }, 404);

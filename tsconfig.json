@@ -17,7 +17,8 @@
       "@api/*": ["src/api/*"],
       "@db/*": ["src/db/*"],
       "@indexer/*": ["src/indexer/*"],
-      "@shared/*": ["src/types/*"]
+      "@shared/*": ["src/types/*"],
+      "@mcp/*": ["src/mcp/*"]
     },
     "types": ["bun-types", "node"]
   },
