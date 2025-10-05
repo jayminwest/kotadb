@@ -32,12 +32,96 @@ The server listens on port `3000` by default. Override with `PORT=4000 bun run s
 
 ## API Highlights
 
+### REST Endpoints
+
 - `GET /health` – Simple heartbeat endpoint.
 - `POST /index` – Queue a repository for indexing (body: `{ "repository": "org/repo", "localPath": "./repo" }`).
 - `GET /search?term=foo` – Search for files containing `foo`. Optional `project` and `limit` parameters.
 - `GET /files/recent` – Recent indexing results.
 
 The indexer clones repositories automatically when a `localPath` is not provided. Override the default GitHub clone source by exporting `KOTA_GIT_BASE_URL` (for example, your self-hosted Git service).
+
+### MCP Protocol Endpoint
+
+KotaDB supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) for standardized agent integration. The MCP endpoint enables CLI agents like Claude Code to discover and use KotaDB's capabilities automatically.
+
+**Endpoint:** `POST /mcp`
+
+**Required Headers:**
+- `Origin`: Must match allowed origins (default: localhost variants)
+- `MCP-Protocol-Version: 2025-06-18`
+- `Accept: application/json`
+
+**Example: Initialize Handshake**
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Origin: http://localhost:3000" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 1,
+    "method": "initialize",
+    "params": {
+      "protocolVersion": "2025-06-18",
+      "capabilities": {},
+      "clientInfo": {"name": "my-client", "version": "1.0"}
+    }
+  }'
+```
+
+**Example: List Available Tools**
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Origin: http://localhost:3000" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 2,
+    "method": "tools/list",
+    "params": {}
+  }'
+```
+
+**Example: Search Code**
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Origin: http://localhost:3000" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -H "Accept: application/json" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 3,
+    "method": "tools/call",
+    "params": {
+      "name": "search_code",
+      "arguments": {"term": "Router"}
+    }
+  }'
+```
+
+**Available MCP Tools:**
+- `search_code`: Search indexed code files for a specific term
+- `index_repository`: Index a git repository by cloning/updating it
+- `list_recent_files`: List recently indexed files
+
+**Security & Configuration:**
+
+By default, KotaDB only accepts requests from localhost origins. For production deployments:
+- Set `KOTA_ALLOWED_ORIGINS` environment variable (comma-separated list of allowed origins)
+- Use a reverse proxy with authentication (e.g., nginx with basic auth)
+- Bind to localhost only and use network policies to control access
+
+**Session Management:**
+
+The optional `Mcp-Session-Id` header is validated but not currently used for state management. Future versions may support persistent sessions with server-side storage.
 
 ## Docker & Compose
 
@@ -59,6 +143,7 @@ src/
   api/                 # HTTP routes and database access
   db/                  # SQLite schema helpers & migrations
   indexer/             # Repository crawling, parsing, and extraction utilities
+  mcp/                 # Model Context Protocol (MCP) implementation
   types/               # Shared TypeScript types
 .github/workflows/     # CI workflows
 ```
