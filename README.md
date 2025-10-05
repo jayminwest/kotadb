@@ -37,8 +37,7 @@ The server listens on port `3000` by default. Override with `PORT=4000 bun run s
 - `GET /search?term=foo` – Search for files containing `foo`. Optional `project` and `limit` parameters.
 - `GET /files/recent` – Recent indexing results.
 
-The current indexer expects repositories to be available on disk (`localPath`) while remote cloning is
-scaffolded but not implemented.
+The indexer clones repositories automatically when a `localPath` is not provided. Override the default GitHub clone source by exporting `KOTA_GIT_BASE_URL` (for example, your self-hosted Git service).
 
 ## Docker & Compose
 
@@ -66,6 +65,6 @@ src/
 
 ## Next Steps
 
-- Implement repository cloning/checkout inside `src/indexer/repos.ts`.
+- Harden repository checkout logic with retry/backoff and temporary workspace isolation.
 - Expand `adws/` with runnable automation pipelines.
 - Add richer schema migrations for symbols, AST metadata, and search primitives.

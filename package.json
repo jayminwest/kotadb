@@ -9,12 +9,16 @@
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
     "test": "bun test",
-    "check": "bunx tsc --noEmit"
+    "check": "bun run typecheck",
+    "typecheck": "bunx tsc --noEmit",
+    "build": "bun run typecheck",
+    "lint": "bunx biome lint"
   },
   "dependencies": {},
   "devDependencies": {
     "@types/node": "^22.9.0",
     "bun-types": "^1.1.10",
-    "typescript": "^5.9.3"
+    "typescript": "^5.9.3",
+    "@biomejs/biome": "^1.7.3"
   }
 }
