@@ -44,13 +44,15 @@ services:
       PORT: ${PORT:-3000}
       ADW_RUNNER_IMAGE: ${ADW_RUNNER_IMAGE:-kotadb-adw-runner:latest}
       ADW_GIT_REF: ${ADW_GIT_REF:-main}
+      ADW_HOST_LOG_PATH: ${ADW_HOST_LOG_PATH}
+      ADW_CONTAINER_LOG_PATH: ${ADW_CONTAINER_LOG_PATH:-/app/.adw_logs}
+      ADW_LOG_ROOT: ${ADW_CONTAINER_LOG_PATH:-/app/.adw_logs}
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock
-      - adw_logs:/app/.adw_logs
+      - ${ADW_HOST_LOG_PATH:?ADW_HOST_LOG_PATH must be set to an absolute host path}:${ADW_CONTAINER_LOG_PATH:-/app/.adw_logs}
     ports:
       - "3000:3000"
     restart: unless-stopped
 
 volumes:
   bun_cache:
-  adw_logs:

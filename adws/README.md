@@ -167,5 +167,6 @@ sudo systemctl enable --now adw-webhook.service
 - `ADW_GIT_REF` – Git branch checked out before each run (default `main`).
 - `ADW_REPO_URL` – Optional explicit Git URL override (falls back to the image's embedded remote).
 - `ADW_RUNNER_AUTO_PULL` – Set to `false` to skip `docker pull` checks before each run.
+- `ADW_LOG_VOLUME` – Optional Docker volume name shared with runner containers (defaults to `kotadb_adw_logs`).
 
 Secrets such as `ANTHROPIC_API_KEY` and `GITHUB_PAT` must still be available in the webhook container environment (e.g. via `.env`, Docker secrets, or a secrets manager). The runner receives them per invocation through `docker run -e`.

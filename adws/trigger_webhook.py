@@ -30,7 +30,11 @@ RUNNER_IMAGE = os.getenv("ADW_RUNNER_IMAGE", "kotadb-adw-runner:latest")
 DOCKER_BIN = os.getenv("ADW_DOCKER_BIN", "docker")
 ADW_GIT_REF = os.getenv("ADW_GIT_REF", os.getenv("ADW_GIT_BRANCH", "main"))
 ADW_REPO_URL = os.getenv("ADW_REPO_URL")
-LOG_ROOT = Path(os.getenv("ADW_LOG_ROOT", project_root() / ".adw_logs")).resolve()
+LOG_ROOT = Path(
+    os.getenv("ADW_CONTAINER_LOG_PATH", os.getenv("ADW_LOG_ROOT", project_root() / ".adw_logs"))
+).resolve()
+LOG_VOLUME = os.getenv("ADW_LOG_VOLUME")
+HOST_LOG_PATH = os.path.expanduser(os.getenv("ADW_HOST_LOG_PATH", "")).strip()
 
 FORWARD_ENV = (
     "ANTHROPIC_API_KEY",
@@ -121,15 +125,24 @@ async def github_webhook(request: Request) -> dict[str, object]:
         if ADW_REPO_URL:
             env_args.extend(["-e", f"ADW_REPO_URL={ADW_REPO_URL}"])
 
-        log_mount = f"{LOG_ROOT}:{Path('/workspace/.adw_logs')}"
+        if LOG_VOLUME:
+            log_mount_args = ["-v", f"{LOG_VOLUME}:/workspace/.adw_logs"]
+        else:
+            if not HOST_LOG_PATH:
+                raise RuntimeError(
+                    "ADW_HOST_LOG_PATH must be set to an absolute host path when ADW_LOG_VOLUME is not provided"
+                )
+            if not os.path.isabs(HOST_LOG_PATH):
+                raise RuntimeError("ADW_HOST_LOG_PATH must be an absolute host path")
+            log_mount_args = ["-v", f"{HOST_LOG_PATH}:/workspace/.adw_logs"]
+
         docker_cmd = [
             DOCKER_BIN,
             "run",
             "--rm",
             "--name",
             f"adw-run-{adw_id}",
-            "-v",
-            log_mount,
+            *log_mount_args,
             *env_args,
             RUNNER_IMAGE,
             str(issue_number),
