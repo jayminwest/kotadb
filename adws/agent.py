@@ -16,18 +16,16 @@ if __package__ is None or __package__ == "":
 
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from dotenv import load_dotenv
-
 from adws.data_types import (
     AgentPromptRequest,
     AgentPromptResponse,
     AgentTemplateRequest,
     ClaudeCodeResultMessage,
 )
-from adws.utils import project_root, run_logs_dir
+from adws.utils import load_adw_env, project_root, run_logs_dir
 
 # Load environment variables for local execution contexts.
-load_dotenv(project_root() / ".env")
+load_adw_env()
 
 # Resolve Claude CLI path (defaults to "claude").
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")

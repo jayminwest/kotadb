@@ -12,7 +12,6 @@ import subprocess
 from pathlib import Path
 
 import uvicorn
-from dotenv import load_dotenv
 from fastapi import FastAPI, Request
 
 if __package__ is None or __package__ == "":
@@ -21,9 +20,9 @@ if __package__ is None or __package__ == "":
 
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from adws.utils import make_adw_id, project_root, run_logs_dir
+from adws.utils import load_adw_env, make_adw_id, project_root, run_logs_dir
 
-load_dotenv(project_root() / ".env")
+load_adw_env()
 
 PORT = int(os.getenv("PORT", "8001"))
 RUNNER_IMAGE = os.getenv("ADW_RUNNER_IMAGE", "kotadb-adw-runner:latest")

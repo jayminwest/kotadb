@@ -8,8 +8,17 @@ import sys
 import uuid
 from pathlib import Path
 
+from dotenv import load_dotenv
+
 PROJECT_NAME = "kota-db-ts"
 DEFAULT_ENV = (os.environ.get("ADW_ENV", "local") or "local").strip()
+
+DEFAULT_ADW_ENV_FILENAMES = (
+    "adws/.env",
+    "adws/.env.local",
+    ".env.adws",
+    ".env.adws.local",
+)
 
 # Environments that may be used by sandboxed agents; higher environments should be gated.
 SANDBOX_ENVIRONMENTS = {"local", "staging"}
@@ -20,6 +29,35 @@ def project_root() -> Path:
     """Return the repository root based on this file's location."""
 
     return Path(__file__).resolve().parents[1]
+
+
+def _resolve_env_path(path: Path) -> Path:
+    """Resolve environment file paths relative to the project root."""
+
+    if path.is_absolute():
+        return path
+    return project_root() / path
+
+
+def load_adw_env() -> None:
+    """Load shared and ADW-specific dotenv files with ADW values taking precedence."""
+
+    root_env = project_root() / ".env"
+    load_dotenv(root_env, override=False)
+
+    override = os.getenv("ADW_ENV_FILE", "").strip()
+    if override:
+        candidates = [
+            _resolve_env_path(Path(entry.strip()).expanduser())
+            for entry in override.split(os.pathsep)
+            if entry.strip()
+        ]
+    else:
+        candidates = [_resolve_env_path(Path(name)) for name in DEFAULT_ADW_ENV_FILENAMES]
+
+    for env_path in candidates:
+        if env_path.is_file():
+            load_dotenv(env_path, override=True)
 
 
 def logs_root() -> Path:

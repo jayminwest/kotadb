@@ -21,7 +21,8 @@ from pathlib import Path
 from typing import Dict, Optional, Set
 
 import schedule
-from dotenv import load_dotenv
+
+from utils import load_adw_env
 
 from github import (
     extract_repo_path,
@@ -30,7 +31,7 @@ from github import (
     get_repo_url,
 )
 
-load_dotenv()
+load_adw_env()
 
 GITHUB_PAT = os.getenv("GITHUB_PAT")
 

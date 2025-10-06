@@ -99,11 +99,14 @@ Automation expects the following commands to succeed unless the plan specifies e
 Ensure plans and implementation steps call out additional scripts (seeders, migrations, smoke tests) when required.
 
 ## Credentials
-Copy `.env.sample` to `.env` and populate:
+Copy `adws/.env.sample` to `adws/.env` and populate:
 - `ANTHROPIC_API_KEY`
 - Optional: `CLAUDE_CODE_PATH`, `GITHUB_PAT`, `E2B_API_KEY`
 
 Restrict production/staging secrets to approved environments. Use the `ADW_ENV` environment variable to scope log directories and credential suffixing.
+
+Shared runtime values (e.g. `ADW_ENV`, log paths) remain in the root `.env`; defining them inside `adws/.env` overrides the shared defaults for automation runs.
+Set `ADW_ENV_FILE` to a custom path (e.g. `.env.adws`) if you prefer to source secrets from a different dotenv file.
 
 ## Containerised Deployment
 
@@ -169,4 +172,4 @@ sudo systemctl enable --now adw-webhook.service
 - `ADW_RUNNER_AUTO_PULL` – Set to `false` to skip `docker pull` checks before each run.
 - `ADW_LOG_VOLUME` – Optional Docker volume name shared with runner containers (defaults to `kotadb_adw_logs`).
 
-Secrets such as `ANTHROPIC_API_KEY` and `GITHUB_PAT` must still be available in the webhook container environment (e.g. via `.env`, Docker secrets, or a secrets manager). The runner receives them per invocation through `docker run -e`.
+Secrets such as `ANTHROPIC_API_KEY` and `GITHUB_PAT` must still be available in the webhook container environment (e.g. via `.env` + `adws/.env`, Docker secrets, or a secrets manager). The runner receives them per invocation through `docker run -e`.

@@ -15,12 +15,10 @@ if __package__ is None or __package__ == "":
 
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from dotenv import load_dotenv
-
 from adws.data_types import GitHubIssue, GitHubIssueListItem
-from adws.utils import project_root
+from adws.utils import load_adw_env, project_root
 
-load_dotenv(project_root() / ".env")
+load_adw_env()
 
 
 def get_github_env() -> Optional[dict[str, str]]:

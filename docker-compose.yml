@@ -40,6 +40,7 @@ services:
         condition: service_started
     env_file:
       - .env
+      - adws/.env
     environment:
       PORT: ${PORT:-3000}
       ADW_RUNNER_IMAGE: ${ADW_RUNNER_IMAGE:-kotadb-adw-runner:latest}

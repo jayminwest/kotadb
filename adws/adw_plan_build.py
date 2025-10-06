@@ -13,8 +13,6 @@ import shutil
 import sys
 from typing import Optional, Tuple, Union
 
-from dotenv import load_dotenv
-
 if __package__ is None or __package__ == "":
     import sys
     from pathlib import Path
@@ -29,7 +27,7 @@ from adws.data_types import (
     IssueClassSlashCommand,
 )
 from adws.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
-from adws.utils import make_adw_id, project_root, setup_logger
+from adws.utils import load_adw_env, make_adw_id, setup_logger
 
 # Agent labels mirror .claude command ownership.
 AGENT_PLANNER = "sdlc_planner"
@@ -257,7 +255,7 @@ def check_error(
 def main() -> None:
     """Entry point for orchestrating a single GitHub issue."""
 
-    load_dotenv(project_root() / ".env")
+    load_adw_env()
     issue_number, adw_id = parse_args()
     adw_id = adw_id or make_adw_id()
     logger = setup_logger(adw_id, "adw_plan_build")

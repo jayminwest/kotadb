@@ -19,12 +19,12 @@ import tempfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
-from dotenv import load_dotenv
 from pydantic import BaseModel
 
 from github import extract_repo_path, get_repo_url, make_issue_comment
+from utils import load_adw_env
 
-load_dotenv()
+load_adw_env()
 
 
 class CheckResult(BaseModel):
