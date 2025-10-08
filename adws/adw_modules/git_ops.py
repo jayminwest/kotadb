@@ -5,7 +5,7 @@ from __future__ import annotations
 import subprocess
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Iterable, Sequence
+from typing import Iterable, Optional, Sequence
 
 from .utils import project_root
 
@@ -77,6 +77,16 @@ def checkout_branch(branch_name: str, create: bool = False, base: str | None = N
     _run_git(["checkout", branch_name], cwd=cwd)
 
 
+def create_branch(branch_name: str, base: str | None = None, cwd: Path | None = None) -> tuple[bool, Optional[str]]:
+    """Create and check out a branch, returning a success flag and optional error message."""
+
+    try:
+        checkout_branch(branch_name, create=True, base=base, cwd=cwd)
+        return True, None
+    except GitError as exc:
+        return False, str(exc)
+
+
 def stage_paths(paths: Sequence[str] | None = None, cwd: Path | None = None) -> None:
     """Stage one or more paths, or everything if omitted."""
 
@@ -97,6 +107,20 @@ def commit(message: str, allow_empty: bool = False, cwd: Path | None = None) -> 
     return _run_git(args, cwd=cwd, check=False)
 
 
+def commit_all(message: str, allow_empty: bool = False, cwd: Path | None = None) -> tuple[bool, Optional[str]]:
+    """Stage all changes and commit them."""
+
+    try:
+        stage_paths(cwd=cwd)
+    except GitError as exc:
+        return False, str(exc)
+
+    result = commit(message, allow_empty=allow_empty, cwd=cwd)
+    if not result.ok:
+        return False, result.stderr or "git commit failed"
+    return True, None
+
+
 def push(branch_name: str, remote: str = "origin", force: bool = False, cwd: Path | None = None) -> GitCommandResult:
     """Push the branch to the remote."""
 
@@ -104,6 +128,15 @@ def push(branch_name: str, remote: str = "origin", force: bool = False, cwd: Pat
     if force:
         args.insert(2, "--force-with-lease")
     return _run_git(args, cwd=cwd, check=False)
+
+
+def push_branch(branch_name: str, remote: str = "origin", force: bool = False, cwd: Path | None = None) -> tuple[bool, Optional[str]]:
+    """Push the branch to the remote."""
+
+    result = push(branch_name, remote=remote, force=force, cwd=cwd)
+    if not result.ok:
+        return False, result.stderr or "git push failed"
+    return True, None
 
 
 def finalize_git_operations(
@@ -134,10 +167,13 @@ __all__ = [
     "GitError",
     "checkout_branch",
     "commit",
+    "commit_all",
+    "create_branch",
     "ensure_branch",
     "ensure_clean_worktree",
     "finalize_git_operations",
     "get_current_branch",
     "push",
+    "push_branch",
     "stage_paths",
 ]

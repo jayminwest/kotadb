@@ -31,6 +31,7 @@ adws/.env.local
 .eslintcache
 .cache
 *.tsbuildinfo
+__pycache__/
 
 # IntelliJ based IDEs
 .idea

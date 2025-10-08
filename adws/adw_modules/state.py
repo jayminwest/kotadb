@@ -58,7 +58,7 @@ class ADWState:
         payload.update(self.extra)
         return {key: value for key, value in payload.items() if value is not None}
 
-    def save(self) -> None:
+    def save(self, *_: Any) -> None:
         self.base_dir.mkdir(parents=True, exist_ok=True)
         with open(self.json_path, "w", encoding="utf-8") as handle:
             json.dump(self.to_dict(), handle, indent=2, sort_keys=True)
@@ -87,7 +87,7 @@ class ADWState:
             extra=extra,
         )
 
-    def update(self, **kwargs: Any) -> None:
+    def update(self, persist: bool = True, **kwargs: Any) -> None:
         for key, value in kwargs.items():
             if key in {"adw_id"}:
                 continue
@@ -95,7 +95,27 @@ class ADWState:
                 setattr(self, key, value)
             else:
                 self.extra[key] = value
-        self.save()
+        if persist:
+            self.save()
+
+    def get(self, key: str, default: Any = None) -> Any:
+        if hasattr(self, key):
+            return getattr(self, key)
+        return self.extra.get(key, default)
+
+    def as_dict(self) -> Dict[str, Any]:
+        return self.to_dict()
+
+    def setdefault(self, key: str, default: Any) -> Any:
+        current = self.get(key)
+        if current is None:
+            self.update(**{key: default})
+            return default
+        return current
+
+    @property
+    def data(self) -> Dict[str, Any]:
+        return self.to_dict()
 
 
 def ensure_adw_id(existing: str | None = None) -> str:

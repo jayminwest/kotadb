@@ -13,6 +13,8 @@ from .utils import load_adw_env
 
 load_adw_env()
 
+ADW_BOT_IDENTIFIER = "[ADW-BOT]"
+
 
 def get_github_env() -> Optional[dict[str, str]]:
     """Return a minimal environment for GitHub CLI commands if a PAT is set."""
@@ -196,6 +198,7 @@ def fetch_issue_comments(repo_path: str, issue_number: int) -> List[Dict[str, ob
 
 
 __all__ = [
+    "ADW_BOT_IDENTIFIER",
     "extract_repo_path",
     "fetch_issue",
     "fetch_issue_comments",
