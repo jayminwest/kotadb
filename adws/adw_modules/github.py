@@ -8,7 +8,7 @@ import subprocess
 import sys
 from typing import Dict, List, Optional
 
-from .data_types import GitHubIssue, GitHubIssueListItem
+from .data_types import GitHubComment, GitHubIssue, GitHubIssueListItem
 from .utils import load_adw_env
 
 load_adw_env()
@@ -197,12 +197,24 @@ def fetch_issue_comments(repo_path: str, issue_number: int) -> List[Dict[str, ob
     return comments
 
 
+def find_keyword_from_comment(keyword: str, issue: GitHubIssue) -> Optional[GitHubComment]:
+    """Return the most recent non-bot comment containing the keyword."""
+
+    for comment in sorted(issue.comments, key=lambda item: item.created_at, reverse=True):
+        if ADW_BOT_IDENTIFIER in comment.body:
+            continue
+        if keyword.lower() in comment.body.lower():
+            return comment
+    return None
+
+
 __all__ = [
     "ADW_BOT_IDENTIFIER",
     "extract_repo_path",
     "fetch_issue",
     "fetch_issue_comments",
     "fetch_open_issues",
+    "find_keyword_from_comment",
     "get_github_env",
     "get_repo_url",
     "make_issue_comment",

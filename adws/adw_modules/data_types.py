@@ -43,6 +43,10 @@ SlashCommand = Literal[
     "/bug",
     "/feature",
     "/classify_issue",
+    "/review",
+    "/document",
+    "/docs-update",
+    "/patch",
     "/find_plan_file",
     "/generate_branch_name",
     "/commit",
@@ -150,6 +154,45 @@ class ClaudeCodeResultMessage(BaseModel):
     total_cost_usd: float
 
 
+class TestResult(BaseModel):
+    """Structured representation of a validation command outcome."""
+
+    label: str
+    passed: bool
+    command: str
+    stdout: Optional[str] = None
+    stderr: Optional[str] = None
+
+
+class ReviewIssue(BaseModel):
+    """Individual issue reported during review."""
+
+    review_issue_number: int
+    issue_description: str
+    issue_resolution: str
+    issue_severity: Literal["skippable", "tech_debt", "blocker"] = "tech_debt"
+    screenshot_path: Optional[str] = None
+    screenshot_url: Optional[str] = None
+
+
+class ReviewResult(BaseModel):
+    """Aggregate review output from the reviewer agent."""
+
+    success: bool
+    review_summary: str
+    review_issues: List[ReviewIssue] = []
+
+
+class DocumentationResult(BaseModel):
+    """Summary of documentation changes produced by the documenter agent."""
+
+    success: bool
+    documentation_created: bool = False
+    documentation_path: Optional[str] = None
+    summary: Optional[str] = None
+    error_message: Optional[str] = None
+
+
 __all__ = [
     "AgentPromptRequest",
     "AgentPromptResponse",
@@ -166,5 +209,9 @@ __all__ = [
     "GitHubUser",
     "IssueClassSlashCommand",
     "SlashCommand",
+    "TestResult",
+    "ReviewIssue",
+    "ReviewResult",
+    "DocumentationResult",
     "resolve_category",
 ]

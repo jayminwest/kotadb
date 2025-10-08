@@ -14,14 +14,17 @@ from .agent import execute_template
 from .data_types import (
     AgentPromptResponse,
     AgentTemplateRequest,
+    DocumentationResult,
     GitHubIssue,
     IssueClassSlashCommand,
+    ReviewIssue,
+    ReviewResult,
 )
 from .git_ops import GitError
 from .github import ADW_BOT_IDENTIFIER
 from .state import ADWState, ensure_adw_id as core_ensure_adw_id
 from .ts_commands import Command, serialize_commands, validation_commands
-from .utils import project_root, setup_logger
+from .utils import parse_json, project_root, setup_logger
 
 AGENT_PLANNER = "sdlc_planner"
 AGENT_IMPLEMENTOR = "sdlc_implementor"
@@ -314,6 +317,133 @@ def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None
     return results
 
 
+def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
+    """Locate the specification or plan file associated with the run."""
+
+    if state.plan_file and Path(state.plan_file).exists():
+        return state.plan_file
+
+    if state.get("plan_file") and Path(state.get("plan_file")).exists():
+        return state.get("plan_file")
+
+    issue_number = state.issue_number
+    if issue_number:
+        specs_dir = project_root() / "specs"
+        if specs_dir.exists():
+            matches = sorted(specs_dir.glob(f"*{issue_number}*.md"))
+            if matches:
+                logger.info(f"Discovered spec file via glob: {matches[0]}")
+                return str(matches[0])
+    logger.warning("No spec file found for review/documentation phase")
+    return None
+
+
+def run_review(spec_file: str, adw_id: str, logger: logging.Logger) -> Tuple[Optional[ReviewResult], Optional[str]]:
+    """Execute the reviewer agent against the provided spec file."""
+
+    request = AgentTemplateRequest(
+        agent_name=AGENT_REVIEWER,
+        slash_command="/review",
+        args=[adw_id, spec_file, AGENT_REVIEWER],
+        adw_id=adw_id,
+        model="sonnet",
+    )
+    logger.debug(f"review request: {request.model_dump_json(indent=2, by_alias=True)}")
+    response = execute_template(request)
+    logger.debug(f"review response: {response.model_dump_json(indent=2)}")
+
+    if not response.success:
+        if command == "/document":
+            logger.info("Retrying documentation with /docs-update")
+            return document_changes(issue, adw_id, logger, command="/docs-update")
+        return None, response.output
+
+    try:
+        result = parse_json(response.output, ReviewResult)
+    except ValueError as exc:
+        return None, f"Failed to parse review result: {exc}"
+    return result, None
+
+
+def summarize_review_result(result: ReviewResult) -> str:
+    """Produce a Markdown summary for review findings."""
+
+    lines = ["## ✅ Review Summary" if result.success else "## ⚠️ Review Findings", result.review_summary.strip()]
+    if result.review_issues:
+        lines.append("")
+        lines.append("### Reported Issues")
+        for issue in result.review_issues:
+            status = "❌" if issue.issue_severity == "blocker" else "⚠️"
+            lines.append(f"- {status} Issue #{issue.review_issue_number}: {issue.issue_description}")
+            lines.append(f"  - Suggested resolution: {issue.issue_resolution}")
+    return "\n".join(lines)
+
+
+def create_and_implement_patch(
+    adw_id: str,
+    review_change_request: str,
+    logger: logging.Logger,
+    agent_name_planner: str = AGENT_PATCHER,
+    agent_name_implementor: str = AGENT_IMPLEMENTOR,
+    spec_path: Optional[str] = None,
+) -> Tuple[Optional[str], AgentPromptResponse]:
+    """Create a patch plan using the patch agent and immediately implement it."""
+
+    args = [adw_id, review_change_request]
+    args.append(spec_path or "")
+    args.append(agent_name_planner)
+
+    request = AgentTemplateRequest(
+        agent_name=agent_name_planner,
+        slash_command="/patch",
+        args=args,
+        adw_id=adw_id,
+        model="sonnet",
+    )
+    logger.debug(f"patch plan request: {request.model_dump_json(indent=2, by_alias=True)}")
+    response = execute_template(request)
+    logger.debug(f"patch plan response: {response.model_dump_json(indent=2)}")
+
+    if not response.success:
+        return None, AgentPromptResponse(output=response.output, success=False)
+
+    patch_file = response.output.strip()
+    if not patch_file:
+        return None, AgentPromptResponse(output="Patch agent returned empty path", success=False)
+
+    implement_response = implement_plan(patch_file, adw_id, logger, agent_name_implementor)
+    return patch_file, implement_response
+
+
+def document_changes(
+    issue: GitHubIssue,
+    adw_id: str,
+    logger: logging.Logger,
+    command: str = "/document",
+) -> Tuple[Optional[DocumentationResult], Optional[str]]:
+    """Invoke the documenter agent to produce documentation updates."""
+
+    request = AgentTemplateRequest(
+        agent_name=AGENT_DOCUMENTOR,
+        slash_command=command,
+        args=[issue.model_dump_json(by_alias=True), adw_id],
+        adw_id=adw_id,
+        model="sonnet",
+    )
+    logger.debug(f"documentation request: {request.model_dump_json(indent=2, by_alias=True)}")
+    response = execute_template(request)
+    logger.debug(f"documentation response: {response.model_dump_json(indent=2)}")
+
+    if not response.success:
+        return None, response.output
+
+    try:
+        result = parse_json(response.output, DocumentationResult)
+    except ValueError as exc:
+        return None, f"Failed to parse documentation result: {exc}"
+    return result, None
+
+
 def summarize_validation_results(results: Sequence[ValidationCommandResult]) -> Tuple[bool, str]:
     """Summarise validation outcomes for GitHub comments."""
 
@@ -394,9 +524,12 @@ __all__ = [
     "classify_issue",
     "create_commit_message",
     "create_pull_request",
+    "create_and_implement_patch",
+    "document_changes",
     "ensure_plan_exists",
     "ensure_state",
     "format_issue_message",
+    "find_spec_file",
     "generate_branch_name",
     "implement_plan",
     "locate_plan_file",
@@ -406,5 +539,7 @@ __all__ = [
     "run_validation_commands",
     "serialize_validation",
     "start_logger",
+    "run_review",
     "summarize_validation_results",
+    "summarize_review_result",
 ]

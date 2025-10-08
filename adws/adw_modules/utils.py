@@ -2,13 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import logging
 import os
+import re
 import sys
 import uuid
 from pathlib import Path
+from typing import Any, Type, TypeVar, Union
 
 from dotenv import load_dotenv
+
+from pydantic import BaseModel
 
 PROJECT_NAME = "kota-db-ts"
 DEFAULT_ENV = (os.environ.get("ADW_ENV", "local") or "local").strip()
@@ -123,6 +128,49 @@ def get_logger(adw_id: str) -> logging.Logger:
     return logging.getLogger(f"adw_{adw_id}")
 
 
+T = TypeVar("T")
+
+
+def parse_json(text: str, target_type: Type[T] | None = None) -> Union[T, Any]:
+    """Parse JSON payloads that may be wrapped in Markdown code fences."""
+
+    code_block_pattern = r"```(?:json)?\s*\n(.*?)\n```"
+    match = re.search(code_block_pattern, text, re.DOTALL)
+    if match:
+        json_str = match.group(1).strip()
+    else:
+        json_str = text.strip()
+
+    if not (json_str.startswith("[") or json_str.startswith("{")):
+        array_start = json_str.find("[")
+        array_end = json_str.rfind("]")
+        obj_start = json_str.find("{")
+        obj_end = json_str.rfind("}")
+
+        if array_start != -1 and (obj_start == -1 or array_start < obj_start) and array_end != -1:
+            json_str = json_str[array_start : array_end + 1]
+        elif obj_start != -1 and obj_end != -1:
+            json_str = json_str[obj_start : obj_end + 1]
+
+    try:
+        data = json.loads(json_str)
+    except json.JSONDecodeError as exc:  # pragma: no cover - defensive
+        raise ValueError(f"Failed to parse JSON from agent output: {exc}") from exc
+
+    if target_type is None:
+        return data
+
+    if isinstance(target_type, type) and issubclass(target_type, BaseModel):
+        return target_type.model_validate(data)  # type: ignore[return-value]
+
+    origin = getattr(target_type, "__origin__", None)
+    if origin is list:
+        item_type = target_type.__args__[0]
+        if issubclass(item_type, BaseModel):
+            return [item_type.model_validate(item) for item in data]  # type: ignore[return-value]
+    return data
+
+
 __all__ = [
     "DEFAULT_ADW_ENV_FILENAMES",
     "DEFAULT_ENV",
@@ -134,6 +182,7 @@ __all__ = [
     "load_adw_env",
     "logs_root",
     "make_adw_id",
+    "parse_json",
     "project_root",
     "run_logs_dir",
     "setup_logger",

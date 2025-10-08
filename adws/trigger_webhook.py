@@ -14,13 +14,7 @@ from pathlib import Path
 import uvicorn
 from fastapi import FastAPI, Request
 
-if __package__ is None or __package__ == "":
-    import sys
-    from pathlib import Path
-
-    sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-from adws.utils import load_adw_env, make_adw_id, project_root, run_logs_dir
+from adws.adw_modules.utils import load_adw_env, make_adw_id, project_root, run_logs_dir
 
 load_adw_env()
 
