@@ -20,7 +20,7 @@ from .data_types import (
 from .git_ops import GitError
 from .github import ADW_BOT_IDENTIFIER
 from .state import ADWState, ensure_adw_id as core_ensure_adw_id
-from .ts_commands import Command, validation_commands
+from .ts_commands import Command, serialize_commands, validation_commands
 from .utils import project_root, setup_logger
 
 AGENT_PLANNER = "sdlc_planner"
@@ -29,6 +29,10 @@ AGENT_CLASSIFIER = "issue_classifier"
 AGENT_PLAN_FINDER = "plan_finder"
 AGENT_BRANCH_GENERATOR = "branch_generator"
 AGENT_PR_CREATOR = "pr_creator"
+AGENT_TESTER = "test_runner"
+AGENT_REVIEWER = "sdlc_reviewer"
+AGENT_DOCUMENTOR = "documentation_writer"
+AGENT_PATCHER = "patch_runner"
 
 AVAILABLE_ADW_WORKFLOWS = [
     "adw_plan",
@@ -44,6 +48,8 @@ AVAILABLE_ADW_WORKFLOWS = [
     "adw_plan_build_document",
     "adw_sdlc",
 ]
+
+LOCKFILE_NAMES = ("bun.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml")
 
 
 @dataclass
@@ -340,14 +346,48 @@ def persist_issue_snapshot(state: ADWState, issue: GitHubIssue) -> None:
     state.update(issue=json.loads(minimal_issue_payload(issue)))
 
 
+def lockfile_changed(cwd: Path | None = None) -> bool:
+    """Return True if any recognised lockfile has modifications."""
+
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        cwd=cwd or project_root(),
+    )
+    if result.returncode != 0:
+        return False
+
+    for line in result.stdout.splitlines():
+        if len(line) < 4:
+            continue
+        filename = line[3:].strip()
+        if not filename:
+            continue
+        if Path(filename).name in LOCKFILE_NAMES:
+            return True
+    return False
+
+
+def serialize_validation(commands: Iterable[Command]) -> List[dict[str, str]]:
+    """Serialize validation commands for agent prompts or logging."""
+
+    return serialize_commands(commands)
+
+
 __all__ = [
     "AGENT_BRANCH_GENERATOR",
     "AGENT_CLASSIFIER",
     "AGENT_IMPLEMENTOR",
+    "AGENT_TESTER",
+    "AGENT_REVIEWER",
+    "AGENT_DOCUMENTOR",
+    "AGENT_PATCHER",
     "AGENT_PLAN_FINDER",
     "AGENT_PLANNER",
     "AGENT_PR_CREATOR",
     "AVAILABLE_ADW_WORKFLOWS",
+    "LOCKFILE_NAMES",
     "DEFAULT_VALIDATION_SEQUENCE",
     "ValidationCommandResult",
     "build_plan",
@@ -360,9 +400,11 @@ __all__ = [
     "generate_branch_name",
     "implement_plan",
     "locate_plan_file",
+    "lockfile_changed",
     "persist_issue_snapshot",
     "record_git_failure",
     "run_validation_commands",
+    "serialize_validation",
     "start_logger",
     "summarize_validation_results",
 ]
