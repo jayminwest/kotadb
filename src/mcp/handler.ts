@@ -3,6 +3,7 @@
  */
 
 import type { Database } from "bun:sqlite";
+import type { AuthContext } from "@shared/index";
 import {
 	type JsonRpcRequest,
 	type JsonRpcResponse,
@@ -21,11 +22,17 @@ import { handleInitialize, type InitializeRequest } from "./lifecycle";
 import { getToolDefinitions, handleToolCall } from "./tools";
 
 /**
- * Main entry point for MCP requests
+ * Main entry point for MCP requests.
+ * All MCP requests are authenticated via middleware before reaching this handler.
+ *
+ * @param db - SQLite database instance
+ * @param request - HTTP request
+ * @param context - Authenticated user context
  */
 export async function handleMcpRequest(
 	db: Database,
 	request: Request,
+	context: AuthContext,
 ): Promise<Response> {
 	// Validate required headers
 	const origin = request.headers.get("origin");
@@ -81,7 +88,7 @@ export async function handleMcpRequest(
 		return jsonRpcResponse(invalidRequest(null, "Invalid JSON-RPC request"));
 	}
 
-	return jsonRpcResponse(await dispatchMethod(db, body));
+	return jsonRpcResponse(await dispatchMethod(db, body, context));
 }
 
 /**
@@ -100,6 +107,7 @@ function handleNotification(notification: { method: string }): Response {
 async function dispatchMethod(
 	db: Database,
 	request: JsonRpcRequest,
+	context: AuthContext,
 ): Promise<JsonRpcResponse> {
 	const { id, method, params } = request;
 
@@ -127,7 +135,7 @@ async function dispatchMethod(
 
 				const toolParams =
 					"arguments" in params ? params.arguments : undefined;
-				const result = handleToolCall(db, params.name, toolParams, id);
+				const result = handleToolCall(db, params.name, toolParams, id, context.userId);
 				return success(id, result);
 			}
 

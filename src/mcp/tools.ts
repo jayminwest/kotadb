@@ -154,13 +154,14 @@ function isListRecentParams(
 export function executeSearchCode(
 	db: Database,
 	params: unknown,
-	requestId: string | number
+	requestId: string | number,
+	userId: string,
 ): unknown {
 	if (!isSearchParams(params)) {
 		throw invalidParams(requestId, "Invalid parameters for search_code tool");
 	}
 
-	const results = searchFiles(db, params.term, {
+	const results = searchFiles(db, params.term, userId, {
 		projectRoot: params.project,
 		limit: params.limit,
 	}).map((row) => ({
@@ -180,7 +181,8 @@ export function executeSearchCode(
 export function executeIndexRepository(
 	db: Database,
 	params: unknown,
-	requestId: string | number
+	requestId: string | number,
+	userId: string,
 ): unknown {
 	if (!isIndexParams(params)) {
 		throw invalidParams(requestId, "Invalid parameters for index_repository tool");
@@ -192,11 +194,11 @@ export function executeIndexRepository(
 		localPath: params.localPath,
 	};
 
-	const runId = recordIndexRun(db, indexRequest);
+	const runId = recordIndexRun(db, indexRequest, userId);
 
 	// Queue async indexing workflow
 	queueMicrotask(() =>
-		runIndexingWorkflow(db, indexRequest, runId).catch((error) => {
+		runIndexingWorkflow(db, indexRequest, runId, userId).catch((error) => {
 			console.error("Indexing workflow failed", error);
 			updateIndexRunStatus(db, runId, "failed");
 		}),
@@ -215,7 +217,8 @@ export function executeIndexRepository(
 export function executeListRecentFiles(
 	db: Database,
 	params: unknown,
-	requestId: string | number
+	requestId: string | number,
+	userId: string,
 ): unknown {
 	if (!isListRecentParams(params)) {
 		throw invalidParams(requestId, "Invalid parameters for list_recent_files tool");
@@ -225,7 +228,7 @@ export function executeListRecentFiles(
 		params && typeof params === "object" && "limit" in params
 			? (params.limit as number)
 			: 10;
-	const files = listRecentFiles(db, limit);
+	const files = listRecentFiles(db, limit, userId);
 
 	return {
 		results: files.map((file) => ({
@@ -244,6 +247,7 @@ async function runIndexingWorkflow(
 	db: Database,
 	request: IndexRequest,
 	runId: number,
+	userId: string,
 ): Promise<void> {
 	const repo = await prepareRepository(request);
 
@@ -260,7 +264,7 @@ async function runIndexingWorkflow(
 		)
 	).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-	saveIndexedFiles(db, records);
+	saveIndexedFiles(db, records, userId);
 	updateIndexRunStatus(db, runId, "completed");
 }
 
@@ -271,15 +275,16 @@ export function handleToolCall(
 	db: Database,
 	toolName: string,
 	params: unknown,
-	requestId: string | number
+	requestId: string | number,
+	userId: string,
 ): unknown {
 	switch (toolName) {
 		case "search_code":
-			return executeSearchCode(db, params, requestId);
+			return executeSearchCode(db, params, requestId, userId);
 		case "index_repository":
-			return executeIndexRepository(db, params, requestId);
+			return executeIndexRepository(db, params, requestId, userId);
 		case "list_recent_files":
-			return executeListRecentFiles(db, params, requestId);
+			return executeListRecentFiles(db, params, requestId, userId);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}

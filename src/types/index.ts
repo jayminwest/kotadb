@@ -18,3 +18,9 @@ export interface IndexedFile {
 export interface ApiContext {
   db: Database;
 }
+
+/**
+ * Authentication types for API key validation and user context.
+ * @see src/auth/context.ts for detailed documentation
+ */
+export type { AuthContext, AuthenticatedRequest, Tier } from "@auth/context";

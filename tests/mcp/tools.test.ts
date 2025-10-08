@@ -12,7 +12,8 @@ beforeAll(async () => {
 	db = new Database(":memory:");
 	ensureSchema(db);
 
-	// Seed test data
+	// Seed test data (using dummy userId for test)
+	const testUserId = "test-user-123";
 	saveIndexedFiles(db, [
 		{
 			projectRoot: "/test/project",
@@ -28,7 +29,7 @@ beforeAll(async () => {
 			dependencies: ["./router"],
 			indexedAt: new Date(),
 		},
-	]);
+	], testUserId);
 
 	// Import and start test server
 	const { createRouter } = await import("@api/routes");
