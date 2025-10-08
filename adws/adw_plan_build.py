@@ -19,15 +19,16 @@ if __package__ is None or __package__ == "":
 
     sys.path.append(str(Path(__file__).resolve().parent.parent))
 
-from adws.agent import execute_template
-from adws.data_types import (
+from adws.adw_modules.agent import execute_template
+from adws.adw_modules.data_types import (
     AgentPromptResponse,
     AgentTemplateRequest,
     GitHubIssue,
     IssueClassSlashCommand,
 )
-from adws.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
-from adws.utils import load_adw_env, make_adw_id, setup_logger
+from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
+from adws.adw_modules.workflow_ops import ensure_state, format_issue_message
+from adws.adw_modules.utils import load_adw_env, setup_logger
 
 # Agent labels mirror .claude command ownership.
 AGENT_PLANNER = "sdlc_planner"
@@ -66,15 +67,6 @@ def parse_args() -> Tuple[str, Optional[str]]:
     issue_number = sys.argv[1]
     adw_id = sys.argv[2] if len(sys.argv) > 2 else None
     return issue_number, adw_id
-
-
-def format_issue_message(adw_id: str, agent_name: str, message: str, session_id: Optional[str] = None) -> str:
-    """Standardise issue comment messages with ADW tracking metadata."""
-
-    prefix = f"{adw_id}_{agent_name}"
-    if session_id:
-        prefix = f"{prefix}_{session_id}"
-    return f"{prefix}: {message}"
 
 
 def classify_issue(issue: GitHubIssue, adw_id: str, logger: logging.Logger) -> Tuple[Optional[IssueClassSlashCommand], Optional[str]]:
@@ -256,8 +248,8 @@ def main() -> None:
     """Entry point for orchestrating a single GitHub issue."""
 
     load_adw_env()
-    issue_number, adw_id = parse_args()
-    adw_id = adw_id or make_adw_id()
+    issue_number, provided_adw_id = parse_args()
+    adw_id, adw_state = ensure_state(provided_adw_id, issue_number)
     logger = setup_logger(adw_id, "adw_plan_build")
     logger.info(f"ADW ID: {adw_id}")
 
@@ -278,11 +270,13 @@ def main() -> None:
     check_error(error, issue_number, adw_id, "ops", "Error classifying issue", logger)
     assert issue_command  # for type-checkers
     logger.info(f"Issue classified as {issue_command}")
+    adw_state.update(issue_class=issue_command)
     make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"✅ Issue classified as: {issue_command}"))
 
     branch_name, error = git_branch(issue, issue_command, adw_id, logger)
     check_error(error, issue_number, adw_id, "ops", "Error creating branch", logger)
     assert branch_name
+    adw_state.update(branch_name=branch_name)
     make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"✅ Working on branch: {branch_name}"))
 
     plan_response = build_plan(issue, issue_command, adw_id, logger)
@@ -292,6 +286,7 @@ def main() -> None:
     plan_file, error = get_plan_file(plan_response.output, adw_id, logger)
     check_error(error, issue_number, adw_id, "ops", "Error locating plan file", logger)
     assert plan_file
+    adw_state.update(plan_file=plan_file)
     make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"✅ Plan file created: {plan_file}"))
 
     commit_message, error = git_commit(AGENT_PLANNER, issue, issue_command, adw_id, logger)
