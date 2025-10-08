@@ -60,9 +60,10 @@ CREATE INDEX idx_user_organizations_org_id ON user_organizations(org_id);
 -- ============================================================================
 
 -- Rate Limit Counters: Track API usage per key per hour
+-- Note: No FK constraint on key_id to allow counters to persist after key deletion for auditing
 CREATE TABLE rate_limit_counters (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
-    key_id text NOT NULL REFERENCES api_keys(key_id) ON DELETE CASCADE,
+    key_id text NOT NULL,
     window_start timestamptz NOT NULL,
     request_count integer NOT NULL DEFAULT 0,
     created_at timestamptz NOT NULL DEFAULT now(),
@@ -88,11 +89,13 @@ CREATE TABLE repositories (
     created_at timestamptz NOT NULL DEFAULT now(),
     updated_at timestamptz NOT NULL DEFAULT now(),
     metadata jsonb DEFAULT '{}'::jsonb,
-    UNIQUE(user_id, full_name),
-    UNIQUE(org_id, full_name),
+    -- Uniqueness enforced by partial indexes (see idx_repositories_user_full_name, idx_repositories_org_full_name)
+    -- Cannot use UNIQUE constraints here because they fail when user_id or org_id is NULL
     CHECK ((user_id IS NOT NULL AND org_id IS NULL) OR (user_id IS NULL AND org_id IS NOT NULL))
 );
 
+CREATE UNIQUE INDEX idx_repositories_user_full_name ON repositories(user_id, full_name) WHERE user_id IS NOT NULL;
+CREATE UNIQUE INDEX idx_repositories_org_full_name ON repositories(org_id, full_name) WHERE org_id IS NOT NULL;
 CREATE INDEX idx_repositories_user_id ON repositories(user_id);
 CREATE INDEX idx_repositories_org_id ON repositories(org_id);
 CREATE INDEX idx_repositories_full_name ON repositories(full_name);

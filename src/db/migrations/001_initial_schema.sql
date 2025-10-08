@@ -364,6 +364,22 @@ CREATE POLICY symbols_select ON symbols
         )
     );
 
+CREATE POLICY symbols_insert ON symbols
+    FOR INSERT
+    WITH CHECK (
+        file_id IN (
+            SELECT id FROM indexed_files
+            WHERE repository_id IN (
+                SELECT id FROM repositories
+                WHERE user_id = (current_setting('app.user_id', true))::uuid
+                OR org_id IN (
+                    SELECT org_id FROM user_organizations
+                    WHERE user_id = (current_setting('app.user_id', true))::uuid
+                )
+            )
+        )
+    );
+
 CREATE TABLE references (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     source_file_id uuid NOT NULL REFERENCES indexed_files(id) ON DELETE CASCADE,
@@ -397,6 +413,22 @@ CREATE POLICY references_select ON references
         )
     );
 
+CREATE POLICY references_insert ON references
+    FOR INSERT
+    WITH CHECK (
+        source_file_id IN (
+            SELECT id FROM indexed_files
+            WHERE repository_id IN (
+                SELECT id FROM repositories
+                WHERE user_id = (current_setting('app.user_id', true))::uuid
+                OR org_id IN (
+                    SELECT org_id FROM user_organizations
+                    WHERE user_id = (current_setting('app.user_id', true))::uuid
+                )
+            )
+        )
+    );
+
 CREATE TABLE dependencies (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     repository_id uuid NOT NULL REFERENCES repositories(id) ON DELETE CASCADE,
@@ -417,6 +449,19 @@ ALTER TABLE dependencies ENABLE ROW LEVEL SECURITY;
 CREATE POLICY dependencies_select ON dependencies
     FOR SELECT
     USING (
+        repository_id IN (
+            SELECT id FROM repositories
+            WHERE user_id = (current_setting('app.user_id', true))::uuid
+            OR org_id IN (
+                SELECT org_id FROM user_organizations
+                WHERE user_id = (current_setting('app.user_id', true))::uuid
+            )
+        )
+    );
+
+CREATE POLICY dependencies_insert ON dependencies
+    FOR INSERT
+    WITH CHECK (
         repository_id IN (
             SELECT id FROM repositories
             WHERE user_id = (current_setting('app.user_id', true))::uuid

@@ -4,14 +4,15 @@ This document describes the PostgreSQL/Supabase database schema for KotaDB, a mu
 
 ## Overview
 
-The schema consists of 8 core tables organized into four functional domains:
+The schema consists of 10 tables organized into five functional domains:
 
 1. **Authentication & API Keys**: User authentication and API key management
 2. **Organizations**: Team workspaces and multi-user collaboration
 3. **Repository Management**: Git repository tracking and indexing jobs
 4. **Code Intelligence**: File indexing, symbol extraction, and dependency graphs
+5. **System**: Migration tracking for schema versioning
 
-All tables use UUID primary keys and timestamptz timestamps. Row Level Security (RLS) policies ensure data isolation between users and organizations.
+All tables use UUID primary keys (except migrations which uses serial) and timestamptz timestamps. Row Level Security (RLS) policies ensure data isolation between users and organizations.
 
 ## Table Relationships
 
@@ -259,6 +260,7 @@ Functions, classes, types, and other code symbols extracted from files.
 
 **RLS Policies**:
 - Users can SELECT symbols from files they own/access
+- Users can INSERT symbols into files they own/access
 
 ---
 
@@ -284,6 +286,7 @@ Cross-file symbol references (imports, function calls, etc.).
 
 **RLS Policies**:
 - Users can SELECT references from files they own/access
+- Users can INSERT references into files they own/access
 
 ---
 
@@ -311,6 +314,7 @@ Package/module dependencies (npm, pip, go mod, cargo, etc.).
 
 **RLS Policies**:
 - Users can SELECT dependencies from repos they own/access
+- Users can INSERT dependencies into repos they own/access
 
 ---
 
