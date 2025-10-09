@@ -12,7 +12,12 @@
     "check": "bun run typecheck",
     "typecheck": "bunx tsc --noEmit",
     "build": "bun run typecheck",
-    "lint": "bunx biome lint"
+    "lint": "bunx biome lint",
+    "test:setup": "./scripts/setup-test-db.sh",
+    "test:teardown": "supabase stop",
+    "test:reset": "./scripts/reset-test-db.sh",
+    "test:env": "./scripts/generate-env-test.sh",
+    "test:status": "supabase status"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

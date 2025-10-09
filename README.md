@@ -44,18 +44,29 @@ The server listens on port `3000` by default. Override with `PORT=4000 bun run s
 
 ### Running Tests
 
-KotaDB uses real PostgreSQL database connections for testing (no mocks). To run tests:
+KotaDB uses real PostgreSQL database connections for testing (no mocks). The test environment uses Supabase Local with auto-generated credentials.
 
+**Prerequisites:** Install [Supabase CLI](https://supabase.com/docs/guides/cli) and [jq](https://jqlang.github.io/jq/)
 ```bash
-# Start test database (first time only)
-./scripts/setup-test-db.sh
+brew install supabase/tap/supabase jq  # macOS
+```
+
+**Quick Start:**
+```bash
+# First-time setup: Start Supabase Local and auto-generate .env.test
+bun run test:setup
 
 # Run tests
 bun test
 
-# Reset test database if needed
-./scripts/reset-test-db.sh
+# Reset database if needed
+bun run test:reset
+
+# Stop services when done
+bun run test:teardown
 ```
+
+**Note:** The `.env.test` file is auto-generated from `supabase status` and should not be committed to git.
 
 For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](docs/testing-setup.md).
 
