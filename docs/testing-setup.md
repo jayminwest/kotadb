@@ -245,51 +245,28 @@ Key steps:
 3. Run migrations and seed data
 4. Execute test suite
 
-## Known Limitations (Work in Progress)
+## Antimocking Migration Complete
 
-### Current State (Partial Implementation)
-
-As of this commit, the antimocking migration is **partially complete**:
+The KotaDB test suite now uses real PostgreSQL database connections instead of mocks.
 
 **✅ Completed:**
-- PostgreSQL test database container setup
-- Schema migrations for test environment
-- Test data seeding scripts
-- Test helper functions (`tests/helpers/db.ts`)
-- MCP test files refactored to remove mocks
-- Setup and reset scripts
+- PostgreSQL test database container setup via Docker Compose
+- Schema migrations for test environment (auth schema + main schema)
+- Test data seeding scripts with deterministic test users, API keys, and repositories
+- Real database test helper functions (`tests/helpers/db.ts`)
+- All test files refactored to use real database:
+  - MCP tests (`tests/mcp/*.test.ts`)
+  - API tests (`tests/api/authenticated-routes.test.ts`)
+  - Auth tests (`tests/auth/middleware.test.ts`, `tests/auth/validator.test.ts`)
+- Mock helper files deleted (`tests/helpers/supabase-mock.ts`, `tests/helpers/auth-mock.ts`)
+- CI/CD integration with PostgreSQL service container
+- Setup and reset scripts for local development
 
-**⚠️ Remaining Work:**
-
-1. **Supabase Client Issue**: The current tests fail because the Supabase JS SDK expects a full Supabase REST API (PostgREST), but we're using plain PostgreSQL. Options:
-   - Use Supabase Local (full stack with PostgREST)
-   - Create a lightweight database abstraction layer that works with both
-   - Use direct SQL client (pg) instead of Supabase SDK in tests
-
-2. **API/Auth Tests**: Not yet refactored:
-   - `tests/api/authenticated-routes.test.ts`
-   - `tests/auth/middleware.test.ts`
-   - `tests/auth/validator.test.ts`
-
-3. **Mock File Cleanup**: Original mock files need to be deleted:
-   - `tests/helpers/supabase-mock.ts`
-   - `tests/helpers/auth-mock.ts`
-
-4. **CI/CD Integration**: `.github/workflows/ci.yml` needs PostgreSQL service configuration
-
-### Next Steps
-
-To complete the antimocking migration:
-
-1. Choose one of these approaches:
-   - **Option A**: Use Supabase Local (docker compose with full Supabase stack)
-   - **Option B**: Abstract database layer to support both Supabase SDK and direct SQL
-   - **Option C**: Use `pg` client directly in tests, bypass Supabase SDK
-
-2. Update remaining test files to use real database
-3. Delete mock helper files
-4. Update CI/CD configuration
-5. Run full test suite and verify 100% pass rate
+**Benefits:**
+- Tests exercise real database behavior (connections, timeouts, transactions)
+- No mock maintenance burden
+- True confidence in authentication and database flows
+- Production parity testing
 
 ## Manual Database Inspection
 

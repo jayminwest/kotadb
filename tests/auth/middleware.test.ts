@@ -1,6 +1,15 @@
-import { describe, it, expect, beforeEach } from "bun:test";
+import { describe, it, expect, beforeEach, beforeAll } from "bun:test";
 import { authenticateRequest, createForbiddenResponse } from "@auth/middleware";
 import { clearCache } from "@auth/cache";
+import { getTestApiKey } from "../helpers/db";
+
+beforeAll(() => {
+  // Set test environment variables to point to local test database
+  process.env.SUPABASE_URL = "http://localhost:5433";
+  process.env.SUPABASE_SERVICE_KEY = "test-service-key-local";
+  process.env.SUPABASE_ANON_KEY = "test-anon-key-local";
+  process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/kotadb_test";
+});
 
 describe("Authentication Middleware", () => {
   beforeEach(() => {
@@ -58,11 +67,6 @@ describe("Authentication Middleware", () => {
     });
 
     it("returns 401 for non-existent API key", async () => {
-      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-        console.log("[Test] Skipping - Supabase credentials not set");
-        return;
-      }
-
       const request = new Request("http://localhost:3000/search", {
         headers: {
           Authorization:
@@ -78,21 +82,11 @@ describe("Authentication Middleware", () => {
     });
 
     it("returns context for valid API key", async () => {
-      // This test requires a valid test key in the database
-      // Skip if not in test environment with seeded data
-      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-        console.log("[Test] Skipping - Supabase credentials not set");
-        return;
-      }
-
-      if (!process.env.TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
+      const testApiKey = getTestApiKey("free");
 
       const request = new Request("http://localhost:3000/search", {
         headers: {
-          Authorization: `Bearer ${process.env.TEST_API_KEY}`,
+          Authorization: `Bearer ${testApiKey}`,
         },
       });
 
@@ -101,32 +95,23 @@ describe("Authentication Middleware", () => {
       expect(result.response).toBeUndefined();
       expect(result.context).toBeDefined();
       expect(result.context?.userId).toBeDefined();
-      expect(result.context?.tier).toBeDefined();
+      expect(result.context?.tier).toBe("free");
       expect(result.context?.keyId).toBeDefined();
       expect(result.context?.rateLimitPerHour).toBeGreaterThan(0);
     });
 
     it("uses cache for repeated requests with same key", async () => {
-      // This test verifies caching behavior
-      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-        console.log("[Test] Skipping - Supabase credentials not set");
-        return;
-      }
-
-      if (!process.env.TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
+      const testApiKey = getTestApiKey("free");
 
       const request1 = new Request("http://localhost:3000/search", {
         headers: {
-          Authorization: `Bearer ${process.env.TEST_API_KEY}`,
+          Authorization: `Bearer ${testApiKey}`,
         },
       });
 
       const request2 = new Request("http://localhost:3000/index", {
         headers: {
-          Authorization: `Bearer ${process.env.TEST_API_KEY}`,
+          Authorization: `Bearer ${testApiKey}`,
         },
       });
 

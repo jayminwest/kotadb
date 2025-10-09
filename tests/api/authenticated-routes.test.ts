@@ -1,4 +1,5 @@
 import { describe, it, expect, beforeAll } from "bun:test";
+import { getTestApiKey, createAuthHeader } from "../helpers/db";
 
 /**
  * Integration tests for authenticated API routes.
@@ -6,15 +7,12 @@ import { describe, it, expect, beforeAll } from "bun:test";
  * These tests verify that authentication middleware properly protects
  * endpoints and that authenticated requests can access resources.
  *
- * NOTE: These tests require Supabase credentials and a test API key.
- * Set environment variables:
- * - SUPABASE_URL
- * - SUPABASE_SERVICE_KEY
- * - TEST_API_KEY (format: kota_<tier>_<keyId>_<secret>)
+ * NOTE: These tests require the local test database to be running.
+ * Run `./scripts/setup-test-db.sh` before running tests.
  */
 
 const BASE_URL = "http://localhost:3000";
-const TEST_API_KEY = process.env.TEST_API_KEY;
+const TEST_API_KEY = getTestApiKey("free");
 
 describe("Authenticated Routes", () => {
   describe("/health endpoint", () => {
@@ -66,11 +64,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("returns results with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/search?term=test`, {
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -94,11 +87,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("returns results with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/files/recent?limit=5`, {
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -131,11 +119,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("accepts index request with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/index`, {
         method: "POST",
         headers: {
@@ -175,11 +158,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("processes MCP request with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/mcp`, {
         method: "POST",
         headers: {
@@ -204,11 +182,6 @@ describe("Authenticated Routes", () => {
 
   describe("Authentication caching", () => {
     it("cache improves performance for repeated requests", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const headers = {
         Authorization: `Bearer ${TEST_API_KEY}`,
       };
