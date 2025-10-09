@@ -6,7 +6,23 @@ export interface SearchOptions {
   limit?: number;
 }
 
-export function recordIndexRun(db: Database, request: IndexRequest, status = "pending"): number {
+/**
+ * Record a new index run for a repository.
+ *
+ * @param db - SQLite database instance
+ * @param request - Index request details
+ * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
+ * @param status - Initial status (default: "pending")
+ * @returns Index run ID
+ */
+export function recordIndexRun(
+  db: Database,
+  request: IndexRequest,
+  userId: string,
+  status = "pending"
+): number {
+  // TODO: Set RLS context when migrated to Supabase
+  // For now, userId is accepted but not used in SQLite
   const statement = db.prepare(
     `INSERT INTO index_runs (repository, ref, status)
      VALUES (?, ?, ?)`
@@ -27,10 +43,21 @@ export function updateIndexRunStatus(db: Database, id: number, status: string): 
   statement.run(status, id);
 }
 
-export function saveIndexedFiles(db: Database, files: IndexedFile[]): number {
+/**
+ * Save indexed files to database.
+ *
+ * @param db - SQLite database instance
+ * @param files - Array of indexed files
+ * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
+ * @returns Number of files saved
+ */
+export function saveIndexedFiles(db: Database, files: IndexedFile[], userId: string): number {
   if (files.length === 0) {
     return 0;
   }
+
+  // TODO: Set RLS context when migrated to Supabase
+  // For now, userId is accepted but not used in SQLite
 
   const insert = db.prepare(
     `INSERT INTO files (project_root, path, content, dependencies, indexed_at)
@@ -57,7 +84,24 @@ export function saveIndexedFiles(db: Database, files: IndexedFile[]): number {
   return files.length;
 }
 
-export function searchFiles(db: Database, term: string, options: SearchOptions = {}) {
+/**
+ * Search indexed files by content term.
+ *
+ * @param db - SQLite database instance
+ * @param term - Search term to match in file content
+ * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
+ * @param options - Search options (projectRoot filter, limit)
+ * @returns Array of matching indexed files
+ */
+export function searchFiles(
+  db: Database,
+  term: string,
+  userId: string,
+  options: SearchOptions = {}
+) {
+  // TODO: Set RLS context when migrated to Supabase
+  // For now, userId is accepted but not used in SQLite
+
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
   const conditions: string[] = [];
   const parameters: Array<string | number> = [];
@@ -97,7 +141,18 @@ export function searchFiles(db: Database, term: string, options: SearchOptions =
   }));
 }
 
-export function listRecentFiles(db: Database, limit = 10): IndexedFile[] {
+/**
+ * List recently indexed files.
+ *
+ * @param db - SQLite database instance
+ * @param limit - Maximum number of files to return
+ * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
+ * @returns Array of recently indexed files
+ */
+export function listRecentFiles(db: Database, limit: number, userId: string): IndexedFile[] {
+  // TODO: Set RLS context when migrated to Supabase
+  // For now, userId is accepted but not used in SQLite
+
   const statement = db.prepare(
     `SELECT project_root, path, content, dependencies, indexed_at
        FROM files

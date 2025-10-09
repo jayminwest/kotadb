@@ -38,3 +38,4 @@ __pycache__/
 
 # Finder (MacOS) folder config
 .DS_Store
+.adw_logs/

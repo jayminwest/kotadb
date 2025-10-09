@@ -6,7 +6,8 @@
       "recommended": true,
       "suspicious": {
         "noAssignInExpressions": "off",
-        "noImplicitAnyLet": "off"
+        "noImplicitAnyLet": "off",
+        "noExplicitAny": "off"
       },
       "style": {
         "noNonNullAssertion": "off",
