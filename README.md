@@ -2,7 +2,7 @@
 
 KotaDB is the indexing and query layer for CLI Agents like Claude Code and Codex. This project exposes a
 lightweight HTTP interface for triggering repository indexing jobs and performing code search backed by
-SQLite. Development is done autonomously through AI developer workflows via the `adws/` automation scripts.
+Supabase (PostgreSQL). Development is done autonomously through AI developer workflows via the `adws/` automation scripts.
 
 ## Getting Started
 
@@ -141,11 +141,13 @@ Dockerfile             # Bun runtime image
 adws/                  # Automation workflows for AI developer agents
 src/
   api/                 # HTTP routes and database access
-  db/                  # SQLite schema helpers & migrations
+  auth/                # Authentication middleware and API key validation
+  db/                  # Supabase client initialization and helpers
   indexer/             # Repository crawling, parsing, and extraction utilities
   mcp/                 # Model Context Protocol (MCP) implementation
   types/               # Shared TypeScript types
 .github/workflows/     # CI workflows
+docs/                  # Documentation (schema, specs, setup guides)
 ```
 
 ## Next Steps

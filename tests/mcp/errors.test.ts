@@ -1,19 +1,16 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { Database } from "bun:sqlite";
-import { ensureSchema } from "@db/schema";
+import { createMockSupabaseClient } from "../helpers/supabase-mock";
 
 const TEST_PORT = 3097;
 let server: ReturnType<typeof Bun.serve>;
-let db: Database;
 
 beforeAll(async () => {
-	// Set up in-memory test database
-	db = new Database(":memory:");
-	ensureSchema(db);
+	// Create mock Supabase client for testing
+	const mockSupabase = createMockSupabaseClient();
 
 	// Import and start test server
 	const { createRouter } = await import("@api/routes");
-	const router = createRouter(db);
+	const router = createRouter(mockSupabase);
 
 	server = Bun.serve({
 		port: TEST_PORT,
@@ -23,7 +20,6 @@ beforeAll(async () => {
 
 afterAll(() => {
 	server.stop();
-	db.close();
 });
 
 describe("MCP JSON-RPC Error Handling", () => {
@@ -120,7 +116,7 @@ describe("MCP JSON-RPC Error Handling", () => {
 					name: "search_code",
 					arguments: {
 						// Missing required 'term' field
-						project: "/test",
+						repository: "test-repo-uuid",
 					},
 				},
 			}),

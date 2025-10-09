@@ -1,5 +1,5 @@
 import { existsSync } from "node:fs";
-import { Database } from "bun:sqlite";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { IndexRequest, AuthContext } from "@shared/index";
 import { buildSnippet } from "@indexer/extractors";
 import { discoverSources, parseSourceFile } from "@indexer/parsers";
@@ -18,7 +18,7 @@ export interface Router {
   handle: (request: Request) => Promise<Response> | Response;
 }
 
-export function createRouter(db: Database): Router {
+export function createRouter(supabase: SupabaseClient): Router {
   return {
     handle: async (request: Request) => {
       const { pathname, searchParams } = new URL(request.url);
@@ -35,7 +35,7 @@ export function createRouter(db: Database): Router {
       }
 
       // All routes below have authenticated context available
-      return handleAuthenticatedRequest(db, request, context!, pathname, searchParams);
+      return handleAuthenticatedRequest(supabase, request, context!, pathname, searchParams);
     }
   };
 }
@@ -45,14 +45,14 @@ export function createRouter(db: Database): Router {
  * All routes here have valid AuthContext available.
  */
 async function handleAuthenticatedRequest(
-  db: Database,
+  supabase: SupabaseClient,
   request: Request,
   context: AuthContext,
   pathname: string,
   searchParams: URLSearchParams
 ): Promise<Response> {
   if (request.method === "POST" && pathname === "/index") {
-    return handleIndexRequest(db, request, context);
+    return handleIndexRequest(supabase, request, context);
   }
 
   if (request.method === "GET" && pathname === "/search") {
@@ -61,27 +61,39 @@ async function handleAuthenticatedRequest(
       return json({ error: "Missing term query parameter" }, 400);
     }
 
-    const projectRoot = searchParams.get("project");
+    const repositoryId = searchParams.get("repository");
     const limit = searchParams.get("limit");
-    const results = searchFiles(db, term, context.userId, {
-      projectRoot: projectRoot ?? undefined,
-      limit: limit ? Number(limit) : undefined
-    }).map((row) => ({
-      ...row,
-      snippet: buildSnippet(row.content, term)
-    }));
 
-    return json({ results });
+    try {
+      const results = await searchFiles(supabase, term, context.userId, {
+        repositoryId: repositoryId ?? undefined,
+        limit: limit ? Number(limit) : undefined
+      });
+
+      const resultsWithSnippets = results.map((row) => ({
+        ...row,
+        snippet: buildSnippet(row.content, term)
+      }));
+
+      return json({ results: resultsWithSnippets });
+    } catch (error) {
+      return json({ error: `Search failed: ${(error as Error).message}` }, 500);
+    }
   }
 
   if (request.method === "GET" && pathname === "/files/recent") {
     const limit = Number(searchParams.get("limit") ?? "10");
-    return json({ results: listRecentFiles(db, limit, context.userId) });
+    try {
+      const results = await listRecentFiles(supabase, limit, context.userId);
+      return json({ results });
+    } catch (error) {
+      return json({ error: `Failed to list files: ${(error as Error).message}` }, 500);
+    }
   }
 
   if (pathname === "/mcp") {
     if (request.method === "POST") {
-      return handleMcpRequest(db, request, context);
+      return handleMcpRequest(supabase, request, context);
     }
 
     if (request.method === "GET") {
@@ -99,7 +111,7 @@ async function handleAuthenticatedRequest(
 }
 
 async function handleIndexRequest(
-  db: Database,
+  supabase: SupabaseClient,
   request: Request,
   context: AuthContext
 ): Promise<Response> {
@@ -121,29 +133,81 @@ async function handleIndexRequest(
     localPath: payload.localPath
   };
 
-  const runId = recordIndexRun(db, indexRequest, context.userId);
+  try {
+    // Find or create repository in database
+    const repositoryId = await ensureRepository(supabase, context.userId, indexRequest);
+    const runId = await recordIndexRun(supabase, indexRequest, context.userId, repositoryId);
 
-  queueMicrotask(() =>
-    runIndexingWorkflow(db, indexRequest, runId, context.userId).catch((error) => {
-      console.error("Indexing workflow failed", error);
-      updateIndexRunStatus(db, runId, "failed");
+    queueMicrotask(() =>
+      runIndexingWorkflow(supabase, indexRequest, runId, context.userId, repositoryId).catch((error) => {
+        console.error("Indexing workflow failed", error);
+        updateIndexRunStatus(supabase, runId, "failed", error.message).catch(console.error);
+      })
+    );
+
+    return json({ runId }, 202);
+  } catch (error) {
+    return json({ error: `Failed to start indexing: ${(error as Error).message}` }, 500);
+  }
+}
+
+/**
+ * Ensure repository exists in database, create if not.
+ * Returns repository UUID.
+ */
+async function ensureRepository(
+  supabase: SupabaseClient,
+  userId: string,
+  request: IndexRequest
+): Promise<string> {
+  const fullName = request.repository;
+  const gitUrl = request.localPath
+    ? request.localPath
+    : `${process.env.KOTA_GIT_BASE_URL ?? "https://github.com"}/${fullName}.git`;
+
+  // Check if repository exists
+  const { data: existing } = await supabase
+    .from("repositories")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("full_name", fullName)
+    .maybeSingle();
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Create new repository
+  const { data: newRepo, error } = await supabase
+    .from("repositories")
+    .insert({
+      user_id: userId,
+      full_name: fullName,
+      git_url: gitUrl,
+      default_branch: request.ref ?? "main",
     })
-  );
+    .select("id")
+    .single();
 
-  return json({ runId }, 202);
+  if (error) {
+    throw new Error(`Failed to create repository: ${error.message}`);
+  }
+
+  return newRepo.id;
 }
 
 async function runIndexingWorkflow(
-  db: Database,
+  supabase: SupabaseClient,
   request: IndexRequest,
-  runId: number,
-  userId: string
+  runId: string,
+  userId: string,
+  repositoryId: string
 ): Promise<void> {
   const repo = await prepareRepository(request);
 
   if (!existsSync(repo.localPath)) {
     console.warn(`Indexing skipped: path ${repo.localPath} does not exist.`);
-    updateIndexRunStatus(db, runId, "skipped");
+    await updateIndexRunStatus(supabase, runId, "skipped");
     return;
   }
 
@@ -152,8 +216,8 @@ async function runIndexingWorkflow(
     await Promise.all(sources.map((source) => parseSourceFile(source, repo.localPath)))
   ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-  saveIndexedFiles(db, records, userId);
-  updateIndexRunStatus(db, runId, "completed");
+  await saveIndexedFiles(supabase, records, userId, repositoryId);
+  await updateIndexRunStatus(supabase, runId, "completed");
 }
 
 function json(payload: unknown, status = 200, extraHeaders: Record<string, string> = {}): Response {

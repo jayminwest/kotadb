@@ -34,32 +34,18 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When debugging data flows between API routes and the database
     - When designing new tables, relationships, or rate-limiting behaviour
 
-- docs/adw-parity-spec.md
+- docs/specs/chore-27-standardize-postgres-remove-sqlite.md
   - Conditions:
-    - When extending or refactoring automation inside `adws/**`
-    - When aligning KotaDB’s ADW workflows with TAC parity
-    - When planning roadmap items related to AI developer workflow tooling
+    - When removing SQLite implementation and migrating to Postgres/Supabase
+    - When refactoring database query layer (src/api/queries.ts) or bootstrap logic (src/index.ts)
+    - When working on issue #27 or related database standardization tasks
+    - When updating type definitions from SQLite to Supabase schemas
 
 - adws/README.md
   - Conditions:
     - When implementing or modifying modules under `adws/adw_modules/**`
     - When updating ADW phase scripts (`adw_plan.py`, `adw_build.py`, etc.)
     - When debugging ADW orchestration, logging, or state persistence
-
-- docs/specs/authentication-middleware.md
-  - Conditions:
-    - When tasks involve authentication, request validation, or middleware behaviour
-    - When adding or updating auth-specific Bun handlers or API routes
-
-- docs/specs/database-foundation-supabase-migration.md
-  - Conditions:
-    - When performing foundational database work or Supabase migration parity
-    - When syncing schema decisions with broader platform requirements
-
-- docs/specs/mcp-compliant-endpoint.md
-  - Conditions:
-    - When building or updating MCP-compatible endpoints or integrations
-    - When aligning API responses or protocols with MCP expectations
 
 - docs/vision/*.md
   - Conditions:

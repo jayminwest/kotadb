@@ -2,7 +2,7 @@
  * Main MCP request handler and JSON-RPC dispatcher
  */
 
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { AuthContext } from "@shared/index";
 import {
 	type JsonRpcRequest,
@@ -25,12 +25,12 @@ import { getToolDefinitions, handleToolCall } from "./tools";
  * Main entry point for MCP requests.
  * All MCP requests are authenticated via middleware before reaching this handler.
  *
- * @param db - SQLite database instance
+ * @param supabase - Supabase client instance
  * @param request - HTTP request
  * @param context - Authenticated user context
  */
 export async function handleMcpRequest(
-	db: Database,
+	supabase: SupabaseClient,
 	request: Request,
 	context: AuthContext,
 ): Promise<Response> {
@@ -88,7 +88,7 @@ export async function handleMcpRequest(
 		return jsonRpcResponse(invalidRequest(null, "Invalid JSON-RPC request"));
 	}
 
-	return jsonRpcResponse(await dispatchMethod(db, body, context));
+	return jsonRpcResponse(await dispatchMethod(supabase, body, context));
 }
 
 /**
@@ -105,7 +105,7 @@ function handleNotification(notification: { method: string }): Response {
  * Dispatch JSON-RPC request to appropriate handler
  */
 async function dispatchMethod(
-	db: Database,
+	supabase: SupabaseClient,
 	request: JsonRpcRequest,
 	context: AuthContext,
 ): Promise<JsonRpcResponse> {
@@ -135,7 +135,7 @@ async function dispatchMethod(
 
 				const toolParams =
 					"arguments" in params ? params.arguments : undefined;
-				const result = handleToolCall(db, params.name, toolParams, id, context.userId);
+				const result = await handleToolCall(supabase, params.name, toolParams, id, context.userId);
 				return success(id, result);
 			}
 

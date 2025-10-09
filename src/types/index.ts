@@ -1,4 +1,4 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface IndexRequest {
   repository: string;
@@ -7,8 +7,8 @@ export interface IndexRequest {
 }
 
 export interface IndexedFile {
-  id?: number;
-  projectRoot: string;
+  id?: string; // UUID in Postgres
+  projectRoot: string; // Repository ID for compatibility
   path: string;
   content: string;
   dependencies: string[];
@@ -16,7 +16,7 @@ export interface IndexedFile {
 }
 
 export interface ApiContext {
-  db: Database;
+  supabase: SupabaseClient;
 }
 
 /**

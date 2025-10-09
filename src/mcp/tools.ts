@@ -2,7 +2,7 @@
  * MCP tool definitions and execution adapters
  */
 
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { existsSync } from "node:fs";
 import type { IndexRequest } from "@shared/index";
 import { buildSnippet } from "@indexer/extractors";
@@ -44,10 +44,10 @@ export const SEARCH_CODE_TOOL: ToolDefinition = {
 				type: "string",
 				description: "The search term to find in code files",
 			},
-			project: {
+			repository: {
 				type: "string",
 				description:
-					"Optional: Filter results to a specific project root path",
+					"Optional: Filter results to a specific repository ID",
 			},
 			limit: {
 				type: "number",
@@ -117,11 +117,11 @@ export function getToolDefinitions(): ToolDefinition[] {
  */
 function isSearchParams(
 	params: unknown,
-): params is { term: string; project?: string; limit?: number } {
+): params is { term: string; repository?: string; limit?: number } {
 	if (typeof params !== "object" || params === null) return false;
 	const p = params as Record<string, unknown>;
 	if (typeof p.term !== "string") return false;
-	if (p.project !== undefined && typeof p.project !== "string") return false;
+	if (p.repository !== undefined && typeof p.repository !== "string") return false;
 	if (p.limit !== undefined && typeof p.limit !== "number") return false;
 	return true;
 }
@@ -151,39 +151,41 @@ function isListRecentParams(
 /**
  * Execute search_code tool
  */
-export function executeSearchCode(
-	db: Database,
+export async function executeSearchCode(
+	supabase: SupabaseClient,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
-): unknown {
+): Promise<unknown> {
 	if (!isSearchParams(params)) {
 		throw invalidParams(requestId, "Invalid parameters for search_code tool");
 	}
 
-	const results = searchFiles(db, params.term, userId, {
-		projectRoot: params.project,
+	const results = await searchFiles(supabase, params.term, userId, {
+		repositoryId: params.repository,
 		limit: params.limit,
-	}).map((row) => ({
-		projectRoot: row.projectRoot,
-		path: row.path,
-		snippet: buildSnippet(row.content, params.term),
-		dependencies: row.dependencies,
-		indexedAt: row.indexedAt.toISOString(),
-	}));
+	});
 
-	return { results };
+	return {
+		results: results.map((row) => ({
+			projectRoot: row.projectRoot,
+			path: row.path,
+			snippet: buildSnippet(row.content, params.term),
+			dependencies: row.dependencies,
+			indexedAt: row.indexedAt.toISOString(),
+		})),
+	};
 }
 
 /**
  * Execute index_repository tool
  */
-export function executeIndexRepository(
-	db: Database,
+export async function executeIndexRepository(
+	supabase: SupabaseClient,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
-): unknown {
+): Promise<unknown> {
 	if (!isIndexParams(params)) {
 		throw invalidParams(requestId, "Invalid parameters for index_repository tool");
 	}
@@ -194,13 +196,15 @@ export function executeIndexRepository(
 		localPath: params.localPath,
 	};
 
-	const runId = recordIndexRun(db, indexRequest, userId);
+	// Ensure repository exists in database
+	const repositoryId = await ensureRepository(supabase, userId, indexRequest);
+	const runId = await recordIndexRun(supabase, indexRequest, userId, repositoryId);
 
 	// Queue async indexing workflow
 	queueMicrotask(() =>
-		runIndexingWorkflow(db, indexRequest, runId, userId).catch((error) => {
+		runIndexingWorkflow(supabase, indexRequest, runId, userId, repositoryId).catch((error) => {
 			console.error("Indexing workflow failed", error);
-			updateIndexRunStatus(db, runId, "failed");
+			updateIndexRunStatus(supabase, runId, "failed", error.message).catch(console.error);
 		}),
 	);
 
@@ -214,12 +218,12 @@ export function executeIndexRepository(
 /**
  * Execute list_recent_files tool
  */
-export function executeListRecentFiles(
-	db: Database,
+export async function executeListRecentFiles(
+	supabase: SupabaseClient,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
-): unknown {
+): Promise<unknown> {
 	if (!isListRecentParams(params)) {
 		throw invalidParams(requestId, "Invalid parameters for list_recent_files tool");
 	}
@@ -228,7 +232,7 @@ export function executeListRecentFiles(
 		params && typeof params === "object" && "limit" in params
 			? (params.limit as number)
 			: 10;
-	const files = listRecentFiles(db, limit, userId);
+	const files = await listRecentFiles(supabase, limit, userId);
 
 	return {
 		results: files.map((file) => ({
@@ -241,19 +245,65 @@ export function executeListRecentFiles(
 }
 
 /**
+ * Ensure repository exists in database, create if not.
+ * Returns repository UUID.
+ */
+async function ensureRepository(
+	supabase: SupabaseClient,
+	userId: string,
+	request: IndexRequest,
+): Promise<string> {
+	const fullName = request.repository;
+	const gitUrl = request.localPath
+		? request.localPath
+		: `${process.env.KOTA_GIT_BASE_URL ?? "https://github.com"}/${fullName}.git`;
+
+	// Check if repository exists
+	const { data: existing } = await supabase
+		.from("repositories")
+		.select("id")
+		.eq("user_id", userId)
+		.eq("full_name", fullName)
+		.maybeSingle();
+
+	if (existing) {
+		return existing.id;
+	}
+
+	// Create new repository
+	const { data: newRepo, error } = await supabase
+		.from("repositories")
+		.insert({
+			user_id: userId,
+			full_name: fullName,
+			git_url: gitUrl,
+			default_branch: request.ref ?? "main",
+		})
+		.select("id")
+		.single();
+
+	if (error) {
+		throw new Error(`Failed to create repository: ${error.message}`);
+	}
+
+	return newRepo.id;
+}
+
+/**
  * Async indexing workflow (reused from routes.ts)
  */
 async function runIndexingWorkflow(
-	db: Database,
+	supabase: SupabaseClient,
 	request: IndexRequest,
-	runId: number,
+	runId: string,
 	userId: string,
+	repositoryId: string,
 ): Promise<void> {
 	const repo = await prepareRepository(request);
 
 	if (!existsSync(repo.localPath)) {
 		console.warn(`Indexing skipped: path ${repo.localPath} does not exist.`);
-		updateIndexRunStatus(db, runId, "skipped");
+		await updateIndexRunStatus(supabase, runId, "skipped");
 		return;
 	}
 
@@ -264,27 +314,27 @@ async function runIndexingWorkflow(
 		)
 	).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
-	saveIndexedFiles(db, records, userId);
-	updateIndexRunStatus(db, runId, "completed");
+	await saveIndexedFiles(supabase, records, userId, repositoryId);
+	await updateIndexRunStatus(supabase, runId, "completed");
 }
 
 /**
  * Main tool call dispatcher
  */
-export function handleToolCall(
-	db: Database,
+export async function handleToolCall(
+	supabase: SupabaseClient,
 	toolName: string,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
-): unknown {
+): Promise<unknown> {
 	switch (toolName) {
 		case "search_code":
-			return executeSearchCode(db, params, requestId, userId);
+			return await executeSearchCode(supabase, params, requestId, userId);
 		case "index_repository":
-			return executeIndexRepository(db, params, requestId, userId);
+			return await executeIndexRepository(supabase, params, requestId, userId);
 		case "list_recent_files":
-			return executeListRecentFiles(db, params, requestId, userId);
+			return await executeListRecentFiles(supabase, params, requestId, userId);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}
