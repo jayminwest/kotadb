@@ -55,6 +55,14 @@ Always use these aliases for imports, not relative paths.
 - `routes.ts`: Request routing and handler orchestration
 - `queries.ts`: Database query functions for indexed files and search
 
+**Authentication & Rate Limiting (src/auth/)**
+- `middleware.ts`: Authentication middleware and rate limit enforcement
+- `validator.ts`: API key validation and tier extraction
+- `keys.ts`: API key generation with bcrypt hashing
+- `rate-limit.ts`: Tier-based rate limiting logic (free=100/hr, solo=1000/hr, team=10000/hr)
+- `context.ts`: Auth context passed to handlers (includes user, tier, rate limit status)
+- `cache.ts`: In-memory caching for API key lookups (reduces database load)
+
 **Database (src/db/)**
 - `client.ts`: Supabase client initialization (service role and anon clients)
 - Tables: 10 tables including `api_keys`, `organizations`, `repositories`, `index_jobs`, `indexed_files`, `symbols`, `references`, `dependencies`, etc.
@@ -73,19 +81,33 @@ Always use these aliases for imports, not relative paths.
 
 ### Workflow
 
-1. **POST /index** triggers repository indexing
-   - Ensures repository exists in `repositories` table (creates if new)
-   - Records index job in `index_jobs` table (status: pending → completed/failed/skipped)
-   - Queues asynchronous indexing via `queueMicrotask()`
-   - Repository preparation: clones if needed, checks out ref
-   - File discovery: walks project tree, filters by extension
-   - Parsing: extracts content and dependencies
-   - Storage: saves to `indexed_files` table with `UNIQUE (repository_id, path)` constraint
+**Authentication & Rate Limiting Flow** (all authenticated endpoints):
+1. Request arrives with `Authorization: Bearer <api_key>` header
+2. `authenticateRequest()` middleware validates API key and extracts tier
+3. `enforceRateLimit()` checks hourly request count via `increment_rate_limit()` DB function
+4. If limit exceeded, return 429 with `Retry-After` header
+5. If allowed, attach auth context (user, tier, rate limit status) to request
+6. Handler executes with rate limit headers injected into response
 
-2. **GET /search** queries indexed files
-   - Full-text search on content
-   - Optional filters: `project` (project_root), `limit`
-   - Returns results with context snippets
+**POST /index** triggers repository indexing:
+- Ensures repository exists in `repositories` table (creates if new)
+- Records index job in `index_jobs` table (status: pending → completed/failed/skipped)
+- Queues asynchronous indexing via `queueMicrotask()`
+- Repository preparation: clones if needed, checks out ref
+- File discovery: walks project tree, filters by extension
+- Parsing: extracts content and dependencies
+- Storage: saves to `indexed_files` table with `UNIQUE (repository_id, path)` constraint
+
+**GET /search** queries indexed files:
+- Full-text search on content
+- Optional filters: `project` (project_root), `limit`
+- Returns results with context snippets
+
+**Rate Limit Response Headers** (all authenticated endpoints):
+- `X-RateLimit-Limit`: Total requests allowed per hour for the tier
+- `X-RateLimit-Remaining`: Requests remaining in current window
+- `X-RateLimit-Reset`: Unix timestamp when the limit resets
+- `Retry-After`: Seconds until retry (429 responses only)
 
 ### Environment Variables
 - `PORT`: Server port (default: 3000)

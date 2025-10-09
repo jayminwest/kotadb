@@ -81,6 +81,38 @@ For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](do
 
 The indexer clones repositories automatically when a `localPath` is not provided. Override the default GitHub clone source by exporting `KOTA_GIT_BASE_URL` (for example, your self-hosted Git service).
 
+### Rate Limiting
+
+All authenticated endpoints enforce tier-based rate limiting to prevent API abuse:
+
+**Tier Limits** (requests per hour):
+- **Free**: 100 requests/hour
+- **Solo**: 1,000 requests/hour
+- **Team**: 10,000 requests/hour
+
+**Response Headers** (included in all authenticated responses):
+```
+X-RateLimit-Limit: 100
+X-RateLimit-Remaining: 95
+X-RateLimit-Reset: 1728475200
+```
+
+**Rate Limit Exceeded** (429 response):
+```json
+{
+  "error": "Rate limit exceeded",
+  "retryAfter": 3456
+}
+```
+
+Response includes headers:
+- `X-RateLimit-Limit` – Total requests allowed per hour for your tier
+- `X-RateLimit-Remaining` – Requests remaining in current window
+- `X-RateLimit-Reset` – Unix timestamp when the limit resets
+- `Retry-After` – Seconds until you can retry (429 responses only)
+
+Rate limits reset at the top of each hour. The `/health` endpoint is exempt from rate limiting.
+
 ### MCP Protocol Endpoint
 
 KotaDB supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) for standardized agent integration. The MCP endpoint enables CLI agents like Claude Code to discover and use KotaDB's capabilities automatically.
