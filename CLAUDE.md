@@ -17,9 +17,16 @@ bun --watch src/index.ts          # Watch mode for development
 
 ### Testing and type-checking
 ```bash
-bun test                # Run test suite
-bunx tsc --noEmit      # Type-check without emitting files
+bun test                          # Run test suite
+bunx tsc --noEmit                # Type-check without emitting files
+bun run test:validate-migrations # Validate migration sync (see below)
 ```
+
+**IMPORTANT: Migration Sync Requirement**
+- Database migrations exist in **two locations**: `src/db/migrations/` (source) and `supabase/migrations/` (copy for Supabase CLI)
+- When adding or modifying migrations in `src/db/migrations/`, you **must** also update `supabase/migrations/`
+- Run `bun run test:validate-migrations` to check for drift between directories
+- Keep both directories synchronized to prevent test environment divergence from production schema
 
 ### Docker
 ```bash

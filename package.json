@@ -17,7 +17,8 @@
     "test:teardown": "supabase stop",
     "test:reset": "./scripts/reset-test-db.sh",
     "test:env": "./scripts/generate-env-test.sh",
-    "test:status": "supabase status"
+    "test:status": "supabase status",
+    "test:validate-migrations": "diff -r src/db/migrations supabase/migrations || echo 'WARNING: Migration directories are out of sync!'"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",
