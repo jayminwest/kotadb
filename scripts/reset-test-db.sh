@@ -8,7 +8,7 @@ echo "🔄 Resetting test database..."
 
 # Truncate tables in reverse dependency order
 echo "🗑️  Truncating tables..."
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d kotadb_test << 'EOF'
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres << 'EOF'
 -- Truncate in reverse dependency order to avoid FK violations
 TRUNCATE TABLE dependencies CASCADE;
 TRUNCATE TABLE references CASCADE;
@@ -25,6 +25,6 @@ EOF
 
 # Re-seed test data
 echo "🌱 Re-seeding test data..."
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d kotadb_test < supabase/seed.sql > /dev/null 2>&1
+PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d postgres < supabase/seed.sql > /dev/null 2>&1
 
 echo "✅ Test database reset complete!"

@@ -5,12 +5,14 @@ const TEST_PORT = 3097;
 let server: ReturnType<typeof Bun.serve>;
 
 beforeAll(async () => {
-	// Set test environment variables to point to local test database
-	process.env.SUPABASE_URL = "http://localhost:5433";
-	process.env.SUPABASE_SERVICE_KEY = "test-service-key-local";
-	process.env.SUPABASE_ANON_KEY = "test-anon-key-local";
+	// Set test environment variables to point to Supabase Local
+	process.env.SUPABASE_URL = "http://localhost:54321";
+	process.env.SUPABASE_SERVICE_KEY =
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+	process.env.SUPABASE_ANON_KEY =
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
 	process.env.DATABASE_URL =
-		"postgresql://postgres:postgres@localhost:5433/kotadb_test";
+		"postgresql://postgres:postgres@localhost:5433/postgres";
 
 	// Import and start test server with real database connection
 	const { createRouter } = await import("@api/routes");
