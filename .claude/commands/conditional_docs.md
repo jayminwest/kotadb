@@ -91,6 +91,14 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When addressing cache timing test flakiness
     - When troubleshooting Supabase Local connectivity in tests
 
+- docs/specs/feature-28-supabase-local-env-test.md
+  - Conditions:
+    - When working on issue #28 or enhancing test infrastructure automation
+    - When implementing or modifying Supabase CLI integration (supabase start/stop/status)
+    - When working with auto-generated .env.test workflow or scripts/generate-env-test.sh
+    - When adding or updating package.json test scripts (test:setup, test:teardown, test:reset)
+    - When troubleshooting Supabase CLI configuration or custom port setup
+    - When onboarding new developers and explaining the test environment setup process
 - docs/troubleshooting/test-failures.md
   - Conditions:
     - When diagnosing any test failures (general troubleshooting guide)
