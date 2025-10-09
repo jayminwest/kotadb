@@ -24,19 +24,33 @@ REPO_URL="${ADW_REPO_URL:-}"
 
 cd /workspace
 
+# Get the current origin URL as fallback
+CURRENT_ORIGIN="$(git remote get-url origin 2>/dev/null || echo "")"
+
+# Default to kotadb/kotadb if no repo URL is specified
 if [[ -z "${REPO_URL}" ]]; then
-  REPO_URL="$(git remote get-url origin 2>/dev/null || echo "")"
+  REPO_URL="${CURRENT_ORIGIN:-https://github.com/kotadb/kotadb.git}"
 fi
 
-if [[ -n "${GITHUB_PAT:-}" ]]; then
-  if [[ -n "${REPO_URL}" && "${REPO_URL}" == https://* ]]; then
+# Only set origin if explicitly provided via ADW_REPO_URL
+# This prevents accidentally overriding the correct origin
+if [[ -n "${ADW_REPO_URL:-}" ]]; then
+  if [[ -n "${GITHUB_PAT:-}" ]]; then
+    if [[ "${REPO_URL}" == https://* ]]; then
+      AUTH_URL="https://${GITHUB_PAT}@${REPO_URL#https://}"
+      git remote set-url origin "${AUTH_URL}"
+    else
+      git remote set-url origin "https://${GITHUB_PAT}@github.com/${GITHUB_REPOSITORY:-kotadb/kotadb}.git"
+    fi
+  else
+    git remote set-url origin "${REPO_URL}"
+  fi
+elif [[ -n "${GITHUB_PAT:-}" ]]; then
+  # Add PAT authentication to existing origin
+  if [[ "${REPO_URL}" == https://* ]]; then
     AUTH_URL="https://${GITHUB_PAT}@${REPO_URL#https://}"
     git remote set-url origin "${AUTH_URL}"
-  else
-    git remote set-url origin "https://${GITHUB_PAT}@github.com/${GITHUB_REPOSITORY:-kotadb/kotadb}.git"
   fi
-elif [[ -n "${REPO_URL}" ]]; then
-  git remote set-url origin "${REPO_URL}"
 fi
 
 git fetch --prune origin "${REPO_REF}" >/dev/null 2>&1 || git fetch --prune origin >/dev/null 2>&1
