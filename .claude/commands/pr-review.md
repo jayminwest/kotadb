@@ -28,8 +28,10 @@ Review another contributor’s pull request. Provide the PR number via `$ARGUMEN
 ## Feedback & Decision
 - Provide actionable feedback grouped by severity (blocking vs. nit).
 - Decide on `Approve`, `Request Changes`, or `Comment` in GitHub; ensure summary references validation results.
+- Post the review summary as a PR comment (e.g., `gh pr review --comment` or `gh pr comment`) so the feedback lives on the discussion thread before handing off.
 
 ## Reporting
 - Decision taken and justification.
 - Key findings (bugs, risks, missing tests/docs) with file/line references.
 - Follow-up actions or open questions.
+- URL to the posted GitHub review comment or confirmation that it was delivered via the PR interface.

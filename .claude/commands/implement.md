@@ -8,7 +8,7 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 - Execute tasks in the documented order, touching only the files listed unless the plan explicitly allows otherwise.
 - Keep commits incremental and logically grouped. Use Conventional Commit subjects referencing the issue.
 - Stay on the correct work branch (`feat/`, `bug/`, `chore/`, etc.) that will merge into `develop` before promotion to `main`.
-- After completing the plan, ensure the working tree is clean and the branch contains all commits.
+- When scoped tasks are complete, rerun the plan’s validation level, ensure the tree is clean, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so the PR opens with a title ending in the issue number (e.g. `feat: add search filters (#210)`).
 
 ## Validation
 Run every command listed in the plan’s `## Validation Commands` section and select the appropriate level from `/validate-implementation`:
@@ -17,6 +17,11 @@ Run every command listed in the plan’s `## Validation Commands` section and se
 - Level 3 (schema/auth/high-risk): add `bun run build`
 
 Capture command output paths or summaries so reviewers can audit results quickly.
+
+## Final Steps
+- After validation passes, confirm `git status --short` is clean apart from intended artifacts.
+- Push the branch (`git push -u origin <branch>`), then run `/pull_request <branch> <issue_json> <plan_path> <adw_id>`.
+- Verify the PR body includes validation evidence and the title suffix `(#<issue-number>)`.
 
 ## Report
 - Provide a concise bullet list of the implementation work performed.

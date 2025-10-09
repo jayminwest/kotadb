@@ -48,4 +48,4 @@ bun run build
 
 - Branches follow `feat/|bug/|chore/` → `develop` → `main`.
 - Run validation before committing, before pushing, and again ahead of PR creation (Level 2 minimum).
-- Include validation evidence in `/pr`, `/pull_request`, and `/pr-review` outputs for traceability.
+- Include validation evidence in `/pull_request` and `/pr-review` outputs for traceability.
