@@ -59,3 +59,9 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When working on roadmap initiatives tied to long-term product epics
     - When you need to confirm scope against strategic goals or sequencing
     - When preparing discovery or planning work that spans multiple domains
+
+- .claude/commands/anti-mock.md
+  - Conditions:
+    - When planning or implementing changes that add or modify automated tests
+    - When touching infrastructure, data access layers, or background jobs where mocks might be tempting
+    - When validation requires Supabase or other third-party integrations

@@ -10,11 +10,16 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 - Stay on the correct work branch (`feat/`, `bug/`, `chore/`, etc.) that will merge into `develop` before promotion to `main`.
 - When scoped tasks are complete, rerun the plan’s validation level, ensure the tree is clean, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so the PR opens with a title ending in the issue number (e.g. `feat: add search filters (#210)`).
 
+## Anti-Mock Guardrails
+- Read `/anti-mock` before touching tests; do not introduce new stub helpers (`createMock*`, fake clients, manual spies).
+- Exercise real Supabase access paths and failure-injection utilities in new or updated tests; document any temporary skips with a follow-up issue.
+- Capture evidence (command output, Supabase logs) that real-service suites ran when preparing the implementation report.
+
 ## Validation
 Run every command listed in the plan’s `## Validation Commands` section and select the appropriate level from `/validate-implementation`:
 - Level 1: `bun run lint`, `bun run typecheck`
-- Level 2 (default for features/bugs): add `bun test`
-- Level 3 (schema/auth/high-risk): add `bun run build`
+- Level 2 (default for features/bugs): add `bun test --filter integration`
+- Level 3 (schema/auth/high-risk): add `bun test --filter integration`, `bun test`, `bun run build`
 
 Capture command output paths or summaries so reviewers can audit results quickly.
 

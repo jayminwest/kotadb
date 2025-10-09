@@ -1,10 +1,16 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { createMockSupabaseClient } from "../helpers/supabase-mock";
+import { createMockAuthHeader } from "../helpers/auth-mock";
 
 const TEST_PORT = 3098;
 let server: ReturnType<typeof Bun.serve>;
 
 beforeAll(async () => {
+	// Set test environment variables for Supabase
+	process.env.SUPABASE_URL = "http://localhost:54321";
+	process.env.SUPABASE_SERVICE_KEY = "test-service-key";
+	process.env.SUPABASE_ANON_KEY = "test-anon-key";
+
 	// Create mock Supabase client with test data
 	const mockSupabase = createMockSupabaseClient({
 		selectData: [
@@ -49,6 +55,7 @@ describe("MCP Tools Integration", () => {
 		"Origin": "http://localhost:3000",
 		"MCP-Protocol-Version": "2025-06-18",
 		"Accept": "application/json",
+		"Authorization": createMockAuthHeader(),
 	};
 
 	test("tools/list returns available tools", async () => {

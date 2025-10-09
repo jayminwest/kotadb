@@ -12,6 +12,7 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 - Working tree is clean (`git status --short` empty) and the current branch matches `<branch_name>`.
 - All commits for the issue exist locally and remotely (`feat/`, `bug/`, `chore/`, etc. → `develop` → `main`).
 - Level 2 or higher validation from `/validate-implementation` has been rerun with passing results captured for the PR body.
+- Anti-mock evidence is ready: note which real-service suites ran, data seeded, and any temporary skips with follow-up issues.
 - Plan document and issue references are up to date with final status and validation notes.
 
 ## Preparation Checklist
@@ -27,7 +28,8 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 - PR title format: `<issue_type>: <short summary> (#<issue_number>)` where `issue_type` is lower-case (`feature`, `bug`, `chore`, etc.).
 - Compose the PR body including:
   - Summary of changes
-  - Validation checklist referencing the level executed with evidence
+  - Validation checklist referencing the level executed with evidence (include Supabase logs or command output proving real-service runs)
+  - Anti-mock statement: confirm no new mocks were introduced and list any temporary exceptions with links to follow-up issues
   - Link to the plan (`[Plan](./<plan_file>)` when present)
   - `Closes #<issue_number>`
   - `ADW ID: <adw_id>`
@@ -44,6 +46,7 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 ## Post-Creation
 - `gh pr view --web` (optional) to verify the rendered description and metadata.
 - Share the PR link with reviewers, ensure labels/reviewers are applied, and monitor `gh pr status` for CI progress.
+- Double-check the PR body captures anti-mock evidence and that labels (e.g., `methodology:anti-mock`) are applied when relevant.
 
 ## Report
 Return only the PR URL.
