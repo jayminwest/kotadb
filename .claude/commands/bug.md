@@ -10,6 +10,8 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 - Investigate impacted modules in `src/**`, `tests/**`, and any infrastructure noted in the issue before proposing changes.
 - Capture all impacted files (and any new assets) in the dedicated section so implementors have clear scope boundaries.
 - Reference the repo git flow: work from `bug/<issue-number>-<slug>` off `develop`, with `develop` promoted to `main` on release.
+- Consult `.claude/commands/conditional_docs.md` and read only the documentation whose conditions align with the defect.
+- When the remediation introduces new documentation, add or update the relevant conditional entry so future agents can discover it quickly.
 
 ## Plan Format
 ```md

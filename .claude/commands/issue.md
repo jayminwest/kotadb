@@ -14,7 +14,7 @@ Create a rigorously labeled GitHub issue capturing the upcoming work. Follow thi
    - `gh label list --limit 100`
    - Ensure you have one label from each required category: component, priority, effort, status. Add optional methodology/risk labels if useful.
 4. **Collect context**
-   - Skim `README.md`, relevant docs, and code paths to summarize the problem/feature succinctly.
+   - Review `.claude/commands/conditional_docs.md` and open only the docs whose conditions match the work (e.g., `README.md`, `CLAUDE.md`, `docs/specs/**`).
    - Capture reproduction steps or business justification as needed.
 5. **Draft issue content**
    - Include sections for Description, Acceptance Criteria, Technical Approach (if known), Validation, and References.

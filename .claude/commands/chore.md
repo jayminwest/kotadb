@@ -10,6 +10,8 @@ Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lea
 - Keep scope tight; defer unrelated improvements.
 - Call out all affected files (and any new artefacts) in the plan to avoid churn during implementation.
 - Reference the git flow: branch from `develop` using `chore/<issue-number>-<slug>`, merging back into `develop` before promotion to `main`.
+- Consult `.claude/commands/conditional_docs.md` and pull in only the docs relevant to this maintenance scope.
+- If the chore introduces new documentation artefacts, extend `.claude/commands/conditional_docs.md` with conditions that describe when to read them.
 
 ## Plan Format
 ```md
