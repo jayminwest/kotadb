@@ -76,7 +76,7 @@ export async function authenticateRequest(
 
   if (!validation) {
     // Log failed authentication attempt (keyId if parseable)
-    console.warn(`[Auth] Invalid API key attempt`);
+    console.warn("[Auth] Invalid API key attempt");
 
     return {
       response: new Response(
@@ -112,7 +112,7 @@ export async function authenticateRequest(
   // Update last_used_at asynchronously (non-blocking)
   queueMicrotask(() => {
     updateLastUsed(validation.keyId).catch((err: unknown) => {
-      console.error(`[Auth] Failed to update last_used_at:`, err);
+      console.error("[Auth] Failed to update last_used_at:", err);
     });
   });
 

@@ -166,8 +166,8 @@ describe("API Key Validator", () => {
       const originalUrl = process.env.SUPABASE_URL;
       const originalKey = process.env.SUPABASE_SERVICE_KEY;
 
-      delete process.env.SUPABASE_URL;
-      delete process.env.SUPABASE_SERVICE_KEY;
+      process.env.SUPABASE_URL = undefined;
+      process.env.SUPABASE_SERVICE_KEY = undefined;
 
       const key = "kota_free_testkey12_0123456789abcdef0123456789abcdef";
 

@@ -16,7 +16,7 @@ describe("Authentication Middleware", () => {
       expect(result.response).toBeDefined();
       expect(result.response?.status).toBe(401);
 
-      const body = await result.response?.json();
+      const body = await result.response?.json() as { error: string; code: string };
       expect(body.error).toBe("Missing API key");
       expect(body.code).toBe("AUTH_MISSING_KEY");
     });
@@ -34,7 +34,7 @@ describe("Authentication Middleware", () => {
       expect(result.response).toBeDefined();
       expect(result.response?.status).toBe(401);
 
-      const body = await result.response?.json();
+      const body = await result.response?.json() as { error: string; code: string };
       expect(body.error).toBe("Invalid authorization header format");
       expect(body.code).toBe("AUTH_INVALID_HEADER");
     });
@@ -52,7 +52,7 @@ describe("Authentication Middleware", () => {
       expect(result.response).toBeDefined();
       expect(result.response?.status).toBe(401);
 
-      const body = await result.response?.json();
+      const body = await result.response?.json() as { error: string; code: string };
       expect(body.error).toBe("Invalid API key");
       expect(body.code).toBe("AUTH_INVALID_KEY");
     });
@@ -190,7 +190,7 @@ describe("Authentication Middleware", () => {
       expect(response.status).toBe(403);
       expect(response.headers.get("Content-Type")).toBe("application/json");
 
-      const body = await response.json();
+      const body = await response.json() as { error: string; code: string };
       expect(body.error).toBe("Insufficient permissions");
       expect(body.code).toBe("AUTH_FORBIDDEN");
     });
@@ -203,7 +203,7 @@ describe("Authentication Middleware", () => {
 
       expect(response.status).toBe(403);
 
-      const body = await response.json();
+      const body = await response.json() as { error: string; code: string };
       expect(body.error).toBe("API key disabled");
       expect(body.code).toBe("AUTH_KEY_DISABLED");
     });

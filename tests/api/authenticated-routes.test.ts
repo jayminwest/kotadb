@@ -20,7 +20,7 @@ describe("Authenticated Routes", () => {
   describe("/health endpoint", () => {
     it("is accessible without authentication", async () => {
       const response = await fetch(`${BASE_URL}/health`);
-      const data = await response.json();
+      const data = await response.json() as { status: string; timestamp: string };
 
       expect(response.status).toBe(200);
       expect(data.status).toBe("ok");
@@ -31,7 +31,7 @@ describe("Authenticated Routes", () => {
   describe("/search endpoint", () => {
     it("returns 401 without authentication", async () => {
       const response = await fetch(`${BASE_URL}/search?term=test`);
-      const data = await response.json();
+      const data = await response.json() as { error: string; code: string };
 
       expect(response.status).toBe(401);
       expect(data.error).toBeDefined();
@@ -44,7 +44,7 @@ describe("Authenticated Routes", () => {
           Authorization: "InvalidFormat token123",
         },
       });
-      const data = await response.json();
+      const data = await response.json() as { error: string; code: string };
 
       expect(response.status).toBe(401);
       expect(data.error).toBeDefined();
@@ -58,7 +58,7 @@ describe("Authenticated Routes", () => {
             "Bearer kota_free_invalid123_0123456789abcdef0123456789abcdef",
         },
       });
-      const data = await response.json();
+      const data = await response.json() as { error: string; code: string };
 
       expect(response.status).toBe(401);
       expect(data.error).toBeDefined();
@@ -76,7 +76,7 @@ describe("Authenticated Routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
       });
-      const data = await response.json();
+      const data = await response.json() as { results: unknown[] };
 
       expect(response.status).toBe(200);
       expect(data.results).toBeDefined();
@@ -87,7 +87,7 @@ describe("Authenticated Routes", () => {
   describe("/files/recent endpoint", () => {
     it("returns 401 without authentication", async () => {
       const response = await fetch(`${BASE_URL}/files/recent`);
-      const data = await response.json();
+      const data = await response.json() as { error: string };
 
       expect(response.status).toBe(401);
       expect(data.error).toBeDefined();
@@ -104,7 +104,7 @@ describe("Authenticated Routes", () => {
           Authorization: `Bearer ${TEST_API_KEY}`,
         },
       });
-      const data = await response.json();
+      const data = await response.json() as { results: unknown[] };
 
       expect(response.status).toBe(200);
       expect(data.results).toBeDefined();
@@ -124,7 +124,7 @@ describe("Authenticated Routes", () => {
           ref: "main",
         }),
       });
-      const data = await response.json();
+      const data = await response.json() as { error: string };
 
       expect(response.status).toBe(401);
       expect(data.error).toBeDefined();
@@ -147,7 +147,7 @@ describe("Authenticated Routes", () => {
           ref: "main",
         }),
       });
-      const data = await response.json();
+      const data = await response.json() as { runId: number };
 
       expect(response.status).toBe(202);
       expect(data.runId).toBeDefined();
@@ -168,7 +168,7 @@ describe("Authenticated Routes", () => {
           id: 1,
         }),
       });
-      const data = await response.json();
+      const data = await response.json() as { error: string };
 
       expect(response.status).toBe(401);
       expect(data.error).toBeDefined();
