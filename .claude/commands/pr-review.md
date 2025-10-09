@@ -3,7 +3,7 @@
 Review another contributor’s pull request. Provide the PR number via `$ARGUMENTS`.
 
 ## Pre-review Setup
-- `git fetch --all --prune`, `git pull --rebase`, ensure local `develop` is up to date, and start from a clean tree (`git status --short`).
+- `git fetch --all --prune`, `git pull --rebase`, ensure local `develop` is up to date, and start from a clean tree (`git status --short`) while verifying the PR follows the branch flow (`feat/`, `bug/`, `chore/`, etc.) into `develop` before promotion to `main`.
 - Checkout the PR branch with `gh pr checkout $ARGUMENTS` or `gh pr checkout <pr-number>`.
 
 ## Context Gathering
@@ -15,11 +15,11 @@ Review another contributor’s pull request. Provide the PR number via `$ARGUMEN
 - Highlight risky changes, missing edge cases, or deviations from plan/architecture.
 
 ## Tests & Tooling
-- Run `bun run lint`, `bun run typecheck`, `bun test`, and any domain-specific scripts (Playwright, health checks) as applicable.
-- Record outcomes and failures with logs.
+- Execute the validation level appropriate to the changes (Level 2 from `/validate-implementation` minimum; Level 3 for high-risk work).
+- Record outcomes and failures with logs, calling out any deviations from the contributor’s reported results.
 
 ## Documentation & Release Notes
-- Verify docs updated where behaviour changes (README, CLAUDE.md, specs).
+- Verify docs updated where behaviour changes (README, CLAUDE.md, `docs/specs/**`).
 - Check release impact/rollback notes if provided.
 
 ## Manual Verification

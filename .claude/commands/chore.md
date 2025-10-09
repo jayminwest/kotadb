@@ -3,11 +3,13 @@
 Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lean, auditable steps that unblock the requested upkeep.
 
 ## Instructions
-- Create a markdown plan under `specs/` with a slug reflecting the chore (e.g., `specs/update-deps-kota-db.md`).
+- Create a markdown plan under `docs/specs/` named `chore-<issue-number>-<slug>.md` (e.g., `docs/specs/chore-1450-refresh-deps.md`).
+- Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Use the template exactly as written.
 - Identify impacts across tooling, CI, documentation, and runtime configuration.
 - Keep scope tight; defer unrelated improvements.
 - Call out all affected files (and any new artefacts) in the plan to avoid churn during implementation.
+- Reference the git flow: branch from `develop` using `chore/<issue-number>-<slug>`, merging back into `develop` before promotion to `main`.
 
 ## Plan Format
 ```md
@@ -38,11 +40,11 @@ Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lea
 - <risk> → <mitigation>
 
 ## Validation Commands
-- bun run lint
-- bun run typecheck
-- bun test
-- bun run build
-- <supplemental checks>
+- `bun run lint`
+- `bun run typecheck`
+- `bun test`
+- `bun run build`
+- <supplemental checks chosen from `/validate-implementation` based on impact level>
 
 ## Deliverables
 - Code changes
@@ -52,4 +54,4 @@ Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lea
 
 ## Report
 - Summarise key actions in bullets.
-- Output the relative path to the new `specs/` plan.
+- Output the relative path to the new `docs/specs/` plan.

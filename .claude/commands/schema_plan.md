@@ -7,7 +7,7 @@ migration scripts under `data/`.
 ## Relevant files/directories
 - `src/db/**`
 - `data/`
-- `specs/**`
+- `docs/specs/**`
 - `docker-compose.yml`
 - `tsconfig.json`
 
@@ -23,7 +23,7 @@ migration scripts under `data/`.
 
 ## Validation Steps
 - Dry-run migrations against a local database snapshot (`sqlite3` or Bun-powered scripts).
-- Execute Bun validation commands in order, capturing logs under `logs/kota-db-ts/<env>/schema/`:
+- Execute **Level 3** from `/validate-implementation`, capturing logs under `logs/kota-db-ts/<env>/schema/`:
   1. `bun run lint`
   2. `bun run typecheck`
   3. `bun test`

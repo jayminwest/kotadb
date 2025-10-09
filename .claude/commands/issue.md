@@ -1,17 +1,31 @@
-# /issue
+# GitHub Issue Creation
 
-Draft and file a GitHub issue for upcoming work. Pass desired metadata via `$ARGUMENTS` (e.g., title, labels, assignees).
+Create a rigorously labeled GitHub issue capturing the upcoming work. Follow this sequence so downstream commands (plan, implement) have complete context.
 
 ## Steps
-1. **Git hygiene**: `git fetch --all --prune`, `git pull --rebase`, note the current branch, and ensure `git status --short` is clean before drafting.
-2. **Deduplicate**: search existing issues/PRs (`gh issue list`, `gh pr list`, repository labels) to avoid duplicates; document findings.
-3. **Gather context**: review recent commits, logs, or conversations; capture reproduction details or business motivations.
-4. **Define taxonomy**: align labels/milestones with team conventions, referencing `$ARGUMENTS` metadata where provided.
-5. **Draft issue**: compose markdown covering problem statement, expected outcome, environment details, and validation ideas.
-6. **Create issue**: use `gh issue create` (or GitHub UI) with the curated metadata; double-check rendered formatting.
-7. **Verify + broadcast**: confirm the issue exists (`gh issue view <number>`), update relevant trackers, and ensure git status remains clean.
+
+1. **Sync repo state**
+   - `git fetch --all --prune`
+   - `git status --short` (ensure clean working tree before opening an issue)
+2. **Avoid duplicates**
+   - `gh issue list --search "<keywords>" --state all`
+   - If a related issue exists, link and update instead of creating a duplicate.
+3. **Confirm label taxonomy (MANDATORY)**
+   - `gh label list --limit 100`
+   - Ensure you have one label from each required category: component, priority, effort, status. Add optional methodology/risk labels if useful.
+4. **Collect context**
+   - Skim `README.md`, relevant docs, and code paths to summarize the problem/feature succinctly.
+   - Capture reproduction steps or business justification as needed.
+5. **Draft issue content**
+   - Include sections for Description, Acceptance Criteria, Technical Approach (if known), Validation, and References.
+   - Keep titles Conventional Commit compatible (e.g., `feat: describe capability`).
+6. **Create the issue**
+   - `gh issue create --title "<title>" --body-file <temp-body.md> --label "component:...,priority:...,effort:...,status:..."`
+   - Record the returned issue number for downstream commands. Store it in your notes.
+7. **Verify issuance**
+   - `gh issue view <number>` to confirm labels, body, assignee, and milestone.
 
 ## Reporting
-- Link to the created issue with assigned metadata.
-- Summary of context/reproduction and any related issues discovered.
-- Follow-up actions or dependencies noted during filing.
+
+- Provide the new issue number, link, and key metadata (title, labels).
+- Note any follow-up tasks (e.g., attach logs/screenshots, notify stakeholders).

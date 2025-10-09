@@ -3,7 +3,10 @@
 Draft a KotaDB feature implementation plan using the issue context passed in `$ARGUMENTS` (provide JSON with issue number, title, summary, and constraints).
 
 ## Instructions
-- Create a new markdown plan under `specs/` named after the feature (slugified).
+- Create a new markdown plan under `docs/specs/` named `feature-<issue-number>-<slug>.md` (e.g., `docs/specs/feature-1024-event-streaming.md`).
+- Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
+- Reference issue metadata from `$ARGUMENTS` at the top of the plan for traceability.
+- Follow the repo git flow: work from `feat/<issue-number>-<slug>` branching off `develop`, with releases promoted from `develop` to `main`.
 - Populate the exact format below so automation can reference each section without guesswork.
 - Research existing patterns in `src/**`, `tests/**`, and platform docs before proposing changes.
 - Highlight any data contracts, API surfaces, or tooling updates that the feature requires.
@@ -58,14 +61,13 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 ```
 
 ## Validation Commands
-Run every command to prove the feature works end-to-end:
+Plan for validation using the levels defined in `/validate-implementation`. Features must run **Level 2** at minimum:
 - `bun run lint`
 - `bun run typecheck`
 - `bun test`
 - `bun run build`
-
-Add any domain-specific scripts (seed data, preview builds) required to validate the feature.
+Document any domain-specific scripts (seed data, preview builds) required for full coverage.
 
 ## Report
 - Summarise the plan in 2–3 bullets.
-- Output the relative path to the created plan under `specs/`.
+- Output the relative path to the created plan under `docs/specs/`.
