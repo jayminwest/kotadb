@@ -67,7 +67,7 @@ services:
       POSTGRES_DB: postgres
       POSTGRES_PORT: 5432
     ports:
-      - "5433:5432"
+      - "5434:5432"  # Changed from 5433 to avoid conflicts
     healthcheck:
       test: ["CMD-SHELL", "pg_isready -U postgres"]
       interval: 5s
@@ -92,7 +92,7 @@ services:
       PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
       PGRST_DB_USE_LEGACY_GUCS: "false"
     ports:
-      - "54321:3000"
+      - "54322:3000"  # Changed from 54321 to avoid conflicts
     restart: unless-stopped
 
   supabase-auth:
@@ -103,10 +103,10 @@ services:
     environment:
       GOTRUE_API_HOST: 0.0.0.0
       GOTRUE_API_PORT: 9999
-      API_EXTERNAL_URL: http://localhost:54321
+      API_EXTERNAL_URL: http://localhost:54322
       GOTRUE_DB_DRIVER: postgres
       GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@supabase-db:5432/postgres?search_path=auth
-      GOTRUE_SITE_URL: http://localhost:54321
+      GOTRUE_SITE_URL: http://localhost:54322
       GOTRUE_URI_ALLOW_LIST: "*"
       GOTRUE_DISABLE_SIGNUP: "false"
       GOTRUE_JWT_ADMIN_ROLES: service_role
@@ -117,7 +117,7 @@ services:
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
       GOTRUE_MAILER_AUTOCONFIRM: "true"
     ports:
-      - "54324:9999"
+      - "54325:9999"  # Changed from 54324 to avoid conflicts
     restart: unless-stopped
 
   supabase-kong:
@@ -137,8 +137,8 @@ services:
       KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
       KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
     ports:
-      - "54320:8000"  # Kong proxy port
-      - "54323:8443"  # Kong proxy SSL port
+      - "54326:8000"  # Changed from 54320 to avoid conflicts
+      - "54327:8443"  # Changed from 54323 to avoid conflicts
     volumes:
       - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
     restart: unless-stopped
@@ -150,12 +150,12 @@ services:
         condition: service_started
     environment:
       SUPABASE_URL: http://supabase-kong:8000
-      SUPABASE_REST_URL: http://localhost:54321/rest/v1/
+      SUPABASE_REST_URL: http://localhost:54322/rest/v1/
       STUDIO_PG_META_URL: http://supabase-kong:8000/pg
       SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
       SUPABASE_SERVICE_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU
     ports:
-      - "54323:3000"
+      - "54328:3000"  # Changed from 54323 to avoid conflicts
     restart: unless-stopped
 
 volumes:
