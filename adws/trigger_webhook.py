@@ -13,19 +13,55 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
+from typing import Tuple
 
-if __package__ is None or __package__ == "":
-    import sys
-    from pathlib import Path
-
-    sys.path.append(str(Path(__file__).resolve().parent.parent))
-
-from adws.utils import load_adw_env, make_adw_id, project_root, run_logs_dir
+from adws.adw_modules.github import ADW_BOT_IDENTIFIER
+from adws.adw_modules.utils import load_adw_env, make_adw_id, project_root, run_logs_dir
 
 load_adw_env()
 
 PORT = int(os.getenv("PORT", "8001"))
 RUNNER_IMAGE = os.getenv("ADW_RUNNER_IMAGE", "kotadb-adw-runner:latest")
+DEFAULT_WORKFLOW = "adw_plan_build_test.py"
+WORKFLOW_COMMANDS = {
+    "plan": "adw_plan.py",
+    "build": "adw_build.py",
+    "test": "adw_test.py",
+    "review": "adw_review.py",
+    "document": "adw_document.py",
+    "patch": "adw_patch.py",
+    "plan-build": "adw_plan_build.py",
+    "plan-build-test": "adw_plan_build_test.py",
+    "plan-build-review": "adw_plan_build_review.py",
+    "plan-build-test-review": "adw_plan_build_test_review.py",
+    "plan-build-document": "adw_plan_build_document.py",
+    "sdlc": "adw_sdlc.py",
+}
+
+
+def resolve_workflow_from_comment(body: str) -> tuple[str | None, str | None]:
+    """Return (script, command_label) if bodycontains an /adw command."""
+
+    if not body:
+        return None, None
+
+    normalised = body.strip().lower()
+    if ADW_BOT_IDENTIFIER.lower() in normalised:
+        return None, None
+
+    prefixes = ("/adw", "adw")
+    for prefix in prefixes:
+        if normalised.startswith(prefix):
+            remainder = normalised[len(prefix):].strip()
+            if not remainder:
+                return WORKFLOW_COMMANDS.get("plan-build-test", DEFAULT_WORKFLOW), "plan-build-test"
+            token = remainder.split()[0].replace("_", "-")
+            workflow = WORKFLOW_COMMANDS.get(token)
+            return workflow, token
+
+    return None, None
+
+
 DOCKER_BIN = os.getenv("ADW_DOCKER_BIN", "docker")
 ADW_GIT_REF = os.getenv("ADW_GIT_REF", os.getenv("ADW_GIT_BRANCH", "main"))
 ADW_REPO_URL = os.getenv("ADW_REPO_URL")
@@ -86,16 +122,18 @@ async def github_webhook(request: Request) -> dict[str, object]:
 
         print(f"Received webhook event={event_type} action={action} issue={issue_number}")
 
-        trigger_reason = None
-        if event_type == "issues" and action == "opened" and issue_number:
-            trigger_reason = "New issue opened"
-        elif event_type == "issue_comment" and action == "created" and issue_number:
-            comment = payload.get("comment", {})
-            comment_body = (comment.get("body") or "").strip().lower()
-            if comment_body == "adw":
-                trigger_reason = "Comment command 'adw'"
+        trigger_reason: str | None = None
+        workflow_script: str | None = None
+        command_label: str | None = None
 
-        if not trigger_reason:
+        if event_type == "issue_comment" and action == "created" and issue_number:
+            comment = payload.get("comment", {})
+            comment_body = (comment.get("body") or "")
+            workflow_script, command_label = resolve_workflow_from_comment(comment_body)
+            if workflow_script:
+                trigger_reason = f"Issue comment command '{command_label}'"
+
+        if not trigger_reason or not workflow_script:
             return {"status": "ignored", "reason": f"No trigger rule matched ({event_type}/{action})"}
 
         adw_id = make_adw_id()
@@ -119,6 +157,8 @@ async def github_webhook(request: Request) -> dict[str, object]:
                 f"ADW_ID={adw_id}",
                 "-e",
                 f"ADW_GIT_REF={ADW_GIT_REF}",
+                "-e",
+                f"ADW_WORKFLOW={workflow_script}",
             ]
         )
         if ADW_REPO_URL:
@@ -149,8 +189,8 @@ async def github_webhook(request: Request) -> dict[str, object]:
         ]
 
         print(
-            "Launching background workflow for issue #{issue_number} "
-            f"({trigger_reason}) → {' '.join(docker_cmd)}"
+            f"Launching background workflow for issue #{issue_number} "
+            f"({trigger_reason}) using {workflow_script} → {' '.join(docker_cmd)}"
         )
 
         subprocess.Popen(  # noqa: S603 - intentional background execution
@@ -169,6 +209,7 @@ async def github_webhook(request: Request) -> dict[str, object]:
             "issue": issue_number,
             "adw_id": adw_id,
             "reason": trigger_reason,
+            "workflow": workflow_script,
             "logs": str(relative_log_dir),
         }
     except Exception as exc:  # noqa: BLE001 - ensure webhook ack

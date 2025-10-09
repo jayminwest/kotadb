@@ -1,162 +1,166 @@
 # KotaDB AI Developer Workflow (ADW)
 
-This package orchestrates planning, implementation, and validation for KotaDB issues using Claude Code and the GitHub CLI. It mirrors the TAC automation stack while tailoring validation to our Bun/TypeScript toolchain.
+The ADW toolchain automates the SDLC loop for GitHub issues by coordinating Claude Code agents, Bun validation, GitHub CLI, and git operations. The implementation mirrors the modular TAC stack while preserving KotaDB-specific validation defaults.
 
-## Components
-- `adw_plan_build.py` – end-to-end workflow runner (classification → plan → implement → PR).
-- `agent.py` – thin wrapper around Claude Code CLI for prompts/templates with run-scoped logging.
-- `github.py` – GitHub CLI helpers for fetching issues, commenting, polling, and branch hygiene.
-- `trigger_cron.py` – 20-second poller that auto-runs the workflow for new issues or `adw` comment pings.
-- `trigger_webhook.py` – FastAPI server that responds to GitHub webhooks and launches workflows asynchronously.
-- `health_check.py` – composite readiness probe (environment variables, git, Bun toolchain, GitHub CLI, Claude CLI).
-- `ts_helpers.py` – Bun/TypeScript command catalogue for validation steps.
-- `utils.py` – shared helpers for log directories, run IDs, environment scoping, and logging.
+All entrypoints are declared as `uv run` scripts so they execute without bespoke virtualenv setup.
 
-All scripts are declared as `uv run` entry points so they can execute without virtualenv setup.
+---
 
-## System Diagram
+## Module Layout
+
 ```
-┌────────────────┐      ┌────────────────────┐      ┌──────────────────┐
-│  GitHub Issue  │──┐   │ adw_plan_build.py │──┐   │ Claude Code CLI │
-└────────────────┘  │   └────────────────────┘  │   └──────────────────┘
-                    │                           │
-                    ▼                           ▼
-             ┌────────────┐             ┌────────────────┐
-             │ github.py  │◄──────────►│ agent.py        │
-             └────────────┘             └────────────────┘
-                    │                           │
-                    ▼                           ▼
-             ┌────────────┐             ┌────────────────┐
-             │ GitHub CLI │             │ Claude Outputs │
-             └────────────┘             └────────────────┘
-                    │                           │
-                    ▼                           ▼
-             ┌────────────┐             ┌────────────────┐
-             │ git branch │             │ logs/<ADW_ID>/ │
-             └────────────┘             └────────────────┘
+adws/
+├── adw_modules/          # Shared core (agents, state, git, workflows)
+│   ├── agent.py          # Claude CLI execution wrapper
+│   ├── data_types.py     # Pydantic models + command enumerations
+│   ├── git_ops.py        # git checkout/commit/push helpers
+│   ├── github.py         # gh CLI accessors, bot annotations
+│   ├── orchestrators.py  # Composite phase runner utilities
+│   ├── state.py          # Persistent ADW state management
+│   ├── ts_commands.py    # Bun validation command catalogue
+│   ├── utils.py          # Env loading, logging, JSON helpers
+│   └── workflow_ops.py   # Agent wrappers for plan/build/test/review/etc.
+├── adw_plan.py           # Plan phase (classify → branch → plan → PR)
+├── adw_build.py          # Build phase (implement plan + push)
+├── adw_test.py           # Validation phase (Bun lint/typecheck/test/build)
+├── adw_review.py         # Review phase (Claude review + reporting)
+├── adw_document.py       # Documentation phase (docs-update + commits)
+├── adw_patch.py          # Patch phase (comment-driven quick fixes)
+├── adw_plan_build*.py    # Composite orchestrators chaining phases
+├── adw_sdlc.py           # Full SDLC (plan → build → test → review → docs)
+├── adw_tests/            # Pytest suite covering utilities and workflows
+├── trigger_cron.py       # Poll-based trigger that launches a workflow
+├── trigger_webhook.py    # FastAPI webhook trigger (comment driven)
+└── health_check.py       # Environment readiness probe
 ```
 
-## Data Flows
-1. **Trigger** – Operator invokes `uv run adw/adw_plan_build.py <issue>` or an automated trigger fires. `health_check.py` may run beforehand to verify prerequisites.
-2. **Issue fetch** – `adw_plan_build.py` resolves the repo via `github.py`, pulls the issue JSON using `gh issue view`, and saves metadata to the run log.
-3. **Classification** – The runner calls `agent.py` with `/classify_issue`, streaming prompts and JSONL output into `logs/kota-db-ts/<env>/<adw_id>/issue_classifier/`.
-4. **Planning** – Planner prompts (`/feature`, `/bug`, `/chore`) generate a spec under `specs/`. `adw_plan_build.py` persists prompts, captures resulting plan text, and records the plan path.
-5. **Branch & commits** – `/generate_branch_name` creates and checks out the working branch. `/commit` stages and commits changes after planning and implementation stages.
-6. **Implementation** – `/implement` consumes the plan file, applies code changes, runs validation commands (Bun lint/typecheck/test/build), and logs command output paths.
-7. **Pull request** – `/pull_request` pushes the branch, builds the PR body, and captures the PR URL for issue comments.
-8. **Issue updates** – `adw_plan_build.py` posts status comments and final success messages via `github.py`.
+---
 
-## Architecture Notes
-- **Control Plane**: `adw_plan_build.py` orchestrates sequential stages, relying on typed contracts from `data_types.py` and utilities from `utils.py` for logging and IDs.
-- **Execution Plane**: `agent.py` isolates Claude Code CLI invocation, saving prompts and JSONL responses for transparency and future replay.
-- **Integration Layer**: `github.py` is the sole gateway to GitHub, keeping CLI invocations centralised and observable.
-- **Validation Layer**: Bun commands (lint, typecheck, test, build) form the default quality gates; additional steps can be injected via plan files or environment profiles under `adws/environments/`.
-- **Observability**: All prompts, raw outputs, and execution logs are written beneath `logs/kota-db-ts/<env>/<adw_id>/`, enabling audit trails for every automation run.
+## Phase Scripts
 
-## Required Toolchain
-- Bun + TypeScript (`bun run lint`, `bun run typecheck`, `bun test`, `bun run build`).
-- GitHub CLI (`gh`) authenticated with `gh auth login` or `GITHUB_PAT`.
-- Claude Code CLI reachable via `CLAUDE_CODE_PATH` (defaults to `claude`).
+Each single-phase script expects `ISSUE_NUMBER [ADW_ID]` and persists progress to `agents/<adw_id>/adw_state.json`:
 
-## Logs & Run Artifacts
-Run metadata is rooted at `logs/kota-db-ts/<env>/<adw_id>/`:
-- `adw_plan_build/` – execution logs per workflow.
-- `<agent>/raw_output.jsonl` – Claude streaming output per agent.
-- `<agent>/prompts/` – saved prompts for auditability.
+- `adw_plan.py` — classify the issue, generate a branch + plan file, commit the plan, and open/update the PR.
+- `adw_build.py` — resume from state, implement the plan, commit code, and push.
+- `adw_test.py` — run Bun lint/typecheck/test/build (auto-includes `bun install` if lockfiles changed) and record results.
+- `adw_review.py` — run the reviewer agent against the spec, summarise findings, and block on unresolved blockers.
+- `adw_document.py` — produce documentation updates via `/document` (or `/docs-update` fallback) and commit/push changes.
+- `adw_patch.py` — apply targeted fixes when an issue/comment contains the `adw_patch` keyword.
 
-Override the base directory with `ADW_LOG_ROOT` if needed.
+Composite runners (e.g. `adw_plan_build_test.py`, `adw_sdlc.py`) simply chain single-phase scripts using `adw_modules.orchestrators.run_sequence`.
 
-## Usage
+---
+
+## Tests
+
+The beginnings of an automated regression suite lives under `adws/adw_tests/`:
+
+- `test_utils.py` — verifies JSON parsing helpers for agent output.
+- `test_state.py` — exercises persistent state creation and rehydration.
+- `test_workflow_ops.py` — covers validation summarisation, lockfile detection, and issue comment formatting.
+
+Run locally with:
+
 ```bash
-# Health check all prerequisites
+uv run pytest adws/adw_tests
+```
+
+The tests avoid live API calls by using temporary directories and subprocess stubs.
+
+---
+
+## Logs & State
+
+Run metadata is rooted at `logs/kota-db-ts/<env>/<adw_id>/`:
+
+- `<phase>/execution.log` — structured logger output per phase.
+- `<agent>/raw_output.jsonl` — Claude streaming output.
+- `<agent>/prompts/` — rendered prompt templates for auditability.
+
+Persistent automation state lands in `agents/<adw_id>/adw_state.json` (branch, plan path, classification, etc.). Override the base directories with `ADW_LOG_ROOT` if necessary.
+
+---
+
+## Toolchain & Credentials
+
+| Requirement      | Notes                                                                 |
+| ---------------- | --------------------------------------------------------------------- |
+| Bun/TypeScript   | `bun run lint`, `bun run typecheck`, `bun test`, `bun run build`      |
+| GitHub CLI       | `gh auth login` or `GITHUB_PAT`                                       |
+| Claude Code CLI  | `CLAUDE_CODE_PATH` (defaults to `claude`)                             |
+| Environment vars | `ANTHROPIC_API_KEY`, optional `E2B_API_KEY`, `ADW_ENV`, log overrides |
+
+Dotenv loading order: repository `.env` ➜ `ADW_ENV_FILE` (if set) ➜ `adws/.env*`.
+
+---
+
+## Usage Examples
+
+```bash
+# Health check prerequisites
 uv run adws/health_check.py --json
 
-# Post health check summary to issue #42
-uv run adws/health_check.py --issue 42
+# Plan + build + test pipeline for issue #123
+uv run adws/adw_plan_build_test.py 123
 
-# Process a single issue (creates plan, commits, PR)
-uv run adws/adw_plan_build.py 1234
+# Restart a run with a known ADW id
+uv run adws/adw_build.py 123 deadbeef
 
-# Resume/debug an existing run id
-uv run adws/adw_plan_build.py 1234 deadbeef
+# Patch mode (requires `adw_patch` keyword in issue/comment)
+uv run adws/adw_patch.py 123 deadbeef
 ```
+
+---
 
 ## Automation Triggers
-- **Cron poller** – `uv run adws/trigger_cron.py`
-  - Polls open issues every 20 seconds.
-  - Runs the workflow when an issue has no comments or the latest comment is exactly `adw`.
-- **Webhook server** – `PORT=8001 uv run adws/trigger_webhook.py`
-  - Exposes `POST /gh-webhook` for GitHub Issues & Issue Comment events and `GET /health` for liveness checks.
-  - Containerised deployments use `docker run` to launch an isolated runner per issue (see below).
+
+- **Cron poller** (`uv run adws/trigger_cron.py`)  
+  Polls open issues every 20 seconds. A workflow launches when the latest comment (excluding ADW bot posts) is exactly `adw`. The cron trigger runs `adw_plan_build_test.py` by default.
+
+- **Webhook server** (`PORT=8001 uv run adws/trigger_webhook.py`)  
+  FastAPI endpoint that reacts to issue comment commands. Examples:
+  - `/adw plan-build-test` → `adw_plan_build_test.py`
+  - `/adw review` → `adw_review.py`
+  - `/adw sdlc` → `adw_sdlc.py`
+  The webhook injects `ADW_WORKFLOW` into the runner container so the appropriate script executes.
+
+Both surfaces write logs beneath `logs/kota-db-ts/…` so bot activity is observable.
+
+---
 
 ## Validation Defaults
-Automation expects the following commands to succeed unless the plan specifies extras:
-- `bun run lint`
-- `bun run typecheck`
-- `bun test`
-- `bun run build`
 
-Ensure plans and implementation steps call out additional scripts (seeders, migrations, smoke tests) when required.
+Unless overridden by the plan or environment, the build/test phases enforce:
 
-## Credentials
-Copy `adws/.env.sample` to `adws/.env` and populate:
-- `ANTHROPIC_API_KEY`
-- Optional: `CLAUDE_CODE_PATH`, `GITHUB_PAT`, `E2B_API_KEY`
+1. `bun run lint`  
+2. `bun run typecheck`  
+3. `bun test`  
+4. `bun run build`
 
-Restrict production/staging secrets to approved environments. Use the `ADW_ENV` environment variable to scope log directories and credential suffixing.
+The test phase automatically injects `bun install` when a recognised lockfile is dirty. Extend `ts_commands.py` if project-specific commands are needed.
 
-Shared runtime values (e.g. `ADW_ENV`, log paths) remain in the root `.env`; defining them inside `adws/.env` overrides the shared defaults for automation runs.
-Set `ADW_ENV_FILE` to a custom path (e.g. `.env.adws`) if you prefer to source secrets from a different dotenv file.
+---
 
-## Containerised Deployment
+## Containerised Deployment (Optional)
 
-Two container images orchestrate the automation:
+Two Docker images power remote execution:
 
-- `docker/adw-webhook.Dockerfile` builds the FastAPI webhook service. It requires Docker socket access to launch sandboxed runs and persists automation logs under `.adw_logs/`.
-- `docker/adw-runner.Dockerfile` builds an execution environment containing Python, uv, Bun, Node (Claude CLI), and the GitHub CLI. Each workflow executes inside this container, starting from a clean clone of the repository.
-
-### Build the images
+| Image                     | Purpose                                         |
+| ------------------------- | ----------------------------------------------- |
+| `docker/adw-webhook`      | Exposes the FastAPI webhook + cron helper       |
+| `docker/adw-runner`       | Ephemeral runtime with Bun, Claude CLI, and gh  |
 
 ```bash
+# Build images
 docker compose build adw_runner adw_webhook
-```
 
-The compose file publishes the runner image locally as `kotadb-adw-runner:latest`; the webhook image references it via `ADW_RUNNER_IMAGE`.
-
-### Run the webhook 24/7
-
-```bash
-# start the webhook and keep it running
+# Run webhook + triggers
 docker compose up -d adw_webhook
-
-# view logs / health
-docker compose logs -f adw_webhook
-curl http://localhost:3000/health
 ```
 
-The service mounts `/var/run/docker.sock` and a persisted `adw_logs` volume so issue runs remain sandboxed yet auditable. Cloudflare Tunnel can forward traffic to port `3000` as before.
+The webhook expects Docker socket access to spawn runner containers and persists logs via the mounted `.adw_logs` volume. Integrate with systemd or your orchestrator of choice for restarts.
 
-### Boot-time restart (systemd example)
-
-Create `/etc/systemd/system/adw-webhook.service`:
-
-```
-[Unit]
-Description=KotaDB ADW Webhook
-After=docker.service
-Requires=docker.service
-
-[Service]
-Type=oneshot
-RemainAfterExit=yes
-WorkingDirectory=/srv/kotadb
-ExecStart=/usr/bin/docker compose up -d adw_webhook
-ExecStop=/usr/bin/docker compose down adw_webhook
-TimeoutStartSec=0
-
-[Install]
-WantedBy=multi-user.target
-```
+---
 
 Enable and start:
 

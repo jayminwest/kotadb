@@ -1,0 +1,206 @@
+#!/usr/bin/env -S uv run
+# /// script
+# dependencies = ["python-dotenv", "pydantic"]
+# ///
+
+"""Build phase for the AI Developer Workflow."""
+
+from __future__ import annotations
+
+import json
+import logging
+import os
+import shutil
+import sys
+from typing import Optional
+
+from adws.adw_modules import git_ops
+from adws.adw_modules.git_ops import GitError
+from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
+from adws.adw_modules.state import ADWState, StateNotFoundError
+from adws.adw_modules.utils import load_adw_env
+from adws.adw_modules.workflow_ops import (
+    AGENT_IMPLEMENTOR,
+    classify_issue,
+    create_commit_message,
+    create_pull_request,
+    ensure_plan_exists,
+    format_issue_message,
+    implement_plan,
+    persist_issue_snapshot,
+    start_logger,
+)
+
+
+def check_env(logger: logging.Logger) -> None:
+    """Ensure required environment variables and executables are present."""
+
+    required = ["ANTHROPIC_API_KEY"]
+    missing = [var for var in required if not os.getenv(var)]
+
+    claude_path = (os.getenv("CLAUDE_CODE_PATH") or "claude").strip()
+    if not shutil.which(claude_path):
+        missing.append(f"CLAUDE_CODE_PATH (CLI not found at '{claude_path}')")
+
+    if missing:
+        for item in missing:
+            logger.error(f"Missing prerequisite: {item}")
+        sys.exit(1)
+
+
+def parse_args(argv: list[str]) -> tuple[str, str]:
+    if len(argv) < 3:
+        print("Usage: uv run adws/adw_build.py <issue-number> <adw-id>", file=sys.stderr)
+        sys.exit(1)
+    return argv[1], argv[2]
+
+
+def load_state(adw_id: str, logger: logging.Logger) -> ADWState:
+    try:
+        return ADWState.load(adw_id)
+    except StateNotFoundError:
+        logger.error(f"No state found for ADW ID {adw_id}. Run adws/adw_plan.py first.")
+        sys.exit(1)
+
+
+def main() -> None:
+    load_adw_env()
+    issue_number, adw_id = parse_args(sys.argv)
+    logger = start_logger(adw_id, "adw_build")
+    logger.info(f"Build phase start | issue #{issue_number} | adw_id={adw_id}")
+
+    state = load_state(adw_id, logger)
+    if state.issue_number:
+        issue_number = state.issue_number
+
+    check_env(logger)
+
+    try:
+        repo_url = get_repo_url()
+        repo_path = extract_repo_path(repo_url)
+    except ValueError as exc:
+        logger.error(f"Unable to resolve repository: {exc}")
+        sys.exit(1)
+
+    if not state.branch_name:
+        logger.error("No branch name in state. Run adws/adw_plan.py first.")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", "❌ Missing branch information. Run planning first."),
+        )
+        sys.exit(1)
+
+    plan_file = ensure_plan_exists(state, issue_number)
+    if not os.path.exists(plan_file):
+        logger.error(f"Plan file missing: {plan_file}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Plan file missing: {plan_file}"),
+        )
+        sys.exit(1)
+
+    try:
+        git_ops.checkout_branch(state.branch_name, create=False)
+    except GitError as exc:
+        logger.error(f"Failed to checkout branch {state.branch_name}: {exc}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Failed to checkout branch {state.branch_name}: {exc}"),
+        )
+        sys.exit(1)
+    logger.info(f"Checked out branch {state.branch_name}")
+
+    issue = fetch_issue(issue_number, repo_path)
+    persist_issue_snapshot(state, issue)
+    state.save()
+
+    make_issue_comment(issue_number, format_issue_message(adw_id, "ops", "✅ Starting implementation phase"))
+
+    implement_response = implement_plan(plan_file, adw_id, logger)
+    if not implement_response.success:
+        logger.error(f"Implementation failed: {implement_response.output}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error implementing plan: {implement_response.output}"),
+        )
+        sys.exit(1)
+
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Solution implemented"),
+    )
+
+    issue_command = state.issue_class
+    if not issue_command:
+        issue_command, error = classify_issue(issue, adw_id, logger)
+        if error or not issue_command:
+            logger.warning(f"Classification unavailable, defaulting to /feature: {error}")
+            issue_command = "/feature"  # type: ignore[assignment]
+        else:
+            state.update(issue_class=issue_command)
+            state.save()
+
+    commit_message, error = create_commit_message(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger)
+    if error or not commit_message:
+        logger.error(f"Implementation commit message failure: {error}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error drafting commit: {error}"),
+        )
+        sys.exit(1)
+
+    committed, commit_error = git_ops.commit_all(commit_message)
+    if not committed:
+        logger.error(f"Implementation commit failed: {commit_error}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error committing implementation: {commit_error}"),
+        )
+        sys.exit(1)
+
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed"),
+    )
+
+    pushed, push_error = git_ops.push_branch(state.branch_name)
+    if not pushed:
+        logger.error(f"Branch push failed: {push_error}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Error pushing branch: {push_error}"),
+        )
+    else:
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {state.branch_name}"),
+        )
+
+    if pushed and state.plan_file:
+        pr_url, pr_error = create_pull_request(state.branch_name, issue, state.plan_file, adw_id, logger)
+        if pr_error:
+            logger.error(f"Pull request update failed: {pr_error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"❌ Error updating pull request: {pr_error}"),
+            )
+        elif pr_url:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"✅ Pull request updated: {pr_url}"),
+            )
+
+    state.save()
+    make_issue_comment(
+        issue_number,
+        f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\\n```json\\n{json.dumps(state.data, indent=2)}\\n```",
+    )
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, "ops", "✅ Build phase completed"),
+    )
+    logger.info("Build phase completed successfully")
+
+
+if __name__ == "__main__":
+    main()
