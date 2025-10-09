@@ -1,178 +1,316 @@
-import type { Database } from "bun:sqlite";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import type { IndexRequest, IndexedFile } from "@shared/index";
 
 export interface SearchOptions {
-  projectRoot?: string;
+  repositoryId?: string;
   limit?: number;
 }
 
 /**
  * Record a new index run for a repository.
  *
- * @param db - SQLite database instance
+ * @param client - Supabase client instance
  * @param request - Index request details
- * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
+ * @param userId - User UUID for RLS context
+ * @param repositoryId - Repository UUID
  * @param status - Initial status (default: "pending")
- * @returns Index run ID
+ * @returns Index job UUID
  */
-export function recordIndexRun(
-  db: Database,
+export async function recordIndexRun(
+  client: SupabaseClient,
   request: IndexRequest,
   userId: string,
+  repositoryId: string,
   status = "pending"
-): number {
-  // TODO: Set RLS context when migrated to Supabase
-  // For now, userId is accepted but not used in SQLite
-  const statement = db.prepare(
-    `INSERT INTO index_runs (repository, ref, status)
-     VALUES (?, ?, ?)`
-  );
+): Promise<string> {
+  const { data, error } = await client
+    .from("index_jobs")
+    .insert({
+      repository_id: repositoryId,
+      ref: request.ref ?? null,
+      status,
+      started_at: new Date().toISOString(),
+    })
+    .select("id")
+    .single();
 
-  const result = statement.run(request.repository, request.ref ?? null, status);
-  return Number(result.lastInsertRowid);
+  if (error) {
+    throw new Error(`Failed to record index run: ${error.message}`);
+  }
+
+  return data.id;
 }
 
-export function updateIndexRunStatus(db: Database, id: number, status: string): void {
-  const statement = db.prepare(
-    `UPDATE index_runs
-       SET status = ?,
-           updated_at = datetime('now')
-     WHERE id = ?`
-  );
+/**
+ * Update the status of an index job.
+ *
+ * @param client - Supabase client instance
+ * @param id - Index job UUID
+ * @param status - New status value
+ * @param errorMessage - Optional error message if status is "failed"
+ */
+export async function updateIndexRunStatus(
+  client: SupabaseClient,
+  id: string,
+  status: string,
+  errorMessage?: string
+): Promise<void> {
+  const updateData: {
+    status: string;
+    completed_at?: string;
+    error_message?: string;
+  } = {
+    status,
+  };
 
-  statement.run(status, id);
+  if (status === "completed" || status === "failed") {
+    updateData.completed_at = new Date().toISOString();
+  }
+
+  if (errorMessage) {
+    updateData.error_message = errorMessage;
+  }
+
+  const { error } = await client
+    .from("index_jobs")
+    .update(updateData)
+    .eq("id", id);
+
+  if (error) {
+    throw new Error(`Failed to update index run status: ${error.message}`);
+  }
 }
 
 /**
  * Save indexed files to database.
  *
- * @param db - SQLite database instance
+ * @param client - Supabase client instance
  * @param files - Array of indexed files
- * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
+ * @param userId - User UUID for RLS context
+ * @param repositoryId - Repository UUID
  * @returns Number of files saved
  */
-export function saveIndexedFiles(db: Database, files: IndexedFile[], userId: string): number {
+export async function saveIndexedFiles(
+  client: SupabaseClient,
+  files: IndexedFile[],
+  userId: string,
+  repositoryId: string
+): Promise<number> {
   if (files.length === 0) {
     return 0;
   }
 
-  // TODO: Set RLS context when migrated to Supabase
-  // For now, userId is accepted but not used in SQLite
+  const records = files.map((file) => ({
+    repository_id: repositoryId,
+    path: file.path,
+    content: file.content,
+    language: detectLanguage(file.path),
+    size_bytes: new TextEncoder().encode(file.content).length,
+    indexed_at: file.indexedAt.toISOString(),
+    metadata: {
+      dependencies: file.dependencies,
+    },
+  }));
 
-  const insert = db.prepare(
-    `INSERT INTO files (project_root, path, content, dependencies, indexed_at)
-     VALUES (?, ?, ?, ?, ?)
-     ON CONFLICT(project_root, path) DO UPDATE SET
-       content = excluded.content,
-       dependencies = excluded.dependencies,
-       indexed_at = excluded.indexed_at`
-  );
+  const { error, count } = await client
+    .from("indexed_files")
+    .upsert(records, {
+      onConflict: "repository_id,path",
+    });
 
-  const run = db.transaction((batch: IndexedFile[]) => {
-    for (const file of batch) {
-      insert.run(
-        file.projectRoot,
-        file.path,
-        file.content,
-        JSON.stringify(file.dependencies),
-        file.indexedAt.toISOString()
-      );
-    }
-  });
+  if (error) {
+    throw new Error(`Failed to save indexed files: ${error.message}`);
+  }
 
-  run(files);
-  return files.length;
+  return count ?? files.length;
 }
 
 /**
  * Search indexed files by content term.
  *
- * @param db - SQLite database instance
+ * @param client - Supabase client instance
  * @param term - Search term to match in file content
- * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
- * @param options - Search options (projectRoot filter, limit)
+ * @param userId - User UUID for RLS context
+ * @param options - Search options (repositoryId filter, limit)
  * @returns Array of matching indexed files
  */
-export function searchFiles(
-  db: Database,
+export async function searchFiles(
+  client: SupabaseClient,
   term: string,
   userId: string,
   options: SearchOptions = {}
-) {
-  // TODO: Set RLS context when migrated to Supabase
-  // For now, userId is accepted but not used in SQLite
-
+): Promise<IndexedFile[]> {
   const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
-  const conditions: string[] = [];
-  const parameters: Array<string | number> = [];
 
-  conditions.push("content LIKE ?");
-  parameters.push(`%${term}%`);
+  let query = client
+    .from("indexed_files")
+    .select("id, repository_id, path, content, metadata, indexed_at")
+    .ilike("content", `%${term}%`)
+    .order("indexed_at", { ascending: false })
+    .limit(limit);
 
-  if (options.projectRoot) {
-    conditions.push("project_root = ?");
-    parameters.push(options.projectRoot);
+  if (options.repositoryId) {
+    query = query.eq("repository_id", options.repositoryId);
   }
 
-  const statement = db.prepare(
-    `SELECT project_root, path, content, dependencies, indexed_at
-       FROM files
-      WHERE ${conditions.join(" AND ")}
-      ORDER BY indexed_at DESC
-      LIMIT ?`
-  );
+  const { data, error } = await query;
 
-  parameters.push(limit);
+  if (error) {
+    throw new Error(`Failed to search files: ${error.message}`);
+  }
 
-  const rows = statement.all(...parameters) as Array<{
-    project_root: string;
-    path: string;
-    content: string;
-    dependencies: string;
-    indexed_at: string;
-  }>;
-
-  return rows.map((row) => ({
-    projectRoot: row.project_root,
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    projectRoot: row.repository_id, // Keep compatibility with existing API
     path: row.path,
     content: row.content,
-    dependencies: JSON.parse(row.dependencies) as string[],
-    indexedAt: new Date(row.indexed_at)
+    dependencies: (row.metadata as { dependencies?: string[] })?.dependencies ?? [],
+    indexedAt: new Date(row.indexed_at),
   }));
 }
 
 /**
  * List recently indexed files.
  *
- * @param db - SQLite database instance
+ * @param client - Supabase client instance
  * @param limit - Maximum number of files to return
- * @param userId - User UUID for RLS context (will be enforced when migrated to Supabase)
+ * @param userId - User UUID for RLS context
  * @returns Array of recently indexed files
  */
-export function listRecentFiles(db: Database, limit: number, userId: string): IndexedFile[] {
-  // TODO: Set RLS context when migrated to Supabase
-  // For now, userId is accepted but not used in SQLite
+export async function listRecentFiles(
+  client: SupabaseClient,
+  limit: number,
+  userId: string
+): Promise<IndexedFile[]> {
+  const { data, error } = await client
+    .from("indexed_files")
+    .select("id, repository_id, path, content, metadata, indexed_at")
+    .order("indexed_at", { ascending: false })
+    .limit(limit);
 
-  const statement = db.prepare(
-    `SELECT project_root, path, content, dependencies, indexed_at
-       FROM files
-      ORDER BY indexed_at DESC
-      LIMIT ?`
-  );
+  if (error) {
+    throw new Error(`Failed to list recent files: ${error.message}`);
+  }
 
-  const rows = statement.all(limit) as Array<{
-    project_root: string;
-    path: string;
-    content: string;
-    dependencies: string;
-    indexed_at: string;
-  }>;
-
-  return rows.map((row) => ({
-    projectRoot: row.project_root,
+  return (data ?? []).map((row) => ({
+    id: row.id,
+    projectRoot: row.repository_id, // Keep compatibility with existing API
     path: row.path,
     content: row.content,
-    dependencies: JSON.parse(row.dependencies) as string[],
-    indexedAt: new Date(row.indexed_at)
+    dependencies: (row.metadata as { dependencies?: string[] })?.dependencies ?? [],
+    indexedAt: new Date(row.indexed_at),
   }));
+}
+
+/**
+ * Ensure repository exists in database, create if not.
+ * Returns repository UUID.
+ *
+ * @param client - Supabase client instance
+ * @param userId - User UUID for RLS context
+ * @param request - Index request with repository details
+ * @returns Repository UUID
+ */
+export async function ensureRepository(
+  client: SupabaseClient,
+  userId: string,
+  request: IndexRequest
+): Promise<string> {
+  const fullName = request.repository;
+  const gitUrl = request.localPath
+    ? request.localPath
+    : `${process.env.KOTA_GIT_BASE_URL ?? "https://github.com"}/${fullName}.git`;
+
+  // Check if repository exists
+  const { data: existing } = await client
+    .from("repositories")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("full_name", fullName)
+    .maybeSingle();
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Create new repository
+  const { data: newRepo, error } = await client
+    .from("repositories")
+    .insert({
+      user_id: userId,
+      full_name: fullName,
+      git_url: gitUrl,
+      default_branch: request.ref ?? "main",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create repository: ${error.message}`);
+  }
+
+  return newRepo.id;
+}
+
+/**
+ * Run the indexing workflow for a repository.
+ * This is the async background task that performs the actual indexing.
+ *
+ * @param client - Supabase client instance
+ * @param request - Index request details
+ * @param runId - Index job UUID
+ * @param userId - User UUID for RLS context
+ * @param repositoryId - Repository UUID
+ */
+export async function runIndexingWorkflow(
+  client: SupabaseClient,
+  request: IndexRequest,
+  runId: string,
+  userId: string,
+  repositoryId: string
+): Promise<void> {
+  const { existsSync } = await import("node:fs");
+  const { prepareRepository } = await import("@indexer/repos");
+  const { discoverSources, parseSourceFile } = await import("@indexer/parsers");
+
+  const repo = await prepareRepository(request);
+
+  if (!existsSync(repo.localPath)) {
+    console.warn(`Indexing skipped: path ${repo.localPath} does not exist.`);
+    await updateIndexRunStatus(client, runId, "skipped");
+    return;
+  }
+
+  const sources = await discoverSources(repo.localPath);
+  const records = (
+    await Promise.all(sources.map((source) => parseSourceFile(source, repo.localPath)))
+  ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  await saveIndexedFiles(client, records, userId, repositoryId);
+  await updateIndexRunStatus(client, runId, "completed");
+}
+
+/**
+ * Detect programming language from file path.
+ * Helper function for metadata enrichment.
+ */
+function detectLanguage(path: string): string {
+  const ext = path.split(".").pop()?.toLowerCase();
+  const languageMap: Record<string, string> = {
+    ts: "typescript",
+    tsx: "typescript",
+    js: "javascript",
+    jsx: "javascript",
+    mjs: "javascript",
+    cjs: "javascript",
+    json: "json",
+    py: "python",
+    go: "go",
+    rs: "rust",
+    java: "java",
+    cpp: "cpp",
+    c: "c",
+    h: "c",
+  };
+  return languageMap[ext ?? ""] ?? "unknown";
 }

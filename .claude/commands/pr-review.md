@@ -13,10 +13,12 @@ Review another contributor’s pull request. Provide the PR number via `$ARGUMEN
 ## Code Inspection
 - Examine diffs module-by-module (`gh pr diff --stat`, `git diff`), focusing on correctness, performance, and security.
 - Highlight risky changes, missing edge cases, or deviations from plan/architecture.
+- Reject new mocks/stubs unless covered by `/anti-mock` exceptions with documented follow-up.
 
 ## Tests & Tooling
 - Execute the validation level appropriate to the changes (Level 2 from `/validate-implementation` minimum; Level 3 for high-risk work).
 - Record outcomes and failures with logs, calling out any deviations from the contributor’s reported results.
+- Confirm integration suites hit real services (Supabase logs, command output) and request evidence if missing.
 
 ## Documentation & Release Notes
 - Verify docs updated where behaviour changes (README, CLAUDE.md, `docs/specs/**`).
@@ -28,8 +30,11 @@ Review another contributor’s pull request. Provide the PR number via `$ARGUMEN
 ## Feedback & Decision
 - Provide actionable feedback grouped by severity (blocking vs. nit).
 - Decide on `Approve`, `Request Changes`, or `Comment` in GitHub; ensure summary references validation results.
+- Post the review summary as a PR comment (e.g., `gh pr review --comment` or `gh pr comment`) so the feedback lives on the discussion thread before handing off.
+- State explicitly whether anti-mock expectations were satisfied and cite supporting evidence or gaps.
 
 ## Reporting
 - Decision taken and justification.
 - Key findings (bugs, risks, missing tests/docs) with file/line references.
 - Follow-up actions or open questions.
+- URL to the posted GitHub review comment or confirmation that it was delivered via the PR interface.

@@ -1,6 +1,16 @@
-import { describe, it, expect, beforeEach, mock } from "bun:test";
+// Set test environment variables BEFORE any imports that might use them
+// Use Kong gateway (54326) for Supabase JS client, not PostgREST direct (54322)
+process.env.SUPABASE_URL = "http://localhost:54326";
+process.env.SUPABASE_SERVICE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+process.env.SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
+
+import { describe, it, expect, beforeEach } from "bun:test";
 import { parseApiKey, validateApiKey } from "@auth/validator";
 import { clearCache } from "@auth/cache";
+import { getTestApiKey } from "../helpers/db";
 
 describe("API Key Validator", () => {
   beforeEach(() => {
@@ -101,63 +111,54 @@ describe("API Key Validator", () => {
       expect(result).toBeNull();
     });
 
-    it("validates against mock database (requires env setup)", async () => {
-      // This test requires SUPABASE_URL and SUPABASE_SERVICE_KEY
-      // Skip if not configured
-      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-        console.log("[Test] Skipping database test - Supabase credentials not set");
-        return;
-      }
-
-      // For real tests, you would:
-      // 1. Create a test API key in test database
-      // 2. Validate against that key
-      // 3. Clean up test key
-
-      // For now, test with invalid key (should return null)
+    it("returns null for non-existent key", async () => {
       const key = "kota_free_nonexistent_0123456789abcdef0123456789abcdef";
       const result = await validateApiKey(key);
 
       expect(result).toBeNull();
     });
 
+    it("validates real test key from database", async () => {
+      const testKey = getTestApiKey("free");
+      const result = await validateApiKey(testKey);
+
+      expect(result).not.toBeNull();
+      expect(result?.userId).toBeDefined();
+      expect(result?.tier).toBe("free");
+      expect(result?.keyId).toBe("test1234567890ab");
+      expect(result?.rateLimitPerHour).toBe(100);
+    });
+
     it("uses cache for repeated validations", async () => {
-      // This test demonstrates cache behavior
-      // In a real test environment with database access, you would:
-      // 1. Create valid test key
-      // 2. Validate once (cache miss)
-      // 3. Validate again (cache hit)
-      // 4. Verify only one database query was made
+      const testKey = getTestApiKey("solo");
 
-      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-        console.log("[Test] Skipping cache test - Supabase credentials not set");
-        return;
-      }
+      const startTime1 = Date.now();
+      const result1 = await validateApiKey(testKey);
+      const duration1 = Date.now() - startTime1;
 
-      // Mock test - would be implemented with real database
-      const key = "kota_free_testcache_0123456789abcdef0123456789abcdef";
+      const startTime2 = Date.now();
+      const result2 = await validateApiKey(testKey);
+      const duration2 = Date.now() - startTime2;
 
-      const result1 = await validateApiKey(key);
-      const result2 = await validateApiKey(key);
+      // Both should succeed
+      expect(result1).not.toBeNull();
+      expect(result2).not.toBeNull();
 
-      // Both should have same result (null in this case without real data)
-      expect(result1).toBe(result2);
+      // Both should have same data
+      expect(result1?.userId).toBe(result2?.userId);
+      expect(result1?.tier).toBe("solo");
+      expect(result2?.tier).toBe("solo");
+
+      // Second call should be faster or equal (cache hit)
+      // Allow +2ms tolerance for real database timing variance
+      expect(duration2).toBeLessThanOrEqual(duration1 + 2);
     });
 
     it("returns null for disabled keys", async () => {
-      // This test would verify that even with valid secret,
-      // a disabled key returns null
-      // Requires test database with disabled key fixture
+      const disabledKey = getTestApiKey("disabled");
+      const result = await validateApiKey(disabledKey);
 
-      if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
-        console.log("[Test] Skipping disabled key test - Supabase credentials not set");
-        return;
-      }
-
-      // Would test with real disabled key
-      const key = "kota_free_disabled123_0123456789abcdef0123456789abcdef";
-      const result = await validateApiKey(key);
-
+      // Disabled keys should return null even if secret is correct
       expect(result).toBeNull();
     });
 

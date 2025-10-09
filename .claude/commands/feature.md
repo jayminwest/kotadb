@@ -13,6 +13,8 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Highlight any data contracts, API surfaces, or tooling updates that the feature requires.
 - Think critically about risk, rollout, and validation; do not leave placeholders empty.
 - Enumerate relevant code paths and new assets in their dedicated sections.
+- Incorporate `/anti-mock` guidance: plan for real Supabase coverage, failure injection, and follow-up for any unavoidable skips.
+- Ensure the plan’s final tasks rerun validation, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so a PR opens immediately (PR titles must end with the issue number, e.g. `feat: add search filters (#210)`).
 - If the plan introduces new documentation areas, append or update the relevant entry in `.claude/commands/conditional_docs.md`.
 
 ## Plan Format
@@ -45,18 +47,20 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 ## Step by Step Tasks
 ### <ordered task group>
 - <actionable bullet in execution order>
+- Conclude with a task group that re-validates, pushes (`git push -u origin <branch>`), and runs `/pull_request <branch> <issue_json> <plan_path> <adw_id>`.
 
 ## Risks & Mitigations
 - <risk> → <mitigation>
 
 ## Validation Strategy
-- Automated tests
-- Manual checks
-- Release guardrails
+- Automated tests (integration/e2e hitting Supabase per `/anti-mock`)
+- Manual checks (document data seeded and failure scenarios exercised)
+- Release guardrails (monitoring, alerting, rollback) with real-service evidence
 
 ## Validation Commands
 - bun run lint
 - bun run typecheck
+- bun test --filter integration
 - bun test
 - bun run build
 - <domain-specific checks>
@@ -66,6 +70,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 Plan for validation using the levels defined in `/validate-implementation`. Features must run **Level 2** at minimum:
 - `bun run lint`
 - `bun run typecheck`
+- `bun test --filter integration`
 - `bun test`
 - `bun run build`
 Document any domain-specific scripts (seed data, preview builds) required for full coverage.

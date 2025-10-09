@@ -2,19 +2,31 @@
 
 KotaDB is the indexing and query layer for CLI Agents like Claude Code and Codex. This project exposes a
 lightweight HTTP interface for triggering repository indexing jobs and performing code search backed by
-SQLite. Development is done autonomously through AI developer workflows via the `adws/` automation scripts.
+Supabase (PostgreSQL). Development is done autonomously through AI developer workflows via the `adws/` automation scripts.
 
 ## Getting Started
 
 ### Prerequisites
 
 - [Bun](https://bun.sh) v1.1+
+- [Supabase](https://supabase.com) account with project created (see `docs/supabase-setup.md`)
 
 ### Install dependencies
 
 ```bash
 bun install
 ```
+
+### Configure Supabase
+
+1. Create a Supabase project at https://supabase.com/dashboard
+2. Copy `.env.sample` to `.env` and add your Supabase credentials:
+   - `SUPABASE_URL` - Your project URL
+   - `SUPABASE_SERVICE_KEY` - Service role key (keep secret)
+   - `SUPABASE_ANON_KEY` - Anonymous/public key
+3. Run database migrations (see `docs/supabase-setup.md` for details)
+
+For detailed setup instructions, see `docs/supabase-setup.md`.
 
 ### Start the API server
 
@@ -29,6 +41,23 @@ The server listens on port `3000` by default. Override with `PORT=4000 bun run s
 - `bun --watch src/index.ts` – Start the server in watch mode for local development.
 - `bun test` – Run the Bun test suite.
 - `bunx tsc --noEmit` – Type-check the project.
+
+### Running Tests
+
+KotaDB uses real PostgreSQL database connections for testing (no mocks). To run tests:
+
+```bash
+# Start test database (first time only)
+./scripts/setup-test-db.sh
+
+# Run tests
+bun test
+
+# Reset test database if needed
+./scripts/reset-test-db.sh
+```
+
+For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](docs/testing-setup.md).
 
 ## API Highlights
 
@@ -141,11 +170,13 @@ Dockerfile             # Bun runtime image
 adws/                  # Automation workflows for AI developer agents
 src/
   api/                 # HTTP routes and database access
-  db/                  # SQLite schema helpers & migrations
+  auth/                # Authentication middleware and API key validation
+  db/                  # Supabase client initialization and helpers
   indexer/             # Repository crawling, parsing, and extraction utilities
   mcp/                 # Model Context Protocol (MCP) implementation
   types/               # Shared TypeScript types
 .github/workflows/     # CI workflows
+docs/                  # Documentation (schema, specs, setup guides)
 ```
 
 ## Next Steps

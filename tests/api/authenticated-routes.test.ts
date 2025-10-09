@@ -1,4 +1,13 @@
-import { describe, it, expect, beforeAll } from "bun:test";
+// Set test environment variables BEFORE any imports that might use them
+process.env.SUPABASE_URL = "http://localhost:54326";
+process.env.SUPABASE_SERVICE_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+process.env.SUPABASE_ANON_KEY =
+  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
+
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { getTestApiKey, createAuthHeader } from "../helpers/db";
 
 /**
  * Integration tests for authenticated API routes.
@@ -6,15 +15,34 @@ import { describe, it, expect, beforeAll } from "bun:test";
  * These tests verify that authentication middleware properly protects
  * endpoints and that authenticated requests can access resources.
  *
- * NOTE: These tests require Supabase credentials and a test API key.
- * Set environment variables:
- * - SUPABASE_URL
- * - SUPABASE_SERVICE_KEY
- * - TEST_API_KEY (format: kota_<tier>_<keyId>_<secret>)
+ * NOTE: These tests require the local test database to be running.
+ * Run `./scripts/setup-test-db.sh` before running tests.
  */
 
-const BASE_URL = "http://localhost:3000";
-const TEST_API_KEY = process.env.TEST_API_KEY;
+const TEST_PORT = 3100;
+const BASE_URL = `http://localhost:${TEST_PORT}`;
+const TEST_API_KEY = getTestApiKey("free");
+
+let server: ReturnType<typeof Bun.serve>;
+
+beforeAll(async () => {
+  // Environment variables already set at module level above
+  // Start test server with real database
+  const { createRouter } = await import("@api/routes");
+  const { getServiceClient } = await import("@db/client");
+
+  const supabase = getServiceClient();
+  const router = createRouter(supabase);
+
+  server = Bun.serve({
+    port: TEST_PORT,
+    fetch: router.handle,
+  });
+});
+
+afterAll(() => {
+  server.stop();
+});
 
 describe("Authenticated Routes", () => {
   describe("/health endpoint", () => {
@@ -66,11 +94,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("returns results with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/search?term=test`, {
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -94,11 +117,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("returns results with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/files/recent?limit=5`, {
         headers: {
           Authorization: `Bearer ${TEST_API_KEY}`,
@@ -131,11 +149,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("accepts index request with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/index`, {
         method: "POST",
         headers: {
@@ -175,11 +188,6 @@ describe("Authenticated Routes", () => {
     });
 
     it("processes MCP request with valid authentication", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const response = await fetch(`${BASE_URL}/mcp`, {
         method: "POST",
         headers: {
@@ -204,11 +212,6 @@ describe("Authenticated Routes", () => {
 
   describe("Authentication caching", () => {
     it("cache improves performance for repeated requests", async () => {
-      if (!TEST_API_KEY) {
-        console.log("[Test] Skipping - TEST_API_KEY not set");
-        return;
-      }
-
       const headers = {
         Authorization: `Bearer ${TEST_API_KEY}`,
       };

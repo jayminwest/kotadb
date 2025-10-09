@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-KotaDB is a lightweight HTTP API service for indexing and searching code repositories. It's built with Bun + TypeScript and uses SQLite for storage. The project is designed to power AI developer workflows through automated code intelligence.
+KotaDB is a lightweight HTTP API service for indexing and searching code repositories. It's built with Bun + TypeScript and uses Supabase (PostgreSQL) for storage with Row Level Security (RLS) for multi-tenant data isolation. The project is designed to power AI developer workflows through automated code intelligence.
 
 ## Development Commands
 
@@ -17,9 +17,13 @@ bun --watch src/index.ts          # Watch mode for development
 
 ### Testing and type-checking
 ```bash
-bun test                # Run test suite
-bunx tsc --noEmit      # Type-check without emitting files
+bun test                          # Run test suite
+bunx tsc --noEmit                # Type-check without emitting files
+./scripts/setup-test-db.sh       # Start Supabase Local test database
+./scripts/reset-test-db.sh       # Reset test database to clean state
 ```
+
+**Testing Philosophy:** KotaDB follows an **antimocking philosophy**. All tests use real Supabase Local database connections instead of mocks for production parity. See `docs/testing-setup.md` for detailed configuration.
 
 ### Docker
 ```bash
@@ -41,7 +45,7 @@ Always use these aliases for imports, not relative paths.
 
 **Entry Point (src/index.ts)**
 - Bootstraps the HTTP server using Bun.serve
-- Opens SQLite database and ensures schema
+- Initializes Supabase client and verifies database connection
 - Routes all requests through the router with global error handling
 
 **API Layer (src/api/)**
@@ -49,9 +53,15 @@ Always use these aliases for imports, not relative paths.
 - `queries.ts`: Database query functions for indexed files and search
 
 **Database (src/db/)**
-- `schema.ts`: SQLite schema initialization with WAL mode and foreign keys enabled
-- Tables: `files`, `index_runs`, `migrations`
-- Database path: `data/kotadb.sqlite` (configurable via `KOTA_DB_PATH`)
+- `client.ts`: Supabase client initialization (service role and anon clients)
+- Tables: 10 tables including `api_keys`, `organizations`, `repositories`, `index_jobs`, `indexed_files`, `symbols`, `references`, `dependencies`, etc.
+- Connection: Configured via `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `SUPABASE_ANON_KEY` environment variables
+- RLS enabled for multi-tenant data isolation with user-scoped and organization-scoped policies
+- **Supabase Local Port Architecture** (for testing):
+  - Port 5434: PostgreSQL (migrations, seed scripts, psql)
+  - Port 54322: PostgREST API (raw HTTP access)
+  - Port 54325: GoTrue auth service
+  - Port 54326: Kong gateway (Supabase JS client - **use this for tests**)
 
 **Indexer (src/indexer/)**
 - `repos.ts`: Git repository management (clone, fetch, checkout)
@@ -66,12 +76,13 @@ Always use these aliases for imports, not relative paths.
 ### Workflow
 
 1. **POST /index** triggers repository indexing
-   - Records index run in database (status: pending → completed/failed/skipped)
+   - Ensures repository exists in `repositories` table (creates if new)
+   - Records index job in `index_jobs` table (status: pending → completed/failed/skipped)
    - Queues asynchronous indexing via `queueMicrotask()`
    - Repository preparation: clones if needed, checks out ref
    - File discovery: walks project tree, filters by extension
    - Parsing: extracts content and dependencies
-   - Storage: saves to SQLite with `UNIQUE (project_root, path)` constraint
+   - Storage: saves to `indexed_files` table with `UNIQUE (repository_id, path)` constraint
 
 2. **GET /search** queries indexed files
    - Full-text search on content
@@ -80,14 +91,16 @@ Always use these aliases for imports, not relative paths.
 
 ### Environment Variables
 - `PORT`: Server port (default: 3000)
-- `KOTA_DB_PATH`: SQLite database path (default: data/kotadb.sqlite)
+- `SUPABASE_URL`: Supabase project URL (required)
+- `SUPABASE_SERVICE_KEY`: Supabase service role key for admin operations (required)
+- `SUPABASE_ANON_KEY`: Supabase anon key for RLS-enforced queries (required)
 - `KOTA_GIT_BASE_URL`: Git clone base URL (default: https://github.com)
 
 ### AI Developer Workflows (adws/)
-Directory structure for future automation pipelines:
-- `triggers/`: Webhook handlers for workflow initiation
-- `environments/`: Container/runtime configurations
-- `prompts/`: Agent prompt templates
-- `reviews/`: Code review generation scripts
+Python-based automation pipeline for autonomous GitHub issue workflows:
+- `adw_plan.py`, `adw_build.py`, `adw_test.py`, `adw_review.py`, `adw_document.py`: Phase scripts for SDLC automation
+- `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops, GitHub integration, state management)
+- `adw_tests/`: Pytest suite for workflow validation
+- `trigger_webhook.py`, `trigger_cron.py`: Webhook and polling-based trigger systems
 
-Currently contains placeholder READMEs—implementation planned for future expansion.
+See `adws/README.md` for complete automation architecture and usage examples.

@@ -17,8 +17,9 @@ Implement approved CI improvements. Provide reference ID via `$ARGUMENTS` (issue
 - Run **Level 2** from `/validate-implementation` (`bun run lint`, `bun run typecheck`, `bun test`); escalate to **Level 3** if build or deployment scripts change.
 - Execute workflow-focused validation: `gh workflow run <name> --ref <branch>` or local dry-runs where feasible.
 - Re-check `git status --short` and `git diff --stat` after edits.
+- Push the CI branch (`git push -u origin <branch>`) and invoke `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so reviewers can assess the changes; PR titles must end with the issue number (e.g. `chore: harden ci cache (#210)`).
 
 ## Reporting
 - Summary of modifications (workflows, scripts, docs) with file paths.
 - Validation commands executed and CI run links.
-- Follow-up tasks, remaining risks, and rollout plan.
+- PR URL plus follow-up tasks, remaining risks, and rollout plan.

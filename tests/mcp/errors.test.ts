@@ -1,19 +1,26 @@
+// Set test environment variables BEFORE any imports that might use them
+process.env.SUPABASE_URL = "http://localhost:54326";
+process.env.SUPABASE_SERVICE_KEY =
+	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+process.env.SUPABASE_ANON_KEY =
+	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+process.env.DATABASE_URL =
+	"postgresql://postgres:postgres@localhost:5434/postgres";
+
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { Database } from "bun:sqlite";
-import { ensureSchema } from "@db/schema";
+import { createAuthHeader } from "../helpers/db";
 
 const TEST_PORT = 3097;
 let server: ReturnType<typeof Bun.serve>;
-let db: Database;
 
 beforeAll(async () => {
-	// Set up in-memory test database
-	db = new Database(":memory:");
-	ensureSchema(db);
-
-	// Import and start test server
+	// Environment variables already set at module level above
+	// Import and start test server with real database connection
 	const { createRouter } = await import("@api/routes");
-	const router = createRouter(db);
+	const { getServiceClient } = await import("@db/client");
+
+	const supabase = getServiceClient();
+	const router = createRouter(supabase);
 
 	server = Bun.serve({
 		port: TEST_PORT,
@@ -23,7 +30,6 @@ beforeAll(async () => {
 
 afterAll(() => {
 	server.stop();
-	db.close();
 });
 
 describe("MCP JSON-RPC Error Handling", () => {
@@ -33,6 +39,7 @@ describe("MCP JSON-RPC Error Handling", () => {
 		"Origin": "http://localhost:3000",
 		"MCP-Protocol-Version": "2025-06-18",
 		"Accept": "application/json",
+		"Authorization": createAuthHeader("free"),
 	};
 
 	test("invalid JSON body returns -32700 Parse Error", async () => {
@@ -120,7 +127,7 @@ describe("MCP JSON-RPC Error Handling", () => {
 					name: "search_code",
 					arguments: {
 						// Missing required 'term' field
-						project: "/test",
+						repository: "test-repo-uuid",
 					},
 				},
 			}),
