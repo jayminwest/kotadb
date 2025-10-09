@@ -105,3 +105,11 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When implementing key format changes or collision handling
     - When debugging bcrypt hashing or key validation issues
     - When updating key format patterns (kota_<tier>_<key_id>_<secret>)
+
+- docs/specs/chore-40-migrate-ci-supabase-local.md
+  - Conditions:
+    - When working on issue #40 or modifying CI test infrastructure
+    - When troubleshooting CI test failures related to Supabase services
+    - When updating GitHub Actions workflows to use Supabase Local
+    - When CI tests fail with authentication errors that pass locally
+    - When aligning CI and local testing environments for parity

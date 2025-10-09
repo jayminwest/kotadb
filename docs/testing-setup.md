@@ -388,13 +388,80 @@ cat .env.test
 
 ## CI/CD Integration
 
-The test database runs in CI via GitHub Actions services. See `.github/workflows/ci.yml` for configuration.
+KotaDB's CI environment uses **Supabase Local** via GitHub Actions to achieve **exact parity** with local testing. This follows the antimocking philosophy by ensuring CI tests run against the same full-stack Supabase environment as local development.
 
-Key steps:
-1. Start PostgreSQL service container
-2. Wait for health check
-3. Run migrations and seed data
-4. Execute test suite
+### CI Architecture
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) uses the official `supabase/setup-cli@v1` action to install Supabase CLI, then runs `.github/scripts/setup-supabase-ci.sh` to:
+
+1. **Initialize Supabase config** (if not present)
+2. **Start Supabase Local services** via `supabase start` (PostgreSQL + PostgREST + Kong + Auth)
+3. **Wait for readiness** with health checks and retries
+4. **Auto-generate `.env.test`** from `supabase status --output json`
+5. **Seed test data** from `supabase/seed.sql`
+
+### Why Supabase Local in CI?
+
+**Before (broken):** CI used plain PostgreSQL service without PostgREST or Supabase stack, causing:
+- ❌ 401 Unauthorized errors (API key validation requires PostgREST RPC)
+- ❌ Tests pass locally but fail in CI (false confidence)
+- ❌ Environment drift violates antimocking principles
+
+**After (fixed):** CI uses Supabase Local for:
+- ✅ Exact parity with local testing (same services, ports, credentials)
+- ✅ Real authentication flow (PostgREST RPC endpoints work)
+- ✅ Consistent test results (133/133 tests pass locally and in CI)
+- ✅ Antimocking compliance (no mocks/stubs to work around missing services)
+
+### CI Workflow Steps
+
+```yaml
+- name: Setup Supabase CLI
+  uses: supabase/setup-cli@v1
+  with:
+    version: latest
+
+- name: Setup Supabase Local and generate test credentials
+  run: .github/scripts/setup-supabase-ci.sh
+
+- name: Validate migration sync
+  run: bun run test:validate-migrations
+
+- name: Test
+  run: |
+    export $(grep -v '^#' .env.test | xargs)
+    bun test
+
+- name: Teardown Supabase Local
+  if: always()
+  run: supabase stop
+```
+
+### CI Execution Time
+
+Target: **Under 2 minutes** total (acceptable trade-off for testing parity)
+
+Breakdown:
+- Supabase startup: ~30-60 seconds (first run may be slower, cached thereafter)
+- Test execution: ~13.5 seconds (133 tests)
+- Migration validation, typecheck, lint: ~10-20 seconds
+
+### Troubleshooting CI Failures
+
+**401 Unauthorized errors in CI:**
+- Check `.github/scripts/setup-supabase-ci.sh` successfully generated `.env.test`
+- Verify `supabase start` completed without errors
+- Ensure test step sources `.env.test` before running `bun test`
+
+**Timeout during Supabase startup:**
+- GitHub Actions has generous Docker limits, but Supabase startup may occasionally be slow
+- Script includes 30-retry health check loop (60 seconds total timeout)
+- Check "Setup Supabase Local" step logs for startup errors
+
+**Migration sync failures:**
+- Ensure `src/db/migrations/` and `supabase/migrations/` are synchronized
+- Run `bun run test:validate-migrations` locally before pushing
+- CI runs this validation automatically to catch drift
 
 ## Antimocking Migration Complete
 

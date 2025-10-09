@@ -44,7 +44,7 @@ The server listens on port `3000` by default. Override with `PORT=4000 bun run s
 
 ### Running Tests
 
-KotaDB uses real PostgreSQL database connections for testing (no mocks). The test environment uses Supabase Local with auto-generated credentials.
+KotaDB uses real PostgreSQL database connections for testing (no mocks). The test environment uses **Supabase Local** with auto-generated credentials to ensure exact parity between local and CI testing environments.
 
 **Prerequisites:** Install [Supabase CLI](https://supabase.com/docs/guides/cli) and [jq](https://jqlang.github.io/jq/)
 ```bash
@@ -67,6 +67,8 @@ bun run test:teardown
 ```
 
 **Note:** The `.env.test` file is auto-generated from `supabase status` and should not be committed to git.
+
+**CI Testing:** GitHub Actions CI uses the same Supabase Local environment via `supabase/setup-cli@v1`, ensuring tests run against identical infrastructure locally and in CI (PostgreSQL + PostgREST + Kong + Auth). See `.github/workflows/ci.yml` for details.
 
 For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](docs/testing-setup.md).
 
