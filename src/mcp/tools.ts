@@ -3,15 +3,13 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { existsSync } from "node:fs";
 import type { IndexRequest } from "@shared/index";
 import { buildSnippet } from "@indexer/extractors";
-import { discoverSources, parseSourceFile } from "@indexer/parsers";
-import { prepareRepository } from "@indexer/repos";
 import {
+	ensureRepository,
 	listRecentFiles,
 	recordIndexRun,
-	saveIndexedFiles,
+	runIndexingWorkflow,
 	searchFiles,
 	updateIndexRunStatus,
 } from "@api/queries";
@@ -244,79 +242,6 @@ export async function executeListRecentFiles(
 	};
 }
 
-/**
- * Ensure repository exists in database, create if not.
- * Returns repository UUID.
- */
-async function ensureRepository(
-	supabase: SupabaseClient,
-	userId: string,
-	request: IndexRequest,
-): Promise<string> {
-	const fullName = request.repository;
-	const gitUrl = request.localPath
-		? request.localPath
-		: `${process.env.KOTA_GIT_BASE_URL ?? "https://github.com"}/${fullName}.git`;
-
-	// Check if repository exists
-	const { data: existing } = await supabase
-		.from("repositories")
-		.select("id")
-		.eq("user_id", userId)
-		.eq("full_name", fullName)
-		.maybeSingle();
-
-	if (existing) {
-		return existing.id;
-	}
-
-	// Create new repository
-	const { data: newRepo, error } = await supabase
-		.from("repositories")
-		.insert({
-			user_id: userId,
-			full_name: fullName,
-			git_url: gitUrl,
-			default_branch: request.ref ?? "main",
-		})
-		.select("id")
-		.single();
-
-	if (error) {
-		throw new Error(`Failed to create repository: ${error.message}`);
-	}
-
-	return newRepo.id;
-}
-
-/**
- * Async indexing workflow (reused from routes.ts)
- */
-async function runIndexingWorkflow(
-	supabase: SupabaseClient,
-	request: IndexRequest,
-	runId: string,
-	userId: string,
-	repositoryId: string,
-): Promise<void> {
-	const repo = await prepareRepository(request);
-
-	if (!existsSync(repo.localPath)) {
-		console.warn(`Indexing skipped: path ${repo.localPath} does not exist.`);
-		await updateIndexRunStatus(supabase, runId, "skipped");
-		return;
-	}
-
-	const sources = await discoverSources(repo.localPath);
-	const records = (
-		await Promise.all(
-			sources.map((source) => parseSourceFile(source, repo.localPath)),
-		)
-	).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
-
-	await saveIndexedFiles(supabase, records, userId, repositoryId);
-	await updateIndexRunStatus(supabase, runId, "completed");
-}
 
 /**
  * Main tool call dispatcher

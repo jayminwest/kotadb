@@ -203,6 +203,94 @@ export async function listRecentFiles(
 }
 
 /**
+ * Ensure repository exists in database, create if not.
+ * Returns repository UUID.
+ *
+ * @param client - Supabase client instance
+ * @param userId - User UUID for RLS context
+ * @param request - Index request with repository details
+ * @returns Repository UUID
+ */
+export async function ensureRepository(
+  client: SupabaseClient,
+  userId: string,
+  request: IndexRequest
+): Promise<string> {
+  const fullName = request.repository;
+  const gitUrl = request.localPath
+    ? request.localPath
+    : `${process.env.KOTA_GIT_BASE_URL ?? "https://github.com"}/${fullName}.git`;
+
+  // Check if repository exists
+  const { data: existing } = await client
+    .from("repositories")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("full_name", fullName)
+    .maybeSingle();
+
+  if (existing) {
+    return existing.id;
+  }
+
+  // Create new repository
+  const { data: newRepo, error } = await client
+    .from("repositories")
+    .insert({
+      user_id: userId,
+      full_name: fullName,
+      git_url: gitUrl,
+      default_branch: request.ref ?? "main",
+    })
+    .select("id")
+    .single();
+
+  if (error) {
+    throw new Error(`Failed to create repository: ${error.message}`);
+  }
+
+  return newRepo.id;
+}
+
+/**
+ * Run the indexing workflow for a repository.
+ * This is the async background task that performs the actual indexing.
+ *
+ * @param client - Supabase client instance
+ * @param request - Index request details
+ * @param runId - Index job UUID
+ * @param userId - User UUID for RLS context
+ * @param repositoryId - Repository UUID
+ */
+export async function runIndexingWorkflow(
+  client: SupabaseClient,
+  request: IndexRequest,
+  runId: string,
+  userId: string,
+  repositoryId: string
+): Promise<void> {
+  const { existsSync } = await import("node:fs");
+  const { prepareRepository } = await import("@indexer/repos");
+  const { discoverSources, parseSourceFile } = await import("@indexer/parsers");
+
+  const repo = await prepareRepository(request);
+
+  if (!existsSync(repo.localPath)) {
+    console.warn(`Indexing skipped: path ${repo.localPath} does not exist.`);
+    await updateIndexRunStatus(client, runId, "skipped");
+    return;
+  }
+
+  const sources = await discoverSources(repo.localPath);
+  const records = (
+    await Promise.all(sources.map((source) => parseSourceFile(source, repo.localPath)))
+  ).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+  await saveIndexedFiles(client, records, userId, repositoryId);
+  await updateIndexRunStatus(client, runId, "completed");
+}
+
+/**
  * Detect programming language from file path.
  * Helper function for metadata enrichment.
  */
