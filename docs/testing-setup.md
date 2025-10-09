@@ -26,7 +26,7 @@ KotaDB follows an **antimocking philosophy** - tests use real database connectio
 ```
 
 This script will:
-- Start a PostgreSQL 15 container on port 5433
+- Start a PostgreSQL 15 container on port 5434
 - Run schema migrations (auth schema + main schema)
 - Seed test data (users, API keys, repositories, indexed files)
 
@@ -53,8 +53,8 @@ This truncates all tables and re-seeds test data.
 ### Connection Details
 
 - **Host**: localhost
-- **Port**: 5433 (to avoid conflicts with local Postgres)
-- **Database**: kotadb_test
+- **Port**: 5434 (to avoid conflicts with local Postgres)
+- **Database**: postgres
 - **User**: postgres
 - **Password**: postgres
 
@@ -125,10 +125,10 @@ const apiKey = TEST_API_KEYS.solo;
 Tests automatically set these environment variables:
 
 ```typescript
-process.env.SUPABASE_URL = "http://localhost:5433";
+process.env.SUPABASE_URL = "http://localhost:5434";
 process.env.SUPABASE_SERVICE_KEY = "test-service-key-local";
 process.env.SUPABASE_ANON_KEY = "test-anon-key-local";
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/kotadb_test";
+process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
 ```
 
 ### Example Test
@@ -142,10 +142,10 @@ let server: ReturnType<typeof Bun.serve>;
 
 beforeAll(async () => {
   // Set test environment
-  process.env.SUPABASE_URL = "http://localhost:5433";
+  process.env.SUPABASE_URL = "http://localhost:5434";
   process.env.SUPABASE_SERVICE_KEY = "test-service-key-local";
   process.env.SUPABASE_ANON_KEY = "test-anon-key-local";
-  process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5433/kotadb_test";
+  process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
 
   // Start test server with real database
   const { createRouter } = await import("@api/routes");
@@ -181,14 +181,14 @@ describe("My Feature", () => {
 
 ### Port Already in Use
 
-If port 5433 is already in use:
+If port 5434 is already in use:
 
 ```bash
-# Find the process using port 5433
-lsof -ti:5433
+# Find the process using port 5434
+lsof -ti:5434
 
 # Kill the process
-kill $(lsof -ti:5433)
+kill $(lsof -ti:5434)
 
 # Or use a different port by editing docker-compose.yml
 ```
@@ -274,7 +274,7 @@ To inspect the test database manually:
 
 ```bash
 # Connect via psql
-PGPASSWORD=postgres psql -h localhost -p 5433 -U postgres -d kotadb_test
+PGPASSWORD=postgres psql -h localhost -p 5434 -U postgres -d postgres
 
 # Useful queries
 SELECT * FROM api_keys;
