@@ -90,3 +90,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When tests fail with "401 Unauthorized" or "null API key validation"
     - When addressing cache timing test flakiness
     - When troubleshooting Supabase Local connectivity in tests
+
+- docs/troubleshooting/test-failures.md
+  - Conditions:
+    - When diagnosing any test failures (general troubleshooting guide)
+    - When tests fail with port configuration errors (54322 vs 54326)
+    - When experiencing "null API key validation" or "401 Unauthorized" errors
+    - When cache timing tests are flaky
+    - When tests fail with connection refused or database connectivity issues
+    - When you need quick diagnosis patterns for common test failure scenarios
