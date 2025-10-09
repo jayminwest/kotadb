@@ -115,7 +115,7 @@ export async function validateApiKey(
   const supabase = getServiceClient();
   const { data, error } = await supabase
     .from("api_keys")
-    .select("id, user_id, secret_hash, tier, rate_limit_per_hour, enabled, org_id")
+    .select("id, user_id, secret_hash, tier, rate_limit_per_hour, enabled")
     .eq("key_id", keyId)
     .single();
 
@@ -144,9 +144,8 @@ export async function validateApiKey(
     rateLimitPerHour: data.rate_limit_per_hour,
   };
 
-  if (data.org_id) {
-    result.orgId = data.org_id;
-  }
+  // Note: org_id column doesn't exist yet in schema
+  // TODO: Add org_id column when migrating to org-level API keys
 
   // Cache successful validation
   setCachedValidation(keyId, result);

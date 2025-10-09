@@ -7,8 +7,13 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Test database connection details
- * Points to Supabase Local (Kong API Gateway -> PostgREST)
- * Using Kong on port 54326 for proper authentication and routing
+ * Points to Supabase Local Kong gateway on port 54326
+ *
+ * Architecture:
+ * - Port 54326 = Kong gateway (routes /rest/v1/ to PostgREST) - Use this for Supabase JS client
+ * - Port 54322 = PostgREST direct (no /rest/v1/ prefix) - Use this for raw HTTP access
+ *
+ * The Supabase JS client expects Kong gateway format with /rest/v1/ prefix.
  */
 const TEST_DB_URL = "http://localhost:54326";
 const TEST_DB_KEY =

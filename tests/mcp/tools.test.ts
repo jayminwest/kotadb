@@ -1,3 +1,12 @@
+// Set test environment variables BEFORE any imports that might use them
+process.env.SUPABASE_URL = "http://localhost:54326";
+process.env.SUPABASE_SERVICE_KEY =
+	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+process.env.SUPABASE_ANON_KEY =
+	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+process.env.DATABASE_URL =
+	"postgresql://postgres:postgres@localhost:5434/postgres";
+
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { createAuthHeader } from "../helpers/db";
 
@@ -5,15 +14,7 @@ const TEST_PORT = 3098;
 let server: ReturnType<typeof Bun.serve>;
 
 beforeAll(async () => {
-	// Set test environment variables to point to Supabase Local
-	process.env.SUPABASE_URL = "http://localhost:54326";
-	process.env.SUPABASE_SERVICE_KEY =
-		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
-	process.env.SUPABASE_ANON_KEY =
-		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
-	process.env.DATABASE_URL =
-		"postgresql://postgres:postgres@localhost:5434/postgres";
-
+	// Environment variables already set at module level above
 	// Import and start test server with real database connection
 	// Test data is seeded via scripts/setup-test-db.sh
 	const { createRouter } = await import("@api/routes");
@@ -103,7 +104,7 @@ describe("MCP Tools Integration", () => {
 					name: "search_code",
 					arguments: {
 						term: "Router",
-						repository: "test-repo-id",
+						repository: "20000000-0000-0000-0000-000000000001", // Test repository ID from seed
 					},
 				},
 			}),
@@ -111,6 +112,7 @@ describe("MCP Tools Integration", () => {
 
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
+		expect(data.result).toBeDefined();
 		expect(data.result.results).toBeArray();
 	});
 

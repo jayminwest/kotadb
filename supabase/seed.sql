@@ -66,6 +66,7 @@ VALUES
 ON CONFLICT (key_id) DO NOTHING;
 
 -- Team tier test key: kota_team_team1234567890ab_0123456789abcdef0123456789abcdef
+-- Note: For now using user_id until schema is migrated to support org-level keys
 INSERT INTO api_keys (user_id, key_id, secret_hash, tier, rate_limit_per_hour, enabled, created_at)
 VALUES
     (

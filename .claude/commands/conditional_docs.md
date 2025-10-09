@@ -81,3 +81,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When removing `tests/helpers/supabase-mock.ts` or `tests/helpers/auth-mock.ts`
     - When implementing test database helpers or seed scripts
     - When troubleshooting authentication test failures in CI/CD pipeline
+
+- docs/specs/chore-33-fix-failing-tests-antimocking.md
+  - Conditions:
+    - When working on issue #33 or fixing test failures after antimocking migration
+    - When debugging port configuration issues (54322 vs 54326)
+    - When fixing environment variable initialization order in tests
+    - When tests fail with "401 Unauthorized" or "null API key validation"
+    - When addressing cache timing test flakiness
+    - When troubleshooting Supabase Local connectivity in tests
