@@ -1,42 +1,26 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { createMockSupabaseClient } from "../helpers/supabase-mock";
-import { createMockAuthHeader } from "../helpers/auth-mock";
+import { createAuthHeader } from "../helpers/db";
 
 const TEST_PORT = 3098;
 let server: ReturnType<typeof Bun.serve>;
 
 beforeAll(async () => {
-	// Set test environment variables for Supabase
-	process.env.SUPABASE_URL = "http://localhost:54321";
-	process.env.SUPABASE_SERVICE_KEY = "test-service-key";
-	process.env.SUPABASE_ANON_KEY = "test-anon-key";
+	// Set test environment variables to point to Supabase Local
+	process.env.SUPABASE_URL = "http://localhost:54326";
+	process.env.SUPABASE_SERVICE_KEY =
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+	process.env.SUPABASE_ANON_KEY =
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+	process.env.DATABASE_URL =
+		"postgresql://postgres:postgres@localhost:5434/postgres";
 
-	// Create mock Supabase client with test data
-	const mockSupabase = createMockSupabaseClient({
-		selectData: [
-			{
-				id: "test-repo-id",
-				repository_id: "test-repo-id",
-				path: "src/router.ts",
-				content: 'export class Router {\n  handle(req) {}\n}',
-				metadata: { dependencies: [] },
-				indexed_at: new Date().toISOString(),
-			},
-			{
-				id: "test-file-2",
-				repository_id: "test-repo-id",
-				path: "src/handler.ts",
-				content: 'import { Router } from "./router";\nexport function createHandler() {}',
-				metadata: { dependencies: ["./router"] },
-				indexed_at: new Date().toISOString(),
-			},
-		],
-		insertData: { id: "test-uuid-123", repository_id: "test-repo-id" },
-	});
-
-	// Import and start test server
+	// Import and start test server with real database connection
+	// Test data is seeded via scripts/setup-test-db.sh
 	const { createRouter } = await import("@api/routes");
-	const router = createRouter(mockSupabase);
+	const { getServiceClient } = await import("@db/client");
+
+	const supabase = getServiceClient();
+	const router = createRouter(supabase);
 
 	server = Bun.serve({
 		port: TEST_PORT,
@@ -55,7 +39,7 @@ describe("MCP Tools Integration", () => {
 		"Origin": "http://localhost:3000",
 		"MCP-Protocol-Version": "2025-06-18",
 		"Accept": "application/json",
-		"Authorization": createMockAuthHeader(),
+		"Authorization": createAuthHeader("free"),
 	};
 
 	test("tools/list returns available tools", async () => {

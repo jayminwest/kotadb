@@ -1,22 +1,25 @@
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
-import { createMockSupabaseClient } from "../helpers/supabase-mock";
-import { createMockAuthHeader } from "../helpers/auth-mock";
+import { createAuthHeader } from "../helpers/db";
 
 const TEST_PORT = 3099;
 let server: ReturnType<typeof Bun.serve>;
 
 beforeAll(async () => {
-	// Set test environment variables for Supabase
-	process.env.SUPABASE_URL = "http://localhost:54321";
-	process.env.SUPABASE_SERVICE_KEY = "test-service-key";
-	process.env.SUPABASE_ANON_KEY = "test-anon-key";
+	// Set test environment variables to point to Supabase Local
+	process.env.SUPABASE_URL = "http://localhost:54326";
+	process.env.SUPABASE_SERVICE_KEY =
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
+	process.env.SUPABASE_ANON_KEY =
+		"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
+	process.env.DATABASE_URL =
+		"postgresql://postgres:postgres@localhost:5434/postgres";
 
-	// Create mock Supabase client for testing
-	const mockSupabase = createMockSupabaseClient();
-
-	// Import and start test server
+	// Import and start test server with real database connection
 	const { createRouter } = await import("@api/routes");
-	const router = createRouter(mockSupabase);
+	const { getServiceClient } = await import("@db/client");
+
+	const supabase = getServiceClient();
+	const router = createRouter(supabase);
 
 	server = Bun.serve({
 		port: TEST_PORT,
@@ -39,7 +42,7 @@ describe("MCP Handshake", () => {
 				"Origin": "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
 				"Accept": "application/json",
-				"Authorization": createMockAuthHeader(),
+				"Authorization": createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -71,7 +74,7 @@ describe("MCP Handshake", () => {
 				"Origin": "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
 				"Accept": "application/json",
-				"Authorization": createMockAuthHeader(),
+				"Authorization": createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -90,7 +93,7 @@ describe("MCP Handshake", () => {
 				"Content-Type": "application/json",
 				"Origin": "http://localhost:3000",
 				"Accept": "application/json",
-				"Authorization": createMockAuthHeader(),
+				"Authorization": createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -113,7 +116,7 @@ describe("MCP Handshake", () => {
 				"Origin": "http://evil.com",
 				"MCP-Protocol-Version": "2025-06-18",
 				"Accept": "application/json",
-				"Authorization": createMockAuthHeader(),
+				"Authorization": createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -135,7 +138,7 @@ describe("MCP Handshake", () => {
 				"Content-Type": "application/json",
 				"MCP-Protocol-Version": "2025-06-18",
 				"Accept": "application/json",
-				"Authorization": createMockAuthHeader(),
+				"Authorization": createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -156,7 +159,7 @@ describe("MCP Handshake", () => {
 				"Origin": "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
 				"Accept": "application/json",
-				"Authorization": createMockAuthHeader(),
+				"Authorization": createAuthHeader("free"),
 			},
 			body: "invalid json{",
 		});
@@ -175,7 +178,7 @@ describe("MCP Handshake", () => {
 				"Origin": "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
 				"Accept": "application/json",
-				"Authorization": createMockAuthHeader(),
+				"Authorization": createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",

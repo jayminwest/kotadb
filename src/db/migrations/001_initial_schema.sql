@@ -380,7 +380,7 @@ CREATE POLICY symbols_insert ON symbols
         )
     );
 
-CREATE TABLE references (
+CREATE TABLE "references" (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
     source_file_id uuid NOT NULL REFERENCES indexed_files(id) ON DELETE CASCADE,
     target_symbol_id uuid REFERENCES symbols(id) ON DELETE SET NULL,
@@ -391,13 +391,13 @@ CREATE TABLE references (
     created_at timestamptz NOT NULL DEFAULT now()
 );
 
-CREATE INDEX idx_references_source_file_id ON references(source_file_id);
-CREATE INDEX idx_references_target_symbol_id ON references(target_symbol_id);
-CREATE INDEX idx_references_reference_type ON references(reference_type);
+CREATE INDEX idx_references_source_file_id ON "references"(source_file_id);
+CREATE INDEX idx_references_target_symbol_id ON "references"(target_symbol_id);
+CREATE INDEX idx_references_reference_type ON "references"(reference_type);
 
-ALTER TABLE references ENABLE ROW LEVEL SECURITY;
+ALTER TABLE "references" ENABLE ROW LEVEL SECURITY;
 
-CREATE POLICY references_select ON references
+CREATE POLICY references_select ON "references"
     FOR SELECT
     USING (
         source_file_id IN (
@@ -413,7 +413,7 @@ CREATE POLICY references_select ON references
         )
     );
 
-CREATE POLICY references_insert ON references
+CREATE POLICY references_insert ON "references"
     FOR INSERT
     WITH CHECK (
         source_file_id IN (

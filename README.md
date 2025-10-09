@@ -42,6 +42,23 @@ The server listens on port `3000` by default. Override with `PORT=4000 bun run s
 - `bun test` – Run the Bun test suite.
 - `bunx tsc --noEmit` – Type-check the project.
 
+### Running Tests
+
+KotaDB uses real PostgreSQL database connections for testing (no mocks). To run tests:
+
+```bash
+# Start test database (first time only)
+./scripts/setup-test-db.sh
+
+# Run tests
+bun test
+
+# Reset test database if needed
+./scripts/reset-test-db.sh
+```
+
+For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](docs/testing-setup.md).
+
 ## API Highlights
 
 ### REST Endpoints
