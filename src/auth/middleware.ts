@@ -7,6 +7,7 @@
 
 import type { AuthContext } from "@auth/context";
 import { validateApiKey, updateLastUsed } from "@auth/validator";
+import { enforceRateLimit } from "@auth/rate-limit";
 
 /**
  * Result of authentication request.
@@ -108,6 +109,37 @@ export async function authenticateRequest(
   console.log(
     `[Auth] Success - userId: ${context.userId}, keyId: ${context.keyId}, tier: ${context.tier}`
   );
+
+  // Enforce rate limit
+  const rateLimit = await enforceRateLimit(context.keyId, context.rateLimitPerHour);
+
+  if (!rateLimit.allowed) {
+    console.warn(
+      `[Auth] Rate limit exceeded - keyId: ${context.keyId}, limit: ${context.rateLimitPerHour}`
+    );
+
+    return {
+      response: new Response(
+        JSON.stringify({
+          error: "Rate limit exceeded",
+          retryAfter: rateLimit.retryAfter,
+        }),
+        {
+          status: 429,
+          headers: {
+            "Content-Type": "application/json",
+            "X-RateLimit-Limit": String(context.rateLimitPerHour),
+            "X-RateLimit-Remaining": "0",
+            "X-RateLimit-Reset": String(rateLimit.resetAt),
+            "Retry-After": String(rateLimit.retryAfter || 0),
+          },
+        }
+      ),
+    };
+  }
+
+  // Attach rate limit result to context for response headers
+  context.rateLimit = rateLimit;
 
   // Update last_used_at asynchronously (non-blocking)
   queueMicrotask(() => {

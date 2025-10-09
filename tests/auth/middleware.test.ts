@@ -10,6 +10,7 @@ import { describe, it, expect, beforeEach } from "bun:test";
 import { authenticateRequest, createForbiddenResponse } from "@auth/middleware";
 import { clearCache } from "@auth/cache";
 import { getTestApiKey } from "../helpers/db";
+import { getServiceClient } from "@db/client";
 
 
 describe("Authentication Middleware", () => {
@@ -193,6 +194,136 @@ describe("Authentication Middleware", () => {
       const body = await response.json() as { error: string; code: string };
       expect(body.error).toBe("API key disabled");
       expect(body.code).toBe("AUTH_KEY_DISABLED");
+    });
+  });
+
+  describe("Rate Limiting Integration", () => {
+    // Helper to clean up rate limit counters
+    async function cleanupRateLimitCounter(keyId: string) {
+      const supabase = getServiceClient();
+      await supabase
+        .from("rate_limit_counters")
+        .delete()
+        .eq("key_id", keyId);
+    }
+
+    it("attaches rate limit result to auth context", async () => {
+      const testApiKey = getTestApiKey("free");
+
+      const request = new Request("http://localhost:3000/search", {
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      const result = await authenticateRequest(request);
+
+      expect(result.context).toBeDefined();
+      expect(result.context?.rateLimit).toBeDefined();
+      expect(result.context?.rateLimit?.allowed).toBe(true);
+      expect(result.context?.rateLimit?.limit).toBe(100);
+      expect(result.context?.rateLimit?.remaining).toBeLessThanOrEqual(100);
+      expect(result.context?.rateLimit?.resetAt).toBeGreaterThan(0);
+
+      if (result.context?.keyId) {
+        await cleanupRateLimitCounter(result.context.keyId);
+      }
+    });
+
+    it("returns 429 when rate limit exceeded", async () => {
+      // Note: This test is slow due to the 100-request loop.
+      // In production, consider using a test-specific lower limit or
+      // skipping this test in quick validation runs.
+
+      const testApiKey = getTestApiKey("free");
+
+      // Make 100 requests to exhaust the free tier limit
+      let lastKeyId: string | undefined;
+      for (let i = 0; i < 100; i++) {
+        const request = new Request("http://localhost:3000/search", {
+          headers: {
+            Authorization: `Bearer ${testApiKey}`,
+          },
+        });
+
+        const result = await authenticateRequest(request);
+        if (result.context?.keyId) {
+          lastKeyId = result.context.keyId;
+        }
+      }
+
+      // 101st request should be rate limited
+      const request = new Request("http://localhost:3000/search", {
+        headers: {
+          Authorization: `Bearer ${testApiKey}`,
+        },
+      });
+
+      const result = await authenticateRequest(request);
+
+      expect(result.context).toBeUndefined();
+      expect(result.response).toBeDefined();
+      expect(result.response?.status).toBe(429);
+
+      // Check response headers
+      expect(result.response?.headers.get("X-RateLimit-Limit")).toBe("100");
+      expect(result.response?.headers.get("X-RateLimit-Remaining")).toBe("0");
+      expect(result.response?.headers.get("X-RateLimit-Reset")).toBeDefined();
+      expect(result.response?.headers.get("Retry-After")).toBeDefined();
+
+      // Check response body
+      const body = await result.response?.json() as { error: string; retryAfter: number };
+      expect(body.error).toBe("Rate limit exceeded");
+      expect(body.retryAfter).toBeGreaterThan(0);
+      expect(body.retryAfter).toBeLessThanOrEqual(3600);
+
+      if (lastKeyId) {
+        await cleanupRateLimitCounter(lastKeyId);
+      }
+    }, 120000); // Increase timeout to 120 seconds for this test
+
+    it("enforces different limits for different tiers", async () => {
+      const freeApiKey = getTestApiKey("free");
+      const soloApiKey = getTestApiKey("solo");
+
+      const freeRequest = new Request("http://localhost:3000/search", {
+        headers: {
+          Authorization: `Bearer ${freeApiKey}`,
+        },
+      });
+
+      const soloRequest = new Request("http://localhost:3000/search", {
+        headers: {
+          Authorization: `Bearer ${soloApiKey}`,
+        },
+      });
+
+      const freeResult = await authenticateRequest(freeRequest);
+      const soloResult = await authenticateRequest(soloRequest);
+
+      expect(freeResult.context?.rateLimit?.limit).toBe(100);
+      expect(soloResult.context?.rateLimit?.limit).toBe(1000);
+
+      if (freeResult.context?.keyId) {
+        await cleanupRateLimitCounter(freeResult.context.keyId);
+      }
+      if (soloResult.context?.keyId) {
+        await cleanupRateLimitCounter(soloResult.context.keyId);
+      }
+    });
+
+    it("rate limit check happens after successful authentication", async () => {
+      // Invalid API key should fail auth before rate limiting
+      const request = new Request("http://localhost:3000/search", {
+        headers: {
+          Authorization: "Bearer kota_free_invalid_0123456789abcdef0123456789abcdef",
+        },
+      });
+
+      const result = await authenticateRequest(request);
+
+      expect(result.response).toBeDefined();
+      expect(result.response?.status).toBe(401); // Auth failure, not 429
     });
   });
 });

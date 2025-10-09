@@ -5,6 +5,8 @@
  * that flows through the request lifecycle after successful API key validation.
  */
 
+import type { RateLimitResult } from "@auth/rate-limit";
+
 /**
  * User tier levels that determine rate limits and feature access.
  */
@@ -29,6 +31,9 @@ export interface AuthContext {
 
   /** Rate limit threshold for this key (requests per hour) */
   rateLimitPerHour: number;
+
+  /** Rate limit status for current request (added after enforcement check) */
+  rateLimit?: RateLimitResult;
 }
 
 /**
