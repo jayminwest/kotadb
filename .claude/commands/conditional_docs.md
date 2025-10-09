@@ -34,6 +34,14 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When debugging data flows between API routes and the database
     - When designing new tables, relationships, or rate-limiting behaviour
 
+- docs/specs/feature-26-tier-based-rate-limiting.md
+  - Conditions:
+    - When working on issue #26 or modifying rate limiting implementation
+    - When debugging 429 responses or rate limit header behavior
+    - When updating tier limits or rate limiting configuration
+    - When troubleshooting rate limit counter accuracy or window reset logic
+    - When adding new authenticated endpoints that require rate limiting
+
 - docs/specs/chore-27-standardize-postgres-remove-sqlite.md
   - Conditions:
     - When removing SQLite implementation and migrating to Postgres/Supabase
@@ -90,3 +98,10 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When tests fail with "401 Unauthorized" or "null API key validation"
     - When addressing cache timing test flakiness
     - When troubleshooting Supabase Local connectivity in tests
+
+- docs/specs/feature-25-api-key-generation.md
+  - Conditions:
+    - When working on issue #25 or modifying API key generation logic
+    - When implementing key format changes or collision handling
+    - When debugging bcrypt hashing or key validation issues
+    - When updating key format patterns (kota_<tier>_<key_id>_<secret>)
