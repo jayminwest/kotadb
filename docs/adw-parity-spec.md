@@ -146,6 +146,8 @@
 3. Refresh `adws/README.md`, `.env.sample`, and developer guides.
 4. Final review using this spec as acceptance criteria.
 
+**Status:** Initial pytest suite (`adws/adw_tests/`) and README refresh landed.
+
 ## 8. Acceptance Criteria
 - All new scripts exist, execute successfully with mocked GitHub/Claude inputs, and persist state in `agents/<adw_id>/adw_state.json`.
 - `adw_plan_build.py`, `adw_plan_build_test.py`, `adw_sdlc.py` operate end-to-end on sample issues.
@@ -164,4 +166,3 @@
 - How should default workflows be configured for triggers (e.g., plan+build+test vs plan+build)?
 - Are there repository-specific validation steps (seed scripts, migrations) that should be optional per issue class?
 - What level of retry logic is required for Bun commands or agent execution failures?
-
