@@ -41,6 +41,13 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When working on issue #27 or related database standardization tasks
     - When updating type definitions from SQLite to Supabase schemas
 
+- docs/migration-sqlite-to-supabase.md
+  - Conditions:
+    - When helping developers upgrade from pre-PR#29 SQLite-based code
+    - When resolving merge conflicts related to database layer changes
+    - When troubleshooting "module not found: @db/schema" or table name errors
+    - When migrating existing test data from SQLite to Supabase
+
 - adws/README.md
   - Conditions:
     - When implementing or modifying modules under `adws/adw_modules/**`

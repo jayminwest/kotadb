@@ -88,10 +88,10 @@ Always use these aliases for imports, not relative paths.
 - `KOTA_GIT_BASE_URL`: Git clone base URL (default: https://github.com)
 
 ### AI Developer Workflows (adws/)
-Directory structure for future automation pipelines:
-- `triggers/`: Webhook handlers for workflow initiation
-- `environments/`: Container/runtime configurations
-- `prompts/`: Agent prompt templates
-- `reviews/`: Code review generation scripts
+Python-based automation pipeline for autonomous GitHub issue workflows:
+- `adw_plan.py`, `adw_build.py`, `adw_test.py`, `adw_review.py`, `adw_document.py`: Phase scripts for SDLC automation
+- `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops, GitHub integration, state management)
+- `adw_tests/`: Pytest suite for workflow validation
+- `trigger_webhook.py`, `trigger_cron.py`: Webhook and polling-based trigger systems
 
-Currently contains placeholder READMEs—implementation planned for future expansion.
+See `adws/README.md` for complete automation architecture and usage examples.

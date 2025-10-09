@@ -9,12 +9,24 @@ Supabase (PostgreSQL). Development is done autonomously through AI developer wor
 ### Prerequisites
 
 - [Bun](https://bun.sh) v1.1+
+- [Supabase](https://supabase.com) account with project created (see `docs/supabase-setup.md`)
 
 ### Install dependencies
 
 ```bash
 bun install
 ```
+
+### Configure Supabase
+
+1. Create a Supabase project at https://supabase.com/dashboard
+2. Copy `.env.sample` to `.env` and add your Supabase credentials:
+   - `SUPABASE_URL` - Your project URL
+   - `SUPABASE_SERVICE_KEY` - Service role key (keep secret)
+   - `SUPABASE_ANON_KEY` - Anonymous/public key
+3. Run database migrations (see `docs/supabase-setup.md` for details)
+
+For detailed setup instructions, see `docs/supabase-setup.md`.
 
 ### Start the API server
 
