@@ -28,8 +28,10 @@ export function createMockAuthHeader(tier: "free" | "solo" | "team" = "free"): s
 export function createMockAuthContext(): AuthContext {
   return {
     userId: "test-user-id-uuid",
-    organizationId: "test-org-id-uuid",
+    orgId: "test-org-id-uuid",
     tier: "free",
+    keyId: "test1234567890ab",
+    rateLimitPerHour: 100,
   };
 }
 

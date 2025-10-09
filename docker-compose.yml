@@ -55,5 +55,24 @@ services:
       - "3000:3000"
     restart: unless-stopped
 
+  # Test database - PostgreSQL for local test environment
+  test-db:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: kotadb_test
+    ports:
+      - "5433:5432"  # Use 5433 to avoid conflicts with local Postgres
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+    volumes:
+      - test_db_data:/var/lib/postgresql/data
+      # Note: Migrations are run manually via scripts/setup-test-db.sh
+
 volumes:
   bun_cache:
+  test_db_data:

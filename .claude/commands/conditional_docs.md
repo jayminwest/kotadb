@@ -65,3 +65,19 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When planning or implementing changes that add or modify automated tests
     - When touching infrastructure, data access layers, or background jobs where mocks might be tempting
     - When validation requires Supabase or other third-party integrations
+
+- docs/testing-setup.md
+  - Conditions:
+    - When setting up local testing environment with Supabase local instance
+    - When troubleshooting test failures related to authentication or database connections
+    - When writing new tests that require real Supabase integration
+    - When debugging Docker-based test infrastructure or CI test pipeline
+    - When onboarding new developers who need to run the test suite locally
+
+- docs/specs/chore-31-replace-test-mocks-supabase-local.md
+  - Conditions:
+    - When working on issue #31 or related antimocking initiatives
+    - When refactoring tests from mocked Supabase clients to real database integration
+    - When removing `tests/helpers/supabase-mock.ts` or `tests/helpers/auth-mock.ts`
+    - When implementing test database helpers or seed scripts
+    - When troubleshooting authentication test failures in CI/CD pipeline
