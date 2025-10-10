@@ -10,24 +10,14 @@ jobs:
   build:
     runs-on: ubuntu-latest
 
-    services:
-      postgres:
-        image: postgres:15-alpine
-        env:
-          POSTGRES_USER: postgres
-          POSTGRES_PASSWORD: postgres
-          POSTGRES_DB: postgres
-        ports:
-          - 5434:5432
-        options: >-
-          --health-cmd pg_isready
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
-
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
+
+      - name: Setup Supabase CLI
+        uses: supabase/setup-cli@v1
+        with:
+          version: latest
 
       - name: Install Bun
         uses: oven-sh/setup-bun@v1
@@ -37,49 +27,26 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Setup test database
-        env:
-          PGPASSWORD: postgres
+      - name: Setup Supabase Local and generate test credentials
         run: |
-          # Wait for PostgreSQL to be ready
-          for i in {1..30}; do
-            if psql -h localhost -p 5434 -U postgres -d postgres -c "SELECT 1" > /dev/null 2>&1; then
-              echo "PostgreSQL is ready!"
-              break
-            fi
-            if [ $i -eq 30 ]; then
-              echo "PostgreSQL failed to start within 30 seconds"
-              exit 1
-            fi
-            sleep 1
-          done
+          chmod +x .github/scripts/setup-supabase-ci.sh
+          .github/scripts/setup-supabase-ci.sh
 
-          # Create migrations table
-          psql -h localhost -p 5434 -U postgres -d postgres -c "
-          CREATE TABLE IF NOT EXISTS migrations (
-              id serial PRIMARY KEY,
-              name text NOT NULL UNIQUE,
-              applied_at timestamptz NOT NULL DEFAULT now()
-          );" || true
-
-          # Run migrations
-          echo "Running migrations..."
-          psql -h localhost -p 5434 -U postgres -d postgres < src/db/migrations/000_test_auth_schema.sql > /dev/null 2>&1
-          psql -h localhost -p 5434 -U postgres -d postgres < src/db/migrations/001_initial_schema.sql 2>&1 | grep -v "role.*does not exist" || true
-
-          # Seed test data
-          echo "Seeding test data..."
-          psql -h localhost -p 5434 -U postgres -d postgres < supabase/seed.sql > /dev/null 2>&1
-
-          echo "Test database setup complete!"
+      - name: Validate migration sync
+        run: bun run test:validate-migrations
 
       - name: Type check
         run: bunx tsc --noEmit
 
+      - name: Lint
+        run: bun run lint
+
       - name: Test
-        env:
-          SUPABASE_URL: http://localhost:5434
-          SUPABASE_SERVICE_KEY: test-service-key-local
-          SUPABASE_ANON_KEY: test-anon-key-local
-          DATABASE_URL: postgresql://postgres:postgres@localhost:5434/postgres
-        run: bun test
+        run: |
+          # Source .env.test for Supabase credentials
+          export $(grep -v '^#' .env.test | xargs)
+          bun test
+
+      - name: Teardown Supabase Local
+        if: always()
+        run: supabase stop

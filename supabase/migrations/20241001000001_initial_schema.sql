@@ -60,36 +60,7 @@ CREATE TABLE organizations (
 CREATE INDEX idx_organizations_owner_id ON organizations(owner_id);
 CREATE INDEX idx_organizations_slug ON organizations(slug);
 
-ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY organizations_select ON organizations
-    FOR SELECT
-    USING (
-        owner_id = (current_setting('app.user_id', true))::uuid
-        OR id IN (
-            SELECT org_id FROM user_organizations
-            WHERE user_id = (current_setting('app.user_id', true))::uuid
-        )
-    );
-
-CREATE POLICY organizations_insert ON organizations
-    FOR INSERT
-    WITH CHECK (owner_id = (current_setting('app.user_id', true))::uuid);
-
-CREATE POLICY organizations_update ON organizations
-    FOR UPDATE
-    USING (
-        owner_id = (current_setting('app.user_id', true))::uuid
-        OR id IN (
-            SELECT org_id FROM user_organizations
-            WHERE user_id = (current_setting('app.user_id', true))::uuid
-            AND role IN ('owner', 'admin')
-        )
-    );
-
-CREATE POLICY organizations_delete ON organizations
-    FOR DELETE
-    USING (owner_id = (current_setting('app.user_id', true))::uuid);
+-- Note: RLS policies for organizations created after user_organizations table exists
 
 CREATE TABLE user_organizations (
     id uuid PRIMARY KEY DEFAULT gen_random_uuid(),
@@ -143,6 +114,41 @@ CREATE POLICY user_organizations_delete ON user_organizations
             AND role IN ('owner', 'admin')
         )
     );
+
+-- ============================================================================
+-- Organizations RLS Policies (defined after user_organizations table exists)
+-- ============================================================================
+
+ALTER TABLE organizations ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY organizations_select ON organizations
+    FOR SELECT
+    USING (
+        owner_id = (current_setting('app.user_id', true))::uuid
+        OR id IN (
+            SELECT org_id FROM user_organizations
+            WHERE user_id = (current_setting('app.user_id', true))::uuid
+        )
+    );
+
+CREATE POLICY organizations_insert ON organizations
+    FOR INSERT
+    WITH CHECK (owner_id = (current_setting('app.user_id', true))::uuid);
+
+CREATE POLICY organizations_update ON organizations
+    FOR UPDATE
+    USING (
+        owner_id = (current_setting('app.user_id', true))::uuid
+        OR id IN (
+            SELECT org_id FROM user_organizations
+            WHERE user_id = (current_setting('app.user_id', true))::uuid
+            AND role IN ('owner', 'admin')
+        )
+    );
+
+CREATE POLICY organizations_delete ON organizations
+    FOR DELETE
+    USING (owner_id = (current_setting('app.user_id', true))::uuid);
 
 -- ============================================================================
 -- Rate Limiting
