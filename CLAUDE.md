@@ -20,6 +20,7 @@ bun --watch src/index.ts          # Watch mode for development
 bun test                          # Run test suite
 bunx tsc --noEmit                # Type-check without emitting files
 bun run test:validate-migrations # Validate migration sync (see below)
+bun run test:validate-env        # Detect hardcoded environment URLs in tests
 ```
 
 **IMPORTANT: Migration Sync Requirement**
@@ -136,3 +137,14 @@ See `adws/README.md` for complete automation architecture and usage examples.
 - Validates migration sync between `src/db/migrations/` and `supabase/migrations/` before tests
 - Teardown via `./scripts/cleanup-test-containers.sh` in cleanup step (always runs)
 - Migrations applied directly to containerized Postgres via `psql` (bypasses Supabase CLI)
+
+**Test Environment Variable Loading Strategy**:
+- **Problem**: CI uses dynamic Docker Compose ports, but tests were hardcoding `localhost:54322`
+- **Solution**: Tests now read from environment variables with fallback to local defaults
+- **Implementation**:
+  - `tests/helpers/db.ts` reads `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` from `process.env`
+  - All test files removed hardcoded env var assignments (lines like `process.env.SUPABASE_URL = "http://localhost:54322"`)
+  - CI workflow exports `.env.test` variables via `export $(grep -v '^#' .env.test | xargs)` before running tests
+  - Local development: falls back to standard ports (54322, 5434) when env vars not set
+- **Validation**: Run `bun run test:validate-env` to detect hardcoded environment variable assignments in tests
+- **Result**: Tests respect dynamic ports from `.env.test` in CI while maintaining local dev compatibility
