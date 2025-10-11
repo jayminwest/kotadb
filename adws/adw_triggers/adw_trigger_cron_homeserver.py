@@ -310,10 +310,15 @@ class HomeServerCronTrigger:
 
     def _setup_logging(self, log_file: Optional[str] = None) -> None:
         """Setup structured logging to file."""
+        # Always use project root for logs
+        project_root = Path(__file__).parent.parent.parent
+
         if log_file:
             log_path = Path(log_file)
+            if not log_path.is_absolute():
+                log_path = project_root / log_path
         else:
-            log_dir = Path(".adw_logs/cron")
+            log_dir = project_root / ".adw_logs" / "cron"
             log_dir.mkdir(parents=True, exist_ok=True)
             log_path = log_dir / f"trigger_{datetime.now().strftime('%Y%m%d')}.log"
 
@@ -325,6 +330,7 @@ class HomeServerCronTrigger:
         )
 
         self.logger = logging.getLogger(__name__)
+        console.print(f"[dim]Logging to: {log_path}[/dim]")
 
     def _log_event(self, event_type: str, **data: Any) -> None:
         """Log structured event."""
