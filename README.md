@@ -44,16 +44,17 @@ The server listens on port `3000` by default. Override with `PORT=4000 bun run s
 
 ### Running Tests
 
-KotaDB uses real PostgreSQL database connections for testing (no mocks). The test environment uses **Supabase Local** with auto-generated credentials to ensure exact parity between local and CI testing environments.
+KotaDB uses real PostgreSQL database connections for testing (no mocks). The test environment uses **Docker Compose** with isolated services to ensure exact parity between local and CI testing environments, with full project isolation to prevent port conflicts.
 
-**Prerequisites:** Install [Supabase CLI](https://supabase.com/docs/guides/cli) and [jq](https://jqlang.github.io/jq/)
+**Prerequisites:** Install [Docker Desktop](https://www.docker.com/products/docker-desktop)
 ```bash
-brew install supabase/tap/supabase jq  # macOS
+# Verify Docker is installed and running
+docker --version
 ```
 
 **Quick Start:**
 ```bash
-# First-time setup: Start Supabase Local and auto-generate .env.test
+# First-time setup: Start Docker Compose services and auto-generate .env.test
 bun run test:setup
 
 # Run tests
@@ -66,9 +67,11 @@ bun run test:reset
 bun run test:teardown
 ```
 
-**Note:** The `.env.test` file is auto-generated from `supabase status` and should not be committed to git.
+**Note:** The `.env.test` file is auto-generated from Docker Compose container ports and should not be committed to git.
 
-**CI Testing:** GitHub Actions CI uses the same Supabase Local environment via `supabase/setup-cli@v1`, ensuring tests run against identical infrastructure locally and in CI (PostgreSQL + PostgREST + Kong + Auth). See `.github/workflows/ci.yml` for details.
+**Project Isolation:** Each test run uses a unique Docker Compose project name (e.g., `kotadb-test-1234567890-98765`), enabling multiple projects or branches to run tests simultaneously without port conflicts.
+
+**CI Testing:** GitHub Actions CI uses the same Docker Compose environment with unique project names, ensuring tests run against identical infrastructure locally and in CI (PostgreSQL + PostgREST + Kong + Auth). See `.github/workflows/ci.yml` for details.
 
 For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](docs/testing-setup.md).
 

@@ -14,11 +14,11 @@
     "build": "bun run typecheck",
     "lint": "bunx biome lint",
     "test:setup": "./scripts/setup-test-db.sh",
-    "test:teardown": "supabase stop",
+    "test:teardown": "./scripts/cleanup-test-containers.sh",
     "test:reset": "./scripts/reset-test-db.sh",
-    "test:env": "./scripts/generate-env-test.sh",
-    "test:status": "supabase status",
-    "test:validate-migrations": "diff -r src/db/migrations supabase/migrations || echo 'WARNING: Migration directories are out of sync!'"
+    "test:env": "./scripts/generate-env-test-compose.sh",
+    "test:validate-migrations": "diff -r src/db/migrations supabase/migrations || echo 'WARNING: Migration directories are out of sync!'",
+    "test:validate-env": "! grep -rn 'process\\.env\\.\\(SUPABASE_URL\\|DATABASE_URL\\)\\s*=\\s*[\"\\x27]' tests/ || (echo 'ERROR: Found hardcoded environment variable string assignments in tests/' && exit 1)"
   },
   "dependencies": {
     "bcryptjs": "^2.4.3",

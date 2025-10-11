@@ -127,10 +127,12 @@ See `adws/README.md` for complete automation architecture and usage examples.
 
 ### CI/CD Testing Infrastructure
 **GitHub Actions Workflow** (`.github/workflows/ci.yml`):
-- Uses `supabase/setup-cli@v1` to install Supabase CLI in CI environment
-- Runs `.github/scripts/setup-supabase-ci.sh` to start Supabase Local services
-- Auto-generates `.env.test` from `supabase status --output json` for dynamic credentials
+- Uses Docker Compose with isolated project names for test environment
+- Runs `.github/scripts/setup-supabase-ci.sh` to start containerized Supabase stack
+- Auto-generates `.env.test` from Docker Compose container ports for dynamic credentials
 - Executes full test suite (133 tests) against real Supabase stack (PostgreSQL + PostgREST + Kong + Auth)
 - Ensures **exact parity** between local and CI testing environments (antimocking compliance)
+- **Project isolation**: unique project names prevent port conflicts across concurrent CI runs
 - Validates migration sync between `src/db/migrations/` and `supabase/migrations/` before tests
-- Teardown via `supabase stop` in cleanup step (always runs)
+- Teardown via `./scripts/cleanup-test-containers.sh` in cleanup step (always runs)
+- Migrations applied directly to containerized Postgres via `psql` (bypasses Supabase CLI)

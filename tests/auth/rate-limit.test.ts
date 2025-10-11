@@ -1,10 +1,15 @@
-// Set test environment variables BEFORE any imports
-process.env.SUPABASE_URL = "http://localhost:54322";
-process.env.SUPABASE_SERVICE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
-process.env.SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
+/**
+ * Rate Limiting Integration Tests
+ *
+ * Tests the rate limiting functionality with real database connection.
+ * Environment variables are loaded from .env.test in CI or default to local Supabase ports.
+ *
+ * Required environment variables:
+ * - SUPABASE_URL (defaults to http://localhost:54322)
+ * - SUPABASE_SERVICE_KEY (defaults to local demo key)
+ * - SUPABASE_ANON_KEY (defaults to local demo key)
+ * - DATABASE_URL (defaults to postgresql://postgres:postgres@localhost:5434/postgres)
+ */
 
 import { describe, it, expect, beforeEach } from "bun:test";
 import { enforceRateLimit } from "@auth/rate-limit";

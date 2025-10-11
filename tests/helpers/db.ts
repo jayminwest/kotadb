@@ -7,16 +7,22 @@ import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 
 /**
  * Test database connection details
- * Points to Supabase Local Kong gateway on port 54322
+ * Points to Supabase Local Kong gateway on port 54322 (local default)
+ * or dynamically generated port in CI (from .env.test)
  *
  * Architecture:
  * - Port 54322 = Kong gateway (routes /rest/v1/ to PostgREST) - Use this for Supabase JS client
  * - Port 54321 = PostgREST direct (no /rest/v1/ prefix) - Use this for raw HTTP access
  *
  * The Supabase JS client expects Kong gateway format with /rest/v1/ prefix.
+ *
+ * Environment variables (set by CI workflow from .env.test):
+ * - SUPABASE_URL: Supabase API URL (defaults to http://localhost:54322 for local dev)
+ * - SUPABASE_SERVICE_KEY: Service role key (defaults to local Supabase demo key)
  */
-const TEST_DB_URL = "http://localhost:54322";
+const TEST_DB_URL = process.env.SUPABASE_URL || "http://localhost:54322";
 const TEST_DB_KEY =
+	process.env.SUPABASE_SERVICE_KEY ||
 	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
 
 /**

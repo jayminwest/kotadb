@@ -1,0 +1,131 @@
+# Docker Compose Test Stack for KotaDB
+# Provides isolated Supabase-compatible services for testing
+# Uses dynamic port allocation to avoid conflicts with other projects
+
+services:
+  # PostgreSQL Database
+  db:
+    image: supabase/postgres:15.1.0.147
+    container_name: ${PROJECT_NAME:-kotadb-test}-db
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+    ports:
+      - "0:5432"  # Dynamic port allocation
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    volumes:
+      - db-data:/var/lib/postgresql/data
+    command: >
+      postgres
+      -c listen_addresses='*'
+      -c shared_preload_libraries=pg_stat_statements
+      -c pg_stat_statements.track=all
+      -c max_connections=100
+
+  # PostgREST - REST API for PostgreSQL
+  rest:
+    image: postgrest/postgrest:v12.0.1
+    container_name: ${PROJECT_NAME:-kotadb-test}-rest
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      PGRST_DB_URI: postgres://postgres:postgres@db:5432/postgres
+      PGRST_DB_SCHEMAS: public,auth
+      PGRST_DB_ANON_ROLE: anon
+      PGRST_DB_EXTRA_SEARCH_PATH: public,auth
+      PGRST_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      PGRST_LOG_LEVEL: error
+    ports:
+      - "0:3000"  # Dynamic port allocation
+    networks:
+      default:
+        aliases:
+          - supabase-rest
+    # Note: PostgREST image doesn't include wget/curl for healthchecks
+    # Service logs successful startup, so we rely on depends_on for ordering
+
+  # GoTrue - Authentication Service
+  auth:
+    image: supabase/gotrue:v2.99.0
+    container_name: ${PROJECT_NAME:-kotadb-test}-auth
+    restart: on-failure:5
+    depends_on:
+      db:
+        condition: service_healthy
+    environment:
+      GOTRUE_API_HOST: 0.0.0.0
+      GOTRUE_API_PORT: 9999
+      API_EXTERNAL_URL: http://localhost:8000
+      GOTRUE_DB_DRIVER: postgres
+      GOTRUE_DB_DATABASE_URL: postgres://postgres:postgres@db:5432/postgres?search_path=auth
+      GOTRUE_DB_AUTOMIGRATE: "true"
+      GOTRUE_SITE_URL: http://localhost:3000
+      GOTRUE_URI_ALLOW_LIST: "*"
+      GOTRUE_DISABLE_SIGNUP: "false"
+      GOTRUE_JWT_ADMIN_ROLES: service_role
+      GOTRUE_JWT_AUD: authenticated
+      GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
+      GOTRUE_JWT_EXP: 3600
+      GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "false"
+      GOTRUE_MAILER_AUTOCONFIRM: "true"
+      GOTRUE_SMTP_ADMIN_EMAIL: admin@example.com
+      GOTRUE_SMTP_HOST: localhost
+      GOTRUE_SMTP_PORT: 2500
+      GOTRUE_SMTP_SENDER_NAME: Admin
+      GOTRUE_MAILER_URLPATHS_INVITE: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_CONFIRMATION: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_RECOVERY: /auth/v1/verify
+      GOTRUE_MAILER_URLPATHS_EMAIL_CHANGE: /auth/v1/verify
+    ports:
+      - "0:9999"  # Dynamic port allocation
+    networks:
+      default:
+        aliases:
+          - supabase-auth
+    healthcheck:
+      test: ["CMD", "wget", "--spider", "-q", "http://localhost:9999/health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # Kong - API Gateway
+  kong:
+    image: kong:2.8.1-alpine
+    container_name: ${PROJECT_NAME:-kotadb-test}-kong
+    depends_on:
+      rest:
+        condition: service_started
+      auth:
+        condition: service_healthy
+    environment:
+      KONG_DATABASE: "off"
+      KONG_DECLARATIVE_CONFIG: /usr/local/kong/kong.yml
+      KONG_DNS_ORDER: LAST,A,CNAME
+      KONG_PLUGINS: request-transformer,cors,key-auth,http-log
+      KONG_LOG_LEVEL: error
+      KONG_NGINX_PROXY_PROXY_BUFFER_SIZE: 160k
+      KONG_NGINX_PROXY_PROXY_BUFFERS: 64 160k
+    ports:
+      - "0:8000"  # Dynamic port allocation for Kong gateway
+    volumes:
+      - ./supabase/kong.yml:/usr/local/kong/kong.yml:ro
+    healthcheck:
+      test: ["CMD", "kong", "health"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+volumes:
+  db-data:
+    name: ${PROJECT_NAME:-kotadb-test}-db-data
+
+networks:
+  default:
+    name: ${PROJECT_NAME:-kotadb-test}-network

@@ -28,6 +28,9 @@ adws/.env.local
 .env.adws
 .env.adws.local
 
+# test infrastructure
+.test-project-name
+
 # caches
 .eslintcache
 .cache

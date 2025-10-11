@@ -1,23 +1,26 @@
-// Set test environment variables BEFORE any imports that might use them
-process.env.SUPABASE_URL = "http://localhost:54322";
-process.env.SUPABASE_SERVICE_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
-process.env.SUPABASE_ANON_KEY =
-  "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0";
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
-
-import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { getTestApiKey, createAuthHeader } from "../helpers/db";
-
 /**
- * Integration tests for authenticated API routes.
+ * Authenticated Routes Integration Tests
  *
- * These tests verify that authentication middleware properly protects
- * endpoints and that authenticated requests can access resources.
+ * Tests authentication middleware and protected endpoints with real database connection.
+ * Environment variables are loaded from .env.test in CI or default to local Supabase ports.
+ *
+ * These tests verify that:
+ * - Unauthenticated requests are properly rejected with 401
+ * - Valid API keys grant access to protected endpoints
+ * - Authentication caching improves performance
+ *
+ * Required environment variables:
+ * - SUPABASE_URL (defaults to http://localhost:54322)
+ * - SUPABASE_SERVICE_KEY (defaults to local demo key)
+ * - SUPABASE_ANON_KEY (defaults to local demo key)
+ * - DATABASE_URL (defaults to postgresql://postgres:postgres@localhost:5434/postgres)
  *
  * NOTE: These tests require the local test database to be running.
  * Run `./scripts/setup-test-db.sh` before running tests.
  */
+
+import { describe, it, expect, beforeAll, afterAll } from "bun:test";
+import { getTestApiKey, createAuthHeader } from "../helpers/db";
 
 const TEST_PORT = 3100;
 const BASE_URL = `http://localhost:${TEST_PORT}`;
@@ -26,7 +29,7 @@ const TEST_API_KEY = getTestApiKey("free");
 let server: ReturnType<typeof Bun.serve>;
 
 beforeAll(async () => {
-  // Environment variables already set at module level above
+  // Environment variables loaded from .env.test (CI) or fallback to local defaults
   // Start test server with real database
   const { createRouter } = await import("@api/routes");
   const { getServiceClient } = await import("@db/client");

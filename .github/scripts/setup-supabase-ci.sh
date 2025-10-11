@@ -1,25 +1,14 @@
 #!/usr/bin/env bash
-# Setup Supabase Local for CI Environment
-# Starts Supabase Local services and generates .env.test for GitHub Actions
-#
-# Expected Supabase CLI output format (current):
-#   API_URL, SECRET_KEY, PUBLISHABLE_KEY, SERVICE_ROLE_KEY, DB_URL, etc.
-# Previous format (pre-v2.x):
-#   api_url, anon_key, service_role_key, db_url, etc.
-# This script handles both formats with fallback logic.
+# Setup Docker Compose Test Stack for CI Environment
+# Starts isolated Docker Compose services and generates .env.test for GitHub Actions
 
 set -euo pipefail
 
-echo "🚀 Setting up Supabase Local for CI environment..."
+echo "🚀 Setting up Docker Compose test environment for CI..."
 
 # Check prerequisites
-if ! command -v supabase &> /dev/null; then
-    echo "❌ Error: Supabase CLI is not installed"
-    exit 1
-fi
-
-if ! command -v jq &> /dev/null; then
-    echo "❌ Error: jq is not installed (required for .env.test generation)"
+if ! command -v docker &> /dev/null; then
+    echo "❌ Error: Docker is not installed"
     exit 1
 fi
 
@@ -28,111 +17,154 @@ if ! docker info > /dev/null 2>&1; then
     exit 1
 fi
 
-# Initialize Supabase config if not present
-if [ ! -f "supabase/config.toml" ]; then
-    echo "📋 Initializing Supabase configuration..."
-    supabase init
+# Generate unique project name for CI isolation
+# Format: kotadb-ci-<github-run-id>-<github-run-attempt>
+# Falls back to timestamp if not in GitHub Actions
+if [ -n "${GITHUB_RUN_ID:-}" ]; then
+    PROJECT_NAME="kotadb-ci-${GITHUB_RUN_ID}-${GITHUB_RUN_ATTEMPT:-1}"
+else
+    PROJECT_NAME="kotadb-ci-$(date +%s)-$$"
 fi
 
-# Start Supabase Local services
-echo "📦 Starting Supabase Local services..."
-supabase start
+export PROJECT_NAME
 
-# Wait for services to be fully ready
-echo "⏳ Waiting for services to be ready..."
-MAX_RETRIES=30
-RETRY_COUNT=0
+echo "📝 Project name: $PROJECT_NAME"
 
-while [ $RETRY_COUNT -lt $MAX_RETRIES ]; do
-    if supabase status --output json > /dev/null 2>&1; then
-        echo "✅ Supabase services are ready!"
+# Store project name for cleanup script
+echo "$PROJECT_NAME" > .test-project-name
+
+# Start database first (GoTrue needs it)
+echo "📦 Starting database service..."
+docker compose -p "$PROJECT_NAME" -f docker-compose.test.yml up -d db
+
+# Wait for database to be healthy
+echo "⏳ Waiting for database to be ready..."
+MAX_ATTEMPTS=30
+ATTEMPT=0
+
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    if docker compose -p "$PROJECT_NAME" ps db 2>/dev/null | grep -q "healthy"; then
+        echo "✅ Database is healthy!"
         break
     fi
 
-    RETRY_COUNT=$((RETRY_COUNT + 1))
-    if [ $RETRY_COUNT -eq $MAX_RETRIES ]; then
-        echo "❌ Error: Supabase services failed to start within timeout"
-        supabase status
+    ATTEMPT=$((ATTEMPT + 1))
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+        echo "❌ Error: Database did not become healthy in time"
+        docker compose -p "$PROJECT_NAME" logs db
         exit 1
     fi
 
-    echo "Waiting for services... (attempt $RETRY_COUNT/$MAX_RETRIES)"
+    echo "  Waiting for database... ($ATTEMPT/$MAX_ATTEMPTS)"
     sleep 2
 done
 
-# Generate .env.test from Supabase status
-echo "🔧 Generating .env.test from Supabase status..."
+# Verify database actually accepts connections (not just healthy)
+echo "⏳ Verifying database accepts connections..."
+MAX_CONN_ATTEMPTS=15
+CONN_ATTEMPT=0
 
-# Get Supabase status as JSON
-STATUS_JSON=$(supabase status --output json)
+while [ $CONN_ATTEMPT -lt $MAX_CONN_ATTEMPTS ]; do
+    if docker compose -p "$PROJECT_NAME" exec -T db psql -U postgres -d postgres -c "SELECT 1" >/dev/null 2>&1; then
+        echo "✅ Database is accepting connections!"
+        break
+    fi
 
-# Extract values using jq with fallbacks for both old and new field name formats
-# New CLI format uses uppercase keys (API_URL, SECRET_KEY, PUBLISHABLE_KEY, SERVICE_ROLE_KEY)
-# Old CLI format used lowercase keys (api_url, anon_key, service_role_key)
-API_URL=$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // "http://localhost:54321"')
-ANON_KEY=$(echo "$STATUS_JSON" | jq -r '.SECRET_KEY // .ANON_KEY // .anon_key // ""')
-SERVICE_KEY=$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // ""')
-DB_URL=$(echo "$STATUS_JSON" | jq -r '.DB_URL // .db_url // ""')
+    CONN_ATTEMPT=$((CONN_ATTEMPT + 1))
+    if [ $CONN_ATTEMPT -eq $MAX_CONN_ATTEMPTS ]; then
+        echo "❌ Error: Database is not accepting connections"
+        docker compose -p "$PROJECT_NAME" logs db
+        exit 1
+    fi
 
-# Validate required values
-if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_KEY" ]; then
-    echo "❌ Error: Failed to extract API keys from Supabase status"
-    echo "Status JSON:"
-    echo "$STATUS_JSON"
-    echo ""
-    echo "Attempted to extract:"
-    echo "  ANON_KEY: Tried SECRET_KEY, ANON_KEY, anon_key"
-    echo "  SERVICE_KEY: Tried SERVICE_ROLE_KEY, service_role_key"
-    exit 1
+    echo "  Verifying connection... ($CONN_ATTEMPT/$MAX_CONN_ATTEMPTS)"
+    sleep 1
+done
+
+# Give database extra time to be ready for network connections from other containers
+echo "⏳ Waiting for database to be ready for network connections..."
+sleep 3
+
+# Start auth service (creates auth schema)
+echo "📦 Starting auth service..."
+docker compose -p "$PROJECT_NAME" -f docker-compose.test.yml up -d auth
+
+# Wait for auth to be healthy
+echo "⏳ Waiting for auth service to be ready..."
+MAX_ATTEMPTS=30
+ATTEMPT=0
+
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    if docker compose -p "$PROJECT_NAME" ps auth 2>/dev/null | grep -q "healthy"; then
+        echo "✅ Auth service is healthy!"
+        # Give GoTrue extra time to complete migrations
+        sleep 2
+        break
+    fi
+
+    ATTEMPT=$((ATTEMPT + 1))
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+        echo "❌ Error: Auth service did not become healthy in time"
+        docker compose -p "$PROJECT_NAME" logs auth
+        exit 1
+    fi
+
+    echo "  Waiting for auth... ($ATTEMPT/$MAX_ATTEMPTS)"
+    sleep 2
+done
+
+# Run migrations (now that auth schema exists from GoTrue)
+# Note: We run migrations before starting other services to ensure schema is ready
+echo "🔄 Running migrations..."
+./scripts/run-migrations-compose.sh "$PROJECT_NAME"
+
+# Start remaining services (rest, kong)
+echo "📦 Starting remaining services (rest, kong)..."
+docker compose -p "$PROJECT_NAME" -f docker-compose.test.yml up -d
+
+# Wait for all services with healthchecks to be healthy
+echo "⏳ Waiting for all services to be ready..."
+MAX_ATTEMPTS=30
+ATTEMPT=0
+
+while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+    # Check if all 3 services with healthchecks are healthy (db, auth, kong)
+    # Note: rest (PostgREST) doesn't have a healthcheck due to missing curl/wget in the image
+    HEALTHY_COUNT=$(docker compose -p "$PROJECT_NAME" ps --format json 2>/dev/null | \
+        grep -c '"Health":"healthy"' || echo "0")
+
+    if [ "$HEALTHY_COUNT" -ge 3 ]; then
+        echo "✅ All services are healthy!"
+        # Give PostgREST a moment to finish starting (it has no healthcheck)
+        sleep 2
+        break
+    fi
+
+    ATTEMPT=$((ATTEMPT + 1))
+    if [ $ATTEMPT -eq $MAX_ATTEMPTS ]; then
+        echo "❌ Error: Services did not become healthy in time"
+        echo "Container status:"
+        docker compose -p "$PROJECT_NAME" ps
+        echo ""
+        echo "Container logs:"
+        docker compose -p "$PROJECT_NAME" logs
+        exit 1
+    fi
+
+    echo "  Waiting for services ($HEALTHY_COUNT/3 healthy)... ($ATTEMPT/$MAX_ATTEMPTS)"
+    sleep 2
+done
+
+# Generate .env.test from container ports (now that all services are running)
+echo "🔧 Generating .env.test from container ports..."
+./scripts/generate-env-test-compose.sh "$PROJECT_NAME"
+
+# Load environment variables for seeding
+if [ -f .env.test ]; then
+    export $(grep -v '^#' .env.test | xargs)
 fi
 
-# Extract database components from connection string
-if [ -n "$DB_URL" ]; then
-    DB_HOST=$(echo "$DB_URL" | sed -n 's/.*@\([^:]*\):.*/\1/p')
-    DB_PORT=$(echo "$DB_URL" | sed -n 's/.*:\([0-9]*\)\/.*/\1/p')
-    DB_NAME=$(echo "$DB_URL" | sed -n 's/.*\/\([^?]*\).*/\1/p')
-    DB_USER=$(echo "$DB_URL" | sed -n 's/.*:\/\/\([^:]*\):.*/\1/p')
-    DB_PASSWORD=$(echo "$DB_URL" | sed -n 's/.*:\/\/[^:]*:\([^@]*\)@.*/\1/p')
-else
-    echo "⚠️  Warning: Could not extract database URL from Supabase status"
-    DB_HOST="localhost"
-    DB_PORT="5434"
-    DB_NAME="postgres"
-    DB_USER="postgres"
-    DB_PASSWORD="postgres"
-    DB_URL="postgresql://postgres:postgres@localhost:5434/postgres"
-fi
-
-# Generate .env.test file
-cat > .env.test << EOF
-# Test Environment Configuration (CI)
-# Auto-generated from Supabase CLI status in GitHub Actions
-# DO NOT commit this file
-
-# Supabase API URL (Kong gateway - provides /rest/v1/ routing to PostgREST)
-SUPABASE_URL=$API_URL
-
-# Supabase Keys (from Supabase Local)
-SUPABASE_SERVICE_KEY=$SERVICE_KEY
-SUPABASE_ANON_KEY=$ANON_KEY
-
-# Direct PostgreSQL connection for migrations (bypasses PostgREST)
-DB_HOST=$DB_HOST
-DB_PORT=$DB_PORT
-DB_NAME=$DB_NAME
-DB_USER=$DB_USER
-DB_PASSWORD=$DB_PASSWORD
-DATABASE_URL=$DB_URL
-EOF
-
-echo "✅ Generated .env.test successfully!"
-echo ""
-echo "Configuration:"
-echo "  API URL:     $API_URL"
-echo "  Database:    $DB_URL"
-echo ""
-
-# Seed test data if seed file exists
+# Seed test data
 if [ -f "supabase/seed.sql" ]; then
     echo "🌱 Seeding test data..."
     PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME < supabase/seed.sql > /dev/null 2>&1 || {
@@ -142,4 +174,9 @@ if [ -f "supabase/seed.sql" ]; then
 fi
 
 echo ""
-echo "🎉 Supabase Local setup complete for CI!"
+echo "Configuration:"
+echo "  API URL (Kong):  $SUPABASE_URL"
+echo "  Database:        $DATABASE_URL"
+echo "  Project Name:    $PROJECT_NAME"
+echo ""
+echo "🎉 Docker Compose test setup complete for CI!"

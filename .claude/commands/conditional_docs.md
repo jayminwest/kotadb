@@ -113,3 +113,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When updating GitHub Actions workflows to use Supabase Local
     - When CI tests fail with authentication errors that pass locally
     - When aligning CI and local testing environments for parity
+
+- docs/specs/chore-51-containerize-test-environment-docker-compose.md
+  - Conditions:
+    - When working on issue #51 or modifying test infrastructure containerization
+    - When troubleshooting Docker Compose test stack issues
+    - When experiencing port conflicts during local test runs
+    - When setting up simultaneous test runs across multiple projects/branches
+    - When updating test scripts (setup-test-db.sh, reset-test-db.sh, etc.)
+    - When investigating project isolation or cleanup issues
