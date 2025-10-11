@@ -4,7 +4,7 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 
 ## Instructions
 - Read the entire plan before making changes; clarify assumptions in inline notes if something is ambiguous.
-- Consult `.claude/commands/conditional_docs.md` for any documentation that matches the implementation scope.
+- Consult `.claude/commands/docs/conditional_docs.md` for any documentation that matches the implementation scope.
 - Execute tasks in the documented order, touching only the files listed unless the plan explicitly allows otherwise.
 - Keep commits incremental and logically grouped. Use Conventional Commit subjects referencing the issue.
 - Stay on the correct work branch (`feat/`, `bug/`, `chore/`, etc.) that will merge into `develop` before promotion to `main`.

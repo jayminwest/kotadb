@@ -7,7 +7,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Create a new markdown plan under `docs/specs/` named `feature-<issue-number>-<slug>.md` (e.g., `docs/specs/feature-1024-event-streaming.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Reference issue metadata from `$ARGUMENTS` at the top of the plan for traceability.
-- Review `.claude/commands/conditional_docs.md` and read any documentation whose conditions match the feature scope.
+- Review `.claude/commands/docs/conditional_docs.md` and read any documentation whose conditions match the feature scope.
 - Follow the repo git flow: work from `feat/<issue-number>-<slug>` branching off `develop`, with releases promoted from `develop` to `main`.
 - Populate the exact format below so automation can reference each section without guesswork.
 - Research existing patterns in `src/**`, `tests/**`, and platform docs before proposing changes.
@@ -16,7 +16,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Enumerate relevant code paths and new assets in their dedicated sections.
 - Incorporate `/anti-mock` guidance: plan for real Supabase coverage, failure injection, and follow-up for any unavoidable skips.
 - Ensure the plan’s final tasks rerun validation, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so a PR opens immediately (PR titles must end with the issue number, e.g. `feat: add search filters (#210)`).
-- If the plan introduces new documentation areas, append or update the relevant entry in `.claude/commands/conditional_docs.md`.
+- If the plan introduces new documentation areas, append or update the relevant entry in `.claude/commands/docs/conditional_docs.md`.
 
 ## Plan Format
 ```md

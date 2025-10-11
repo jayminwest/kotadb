@@ -17,7 +17,7 @@ Synchronise documentation with recent code changes. Provide related PR/issue ide
 4. Validate formatting (markdown lint if available) and run Level 1 from `/validate-implementation` (`bun run lint`, `bun run typecheck`) where relevant.
 5. Maintain git hygiene: stage with `git add --patch`, confirm `git status --short`, and capture `git diff --stat`.
 6. Push the documentation branch (`git push -u origin <branch>`) and execute `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so the PR opens immediately; ensure the PR title ends with the issue number (e.g. `docs: refresh api usage (#210)`).
-7. If you create significant new documentation, add or update the relevant entry in `.claude/commands/conditional_docs.md`.
+7. If you create significant new documentation, add or update the relevant entry in `.claude/commands/docs/conditional_docs.md`.
 
 ## Reporting
 - Summary of documentation sections updated with file paths.

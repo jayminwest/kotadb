@@ -68,7 +68,7 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When you need to confirm scope against strategic goals or sequencing
     - When preparing discovery or planning work that spans multiple domains
 
-- .claude/commands/anti-mock.md
+- .claude/commands/docs/anti-mock.md
   - Conditions:
     - When planning or implementing changes that add or modify automated tests
     - When touching infrastructure, data access layers, or background jobs where mocks might be tempting
@@ -131,3 +131,11 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When updating CI workflows that reference `app/scripts/` or `automation/` directories
     - When adding Python project structure to `automation/` directory
     - When debugging path assumptions in test setup or cleanup scripts
+
+- docs/specs/chore-58-organize-commands-subdirectories.md
+  - Conditions:
+    - When working on issue #58 or organizing `.claude/commands/` directory structure
+    - When adding new slash commands and determining subdirectory placement
+    - When troubleshooting command discovery issues after subdirectory reorganization
+    - When updating documentation that references command paths
+    - When understanding the logical grouping pattern for commands (workflows, git, issues, homeserver, worktree, automation, app, docs, ci, tools)
