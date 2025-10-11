@@ -16,12 +16,28 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 - Capture evidence (command output, Supabase logs) that real-service suites ran when preparing the implementation report.
 
 ## Validation
-Run every command listed in the plan’s `## Validation Commands` section and select the appropriate level from `/validate-implementation`:
-- Level 1: `bun run lint`, `bun run typecheck`
-- Level 2 (default for features/bugs): add `bun test --filter integration`
-- Level 3 (schema/auth/high-risk): add `bun test --filter integration`, `bun test`, `bun run build`
 
-Capture command output paths or summaries so reviewers can audit results quickly.
+Before creating the PR, select and execute the appropriate validation level:
+
+1. Consult `/validate-implementation` to understand the 3 validation levels
+2. Determine the correct level based on your changes:
+   - **Level 1** (Quick): Docs-only, config comments (lint + typecheck)
+   - **Level 2** (Integration): Features, bugs, endpoints (**DEFAULT**)
+   - **Level 3** (Release): Schema, auth, migrations, high-risk changes
+3. Run all commands for your selected level in order
+4. Capture the output and status of each command
+5. Stop immediately if any command fails; fix before proceeding
+
+**Commands by Level**:
+- Level 1: `bun run lint && bun run typecheck`
+- Level 2: `bun run lint && bun run typecheck && bun test --filter integration`
+- Level 3: `bun run lint && bun run typecheck && bun test --filter integration && bun test && bun run build`
+
+**Evidence Required**:
+- Document which level you selected and why
+- Include pass/fail status for each command
+- Provide Supabase logs or other proof that integration tests hit real services
+- This evidence will be included in the PR body
 
 ## Final Steps
 - After validation passes, confirm `git status --short` is clean apart from intended artifacts.
