@@ -27,6 +27,9 @@ import requests
 from rich.console import Console
 from rich.panel import Panel
 
+# Add parent directory to path for module imports
+sys.path.insert(0, str(Path(__file__).parent.parent))
+
 from adws.adw_modules.agent import execute_template
 from adws.adw_modules.data_types import (
     AgentTemplateRequest,
@@ -126,9 +129,8 @@ def main(adw_id: str, worktree_name: str, task: str, task_id: str, model: str) -
     """Execute simple build workflow for home server task."""
     print_status_panel("Starting simple build workflow", adw_id, worktree_name, "info")
 
-    # Determine working directory (detect repository name dynamically)
-    repo_name = Path.cwd().name
-    worktree_path = Path.cwd() / "trees" / worktree_name / repo_name
+    # Determine working directory
+    worktree_path = Path.cwd() / "trees" / worktree_name
     if not worktree_path.exists():
         error_msg = f"Worktree directory not found: {worktree_path}"
         console.print(f"[red]{error_msg}[/red]")

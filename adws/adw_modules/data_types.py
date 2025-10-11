@@ -74,6 +74,8 @@ SlashCommand = Literal[
     "/commit",
     "/pull_request",
     "/implement",
+    "/build",
+    "/plan",
 ]
 
 
