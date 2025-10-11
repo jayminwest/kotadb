@@ -44,7 +44,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 from adws.adw_modules.data_types import (
     HomeServerCronConfig,
     HomeServerTask,
-    ModelType,
     TaskStatus,
 )
 from adws.adw_modules.utils import load_adw_env
@@ -426,11 +425,20 @@ class HomeServerCronTrigger:
                 worktree_name,
                 "--task",
                 task.description,
+                "--task-title",
+                task.title,
                 "--task-id",
                 task.task_id,
                 "--model",
                 model,
             ]
+
+            # Optional flags from environment or task tags
+            if task.tags.get("skip_pr") == "true":
+                cmd.append("--skip-pr")
+
+            if task.tags.get("skip_cleanup") == "true":
+                cmd.append("--skip-cleanup")
 
             if self.config.dry_run:
                 console.print(f"[cyan]DRY RUN: Would execute: {' '.join(cmd)}[/cyan]")

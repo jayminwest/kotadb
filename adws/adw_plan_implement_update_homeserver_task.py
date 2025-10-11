@@ -34,7 +34,6 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from adws.adw_modules.agent import execute_template
 from adws.adw_modules.data_types import (
     AgentTemplateRequest,
-    HomeServerTaskUpdate,
     TaskStatus,
 )
 from adws.adw_modules.utils import load_adw_env
@@ -73,6 +72,7 @@ def update_homeserver_task(
     worktree: str,
     commit_hash: Optional[str] = None,
     error: Optional[str] = None,
+    result: Optional[dict] = None,
 ) -> bool:
     """Update task status on home server."""
     try:
@@ -96,7 +96,7 @@ def update_homeserver_task(
         payload = {"adw_id": adw_id, "worktree": worktree}
         if status == TaskStatus.COMPLETED and commit_hash:
             payload["commit_hash"] = commit_hash
-            payload["result"] = {}
+            payload["result"] = result or {}
         elif status == TaskStatus.FAILED and error:
             payload["error"] = error
 
@@ -125,13 +125,140 @@ def get_commit_hash(working_dir: Path) -> Optional[str]:
         return None
 
 
+def push_and_create_pr(
+    worktree_path: Path,
+    worktree_name: str,
+    task_title: str,
+    task_description: str,
+    adw_id: str,
+    task_id: str,
+    commit_hash: str,
+    base_branch: str = "develop",
+) -> Optional[str]:
+    """Push branch to remote and create pull request.
+
+    Returns:
+        PR URL if successful, None otherwise
+    """
+    try:
+        # Push branch to remote
+        console.print(f"[cyan]🔄 Pushing branch {worktree_name} to remote...[/cyan]")
+
+        result = subprocess.run(
+            ["git", "push", "-u", "origin", worktree_name],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        console.print("[green]✓ Branch pushed successfully[/green]")
+
+        # Create PR using gh CLI
+        console.print("[cyan]🔄 Creating pull request...[/cyan]")
+
+        # Build PR body with metadata
+        pr_body = f"""{task_description}
+
+---
+
+**Automated Workflow Details:**
+- **Task ID**: {task_id}
+- **ADW ID**: {adw_id}
+- **Worktree**: {worktree_name}
+- **Commit**: {commit_hash[:8]}
+- **Generated**: {datetime.now().isoformat()}
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+"""
+
+        result = subprocess.run(
+            [
+                "gh", "pr", "create",
+                "--title", task_title,
+                "--body", pr_body,
+                "--base", base_branch,
+                "--head", worktree_name,
+            ],
+            cwd=worktree_path,
+            capture_output=True,
+            text=True,
+            check=True,
+        )
+
+        # Extract PR URL from output
+        pr_url = result.stdout.strip()
+        console.print(f"[green]✓ Pull request created: {pr_url}[/green]")
+
+        return pr_url
+
+    except subprocess.CalledProcessError as e:
+        console.print(f"[red]ERROR: Failed to push/create PR: {e.stderr}[/red]")
+        return None
+    except Exception as e:
+        console.print(f"[red]ERROR: Unexpected error: {e}[/red]")
+        return None
+
+
+def cleanup_worktree(
+    worktree_name: str,
+    worktree_base_path: str = "trees",
+) -> bool:
+    """Remove worktree and delete local branch.
+
+    Returns:
+        True if cleanup successful, False otherwise
+    """
+    try:
+        console.print(f"[cyan]🧹 Cleaning up worktree {worktree_name}...[/cyan]")
+
+        # Remove worktree
+        result = subprocess.run(
+            ["git", "worktree", "remove", f"{worktree_base_path}/{worktree_name}", "--force"],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            console.print(f"[yellow]WARN: Failed to remove worktree: {result.stderr}[/yellow]")
+
+        # Delete local branch
+        result = subprocess.run(
+            ["git", "branch", "-D", worktree_name],
+            capture_output=True,
+            text=True,
+        )
+
+        if result.returncode != 0:
+            console.print(f"[yellow]WARN: Failed to delete branch: {result.stderr}[/yellow]")
+
+        console.print("[green]✓ Worktree cleanup complete[/green]")
+        return True
+
+    except Exception as e:
+        console.print(f"[red]ERROR: Cleanup failed: {e}[/red]")
+        return False
+
+
 @click.command()
 @click.option("--adw-id", required=True, help="ADW execution ID")
 @click.option("--worktree-name", required=True, help="Worktree name")
 @click.option("--task", required=True, help="Task description")
+@click.option("--task-title", required=True, help="Task title for PR")
 @click.option("--task-id", required=True, help="Task ID from home server")
 @click.option("--model", default="sonnet", help="Claude model (sonnet or opus)")
-def main(adw_id: str, worktree_name: str, task: str, task_id: str, model: str) -> None:
+@click.option("--skip-pr", is_flag=True, help="Skip PR creation")
+@click.option("--skip-cleanup", is_flag=True, help="Skip worktree cleanup")
+def main(
+    adw_id: str,
+    worktree_name: str,
+    task: str,
+    task_title: str,
+    task_id: str,
+    model: str,
+    skip_pr: bool = False,
+    skip_cleanup: bool = False,
+) -> None:
     """Execute complex plan+implement workflow for home server task."""
     print_status_panel("Starting complex workflow (plan+implement)", adw_id, worktree_name, status="info")
 
@@ -206,14 +333,37 @@ def main(adw_id: str, worktree_name: str, task: str, task_id: str, model: str) -
         if commit_hash:
             console.print(f"[cyan]Commit: {commit_hash[:8]}[/cyan]")
 
-        # Update home server: completed
+        # Push branch and create PR (unless skipped)
+        pr_url = None
+        if not skip_pr:
+            pr_url = push_and_create_pr(
+                worktree_path=worktree_path,
+                worktree_name=worktree_name,
+                task_title=task_title,
+                task_description=task,
+                adw_id=adw_id,
+                task_id=task_id,
+                commit_hash=commit_hash,
+                base_branch="develop",
+            )
+
+        # Update home server with PR URL
+        result_data = {"commit_hash": commit_hash}
+        if pr_url:
+            result_data["pr_url"] = pr_url
+
         update_homeserver_task(
             task_id,
             TaskStatus.COMPLETED,
             adw_id,
             worktree_name,
             commit_hash=commit_hash,
+            result=result_data,
         )
+
+        # Optional: Clean up worktree after successful PR creation
+        if pr_url and not skip_cleanup and os.getenv("ADW_CLEANUP_WORKTREES", "false").lower() == "true":
+            cleanup_worktree(worktree_name)
 
         # Display summary table
         summary_table = Table(show_header=True, box=None)
