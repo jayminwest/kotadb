@@ -145,7 +145,7 @@ export async function searchFiles(
   let query = client
     .from("indexed_files")
     .select("id, repository_id, path, content, metadata, indexed_at")
-    .ilike("content", `%${term}%`)
+    .textSearch("content", term, { type: "plain", config: "english" })
     .order("indexed_at", { ascending: false })
     .limit(limit);
 
