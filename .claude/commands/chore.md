@@ -3,6 +3,7 @@
 Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lean, auditable steps that unblock the requested upkeep.
 
 ## Instructions
+- **Verify issue labels first**: Run `gh issue view <issue-number> --json labels` to ensure the issue has labels from all four categories (component, priority, effort, status). If labels are missing, apply them before proceeding.
 - Create a markdown plan under `docs/specs/` named `chore-<issue-number>-<slug>.md` (e.g., `docs/specs/chore-1450-refresh-deps.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Use the template exactly as written.

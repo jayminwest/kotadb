@@ -348,7 +348,7 @@ Task → /plan → /implement → Commit → Update Home Server (completed)
 - `adws/adw_build_update_homeserver_task.py`: Simple workflow handler
 - `adws/adw_plan_implement_update_homeserver_task.py`: Complex workflow handler
 - `adws/adw_modules/data_types.py`: Type definitions (HomeServerTask, etc.)
-- `.claude/commands/`: Slash command templates
+- `../.claude/commands/`: Slash command templates (at repository root)
 
 ### Monitoring
 

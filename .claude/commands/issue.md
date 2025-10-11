@@ -21,9 +21,17 @@ Create a rigorously labeled GitHub issue capturing the upcoming work. Follow thi
    - Keep titles Conventional Commit compatible (e.g., `feat: describe capability`).
 6. **Create the issue**
    - `gh issue create --title "<title>" --body-file <temp-body.md> --label "component:...,priority:...,effort:...,status:..."`
+   - **Label requirements**: MUST include at least one label from each category:
+     - Component: backend, api, database, testing, ci-cd, documentation, observability
+     - Priority: critical, high, medium, low
+     - Effort: small, medium, large
+     - Status: needs-investigation, blocked, in-progress, ready-review
+   - Example: `--label "component:backend,priority:medium,effort:small,status:needs-investigation"`
    - Record the returned issue number for downstream commands. Store it in your notes.
-7. **Verify issuance**
+7. **Verify issuance and labels**
    - `gh issue view <number>` to confirm labels, body, assignee, and milestone.
+   - Verify all four label categories are present: component, priority, effort, status
+   - If labels are missing, add them immediately: `gh issue edit <number> --add-label "missing:labels"`
 
 ## Reporting
 

@@ -3,6 +3,7 @@
 Draft a KotaDB feature implementation plan using the issue context passed in `$ARGUMENTS` (provide JSON with issue number, title, summary, and constraints).
 
 ## Instructions
+- **Verify issue labels first**: Run `gh issue view <issue-number> --json labels` to ensure the issue has labels from all four categories (component, priority, effort, status). If labels are missing, apply them before proceeding.
 - Create a new markdown plan under `docs/specs/` named `feature-<issue-number>-<slug>.md` (e.g., `docs/specs/feature-1024-event-streaming.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Reference issue metadata from `$ARGUMENTS` at the top of the plan for traceability.
