@@ -13,6 +13,7 @@ coverage
 # logs
 logs
 /.adw_logs
+/automation/.adw_logs
 _.log
 report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
@@ -23,8 +24,8 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 .env.test.local
 .env.production.local
 .env.local
-adws/.env
-adws/.env.local
+automation/adws/.env
+automation/adws/.env.local
 .env.adws
 .env.adws.local
 

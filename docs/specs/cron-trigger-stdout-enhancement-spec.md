@@ -386,9 +386,9 @@ self._log_event("task_completed", task_id=task.task_id, adw_id=adw_id, duration=
 [14:37:32] ✅ d081c1: Planning completed
 [14:37:32] 📄 d081c1: Plan created: docs/specs/plan-d081c104.md
 [14:37:33] 📝 d081c1: Executing /implement template
-[14:38:15] 🔄 d081c1: Modified: src/api/queries.ts
-[14:38:42] 🔄 d081c1: Created: src/db/migrations/0012_fulltext_search_index.sql
-[14:39:10] 🔄 d081c1: Modified: tests/api/authenticated-routes.test.ts
+[14:38:15] 🔄 d081c1: Modified: app/src/api/queries.ts
+[14:38:42] 🔄 d081c1: Created: app/src/db/migrations/0012_fulltext_search_index.sql
+[14:39:10] 🔄 d081c1: Modified: app/tests/api/authenticated-routes.test.ts
 [14:40:25] ✓ d081c1: Type-check passed
 [14:41:50] ✓ d081c1: Tests passed (133/133)
 ```
@@ -419,7 +419,7 @@ self._log_event("task_completed", task_id=task.task_id, adw_id=adw_id, duration=
 
 ```
 [14:43:22] ❌ a3f9b2: Build failed: Type check failed
-[14:43:22] ❌ a3f9b2: src/auth/middleware.ts:42 - Property 'tier' does not exist on type 'AuthContext'
+[14:43:22] ❌ a3f9b2: app/src/auth/middleware.ts:42 - Property 'tier' does not exist on type 'AuthContext'
 [14:43:23] 📡 a3f9b2: Updated home server → failed
 [14:43:23] ❌ Task issue-52 failed with exit code 1 (ADW: a3f9b2, Duration: 481s)
 ```
@@ -452,16 +452,16 @@ Add flags for controlling output verbosity:
 **Usage**:
 ```bash
 # Default: Balanced output with status updates
-uv run adws/adw_triggers/adw_trigger_cron_homeserver.py
+uv run automation/adws/adw_triggers/adw_trigger_cron_homeserver.py
 
 # Verbose: Show all workflow stdout/stderr
-uv run adws/adw_triggers/adw_trigger_cron_homeserver.py --verbose
+uv run automation/adws/adw_triggers/adw_trigger_cron_homeserver.py --verbose
 
 # Quiet: Only show errors and final results
-uv run adws/adw_triggers/adw_trigger_cron_homeserver.py --quiet
+uv run automation/adws/adw_triggers/adw_trigger_cron_homeserver.py --quiet
 
 # Custom log location
-uv run adws/adw_triggers/adw_trigger_cron_homeserver.py --log-file /var/log/adw-cron.log
+uv run automation/adws/adw_triggers/adw_trigger_cron_homeserver.py --log-file /var/log/adw-cron.log
 ```
 
 ---

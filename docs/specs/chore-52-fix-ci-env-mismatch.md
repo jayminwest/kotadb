@@ -15,9 +15,9 @@ CI tests are failing with 401 authentication errors because tests are using hard
 - Must preserve test isolation and parallel execution capabilities
 
 ## Relevant Files
-- `tests/mcp/handshake.test.ts` — Sets hardcoded env vars at module-level (lines 2-8), preventing .env.test loading
-- `tests/api/authenticated-routes.test.ts` — Likely has similar hardcoded env var issue
-- `tests/helpers/db.ts` — Defines test constants with hardcoded ports (line 18: http://localhost:54322)
+- `app/tests/mcp/handshake.test.ts` — Sets hardcoded env vars at module-level (lines 2-8), preventing .env.test loading
+- `app/tests/api/authenticated-routes.test.ts` — Likely has similar hardcoded env var issue
+- `app/tests/helpers/db.ts` — Defines test constants with hardcoded ports (line 18: http://localhost:54322)
 - `.github/workflows/ci.yml` — Sources .env.test but tests override it (line 45)
 - `.env.test` — Correctly generated with dynamic ports but not respected by tests
 
@@ -32,8 +32,8 @@ None (fixing existing configuration only)
 3. Document the root cause for future reference
 
 ### Execution
-1. Remove hardcoded `process.env` assignments from test files (tests/mcp/handshake.test.ts, tests/api/authenticated-routes.test.ts)
-2. Update tests/helpers/db.ts to read from environment variables instead of hardcoded constants
+1. Remove hardcoded `process.env` assignments from test files (app/tests/mcp/handshake.test.ts, app/tests/api/authenticated-routes.test.ts)
+2. Update app/tests/helpers/db.ts to read from environment variables instead of hardcoded constants
 3. Ensure test files import environment-dependent modules after .env.test is loaded via CI workflow's export command
 4. Add validation script to detect hardcoded localhost URLs in test files
 5. Run full test suite locally to verify fixes
@@ -53,9 +53,9 @@ None (fixing existing configuration only)
 - Search test helpers for hardcoded connection constants
 
 ### Phase 2: Fix Environment Variable Loading
-- Remove hardcoded env var assignments from tests/mcp/handshake.test.ts (lines 2-8)
-- Remove hardcoded env var assignments from tests/api/authenticated-routes.test.ts (if present)
-- Update tests/helpers/db.ts to read TEST_DB_URL and TEST_DB_KEY from environment variables with fallback
+- Remove hardcoded env var assignments from app/tests/mcp/handshake.test.ts (lines 2-8)
+- Remove hardcoded env var assignments from app/tests/api/authenticated-routes.test.ts (if present)
+- Update app/tests/helpers/db.ts to read TEST_DB_URL and TEST_DB_KEY from environment variables with fallback
 - Ensure all test files can load environment variables from CI's export command (already done in ci.yml:45)
 - Verify that beforeAll hooks can access environment variables set by shell
 
@@ -65,9 +65,9 @@ None (fixing existing configuration only)
 - Document environment variable loading pattern in tests
 
 ### Phase 4: Validation and Deployment
-- Run `bun test` locally to verify all tests pass
-- Run `bunx tsc --noEmit` to ensure type safety
-- Run `bun run lint` to check code style
+- Run `cd app && bun test` locally to verify all tests pass
+- Run `cd app && bunx tsc --noEmit` to ensure type safety
+- Run `cd app && bun run lint` to check code style
 - Commit changes with descriptive message
 - Push branch to origin with `git push -u origin chore/51-containerize-test-environment-docker-compose`
 - Monitor CI run and verify all tests pass
@@ -82,15 +82,15 @@ None (fixing existing configuration only)
 **Mitigation:** Update test helpers to fall back to standard Supabase Local ports (54322, 5434) when env vars are not set, preserving local development experience
 
 **Risk:** Dynamic environment variable loading may introduce timing issues
-**Mitigation:** Environment variables are set by shell before `bun test` runs, so they will be available at module load time
+**Mitigation:** Environment variables are set by shell before `cd app && bun test` runs, so they will be available at module load time
 
 ## Validation Commands
-- `bun run lint` — Ensure code style compliance
-- `bunx tsc --noEmit` — Type-check without emitting files
-- `bun test` — Run full test suite (133 tests)
-- `bun run test:validate-migrations` — Ensure migration sync
-- `grep -r "localhost:54322" tests/` — Verify no hardcoded URLs remain
-- `grep -r "localhost:5434" tests/` — Verify no hardcoded database ports remain
+- `cd app && bun run lint` — Ensure code style compliance
+- `cd app && bunx tsc --noEmit` — Type-check without emitting files
+- `cd app && bun test` — Run full test suite (133 tests)
+- `cd app && bun run test:validate-migrations` — Ensure migration sync
+- `grep -r "localhost:54322" app/tests/` — Verify no hardcoded URLs remain
+- `grep -r "localhost:5434" app/tests/` — Verify no hardcoded database ports remain
 
 ## Deliverables
 - Fixed test files that respect dynamic environment variables from .env.test

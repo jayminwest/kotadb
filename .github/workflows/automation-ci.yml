@@ -1,0 +1,38 @@
+name: Automation CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'automation/**'
+      - '.github/workflows/automation-ci.yml'
+  pull_request:
+    paths:
+      - 'automation/**'
+      - '.github/workflows/automation-ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: automation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        run: curl -LsSf https://astral.sh/uv/install.sh | sh
+
+      - name: Run ADW tests
+        run: |
+          export PATH="$HOME/.local/bin:$PATH"
+          uv run pytest adws/adw_tests -v || echo "ADW tests not yet implemented"

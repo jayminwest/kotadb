@@ -37,4 +37,4 @@ ENV ADW_RUNNER_IMAGE=kotadb-adw-runner:latest \
 
 EXPOSE 3000
 
-CMD ["python", "-m", "adws.trigger_webhook"]
+CMD ["python", "-m", "automation.adws.trigger_webhook"]

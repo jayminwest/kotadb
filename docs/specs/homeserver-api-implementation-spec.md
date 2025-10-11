@@ -39,7 +39,7 @@ Host: jaymins-mac-pro.tail1b7f44.ts.net
   {
     "task_id": "issue-47-fulltext-search",
     "title": "Optimize search with PostgreSQL full-text search",
-    "description": "Replace ILIKE with PostgreSQL full-text search using GIN indexes and ts_vector. See GitHub issue #47 for details. Update both src/db/migrations/ and supabase/migrations/ directories.",
+    "description": "Replace ILIKE with PostgreSQL full-text search using GIN indexes and ts_vector. See GitHub issue #47 for details. Update both app/src/db/migrations/ and supabase/migrations/ directories.",
     "status": "pending",
     "priority": "medium",
     "tags": {
@@ -224,8 +224,8 @@ Content-Type: application/json
   "commit_hash": "a1b2c3d4e5f6",
   "result": {
     "files_modified": [
-      "src/api/queries.ts",
-      "src/db/migrations/0012_fulltext_search_index.sql",
+      "app/src/api/queries.ts",
+      "app/src/db/migrations/0012_fulltext_search_index.sql",
       "supabase/migrations/20251011_fulltext_search_index.sql"
     ],
     "tests_passed": true,
@@ -255,7 +255,7 @@ Content-Type: application/json
   "worktree": "feat-fulltext-search",
   "commit_hash": "a1b2c3d4",
   "result": {
-    "files_modified": ["src/api/queries.ts", "src/db/migrations/0012_fulltext_search_index.sql"],
+    "files_modified": ["app/src/api/queries.ts", "app/src/db/migrations/0012_fulltext_search_index.sql"],
     "workflow": "complex"
   }
 }
@@ -301,7 +301,7 @@ Content-Type: application/json
 {
   "adw_id": "d081c104",
   "worktree": "feat-fulltext-search",
-  "error": "Type check failed: src/api/queries.ts:148 - Property 'textSearch' does not exist on type 'PostgrestQueryBuilder'"
+  "error": "Type check failed: app/src/api/queries.ts:148 - Property 'textSearch' does not exist on type 'PostgrestQueryBuilder'"
 }
 ```
 
@@ -579,7 +579,7 @@ Return aggregate statistics:
 
 ### Integration Testing
 
-- [ ] Run KotaDB trigger script: `uv run adws/adw_triggers/adw_trigger_cron_homeserver.py --once`
+- [ ] Run KotaDB trigger script: `uv run automation/adws/adw_triggers/adw_trigger_cron_homeserver.py --once`
 - [ ] Verify it fetches, claims, and updates tasks correctly
 - [ ] Let a full workflow run (create worktree, execute, commit, report back)
 

@@ -4,6 +4,8 @@ The ADW toolchain automates the SDLC loop for GitHub issues by coordinating Clau
 
 All entrypoints are declared as `uv run` scripts so they execute without bespoke virtualenv setup.
 
+**Note:** The agentic layer operates on the application layer located in `../app/`. All references to source code, tests, and configuration files in the TypeScript application should use paths relative to `../app/` (e.g., `../app/src/index.ts`, `../app/package.json`).
+
 ---
 
 ## Module Layout
@@ -85,7 +87,7 @@ Persistent automation state lands in `agents/<adw_id>/adw_state.json` (branch, p
 
 | Requirement      | Notes                                                                 |
 | ---------------- | --------------------------------------------------------------------- |
-| Bun/TypeScript   | `bun run lint`, `bun run typecheck`, `bun test`, `bun run build`      |
+| Bun/TypeScript   | Application layer: `cd ../app && bun run lint`, `bun test`, etc.     |
 | GitHub CLI       | `gh auth login` or `GITHUB_PAT`                                       |
 | Claude Code CLI  | `CLAUDE_CODE_PATH` (defaults to `claude`)                             |
 | Environment vars | `ANTHROPIC_API_KEY`, optional `E2B_API_KEY`, `ADW_ENV`, log overrides |
@@ -133,12 +135,12 @@ Both surfaces write logs beneath `logs/kota-db-ts/…` so bot activity is observ
 
 ## Validation Defaults
 
-Unless overridden by the plan or environment, the build/test phases enforce:
+Unless overridden by the plan or environment, the build/test phases enforce (from `../app/` directory):
 
-1. `bun run lint`  
-2. `bun run typecheck`  
-3. `bun test`  
-4. `bun run build`
+1. `cd ../app && bun run lint`
+2. `cd ../app && bun run typecheck`
+3. `cd ../app && bun test`
+4. `cd ../app && bun run build`
 
 The test phase automatically injects `bun install` when a recognised lockfile is dirty. Extend `ts_commands.py` if project-specific commands are needed.
 
@@ -148,13 +150,13 @@ The test phase automatically injects `bun install` when a recognised lockfile is
 
 Two Docker images power remote execution:
 
-| Image                     | Purpose                                         |
-| ------------------------- | ----------------------------------------------- |
-| `docker/adw-webhook`      | Exposes the FastAPI webhook + cron helper       |
-| `docker/adw-runner`       | Ephemeral runtime with Bun, Claude CLI, and gh  |
+| Image                              | Purpose                                         |
+| ---------------------------------- | ----------------------------------------------- |
+| `automation/docker/adw-webhook`    | Exposes the FastAPI webhook + cron helper       |
+| `automation/docker/adw-runner`     | Ephemeral runtime with Bun, Claude CLI, and gh  |
 
 ```bash
-# Build images
+# Build images (from repository root)
 docker compose build adw_runner adw_webhook
 
 # Run webhook + triggers

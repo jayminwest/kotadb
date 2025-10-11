@@ -63,7 +63,7 @@ RUN chown -R adw:adw /workspace
 RUN mkdir -p /home/adw/.cache/uv && chown -R adw:adw /home/adw/.cache
 
 # Lightweight entrypoint script to execute a single ADW run
-COPY adws/scripts/run-adw.sh /usr/local/bin/run-adw
+COPY automation/adws/scripts/run-adw.sh /usr/local/bin/run-adw
 RUN chmod +x /usr/local/bin/run-adw && chown adw:adw /usr/local/bin/run-adw
 
 # Switch to non-root user for runtime safety

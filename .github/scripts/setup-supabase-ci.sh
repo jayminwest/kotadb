@@ -116,7 +116,7 @@ done
 # Run migrations (now that auth schema exists from GoTrue)
 # Note: We run migrations before starting other services to ensure schema is ready
 echo "🔄 Running migrations..."
-./scripts/run-migrations-compose.sh "$PROJECT_NAME"
+app/scripts/run-migrations-compose.sh "$PROJECT_NAME"
 
 # Start remaining services (rest, kong)
 echo "📦 Starting remaining services (rest, kong)..."
@@ -157,7 +157,7 @@ done
 
 # Generate .env.test from container ports (now that all services are running)
 echo "🔧 Generating .env.test from container ports..."
-./scripts/generate-env-test-compose.sh "$PROJECT_NAME"
+app/scripts/generate-env-test-compose.sh "$PROJECT_NAME"
 
 # Load environment variables for seeding
 if [ -f .env.test ]; then
@@ -165,9 +165,9 @@ if [ -f .env.test ]; then
 fi
 
 # Seed test data
-if [ -f "supabase/seed.sql" ]; then
+if [ -f "app/supabase/seed.sql" ]; then
     echo "🌱 Seeding test data..."
-    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME < supabase/seed.sql > /dev/null 2>&1 || {
+    PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME < app/supabase/seed.sql > /dev/null 2>&1 || {
         echo "⚠️  Warning: Seeding failed, continuing anyway..."
     }
     echo "✅ Test data seeded successfully!"

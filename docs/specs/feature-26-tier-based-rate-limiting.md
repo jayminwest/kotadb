@@ -31,16 +31,16 @@ The implementation adapts the reverted SQLite-based rate limiting (commit `2fa5d
 **Key Integration Points**:
 1. **Authentication Flow**: `authenticateRequest()` → **rate limit check** → `AuthContext` (enhanced)
 2. **Response Headers**: All successful responses include `X-RateLimit-*` headers
-3. **Database Function**: Existing `increment_rate_limit()` in `src/db/functions/increment_rate_limit.sql`
+3. **Database Function**: Existing `increment_rate_limit()` in `app/src/db/functions/increment_rate_limit.sql`
 4. **Error Handling**: New 429 response with `Retry-After` header
 
 ### Key Modules to Touch
-- `src/auth/rate-limit.ts` (new) - Core rate limiting logic
-- `src/auth/middleware.ts` - Integration with `authenticateRequest()`
-- `src/auth/context.ts` - Add `rateLimit` field to `AuthContext`
-- `src/api/routes.ts` - Response header injection
-- `tests/auth/rate-limit.test.ts` (new) - Comprehensive test suite
-- `tests/auth/middleware.test.ts` - Integration tests
+- `app/src/auth/rate-limit.ts` (new) - Core rate limiting logic
+- `app/src/auth/middleware.ts` - Integration with `authenticateRequest()`
+- `app/src/auth/context.ts` - Add `rateLimit` field to `AuthContext`
+- `app/src/api/routes.ts` - Response header injection
+- `app/tests/auth/rate-limit.test.ts` (new) - Comprehensive test suite
+- `app/tests/auth/middleware.test.ts` - Integration tests
 
 ### Data/API Impacts
 
@@ -78,19 +78,19 @@ export interface AuthContext {
 ## Relevant Files
 
 ### Existing Files (to modify)
-- `src/auth/middleware.ts` — Add rate limit enforcement after key validation
-- `src/auth/context.ts` — Extend `AuthContext` with `rateLimit?: RateLimitResult`
-- `src/api/routes.ts` — Inject rate limit headers into responses
-- `src/db/functions/increment_rate_limit.sql` — Already exists, verified compatible
-- `tests/auth/middleware.test.ts` — Add integration tests for rate limiting
+- `app/src/auth/middleware.ts` — Add rate limit enforcement after key validation
+- `app/src/auth/context.ts` — Extend `AuthContext` with `rateLimit?: RateLimitResult`
+- `app/src/api/routes.ts` — Inject rate limit headers into responses
+- `app/src/db/functions/increment_rate_limit.sql` — Already exists, verified compatible
+- `app/tests/auth/middleware.test.ts` — Add integration tests for rate limiting
 - `docs/schema.md` — Already documents `rate_limit_counters` table
 
 ### New Files
-- `src/auth/rate-limit.ts` — Core rate limiting module
+- `app/src/auth/rate-limit.ts` — Core rate limiting module
   - `RateLimitResult` interface
   - `enforceRateLimit(keyId, rateLimitPerHour)` function
   - Supabase client integration
-- `tests/auth/rate-limit.test.ts` — Comprehensive test suite
+- `app/tests/auth/rate-limit.test.ts` — Comprehensive test suite
   - Unit tests for `enforceRateLimit()`
   - Window reset behavior verification
   - Concurrent request handling
@@ -100,27 +100,27 @@ export interface AuthContext {
 
 ### Phase 1: Core Rate Limiting Module
 - Extract rate limiting logic from historical implementation (commit `2fa5df2`)
-- Create `src/auth/rate-limit.ts` with Supabase adapter
+- Create `app/src/auth/rate-limit.ts` with Supabase adapter
 - Implement `enforceRateLimit()` using `increment_rate_limit()` database function
 - Define `RateLimitResult` interface matching database return type
 - Add error handling for database failures
 
 ### Phase 2: Middleware Integration
-- Update `src/auth/context.ts` to add optional `rateLimit` field
-- Modify `src/auth/middleware.ts` to call rate limiting after successful auth
+- Update `app/src/auth/context.ts` to add optional `rateLimit` field
+- Modify `app/src/auth/middleware.ts` to call rate limiting after successful auth
 - Implement 429 response with proper headers when limit exceeded
 - Store rate limit result in context for downstream use
 - Ensure `/health` endpoint remains exempt (already skips auth)
 
 ### Phase 3: Response Header Injection
-- Update `src/api/routes.ts` to add rate limit headers to all authenticated responses
+- Update `app/src/api/routes.ts` to add rate limit headers to all authenticated responses
 - Extract header injection into reusable helper function
 - Ensure headers are present on both success (200/202) and error (400/500) responses
 - Validate header format matches HTTP standards
 
 ### Phase 4: Testing & Validation
-- Create comprehensive test suite in `tests/auth/rate-limit.test.ts`
-- Add integration tests to `tests/auth/middleware.test.ts`
+- Create comprehensive test suite in `app/tests/auth/rate-limit.test.ts`
+- Add integration tests to `app/tests/auth/middleware.test.ts`
 - Test concurrent request handling for race condition safety
 - Verify window reset behavior across hour boundaries
 - Validate all response headers are present and accurate
@@ -129,7 +129,7 @@ export interface AuthContext {
 ## Step by Step Tasks
 
 ### 1. Create Core Rate Limiting Module
-- Create `src/auth/rate-limit.ts`
+- Create `app/src/auth/rate-limit.ts`
 - Define `RateLimitResult` interface:
   ```typescript
   export interface RateLimitResult {
@@ -147,12 +147,12 @@ export interface AuthContext {
 - Handle database errors gracefully (fail closed: deny request)
 
 ### 2. Extend Authentication Context
-- Update `src/auth/context.ts`
+- Update `app/src/auth/context.ts`
 - Add `rateLimit?: RateLimitResult` field to `AuthContext` interface
 - Document field purpose in JSDoc comments
 
 ### 3. Integrate with Authentication Middleware
-- Update `src/auth/middleware.ts`
+- Update `app/src/auth/middleware.ts`
 - Import `enforceRateLimit` from `@auth/rate-limit`
 - After successful API key validation (line 96-105), call `enforceRateLimit()`
 - If `!rateLimit.allowed`, return 429 response:
@@ -179,7 +179,7 @@ export interface AuthContext {
 - If allowed, attach `rateLimit` to context: `return { context: { ...context, rateLimit } }`
 
 ### 4. Add Response Header Injection
-- Update `src/api/routes.ts`
+- Update `app/src/api/routes.ts`
 - Create helper function `addRateLimitHeaders(response: Response, rateLimit: RateLimitResult): Response`
 - In `handleAuthenticatedRequest()`, wrap all response returns:
   ```typescript
@@ -197,7 +197,7 @@ export interface AuthContext {
 - Ensure headers don't interfere with existing `Content-Type` and error headers
 
 ### 5. Write Comprehensive Tests
-- Create `tests/auth/rate-limit.test.ts`
+- Create `app/tests/auth/rate-limit.test.ts`
 - Test scenarios:
   - ✅ First request increments counter to 1
   - ✅ Subsequent requests increment counter correctly
@@ -211,7 +211,7 @@ export interface AuthContext {
 - Seed test API keys via `getTestApiKey()` helper
 
 ### 6. Add Middleware Integration Tests
-- Update `tests/auth/middleware.test.ts`
+- Update `app/tests/auth/middleware.test.ts`
 - New test cases:
   - ✅ Authenticated request includes rate limit context
   - ✅ Request within limit succeeds with headers
@@ -232,11 +232,11 @@ export interface AuthContext {
 
 ### 8. Run Validation Suite (Level 2)
 - Execute validation commands in order:
-  - `bun run lint` — Verify linting passes
-  - `bun run typecheck` — Verify no type errors
-  - `bun test --filter integration` — Run integration tests
-  - `bun test` — Run full test suite
-  - `bun run build` — Verify build succeeds
+  - `cd app && bun run lint` — Verify linting passes
+  - `cd app && bun run typecheck` — Verify no type errors
+  - `cd app && bun test --filter integration` — Run integration tests
+  - `cd app && bun test` — Run full test suite
+  - `cd app && bun run build` — Verify build succeeds
 - Fix any failures before proceeding
 
 ### 9. Update Documentation
@@ -245,7 +245,7 @@ export interface AuthContext {
 - Document rate limit headers in README.md API section
 
 ### 10. Commit and Push Implementation
-- Stage all changes: `git add src/ tests/ docs/`
+- Stage all changes: `git add app/src/ app/tests/ docs/`
 - Commit with descriptive message:
   ```bash
   git commit -m "feat: implement tier-based rate limiting middleware (#26)
@@ -296,14 +296,14 @@ export interface AuthContext {
 ### Automated Tests (Real Supabase Integration)
 All tests use real Supabase Local instance per `/anti-mock` policy:
 
-1. **Unit Tests** (`tests/auth/rate-limit.test.ts`):
+1. **Unit Tests** (`app/tests/auth/rate-limit.test.ts`):
    - Rate limit enforcement logic
    - Counter increment accuracy
    - Window reset behavior
    - Concurrent request handling
    - Error handling (database failures)
 
-2. **Integration Tests** (`tests/auth/middleware.test.ts`):
+2. **Integration Tests** (`app/tests/auth/middleware.test.ts`):
    - Rate limiting integrated with authentication flow
    - 429 response generation
    - Header injection on all endpoints
@@ -320,10 +320,10 @@ All tests use real Supabase Local instance per `/anti-mock` policy:
 **Scenario 1: Normal Usage (Within Limits)**
 ```bash
 # Start Supabase Local
-bun run test:setup
+cd app && bun run test:setup
 
 # Start server
-bun run src/index.ts
+bun run app/src/index.ts
 
 # Make requests within free tier limit (100/hr)
 for i in {1..5}; do
@@ -379,15 +379,15 @@ curl -v -H "Authorization: Bearer $(cat .test-api-key)" \
 
 ```bash
 # Level 2 Validation (required for feature work)
-bun run lint
-bun run typecheck
-bun test --filter integration
-bun test
-bun run build
+cd app && bun run lint
+cd app && bun run typecheck
+cd app && bun test --filter integration
+cd app && bun test
+cd app && bun run build
 
 # Domain-specific checks
-bun run test:validate-migrations  # Ensure migration sync
-bun run test:status              # Verify Supabase Local running
+cd app && bun run test:validate-migrations  # Ensure migration sync
+cd app && bun run test:status              # Verify Supabase Local running
 
 # Optional: Load testing (not required for merge)
 # autocannon -c 10 -d 5 -H "Authorization: Bearer <key>" http://localhost:3000/search?term=test
@@ -400,7 +400,7 @@ bun run test:status              # Verify Supabase Local running
 - **PR #18**: Reverted implementation (incompatible with new auth architecture)
 - **Issue #13**: Auth middleware foundation (prerequisite, completed)
 - **Issue #25**: API key generation (prerequisite, completed)
-- **Database Function**: `src/db/functions/increment_rate_limit.sql` (already exists)
+- **Database Function**: `app/src/db/functions/increment_rate_limit.sql` (already exists)
 - **Schema Documentation**: `docs/schema.md` lines 320-348
 
 ## Dependencies
@@ -408,8 +408,8 @@ bun run test:status              # Verify Supabase Local running
 - ✅ Auth middleware (Issue #13) — Completed
 - ✅ API key generation (Issue #25) — Completed
 - ✅ `rate_limit_counters` table — Exists in schema
-- ✅ `increment_rate_limit()` function — Exists in `src/db/functions/`
-- ✅ Supabase Local test environment — Available via `bun run test:setup`
+- ✅ `increment_rate_limit()` function — Exists in `app/src/db/functions/`
+- ✅ Supabase Local test environment — Available via `cd app && bun run test:setup`
 
 ## Success Criteria
 

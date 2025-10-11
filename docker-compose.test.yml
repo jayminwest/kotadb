@@ -115,7 +115,7 @@ services:
     ports:
       - "0:8000"  # Dynamic port allocation for Kong gateway
     volumes:
-      - ./supabase/kong.yml:/usr/local/kong/kong.yml:ro
+      - ./app/supabase/kong.yml:/usr/local/kong/kong.yml:ro
     healthcheck:
       test: ["CMD", "kong", "health"]
       interval: 5s

@@ -26,9 +26,9 @@ fi
 echo "📡 Database port: $DB_PORT"
 
 # Run each migration file in order
-# Use supabase/migrations for the actual PostgreSQL migrations
-# (src/db/migrations has the source, but may have old SQLite files or rollbacks)
-MIGRATION_DIR="supabase/migrations"
+# Use app/supabase/migrations for the actual PostgreSQL migrations
+# (app/src/db/migrations has the source, but may have old SQLite files or rollbacks)
+MIGRATION_DIR="app/supabase/migrations"
 MIGRATION_COUNT=0
 
 if [ ! -d "$MIGRATION_DIR" ]; then

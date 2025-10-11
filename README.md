@@ -2,7 +2,7 @@
 
 KotaDB is the indexing and query layer for CLI Agents like Claude Code and Codex. This project exposes a
 lightweight HTTP interface for triggering repository indexing jobs and performing code search backed by
-Supabase (PostgreSQL). Development is done autonomously through AI developer workflows via the `adws/` automation scripts.
+Supabase (PostgreSQL). Development is done autonomously through AI developer workflows via the `automation/adws/` automation scripts.
 
 ## Getting Started
 
@@ -14,7 +14,7 @@ Supabase (PostgreSQL). Development is done autonomously through AI developer wor
 ### Install dependencies
 
 ```bash
-bun install
+cd app && bun install
 ```
 
 ### Configure Supabase
@@ -31,16 +31,16 @@ For detailed setup instructions, see `docs/supabase-setup.md`.
 ### Start the API server
 
 ```bash
-bun run src/index.ts
+cd app && bun run src/index.ts
 ```
 
-The server listens on port `3000` by default. Override with `PORT=4000 bun run src/index.ts`.
+The server listens on port `3000` by default. Override with `PORT=4000 cd app && bun run src/index.ts`.
 
 ### Useful scripts
 
-- `bun --watch src/index.ts` – Start the server in watch mode for local development.
-- `bun test` – Run the Bun test suite.
-- `bunx tsc --noEmit` – Type-check the project.
+- `cd app && bun --watch src/index.ts` – Start the server in watch mode for local development.
+- `cd app && bun test` – Run the Bun test suite.
+- `cd app && bunx tsc --noEmit` – Type-check the project.
 
 ### Running Tests
 
@@ -55,23 +55,23 @@ docker --version
 **Quick Start:**
 ```bash
 # First-time setup: Start Docker Compose services and auto-generate .env.test
-bun run test:setup
+cd app && bun run test:setup
 
 # Run tests
-bun test
+cd app && bun test
 
 # Reset database if needed
-bun run test:reset
+cd app && bun run test:reset
 
 # Stop services when done
-bun run test:teardown
+cd app && bun run test:teardown
 ```
 
 **Note:** The `.env.test` file is auto-generated from Docker Compose container ports and should not be committed to git.
 
 **Project Isolation:** Each test run uses a unique Docker Compose project name (e.g., `kotadb-test-1234567890-98765`), enabling multiple projects or branches to run tests simultaneously without port conflicts.
 
-**CI Testing:** GitHub Actions CI uses the same Docker Compose environment with unique project names, ensuring tests run against identical infrastructure locally and in CI (PostgreSQL + PostgREST + Kong + Auth). See `.github/workflows/ci.yml` for details.
+**CI Testing:** GitHub Actions CI uses the same Docker Compose environment with unique project names, ensuring tests run against identical infrastructure locally and in CI (PostgreSQL + PostgREST + Kong + Auth). See `.github/workflows/app-ci.yml` for details.
 
 For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](docs/testing-setup.md).
 
@@ -208,27 +208,39 @@ Build and run the service in a container:
 docker compose up dev
 ```
 
-A production-flavoured service is available via the `home` target in `docker-compose.yml`. Deployments to
-Fly.io can leverage the baseline configuration in `fly.toml`.
+The `dev` and `home` services use the build context from the `app/` directory. A production-flavoured service is available via the `home` target in `docker-compose.yml`. Deployments to Fly.io can leverage the baseline configuration in `fly.toml`.
 
 ## Project Layout
 
 ```
-Dockerfile             # Bun runtime image
-adws/                  # Automation workflows for AI developer agents
-src/
-  api/                 # HTTP routes and database access
-  auth/                # Authentication middleware and API key validation
-  db/                  # Supabase client initialization and helpers
-  indexer/             # Repository crawling, parsing, and extraction utilities
-  mcp/                 # Model Context Protocol (MCP) implementation
-  types/               # Shared TypeScript types
-.github/workflows/     # CI workflows
+app/                   # Application layer (TypeScript/Bun API service)
+  src/
+    api/               # HTTP routes and database access
+    auth/              # Authentication middleware and API key validation
+    db/                # Supabase client initialization and helpers
+    indexer/           # Repository crawling, parsing, and extraction utilities
+    mcp/               # Model Context Protocol (MCP) implementation
+    types/             # Shared TypeScript types
+  tests/               # Test suite (133 tests)
+  package.json         # Bun dependencies and scripts
+  tsconfig.json        # TypeScript configuration
+  Dockerfile           # Bun runtime image
+  supabase/            # Database migrations and configuration
+  scripts/             # Application-specific bash scripts
+
+automation/            # Agentic layer (Python AI developer workflows)
+  adws/                # ADW automation scripts and modules
+  docker/              # ADW-specific Docker images
+  .claude/commands/    # Claude Code slash commands
+
+.github/workflows/     # CI workflows (app-ci.yml for application tests)
 docs/                  # Documentation (schema, specs, setup guides)
 ```
+
+See `app/README.md` for application-specific quickstart and `automation/adws/README.md` for automation workflows.
 
 ## Next Steps
 
 - Harden repository checkout logic with retry/backoff and temporary workspace isolation.
-- Expand `adws/` with runnable automation pipelines.
+- Expand `automation/adws/` with runnable automation pipelines.
 - Add richer schema migrations for symbols, AST metadata, and search primitives.

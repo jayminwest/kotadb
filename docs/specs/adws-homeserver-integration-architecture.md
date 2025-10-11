@@ -41,10 +41,10 @@ This document specifies the complete architecture for integrating KotaDB's AI De
 ---
 
 ## Layer 1: ADWs (AI Developer Workflows)
-**Location**: `adws/`
+**Location**: `automation/adws/`
 
 ### Primary Trigger Script
-**File**: `adws/adw_triggers/adw_trigger_cron_homeserver.py`
+**File**: `automation/adws/adw_triggers/adw_trigger_cron_homeserver.py`
 
 **Responsibilities**:
 - Poll home server endpoint at configurable intervals (default: 15 seconds)
@@ -106,8 +106,8 @@ stats = {
 
 ### Workflow Scripts (Delegation Targets)
 **Files**:
-- `adws/adw_build_update_homeserver_task.py` (simple workflow)
-- `adws/adw_plan_implement_update_homeserver_task.py` (complex workflow)
+- `automation/adws/adw_build_update_homeserver_task.py` (simple workflow)
+- `automation/adws/adw_plan_implement_update_homeserver_task.py` (complex workflow)
 
 **Responsibilities**:
 - Accept CLI arguments: `--adw-id`, `--worktree-name`, `--task`, `--task-id`, `--model`
@@ -233,7 +233,7 @@ stats = {
 ---
 
 ## Layer 4: Architecture
-**Location**: `adws/adw_modules/`
+**Location**: `automation/adws/adw_modules/`
 
 ### Core Modules
 
@@ -313,7 +313,7 @@ def worktree_exists(worktree_name: str, base_path: str) -> bool
 ---
 
 ## Layer 5: Tests
-**Location**: `adws/adw_tests/`
+**Location**: `automation/adws/adw_app/tests/`
 
 ### Test Files
 
@@ -350,7 +350,7 @@ def test_workflow_updates_task_on_failure()
 ---
 
 ## Layer 6: Docs
-**Location**: `adws/README.md` updates
+**Location**: `automation/adws/README.md` updates
 
 ### Documentation Updates Required
 
@@ -370,7 +370,7 @@ KotaDB ADWs can be triggered from a custom home server endpoint via Tailscale.
 
 2. Start the cron trigger:
    ```bash
-   uv run adws/adw_triggers/adw_trigger_cron_homeserver.py
+   uv run automation/adws/adw_triggers/adw_trigger_cron_homeserver.py
    ```
 
 ### Task Structure
@@ -397,7 +397,7 @@ Worktree names are auto-generated from task titles if not provided.
 ---
 
 ## Layer 7: Types
-**Location**: `adws/adw_modules/data_types.py`
+**Location**: `automation/adws/adw_modules/data_types.py`
 
 ### Type Definitions (Comprehensive)
 
@@ -757,7 +757,7 @@ task.tags = {"model": "opus"}
 **Provides**:
 - Project overview (KotaDB HTTP API service)
 - Tech stack (Bun, TypeScript, Supabase)
-- Development commands (`bun test`, `bunx tsc --noEmit`)
+- Development commands (`cd app && bun test`, `cd app && bunx tsc --noEmit`)
 - Architecture (API layer, auth, database, indexer)
 - Path aliases (`@api/*`, `@db/*`, etc.)
 - Environment variables
@@ -840,7 +840,7 @@ Update Home Server (task completed)
 ### File Structure After Execution
 ```
 kota-db-ts/
-├── adws/
+├── automation/adws/
 │   ├── adw_triggers/
 │   │   └── adw_trigger_cron_homeserver.py
 │   ├── adw_build_update_homeserver_task.py
@@ -879,7 +879,7 @@ kota-db-ts/
 
 ## Dependencies & Prerequisites
 
-### Python Packages (adws/adw_triggers/adw_trigger_cron_homeserver.py)
+### Python Packages (automation/adws/adw_triggers/adw_trigger_cron_homeserver.py)
 ```python
 # /// script
 # requires-python = ">=3.10"
@@ -896,7 +896,7 @@ kota-db-ts/
 
 ### Environment Variables
 ```bash
-# .env or adws/.env
+# .env or automation/adws/.env
 ANTHROPIC_API_KEY=sk-ant-...
 CLAUDE_CODE_PATH=claude  # Default
 HOMESERVER_URL=https://jaymins-mac-pro.tail1b7f44.ts.net

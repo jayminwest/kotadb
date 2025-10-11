@@ -20,22 +20,22 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
 ## Relevant Files
 
 ### Core Database Layer
-- `src/db/schema.ts` — **Legacy SQLite schema initialization (DELETE or gut)**
+- `app/src/db/schema.ts` — **Legacy SQLite schema initialization (DELETE or gut)**
   - Contains `openDatabase()`, `ensureSchema()` using `bun:sqlite` API
   - Creates 3 tables: `files`, `index_runs`, `migrations` with SQLite syntax
-- `src/db/client.ts` — **Production Supabase client (KEEP, enhance)**
+- `app/src/db/client.ts` — **Production Supabase client (KEEP, enhance)**
   - Service role and anon client initialization
   - RLS context management (`setUserContext`, `clearUserContext`)
   - Already production-ready, no changes needed
 
 ### Bootstrap & Initialization
-- `src/index.ts:2,7-8,10,35` — **Remove SQLite initialization**
+- `app/src/index.ts:2,7-8,10,35` — **Remove SQLite initialization**
   - Currently imports from `@db/schema` and calls `openDatabase()`, `ensureSchema()`
   - Passes SQLite `db` instance to router
   - Must migrate to Supabase client initialization
 
 ### API Query Layer
-- `src/api/queries.ts` — **Refactor all query functions**
+- `app/src/api/queries.ts` — **Refactor all query functions**
   - Line 1: Imports `Database` from `bun:sqlite`
   - Functions: `recordIndexRun`, `updateIndexRunStatus`, `saveIndexedFiles`, `searchFiles`, `listRecentFiles`
   - All use SQLite-specific syntax (`.prepare()`, `.run()`, `.all()`)
@@ -44,25 +44,25 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
   - Type changes: `INTEGER` → `UUID`, `TEXT` timestamps → `timestamptz`
 
 ### API Routing
-- `src/api/routes.ts` — **Update router initialization**
+- `app/src/api/routes.ts` — **Update router initialization**
   - Currently accepts SQLite `Database` instance
   - Must change to accept/use Supabase client
 
 ### Type Definitions
-- `src/types/index.ts` — **Update type definitions**
+- `app/src/types/index.ts` — **Update type definitions**
   - Currently imports `Database` from `bun:sqlite` for type annotations
   - Must migrate to Supabase types
 
 ### MCP Protocol Layer
-- `src/mcp/handler.ts` — **Update database client usage**
-- `src/mcp/tools.ts` — **Update query calls to use Supabase**
+- `app/src/mcp/handler.ts` — **Update database client usage**
+- `app/src/mcp/tools.ts` — **Update query calls to use Supabase**
 
 ### Test Suite
-- `tests/mcp/tools.test.ts` — **Migrate to Supabase test client**
-- `tests/mcp/handshake.test.ts` — **Update database setup**
-- `tests/mcp/errors.test.ts` — **Update database mocks**
-- `tests/api/authenticated-routes.test.ts` — **Update to use Supabase client**
-- `tests/smoke.test.ts` — **Verify no SQLite dependencies**
+- `app/tests/mcp/tools.test.ts` — **Migrate to Supabase test client**
+- `app/tests/mcp/handshake.test.ts` — **Update database setup**
+- `app/tests/mcp/errors.test.ts` — **Update database mocks**
+- `app/tests/api/authenticated-routes.test.ts` — **Update to use Supabase client**
+- `app/tests/smoke.test.ts` — **Verify no SQLite dependencies**
 
 ### Configuration Files
 - `.env.sample:8,13` — **Update database environment variables**
@@ -81,15 +81,15 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
 
 ### New Files
 - `docs/specs/chore-27-standardize-postgres-remove-sqlite.md` — **This plan document**
-- `src/db/queries/indexed_files.ts` — **Postgres query helpers for indexed_files table (optional refactor)**
-- `src/db/queries/index_jobs.ts` — **Postgres query helpers for index_jobs table (optional refactor)**
+- `app/src/db/queries/indexed_files.ts` — **Postgres query helpers for indexed_files table (optional refactor)**
+- `app/src/db/queries/index_jobs.ts` — **Postgres query helpers for index_jobs table (optional refactor)**
 
 ## Work Items
 
 ### Preparation
 1. **Verify Supabase connectivity**
    - Ensure `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, `SUPABASE_ANON_KEY` are set in `.env`
-   - Verify connection with quick test script: `bun run src/db/client.ts` should not throw
+   - Verify connection with quick test script: `bun run app/src/db/client.ts` should not throw
 2. **Backup current state**
    - Commit any uncommitted work: `git status` should be clean
    - Create feature branch from `develop`: `git checkout -b chore/27-standardize-postgres-remove-sqlite`
@@ -99,7 +99,7 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
    - Document all affected files and functions
 
 ### Execution
-1. **Phase 1: Update API query layer** (src/api/queries.ts)
+1. **Phase 1: Update API query layer** (app/src/api/queries.ts)
    - Remove `import type { Database } from "bun:sqlite"`
    - Add `import { getServiceClient, type SupabaseClient } from "@db/client"`
    - Refactor `recordIndexRun()`:
@@ -123,12 +123,12 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
    - Refactor `listRecentFiles()`:
      - Use `indexed_files` table with `.order('indexed_at', { ascending: false })`
 
-2. **Phase 2: Update API routing layer** (src/api/routes.ts)
+2. **Phase 2: Update API routing layer** (app/src/api/routes.ts)
    - Change `createRouter()` signature to accept/use `SupabaseClient` instead of SQLite `Database`
    - Pass Supabase client to all query functions
    - Update type imports
 
-3. **Phase 3: Update bootstrap logic** (src/index.ts)
+3. **Phase 3: Update bootstrap logic** (app/src/index.ts)
    - Remove imports: `import { ensureSchema, openDatabase } from "@db/schema"`
    - Add import: `import { getServiceClient } from "@db/client"`
    - Replace `openDatabase()` and `ensureSchema()` calls with:
@@ -140,16 +140,16 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
    - Add error handling for missing Supabase credentials
 
 4. **Phase 4: Update MCP protocol layer**
-   - Update `src/mcp/handler.ts`: Change to use Supabase client
-   - Update `src/mcp/tools.ts`: Replace query calls with Supabase-based queries
+   - Update `app/src/mcp/handler.ts`: Change to use Supabase client
+   - Update `app/src/mcp/tools.ts`: Replace query calls with Supabase-based queries
    - Update type imports
 
-5. **Phase 5: Update type definitions** (src/types/index.ts)
+5. **Phase 5: Update type definitions** (app/src/types/index.ts)
    - Remove `import type { Database } from "bun:sqlite"`
    - Add Supabase-compatible type definitions (UUID, timestamptz)
    - Update `IndexedFile`, `IndexRequest` interfaces to match Postgres schema
 
-6. **Phase 6: Remove or refactor SQLite schema file** (src/db/schema.ts)
+6. **Phase 6: Remove or refactor SQLite schema file** (app/src/db/schema.ts)
    - **Option A** (recommended): Delete file entirely
      - Only if no Postgres-compatible helpers are needed
    - **Option B**: Refactor to Postgres migration runner
@@ -162,7 +162,7 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
      - Remove `DATABASE_URL_LOCAL=sqlite:///data/kotadb.sqlite`
      - Add comments documenting required Supabase env vars
    - `CLAUDE.md`:
-     - Update "Database (src/db/)" section to remove SQLite references
+     - Update "Database (app/src/db/)" section to remove SQLite references
      - Update "Database path: data/kotadb.sqlite" to "Supabase connection via environment variables"
    - `README.md`:
      - Remove SQLite setup instructions
@@ -173,11 +173,11 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
 
 8. **Phase 8: Update test suite**
    - Create test helper for Supabase test database setup
-   - Update `tests/mcp/tools.test.ts`: Replace SQLite mock with Supabase test client
-   - Update `tests/mcp/handshake.test.ts`: Use Supabase client for setup
-   - Update `tests/mcp/errors.test.ts`: Update database mocks
-   - Update `tests/api/authenticated-routes.test.ts`: Migrate to Supabase
-   - Update `tests/smoke.test.ts`: Verify Supabase connection, not SQLite
+   - Update `app/tests/mcp/tools.test.ts`: Replace SQLite mock with Supabase test client
+   - Update `app/tests/mcp/handshake.test.ts`: Use Supabase client for setup
+   - Update `app/tests/mcp/errors.test.ts`: Update database mocks
+   - Update `app/tests/api/authenticated-routes.test.ts`: Migrate to Supabase
+   - Update `app/tests/smoke.test.ts`: Verify Supabase connection, not SQLite
 
 ### Follow-up
 1. **Verify no SQLite remnants**
@@ -186,7 +186,7 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
    - Run `git grep "KOTA_DB_PATH"` → should return 0 results
    - Verify no `data/kotadb.sqlite*` files created on server start
 2. **Manual smoke test**
-   - Start server: `bun run src/index.ts`
+   - Start server: `bun run app/src/index.ts`
    - Verify Supabase connection success in logs
    - Test `POST /index` endpoint
    - Test `GET /search` endpoint
@@ -205,10 +205,10 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
 1. Verify all Supabase environment variables are set locally
 2. Create feature branch `chore/27-standardize-postgres-remove-sqlite` from `develop`
 3. Run `git grep "bun:sqlite"` and document affected files
-4. Run `bun test` to establish baseline (tests may fail, that's expected)
+4. Run `cd app && bun test` to establish baseline (tests may fail, that's expected)
 
 ### Phase 2: Query Layer Migration
-1. Open `src/api/queries.ts` and refactor `recordIndexRun()` to use Supabase `.insert()`
+1. Open `app/src/api/queries.ts` and refactor `recordIndexRun()` to use Supabase `.insert()`
 2. Refactor `updateIndexRunStatus()` to use `.update().eq()`
 3. Refactor `saveIndexedFiles()` to use `indexed_files` table and `.upsert()`
 4. Refactor `searchFiles()` to use `.ilike()` or `.textSearch()`
@@ -217,24 +217,24 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
 7. Update type imports at top of file
 
 ### Phase 3: Bootstrap and Router
-1. Update `src/index.ts` to remove SQLite imports and initialization
+1. Update `app/src/index.ts` to remove SQLite imports and initialization
 2. Initialize Supabase client with `getServiceClient()`
 3. Pass Supabase client to router
 4. Update console logs
-5. Update `src/api/routes.ts` to accept `SupabaseClient` instead of `Database`
+5. Update `app/src/api/routes.ts` to accept `SupabaseClient` instead of `Database`
 
 ### Phase 4: MCP Layer
-1. Update `src/mcp/handler.ts` to use Supabase client
-2. Update `src/mcp/tools.ts` to call refactored query functions
+1. Update `app/src/mcp/handler.ts` to use Supabase client
+2. Update `app/src/mcp/tools.ts` to call refactored query functions
 3. Remove SQLite type imports
 
 ### Phase 5: Type Definitions
-1. Update `src/types/index.ts` to remove SQLite imports
+1. Update `app/src/types/index.ts` to remove SQLite imports
 2. Add Supabase-compatible types (UUID, timestamptz)
 3. Update interfaces to match Postgres schema (repository_id vs project_root)
 
 ### Phase 6: Remove SQLite Schema
-1. Delete `src/db/schema.ts` entirely (recommended)
+1. Delete `app/src/db/schema.ts` entirely (recommended)
 2. Verify no other files import from this module
 3. If needed, create Postgres migration runner as replacement
 
@@ -245,9 +245,9 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
 4. Update `docker-compose.yml` if needed
 
 ### Phase 8: Test Migration
-1. Create `tests/helpers/supabase-test-client.ts` for test database setup
+1. Create `app/tests/helpers/supabase-test-client.ts` for test database setup
 2. Update each test file to use Supabase test client
-3. Run `bun test` and fix failures iteratively
+3. Run `cd app && bun test` and fix failures iteratively
 4. Ensure all tests pass with Postgres client only
 
 ### Phase 9: Validation
@@ -273,10 +273,10 @@ This chore addresses **Epic 1: Database Foundation** by completing the SQLite-to
 
 ### Required Validation (always run)
 ```bash
-bun run lint          # Biome linting
-bun run typecheck     # TypeScript type checking
-bun test              # Full test suite
-bun run build         # Production build verification
+cd app && bun run lint          # Biome linting
+cd app && bun run typecheck     # TypeScript type checking
+cd app && bun test              # Full test suite
+cd app && bun run build         # Production build verification
 ```
 
 ### Supplemental Checks (impact level: HIGH)
@@ -291,7 +291,7 @@ git grep "@supabase/supabase-js"
 git grep "getServiceClient\|getAnonClient"
 
 # Manual smoke tests
-bun run src/index.ts  # Start server, check logs
+bun run app/src/index.ts  # Start server, check logs
 curl http://localhost:3000/health
 curl -X POST http://localhost:3000/index -H "Content-Type: application/json" -d '{"repository": "test/repo"}'
 curl "http://localhost:3000/search?term=test"
@@ -310,24 +310,24 @@ ls -la data/kotadb.sqlite*  # Should not exist after restart
 ### Test Coverage Verification
 ```bash
 # Run tests with coverage (if configured)
-bun test --coverage
+cd app && bun test --coverage
 
 # Verify specific test suites pass
-bun test tests/api/
-bun test tests/mcp/
-bun test tests/auth/
+cd app && bun test app/tests/api/
+cd app && bun test app/tests/mcp/
+cd app && bun test app/tests/auth/
 ```
 
 ## Deliverables
 
 ### Code Changes
-- ✅ `src/api/queries.ts` — Refactored to use Supabase client with Postgres schema
-- ✅ `src/api/routes.ts` — Updated to accept/use Supabase client
-- ✅ `src/index.ts` — Bootstrap logic migrated to Supabase initialization
-- ✅ `src/mcp/handler.ts` — Updated to use Supabase client
-- ✅ `src/mcp/tools.ts` — Refactored to call Supabase-based queries
-- ✅ `src/types/index.ts` — Updated type definitions for Postgres schema
-- ✅ `src/db/schema.ts` — **DELETED** (SQLite implementation removed)
+- ✅ `app/src/api/queries.ts` — Refactored to use Supabase client with Postgres schema
+- ✅ `app/src/api/routes.ts` — Updated to accept/use Supabase client
+- ✅ `app/src/index.ts` — Bootstrap logic migrated to Supabase initialization
+- ✅ `app/src/mcp/handler.ts` — Updated to use Supabase client
+- ✅ `app/src/mcp/tools.ts` — Refactored to call Supabase-based queries
+- ✅ `app/src/types/index.ts` — Updated type definitions for Postgres schema
+- ✅ `app/src/db/schema.ts` — **DELETED** (SQLite implementation removed)
 - ✅ All test files migrated to Supabase test client
 
 ### Config Updates
@@ -341,9 +341,9 @@ bun test tests/auth/
 - ✅ `.claude/commands/conditional_docs.md` — Updated with conditions for this spec (if needed)
 
 ### Validation Evidence
-- ✅ All tests pass: `bun test` exits 0
-- ✅ Type checking passes: `bunx tsc --noEmit` exits 0
-- ✅ Linting passes: `bun run lint` exits 0
+- ✅ All tests pass: `cd app && bun test` exits 0
+- ✅ Type checking passes: `cd app && bunx tsc --noEmit` exits 0
+- ✅ Linting passes: `cd app && bun run lint` exits 0
 - ✅ No SQLite imports: `git grep "bun:sqlite"` returns 0 results
 - ✅ Server starts successfully with Supabase connection
 - ✅ Manual API smoke tests pass

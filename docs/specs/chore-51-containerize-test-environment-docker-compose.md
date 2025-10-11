@@ -97,7 +97,7 @@ The current test infrastructure uses Supabase CLI's global state management (`su
 - Add health checks for reliable startup detection
 
 ### 2. Create Migration Runner Script
-- Create `scripts/run-migrations-compose.sh` to apply migrations from `src/db/migrations/*.sql`
+- Create `scripts/run-migrations-compose.sh` to apply migrations from `app/src/db/migrations/*.sql`
 - Use `psql` to connect to containerized Postgres (bypass Supabase CLI)
 - Accept project name as parameter to target correct container
 - Run migrations in order (sorted by filename)
@@ -155,11 +155,11 @@ The current test infrastructure uses Supabase CLI's global state management (`su
 - Add entry to `.claude/commands/conditional_docs.md` for this spec
 
 ### 10. Validation and Cleanup
-- Run `bunx tsc --noEmit` to verify type checking
-- Run `bun run lint` to verify linting passes
-- Run `bun run test:validate-migrations` to check migration sync
-- Test containerized setup locally: `bun run test:setup && bun test`
-- Test simultaneous test runs (open 2+ terminal windows, run `bun test` in each)
+- Run `cd app && bunx tsc --noEmit` to verify type checking
+- Run `cd app && bun run lint` to verify linting passes
+- Run `cd app && bun run test:validate-migrations` to check migration sync
+- Test containerized setup locally: `cd app && bun run test:setup && bun test`
+- Test simultaneous test runs (open 2+ terminal windows, run `cd app && bun test` in each)
 - Verify cleanup works with ctrl-c during test run
 - Verify cleanup works when tests fail deliberately
 - Push branch and verify CI passes with new approach
@@ -201,24 +201,24 @@ docker compose down -v
 
 **Local validation before pushing:**
 ```bash
-bun run typecheck          # Type-check passes
-bun run lint               # Linting passes
-bun run test:validate-migrations  # Migration sync verified
-bun run test:setup         # Containerized setup works
-bun test                   # All 133 tests pass
+cd app && bun run typecheck          # Type-check passes
+cd app && bun run lint               # Linting passes
+cd app && bun run test:validate-migrations  # Migration sync verified
+cd app && bun run test:setup         # Containerized setup works
+cd app && bun test                   # All 133 tests pass
 
 # Test simultaneous runs (open 2 terminals)
 # Terminal 1:
 cd /Users/jayminwest/Projects/kota-db-ts
-bun run test:setup && bun test
+cd app && bun run test:setup && bun test
 
 # Terminal 2:
 cd /Users/jayminwest/Projects/kota-db-ts-branch2
-bun run test:setup && bun test
+cd app && bun run test:setup && bun test
 # Should run without port conflicts
 
 # Test cleanup guarantees
-bun run test:setup
+cd app && bun run test:setup
 # Press ctrl-c during tests
 docker ps | grep kotadb-test  # Should show no containers
 ```

@@ -4,7 +4,7 @@
 
 CI tests are failing with **401 Unauthorized** errors despite tests passing locally in ~13.5 seconds. The root cause is an environment mismatch:
 
-- **Local testing**: Uses Supabase Local (full stack: PostgreSQL + PostgREST + Kong + Auth) via `bun run test:setup`
+- **Local testing**: Uses Supabase Local (full stack: PostgreSQL + PostgREST + Kong + Auth) via `cd app && bun run test:setup`
 - **CI testing**: Uses plain PostgreSQL service without PostgREST or Supabase stack
 
 This violates KotaDB's **anti-mock philosophy** by creating testing drift between local and CI environments. Authentication tests fail because API key validation requires PostgREST RPC endpoints that don't exist in GitHub Actions' plain PostgreSQL service.
@@ -71,7 +71,7 @@ This violates KotaDB's **anti-mock philosophy** by creating testing drift betwee
 ### 3. Update Test Execution Step
 - Remove manual PostgreSQL setup and migration running
 - Source `.env.test` for test credentials (auto-generated from `supabase status`)
-- Execute `bun test` with Supabase Local backing services
+- Execute `cd app && bun test` with Supabase Local backing services
 - Add Supabase teardown step (`supabase stop`) in workflow cleanup
 
 ### 4. Update Documentation
@@ -80,8 +80,8 @@ This violates KotaDB's **anti-mock philosophy** by creating testing drift betwee
 - Add note in `CLAUDE.md` about CI/CD test environment architecture
 
 ### 5. Validation and Cleanup
-- Run `bunx tsc --noEmit` to verify type checking
-- Run `bun run lint` to verify linting passes
+- Run `cd app && bunx tsc --noEmit` to verify type checking
+- Run `cd app && bun run lint` to verify linting passes
 - Test CI workflow on branch with trivial change
 - Verify all 133 tests pass in CI with no 401 errors
 - Check CI execution time remains under 2 minutes
@@ -94,7 +94,7 @@ This violates KotaDB's **anti-mock philosophy** by creating testing drift betwee
 |------|------------|
 | **Supabase Local startup adds significant time (~30-60s)** | Accept trade-off for testing parity; monitor actual duration and optimize if >2min total |
 | **Docker-in-Docker resource limits in GitHub Actions** | GitHub Actions provides generous limits; Supabase Local tested to work in similar CI environments |
-| **Migration sync issues between `src/db/migrations/` and `supabase/migrations/`** | Already have `bun run test:validate-migrations` to catch drift; add to CI validation steps |
+| **Migration sync issues between `app/src/db/migrations/` and `supabase/migrations/`** | Already have `cd app && bun run test:validate-migrations` to catch drift; add to CI validation steps |
 | **Intermittent Supabase service startup failures** | Add retry logic and health checks in setup script; fail fast with clear error messages |
 | **Credentials exposure in CI logs** | Setup script uses secure variable handling; no credentials printed to stdout |
 
@@ -102,10 +102,10 @@ This violates KotaDB's **anti-mock philosophy** by creating testing drift betwee
 
 **Local validation before pushing:**
 ```bash
-bun run typecheck          # Type-check passes
-bun run lint              # Linting passes
-bun test                  # All 133 tests pass (local Supabase)
-bun run test:validate-migrations  # Migration sync verified
+cd app && bun run typecheck          # Type-check passes
+cd app && bun run lint              # Linting passes
+cd app && bun test                  # All 133 tests pass (local Supabase)
+cd app && bun run test:validate-migrations  # Migration sync verified
 ```
 
 **CI-specific validation (from `/validate-implementation`):**

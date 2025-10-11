@@ -1,14 +1,24 @@
-name: CI
+name: Application CI
 
 on:
   push:
     branches:
       - main
+      - develop
+    paths:
+      - 'app/**'
+      - '.github/workflows/app-ci.yml'
   pull_request:
+    paths:
+      - 'app/**'
+      - '.github/workflows/app-ci.yml'
 
 jobs:
   build:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -23,11 +33,12 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Setup Docker Compose test stack and generate credentials
+        working-directory: .
         run: |
           chmod +x .github/scripts/setup-supabase-ci.sh
-          chmod +x scripts/generate-env-test-compose.sh
-          chmod +x scripts/run-migrations-compose.sh
-          chmod +x scripts/cleanup-test-containers.sh
+          chmod +x app/scripts/generate-env-test-compose.sh
+          chmod +x app/scripts/run-migrations-compose.sh
+          chmod +x app/scripts/cleanup-test-containers.sh
           .github/scripts/setup-supabase-ci.sh
 
       - name: Validate migration sync
@@ -42,11 +53,12 @@ jobs:
       - name: Test
         run: |
           # Source .env.test for Supabase credentials
-          export $(grep -v '^#' .env.test | xargs)
+          export $(grep -v '^#' ../.env.test | xargs)
           bun test
 
       - name: Teardown Docker Compose test stack
         if: always()
+        working-directory: .
         run: |
-          chmod +x scripts/cleanup-test-containers.sh
-          ./scripts/cleanup-test-containers.sh || true
+          chmod +x app/scripts/cleanup-test-containers.sh
+          app/scripts/cleanup-test-containers.sh || true

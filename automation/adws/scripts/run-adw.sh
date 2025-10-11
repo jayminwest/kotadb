@@ -74,11 +74,11 @@ git config --global user.email "${GIT_AUTHOR_EMAIL:-bot@kotadb.local}"
 git config --global user.name "${GIT_AUTHOR_NAME:-KotaDB ADW Bot}"
 git config --global pull.rebase false
 
-if [[ -f "bun.lock" || -f "package.json" ]]; then
-  bun install --frozen-lockfile >/dev/null 2>&1 || bun install >/dev/null 2>&1
+if [[ -f "app/bun.lock" || -f "app/package.json" ]]; then
+  cd app && bun install --frozen-lockfile >/dev/null 2>&1 || bun install >/dev/null 2>&1 && cd ..
 fi
 
 export ISSUE_NUMBER
 export ADW_ID
 
-exec uv run adws/adw_plan_build.py "${ISSUE_NUMBER}" "${ADW_ID}"
+exec uv run automation/adws/adw_plan_build.py "${ISSUE_NUMBER}" "${ADW_ID}"
