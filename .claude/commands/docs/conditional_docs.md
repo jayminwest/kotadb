@@ -139,3 +139,10 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When troubleshooting command discovery issues after subdirectory reorganization
     - When updating documentation that references command paths
     - When understanding the logical grouping pattern for commands (workflows, git, issues, homeserver, worktree, automation, app, docs, ci, tools)
+
+- docs/specs/chore-update-automation-commands-path.md
+  - Conditions:
+    - When modifying path references in `automation/adws/adw_modules/agent.py`
+    - When troubleshooting slash command template loading in automation layer
+    - When understanding the migration from `automation/.claude/commands/` to root `.claude/commands/`
+    - When verifying command path resolution in ADW workflows

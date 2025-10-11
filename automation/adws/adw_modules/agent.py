@@ -23,7 +23,8 @@ load_adw_env()
 
 # Resolve Claude CLI path (defaults to "claude").
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")
-COMMANDS_ROOT = project_root() / ".claude" / "commands"
+# Commands are at repository root, one level above automation directory
+COMMANDS_ROOT = project_root().parent / ".claude" / "commands"
 
 
 def check_claude_installed() -> Optional[str]:
@@ -112,16 +113,31 @@ def save_prompt(
 
 
 def command_template_path(slash_command: str) -> Path:
-    """Return the on-disk path for a slash command template."""
+    """Return the on-disk path for a slash command template.
+
+    Searches for the command file in COMMANDS_ROOT and its subdirectories.
+    For example, /chore resolves to .claude/commands/issues/chore.md.
+    """
 
     if not slash_command.startswith("/"):
         raise ValueError(f"Invalid slash command: {slash_command}")
 
     command_name = slash_command[1:]
-    path = COMMANDS_ROOT / f"{command_name}.md"
-    if not path.exists():
-        raise FileNotFoundError(f"Prompt template not found for {slash_command} at {path}")
-    return path
+
+    # First, try direct path (for backward compatibility if any commands remain at root)
+    direct_path = COMMANDS_ROOT / f"{command_name}.md"
+    if direct_path.exists():
+        return direct_path
+
+    # Search in subdirectories
+    for subdir in COMMANDS_ROOT.iterdir():
+        if not subdir.is_dir():
+            continue
+        candidate = subdir / f"{command_name}.md"
+        if candidate.exists():
+            return candidate
+
+    raise FileNotFoundError(f"Prompt template not found for {slash_command} in {COMMANDS_ROOT} or its subdirectories")
 
 
 def render_slash_command_prompt(slash_command: str, args: Sequence[str]) -> str:
