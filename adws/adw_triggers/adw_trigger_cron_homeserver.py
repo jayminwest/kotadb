@@ -69,7 +69,7 @@ def signal_handler(signum: int, _frame: object) -> None:
 class HomeServerTaskManager:
     """Manages communication with the home server API."""
 
-    def __init__(self, base_url: str, tasks_endpoint: str = "/api/kota-tasks"):
+    def __init__(self, base_url: str, tasks_endpoint: str = "/api/tasks/kotadb"):
         self.base_url = base_url.rstrip("/")
         self.tasks_endpoint = tasks_endpoint
         self.timeout = 10  # seconds
@@ -378,7 +378,7 @@ class HomeServerCronTrigger:
 )
 @click.option(
     "--tasks-endpoint",
-    default=os.getenv("HOMESERVER_TASKS_ENDPOINT", "/api/kota-tasks"),
+    default=os.getenv("HOMESERVER_TASKS_ENDPOINT", "/api/tasks/kotadb"),
     help="Tasks API endpoint path",
 )
 @click.option(

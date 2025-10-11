@@ -10,7 +10,7 @@ Update the status of a task on the home server API.
 ## Instructions
 
 1. Use the WebFetch tool to make a POST request to update the task status
-2. Construct the full URL: `{base_url}/api/kota-tasks/{task_id}`
+2. Construct the full URL: `{base_url}/api/tasks/kotadb/{task_id}`
 3. Parse the update_content_json to extract fields like:
    - `adw_id`: ADW execution ID
    - `worktree`: Worktree name used for the task

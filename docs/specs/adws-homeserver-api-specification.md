@@ -12,7 +12,7 @@
 This document specifies the REST API contract for the home server task management system that integrates with KotaDB's AI Developer Workflows (ADWs). The API provides endpoints for task lifecycle management (create, read, update) and is accessed securely via Tailscale without requiring authentication.
 
 **Base URL**: `https://jaymins-mac-pro.tail1b7f44.ts.net`
-**API Prefix**: `/api/kota-tasks`
+**API Prefix**: `/api/tasks/kotadb`
 **Authentication**: None (Tailscale network security)
 **Protocol**: HTTPS
 **Content-Type**: `application/json`
@@ -35,7 +35,7 @@ This document specifies the REST API contract for the home server task managemen
 
 ### 1. List Tasks (GET)
 
-**Endpoint**: `GET /api/kota-tasks`
+**Endpoint**: `GET /api/tasks/kotadb`
 
 **Purpose**: Fetch tasks filtered by status and limit
 
@@ -48,9 +48,9 @@ This document specifies the REST API contract for the home server task managemen
 
 **Example Requests**:
 ```
-GET /api/kota-tasks?status=pending&limit=5
-GET /api/kota-tasks?status=pending&status=claimed&limit=10
-GET /api/kota-tasks?status=failed
+GET /api/tasks/kotadb?status=pending&limit=5
+GET /api/tasks/kotadb?status=pending&status=claimed&limit=10
+GET /api/tasks/kotadb?status=failed
 ```
 
 **Response**: `200 OK`
@@ -107,7 +107,7 @@ GET /api/kota-tasks?status=failed
 
 ### 2. Get Task by ID (GET)
 
-**Endpoint**: `GET /api/kota-tasks/{task_id}`
+**Endpoint**: `GET /api/tasks/kotadb/{task_id}`
 
 **Purpose**: Retrieve a single task by its unique identifier
 
@@ -118,7 +118,7 @@ GET /api/kota-tasks?status=failed
 
 **Example Request**:
 ```
-GET /api/kota-tasks/task-001
+GET /api/tasks/kotadb/task-001
 ```
 
 **Response**: `200 OK`
@@ -155,7 +155,7 @@ GET /api/kota-tasks/task-001
 
 ### 3. Create Task (POST)
 
-**Endpoint**: `POST /api/kota-tasks`
+**Endpoint**: `POST /api/tasks/kotadb`
 
 **Purpose**: Create a new task
 
@@ -219,7 +219,7 @@ GET /api/kota-tasks/task-001
 
 ### 4. Claim Task (POST)
 
-**Endpoint**: `POST /api/kota-tasks/{task_id}/claim`
+**Endpoint**: `POST /api/tasks/kotadb/{task_id}/claim`
 
 **Purpose**: Claim a pending task (transition to `claimed` status)
 
@@ -277,7 +277,7 @@ GET /api/kota-tasks/task-001
 
 ### 5. Start Task (POST)
 
-**Endpoint**: `POST /api/kota-tasks/{task_id}/start`
+**Endpoint**: `POST /api/tasks/kotadb/{task_id}/start`
 
 **Purpose**: Mark task as in progress (transition from `claimed` to `in_progress`)
 
@@ -315,7 +315,7 @@ GET /api/kota-tasks/task-001
 
 ### 6. Complete Task (POST)
 
-**Endpoint**: `POST /api/kota-tasks/{task_id}/complete`
+**Endpoint**: `POST /api/tasks/kotadb/{task_id}/complete`
 
 **Purpose**: Mark task as completed with result data
 
@@ -378,7 +378,7 @@ GET /api/kota-tasks/task-001
 
 ### 7. Fail Task (POST)
 
-**Endpoint**: `POST /api/kota-tasks/{task_id}/fail`
+**Endpoint**: `POST /api/tasks/kotadb/{task_id}/fail`
 
 **Purpose**: Mark task as failed with error information
 
@@ -419,7 +419,7 @@ GET /api/kota-tasks/task-001
 
 ### 8. Update Task (PATCH)
 
-**Endpoint**: `PATCH /api/kota-tasks/{task_id}`
+**Endpoint**: `PATCH /api/tasks/kotadb/{task_id}`
 
 **Purpose**: Update arbitrary task fields (general-purpose update)
 
@@ -454,7 +454,7 @@ GET /api/kota-tasks/task-001
 
 ### 9. Delete Task (DELETE)
 
-**Endpoint**: `DELETE /api/kota-tasks/{task_id}`
+**Endpoint**: `DELETE /api/tasks/kotadb/{task_id}`
 
 **Purpose**: Delete a task (soft or hard delete, implementation choice)
 
@@ -601,7 +601,7 @@ pending → in_progress  (must be claimed first)
 
 ### Example 1: Fetch Pending Tasks
 ```bash
-curl -X GET "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks?status=pending&limit=5"
+curl -X GET "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb?status=pending&limit=5"
 ```
 
 **Response**:
@@ -629,7 +629,7 @@ curl -X GET "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks?status=pen
 
 ### Example 2: Claim Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/task-001/claim" \
+curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-001/claim" \
   -H "Content-Type: application/json" \
   -d '{
     "adw_id": "abc12345",
@@ -653,7 +653,7 @@ curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/task-001/
 
 ### Example 3: Complete Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/task-001/complete" \
+curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-001/complete" \
   -H "Content-Type: application/json" \
   -d '{
     "adw_id": "abc12345",
@@ -689,7 +689,7 @@ curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/task-001/
 
 ### Example 4: Fail Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/task-001/fail" \
+curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-001/fail" \
   -H "Content-Type: application/json" \
   -d '{
     "adw_id": "abc12345",
@@ -713,7 +713,7 @@ curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/task-001/
 
 ### Example 5: Create New Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks" \
+curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Fix typo in README",
@@ -827,15 +827,15 @@ CREATE INDEX idx_adw_id ON kota_tasks(adw_id);
 - [ ] Set up project structure (FastAPI/Express/Flask/etc.)
 - [ ] Configure database connection
 - [ ] Create `kota_tasks` table with schema
-- [ ] Implement GET `/api/kota-tasks` (list with filters)
-- [ ] Implement GET `/api/kota-tasks/{task_id}` (get by ID)
-- [ ] Implement POST `/api/kota-tasks` (create task)
-- [ ] Implement POST `/api/kota-tasks/{task_id}/claim` (claim task)
-- [ ] Implement POST `/api/kota-tasks/{task_id}/start` (start task)
-- [ ] Implement POST `/api/kota-tasks/{task_id}/complete` (complete task)
-- [ ] Implement POST `/api/kota-tasks/{task_id}/fail` (fail task)
-- [ ] Implement PATCH `/api/kota-tasks/{task_id}` (update task)
-- [ ] Implement DELETE `/api/kota-tasks/{task_id}` (delete task)
+- [ ] Implement GET `/api/tasks/kotadb` (list with filters)
+- [ ] Implement GET `/api/tasks/kotadb/{task_id}` (get by ID)
+- [ ] Implement POST `/api/tasks/kotadb` (create task)
+- [ ] Implement POST `/api/tasks/kotadb/{task_id}/claim` (claim task)
+- [ ] Implement POST `/api/tasks/kotadb/{task_id}/start` (start task)
+- [ ] Implement POST `/api/tasks/kotadb/{task_id}/complete` (complete task)
+- [ ] Implement POST `/api/tasks/kotadb/{task_id}/fail` (fail task)
+- [ ] Implement PATCH `/api/tasks/kotadb/{task_id}` (update task)
+- [ ] Implement DELETE `/api/tasks/kotadb/{task_id}` (delete task)
 - [ ] Add validation for status transitions
 - [ ] Add error handling and consistent error responses
 - [ ] Configure CORS (if needed)
@@ -873,7 +873,7 @@ import sqlite3
 
 app = FastAPI()
 
-@app.get("/api/kota-tasks")
+@app.get("/api/tasks/kotadb")
 async def list_tasks(status: str = None, limit: int = 10):
     # Implementation
     pass
@@ -884,7 +884,7 @@ async def list_tasks(status: str = None, limit: int = 10):
 const express = require('express');
 const app = express();
 
-app.get('/api/kota-tasks', (req, res) => {
+app.get('/api/tasks/kotadb', (req, res) => {
     const { status, limit = 10 } = req.query;
     // Implementation
 });
@@ -896,7 +896,7 @@ import { Hono } from 'hono'
 
 const app = new Hono()
 
-app.get('/api/kota-tasks', (c) => {
+app.get('/api/tasks/kotadb', (c) => {
     const status = c.req.query('status')
     const limit = c.req.query('limit') || 10
     // Implementation

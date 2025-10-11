@@ -1,0 +1,135 @@
+{
+  "name": "KotaDB Development",
+  "image": "oven/bun:1.1.29",
+
+  // Features to install
+  "features": {
+    "ghcr.io/devcontainers/features/git:1": {},
+    "ghcr.io/devcontainers/features/docker-in-docker:2": {},
+    "ghcr.io/devcontainers/features/github-cli:1": {},
+    "ghcr.io/devcontainers/features/common-utils:2": {
+      "installZsh": true,
+      "installOhMyZsh": true,
+      "upgradePackages": true,
+      "username": "bun"
+    }
+  },
+
+  // Install Supabase CLI, Claude Code, and dependencies on container creation
+  "onCreateCommand": "bash .devcontainer/setup.sh",
+
+  // Install dependencies when container is created
+  "postCreateCommand": "bun install",
+
+  // Forward ports for the application and Supabase services
+  "forwardPorts": [
+    3000,   // KotaDB API
+    5434,   // Supabase DB
+    54322,  // Supabase REST (PostgREST)
+    54325,  // Supabase Auth (GoTrue)
+    54326,  // Supabase Kong (API Gateway)
+    54328   // Supabase Studio
+  ],
+
+  // Port attributes
+  "portsAttributes": {
+    "3000": {
+      "label": "KotaDB API",
+      "onAutoForward": "notify"
+    },
+    "5434": {
+      "label": "Supabase PostgreSQL",
+      "onAutoForward": "silent"
+    },
+    "54322": {
+      "label": "Supabase REST API",
+      "onAutoForward": "silent"
+    },
+    "54325": {
+      "label": "Supabase Auth",
+      "onAutoForward": "silent"
+    },
+    "54326": {
+      "label": "Supabase Kong",
+      "onAutoForward": "silent"
+    },
+    "54328": {
+      "label": "Supabase Studio",
+      "onAutoForward": "notify"
+    }
+  },
+
+  // VS Code customizations
+  "customizations": {
+    "vscode": {
+      "extensions": [
+        // TypeScript & JavaScript
+        "dbaeumer.vscode-eslint",
+        "esbenp.prettier-vscode",
+        "biomejs.biome",
+
+        // Bun
+        "oven.bun-vscode",
+
+        // Database & Supabase
+        "supabase.supabase-vscode",
+        "mtxr.sqltools",
+        "mtxr.sqltools-driver-pg",
+
+        // Git & GitHub
+        "github.vscode-pull-request-github",
+        "eamodio.gitlens",
+
+        // Claude Code
+        "anthropic.claude-code",
+
+        // General development
+        "streetsidesoftware.code-spell-checker",
+        "EditorConfig.EditorConfig",
+        "christian-kohler.path-intellisense"
+      ],
+      "settings": {
+        "typescript.tsdk": "node_modules/typescript/lib",
+        "typescript.enablePromptUseWorkspaceTsdk": true,
+        "editor.formatOnSave": true,
+        "editor.defaultFormatter": "biomejs.biome",
+        "editor.codeActionsOnSave": {
+          "quickfix.biome": "explicit",
+          "source.organizeImports.biome": "explicit"
+        },
+        "[typescript]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[javascript]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "[json]": {
+          "editor.defaultFormatter": "biomejs.biome"
+        },
+        "files.watcherExclude": {
+          "**/node_modules/**": true,
+          "**/dist/**": true,
+          "**/build/**": true,
+          "**/.git/**": true,
+          "**/data/**": true
+        }
+      }
+    }
+  },
+
+  // Environment variables
+  "containerEnv": {
+    "NODE_ENV": "development"
+  },
+
+  // Mount docker socket for docker-in-docker
+  "mounts": [
+    "source=/var/run/docker.sock,target=/var/run/docker.sock,type=bind"
+  ],
+
+  // Use 'postAttachCommand' to run commands after the container is running
+  "postAttachCommand": "echo '🚀 Dev container ready! Run \"bun run dev\" to start the server.'",
+
+  // Comment out to run as root instead
+  "remoteUser": "bun"
+}

@@ -10,7 +10,7 @@ Fetch eligible tasks from the home server API endpoint.
 ## Instructions
 
 1. Use the WebFetch tool to make a GET request to the home server tasks endpoint
-2. Construct the full URL: `{base_url}/api/kota-tasks`
+2. Construct the full URL: `{base_url}/api/tasks/kotadb`
 3. Include query parameters: `status={status_filter}&limit={limit}`
 4. Parse the JSON response and validate the structure
 5. Ensure each task has required fields: `task_id`, `title`, `description`, `status`

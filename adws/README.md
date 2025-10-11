@@ -192,7 +192,7 @@ KotaDB ADWs can be triggered from a custom home server endpoint via Tailscale, e
 1. Configure home server URL (in `.env` or environment):
    ```bash
    export HOMESERVER_URL="https://jaymins-mac-pro.tail1b7f44.ts.net"
-   export HOMESERVER_TASKS_ENDPOINT="/api/kota-tasks"
+   export HOMESERVER_TASKS_ENDPOINT="/api/tasks/kotadb"
    ```
 
 2. Start the cron trigger:

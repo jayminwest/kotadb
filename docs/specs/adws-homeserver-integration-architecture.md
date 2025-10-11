@@ -61,7 +61,7 @@ This document specifies the complete architecture for integrating KotaDB's AI De
 class HomeServerCronConfig(BaseModel):
     polling_interval: int = 15  # seconds
     home_server_url: str = "https://jaymins-mac-pro.tail1b7f44.ts.net"
-    tasks_endpoint: str = "/api/kota-tasks"
+    tasks_endpoint: str = "/api/tasks/kotadb"
     dry_run: bool = False
     max_concurrent_tasks: int = 3
     worktree_base_path: str = "trees"
@@ -365,7 +365,7 @@ KotaDB ADWs can be triggered from a custom home server endpoint via Tailscale.
 1. Configure home server URL:
    ```bash
    export HOMESERVER_URL="https://jaymins-mac-pro.tail1b7f44.ts.net"
-   export HOMESERVER_TASKS_ENDPOINT="/api/kota-tasks"
+   export HOMESERVER_TASKS_ENDPOINT="/api/tasks/kotadb"
    ```
 
 2. Start the cron trigger:
@@ -474,7 +474,7 @@ class HomeServerCronConfig(BaseModel):
     """Configuration for home server cron trigger."""
     polling_interval: int = Field(default=15, ge=1, description="Polling interval in seconds")
     home_server_url: str = Field(..., description="Base URL of home server")
-    tasks_endpoint: str = Field(default="/api/kota-tasks", description="Tasks API endpoint")
+    tasks_endpoint: str = Field(default="/api/tasks/kotadb", description="Tasks API endpoint")
     dry_run: bool = Field(default=False, description="Run without making changes")
     max_concurrent_tasks: int = Field(default=3, ge=1, description="Max parallel tasks")
     worktree_base_path: str = Field(default="trees", description="Base path for worktrees")
@@ -674,7 +674,7 @@ You are tasked with fetching eligible tasks from the home server API.
 - Limit: $3 (maximum number of tasks to fetch)
 
 **Instructions:**
-1. Use the WebFetch tool to make a GET request to: {base_url}/api/kota-tasks
+1. Use the WebFetch tool to make a GET request to: {base_url}/api/tasks/kotadb
 2. Include query parameters: status={status_filter}&limit={limit}
 3. Parse the JSON response
 4. Validate each task has required fields: task_id, title, description, status
@@ -900,7 +900,7 @@ kota-db-ts/
 ANTHROPIC_API_KEY=sk-ant-...
 CLAUDE_CODE_PATH=claude  # Default
 HOMESERVER_URL=https://jaymins-mac-pro.tail1b7f44.ts.net
-HOMESERVER_TASKS_ENDPOINT=/api/kota-tasks
+HOMESERVER_TASKS_ENDPOINT=/api/tasks/kotadb
 ```
 
 ### System Requirements
@@ -916,9 +916,9 @@ HOMESERVER_TASKS_ENDPOINT=/api/kota-tasks
 
 ### Trigger Loop
 ```
-1. Poll home server: GET /api/kota-tasks?status=pending&limit=3
+1. Poll home server: GET /api/tasks/kotadb?status=pending&limit=3
 2. For each task:
-   a. Claim task: POST /api/kota-tasks/{task_id}/claim (status → claimed, set adw_id)
+   a. Claim task: POST /api/tasks/kotadb/{task_id}/claim (status → claimed, set adw_id)
    b. Generate worktree name (if not provided)
    c. Create worktree (if doesn't exist)
    d. Spawn workflow script as detached subprocess:
@@ -937,9 +937,9 @@ HOMESERVER_TASKS_ENDPOINT=/api/kota-tasks
    - Complex: /plan → /implement
 4. On success:
    - Get commit hash
-   - POST /api/kota-tasks/{task_id}/complete (status → completed, add result)
+   - POST /api/tasks/kotadb/{task_id}/complete (status → completed, add result)
 5. On failure:
-   - POST /api/kota-tasks/{task_id}/fail (status → failed, add error)
+   - POST /api/tasks/kotadb/{task_id}/fail (status → failed, add error)
 6. Generate workflow_summary.json
 7. Exit with appropriate code
 ```
