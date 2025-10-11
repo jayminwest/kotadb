@@ -140,6 +140,7 @@ describe("Authenticated Routes", () => {
         body: JSON.stringify({
           repository: "test/repo",
           ref: "main",
+          localPath: ".",
         }),
       });
       const data = await response.json() as { error: string };
@@ -158,6 +159,7 @@ describe("Authenticated Routes", () => {
         body: JSON.stringify({
           repository: "test/repo",
           ref: "main",
+          localPath: ".",
         }),
       });
       const data = await response.json() as { runId: number };

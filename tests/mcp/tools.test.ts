@@ -152,6 +152,7 @@ describe("MCP Tools Integration", () => {
 					arguments: {
 						repository: "test/repo",
 						ref: "main",
+						localPath: ".",
 					},
 				},
 			}),
