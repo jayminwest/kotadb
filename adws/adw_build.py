@@ -140,6 +140,28 @@ def main() -> None:
             state.update(issue_class=issue_command)
             state.save()
 
+    # Check if there are any changes to commit
+    has_changes = not git_ops.ensure_clean_worktree()
+
+    if not has_changes:
+        logger.info("No changes detected - implementation already complete or no modifications needed")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_IMPLEMENTOR, "ℹ️ No changes needed - implementation already complete"),
+        )
+        # Skip commit, push, and PR creation since there's nothing to commit
+        state.save()
+        make_issue_comment(
+            issue_number,
+            f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\\n```json\\n{json.dumps(state.data, indent=2)}\\n```",
+        )
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", "✅ Build phase completed (no changes needed)"),
+        )
+        logger.info("Build phase completed successfully (no changes needed)")
+        return
+
     commit_message, error = create_commit_message(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger)
     if error or not commit_message:
         logger.error(f"Implementation commit message failure: {error}")

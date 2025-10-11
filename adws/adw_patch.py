@@ -165,27 +165,38 @@ def main() -> None:
         )
         sys.exit(1)
 
-    commit_message, error = create_commit_message(
-        AGENT_IMPLEMENTOR,
-        issue,
-        state.issue_class or "/feature",  # type: ignore[arg-type]
-        adw_id,
-        logger,
-    )
-    if error or not commit_message:
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Failed to draft patch commit message: {error}"),
-        )
-        sys.exit(1)
+    # Check if there are any changes to commit
+    has_changes = not git_ops.ensure_clean_worktree()
 
-    committed, git_error = git_ops.commit_all(commit_message)
-    if not committed:
+    if not has_changes:
+        logger.info("No changes detected - patch already applied or no modifications needed")
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Patch commit failed: {git_error}"),
+            format_issue_message(adw_id, AGENT_IMPLEMENTOR, "ℹ️ No changes needed - patch already applied"),
         )
-        sys.exit(1)
+        # Skip commit and push since there's nothing to commit, but continue with state save
+    else:
+        commit_message, error = create_commit_message(
+            AGENT_IMPLEMENTOR,
+            issue,
+            state.issue_class or "/feature",  # type: ignore[arg-type]
+            adw_id,
+            logger,
+        )
+        if error or not commit_message:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Failed to draft patch commit message: {error}"),
+            )
+            sys.exit(1)
+
+        committed, git_error = git_ops.commit_all(commit_message)
+        if not committed:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Patch commit failed: {git_error}"),
+            )
+            sys.exit(1)
 
     pushed, push_error = git_ops.push_branch(branch_name)
     if not pushed:
