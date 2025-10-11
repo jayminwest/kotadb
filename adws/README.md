@@ -370,3 +370,118 @@ Example output:
 │  Last Check         14:32:15                                          │
 └────────────────────────────────────────────────────────────────────────┘
 ```
+
+---
+
+## Troubleshooting
+
+### Worktree Management Issues
+
+**Issue**: Worktrees not being cleaned up after PR creation
+**Symptoms**: `trees/` directory accumulates subdirectories like `trees/feat-issue-47-29d2a677/`
+**Solution**:
+1. Check `ADW_CLEANUP_WORKTREES` setting in `adws/.env` (default: `true`)
+2. Verify the PR creation was successful (cleanup only runs after successful PR)
+3. Check for `--skip-cleanup` flag in workflow invocation
+
+**Issue**: Want to preserve worktree for debugging
+**Solutions**:
+- **Temporary**: Run workflow with `--skip-cleanup` flag
+  ```bash
+  uv run adws/adw_build_update_homeserver_task.py \
+    --adw-id abc123 \
+    --worktree-name feat-debug \
+    --task "Fix bug" \
+    --task-id task-001 \
+    --skip-cleanup
+  ```
+- **Persistent**: Set environment variable in `adws/.env`
+  ```bash
+  ADW_CLEANUP_WORKTREES=false
+  ```
+
+**Issue**: Stale worktrees preventing new task execution
+**Symptoms**: `fatal: 'trees/feat-xyz' already exists`
+**Solution**: Manually clean up stale worktrees
+```bash
+# List all worktrees
+git worktree list
+
+# Remove specific worktree
+git worktree remove trees/feat-xyz
+
+# Remove corresponding branch (if no longer needed)
+git branch -D feat/xyz
+
+# Prune stale worktree metadata
+git worktree prune
+```
+
+### Home Server Integration Issues
+
+**Issue**: Tasks not being picked up from home server
+**Symptoms**: Trigger polls but never claims tasks
+**Diagnostics**:
+1. Verify home server is accessible:
+   ```bash
+   curl -s $HOMESERVER_URL$HOMESERVER_TASKS_ENDPOINT | jq
+   ```
+2. Check task status filter (only `pending` tasks are claimed)
+3. Review trigger logs for connection errors
+
+**Issue**: Task status not updating on home server
+**Symptoms**: Tasks stuck in `claimed` or `in_progress` state
+**Diagnostics**:
+1. Check network connectivity to home server (Tailscale)
+2. Verify home server API endpoint accepts PUT requests
+3. Review `adw_id` logs for HTTP error responses
+
+### CI/CD Issues
+
+**Issue**: GitHub Actions failing with "Failed to extract API keys"
+**Symptoms**: CI fails at "Setup Supabase Local" step
+**Root Cause**: Supabase CLI output format changed between versions
+**Solution**: The `.github/scripts/setup-supabase-ci.sh` script has been updated to handle both old and new formats with fallback logic. If you still encounter issues:
+1. Check Supabase CLI version: `supabase --version`
+2. Verify JSON output: `supabase status --output json | jq`
+3. Update script if new field names are introduced
+
+### Validation Failures
+
+**Issue**: Tests passing locally but failing in CI
+**Common Causes**:
+1. **Port mismatch**: Local tests use port `54326`, CI may differ
+2. **Environment variables**: Check `.env.test` is generated correctly
+3. **Database state**: CI runs against fresh database, local may have stale data
+
+**Solution**:
+```bash
+# Reset local test database to match CI state
+bun run test:reset
+bun test
+
+# Regenerate .env.test from Supabase status
+bun run test:env
+```
+
+**Issue**: Rate limit tests failing intermittently
+**Symptoms**: Cache timing tests show flaky behavior
+**Cause**: Time-dependent assertions in tests
+**Workaround**: These are known flaky tests, rerun if failed (tracked in test comments)
+
+### Workflow Execution Issues
+
+**Issue**: Workflow exits with "No changes needed"
+**Symptoms**: Build phase completes without creating commit
+**Expected Behavior**: This is intentional when implementation is already complete or unnecessary
+**When to Investigate**: If you expected changes but none were made, review:
+1. Agent logs in `logs/kota-db-ts/<env>/<adw_id>/`
+2. Plan file requirements vs actual implementation
+3. Working tree status via `git status`
+
+**Issue**: Multiple concurrent workflows conflicting
+**Symptoms**: Git errors about locked refs or merge conflicts
+**Solution**: Worktree isolation prevents conflicts. Check:
+1. Each workflow uses unique worktree name
+2. Worktrees are created from correct base branch (`develop`)
+3. No manual git operations in worktree directories

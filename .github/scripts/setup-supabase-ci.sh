@@ -1,6 +1,12 @@
 #!/usr/bin/env bash
 # Setup Supabase Local for CI Environment
 # Starts Supabase Local services and generates .env.test for GitHub Actions
+#
+# Expected Supabase CLI output format (current):
+#   API_URL, SECRET_KEY, PUBLISHABLE_KEY, SERVICE_ROLE_KEY, DB_URL, etc.
+# Previous format (pre-v2.x):
+#   api_url, anon_key, service_role_key, db_url, etc.
+# This script handles both formats with fallback logic.
 
 set -euo pipefail
 
@@ -60,17 +66,23 @@ echo "🔧 Generating .env.test from Supabase status..."
 # Get Supabase status as JSON
 STATUS_JSON=$(supabase status --output json)
 
-# Extract values using jq
-API_URL=$(echo "$STATUS_JSON" | jq -r '.api_url // "http://localhost:54321"')
-ANON_KEY=$(echo "$STATUS_JSON" | jq -r '.anon_key // ""')
-SERVICE_KEY=$(echo "$STATUS_JSON" | jq -r '.service_role_key // ""')
-DB_URL=$(echo "$STATUS_JSON" | jq -r '.db_url // ""')
+# Extract values using jq with fallbacks for both old and new field name formats
+# New CLI format uses uppercase keys (API_URL, SECRET_KEY, PUBLISHABLE_KEY, SERVICE_ROLE_KEY)
+# Old CLI format used lowercase keys (api_url, anon_key, service_role_key)
+API_URL=$(echo "$STATUS_JSON" | jq -r '.API_URL // .api_url // "http://localhost:54321"')
+ANON_KEY=$(echo "$STATUS_JSON" | jq -r '.SECRET_KEY // .ANON_KEY // .anon_key // ""')
+SERVICE_KEY=$(echo "$STATUS_JSON" | jq -r '.SERVICE_ROLE_KEY // .service_role_key // ""')
+DB_URL=$(echo "$STATUS_JSON" | jq -r '.DB_URL // .db_url // ""')
 
 # Validate required values
 if [ -z "$ANON_KEY" ] || [ -z "$SERVICE_KEY" ]; then
     echo "❌ Error: Failed to extract API keys from Supabase status"
     echo "Status JSON:"
     echo "$STATUS_JSON"
+    echo ""
+    echo "Attempted to extract:"
+    echo "  ANON_KEY: Tried SECRET_KEY, ANON_KEY, anon_key"
+    echo "  SERVICE_KEY: Tried SERVICE_ROLE_KEY, service_role_key"
     exit 1
 fi
 
