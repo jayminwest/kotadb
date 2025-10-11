@@ -362,7 +362,7 @@ def main(
         )
 
         # Optional: Clean up worktree after successful PR creation
-        if pr_url and not skip_cleanup and os.getenv("ADW_CLEANUP_WORKTREES", "false").lower() == "true":
+        if pr_url and not skip_cleanup and os.getenv("ADW_CLEANUP_WORKTREES", "true").lower() == "true":
             cleanup_worktree(worktree_name)
 
         # Display summary table
