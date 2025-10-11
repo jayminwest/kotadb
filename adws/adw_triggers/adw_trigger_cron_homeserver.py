@@ -97,15 +97,15 @@ class HomeServerTaskManager:
             stats["errors"] += 1
             return []
 
-    def claim_task(self, task_id: str, adw_id: str) -> bool:
+    def claim_task(self, task_id: str, adw_id: str, worktree: Optional[str] = None) -> bool:
         """Claim a task by updating its status to 'claimed'."""
         try:
-            url = f"{self.base_url}{self.tasks_endpoint}/{task_id}"
+            url = f"{self.base_url}{self.tasks_endpoint}/{task_id}/claim"
             payload = {
-                "status": TaskStatus.CLAIMED.value,
                 "adw_id": adw_id,
-                "timestamp": datetime.now().isoformat(),
             }
+            if worktree:
+                payload["worktree"] = worktree
 
             response = requests.post(url, json=payload, timeout=self.timeout)
             response.raise_for_status()
@@ -315,7 +315,7 @@ class HomeServerCronTrigger:
                     continue
 
             # Claim the task
-            if not self.task_manager.claim_task(task.task_id, adw_id):
+            if not self.task_manager.claim_task(task.task_id, adw_id, worktree_name):
                 continue
 
             # Delegate to workflow

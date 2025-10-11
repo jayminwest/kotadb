@@ -75,17 +75,29 @@ def update_homeserver_task(
     try:
         home_server_url = os.getenv("HOMESERVER_URL", "https://jaymins-mac-pro.tail1b7f44.ts.net")
         tasks_endpoint = os.getenv("HOMESERVER_TASKS_ENDPOINT", "/api/kota-tasks")
-        url = f"{home_server_url}{tasks_endpoint}/{task_id}"
 
-        update = HomeServerTaskUpdate(
-            status=status,
-            adw_id=adw_id,
-            worktree=worktree,
-            commit_hash=commit_hash,
-            error=error,
-        )
+        # Map status to appropriate endpoint
+        endpoint_map = {
+            TaskStatus.IN_PROGRESS: f"{tasks_endpoint}/{task_id}/start",
+            TaskStatus.COMPLETED: f"{tasks_endpoint}/{task_id}/complete",
+            TaskStatus.FAILED: f"{tasks_endpoint}/{task_id}/fail",
+        }
 
-        response = requests.post(url, json=update.model_dump(), timeout=10)
+        if status not in endpoint_map:
+            console.print(f"[red]ERROR: Invalid status for update: {status}[/red]")
+            return False
+
+        url = f"{home_server_url}{endpoint_map[status]}"
+
+        # Build payload based on status
+        payload = {"adw_id": adw_id, "worktree": worktree}
+        if status == TaskStatus.COMPLETED and commit_hash:
+            payload["commit_hash"] = commit_hash
+            payload["result"] = {}
+        elif status == TaskStatus.FAILED and error:
+            payload["error"] = error
+
+        response = requests.post(url, json=payload, timeout=10)
         response.raise_for_status()
 
         console.print(f"[green]✓ Updated home server task {task_id} to status: {status.value}[/green]")
@@ -120,8 +132,9 @@ def main(adw_id: str, worktree_name: str, task: str, task_id: str, model: str) -
     """Execute complex plan+implement workflow for home server task."""
     print_status_panel("Starting complex workflow (plan+implement)", adw_id, worktree_name, status="info")
 
-    # Determine working directory
-    worktree_path = Path.cwd() / "trees" / worktree_name / "kota-db-ts"
+    # Determine working directory (detect repository name dynamically)
+    repo_name = Path.cwd().name
+    worktree_path = Path.cwd() / "trees" / worktree_name / repo_name
     if not worktree_path.exists():
         error_msg = f"Worktree directory not found: {worktree_path}"
         console.print(f"[red]{error_msg}[/red]")
