@@ -4,11 +4,33 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 from datetime import datetime
-from typing import List, Literal, Optional
+from enum import Enum
+from typing import Any, Dict, List, Literal, Optional
 
 from pydantic import BaseModel, Field
 
 CommandType = Literal["feature", "bug", "chore", "schema", "support"]
+
+
+class TaskStatus(str, Enum):
+    """Valid task statuses for home server tasks."""
+    PENDING = "pending"
+    CLAIMED = "claimed"
+    IN_PROGRESS = "in_progress"
+    COMPLETED = "completed"
+    FAILED = "failed"
+
+
+class WorkflowType(str, Enum):
+    """Workflow complexity types."""
+    SIMPLE = "simple"      # /build only
+    COMPLEX = "complex"    # /plan + /implement
+
+
+class ModelType(str, Enum):
+    """Claude model selection."""
+    SONNET = "sonnet"
+    OPUS = "opus"
 
 
 @dataclass(frozen=True)
@@ -193,6 +215,67 @@ class DocumentationResult(BaseModel):
     error_message: Optional[str] = None
 
 
+class HomeServerTask(BaseModel):
+    """Task fetched from home server endpoint."""
+    task_id: str = Field(..., description="Unique task identifier")
+    title: str = Field(..., description="Short task title")
+    description: str = Field(..., description="Detailed task description")
+    status: TaskStatus = Field(default=TaskStatus.PENDING)
+    priority: Optional[str] = Field(None, description="Priority level (low/medium/high)")
+    tags: Dict[str, str] = Field(default_factory=dict, description="Metadata tags")
+    worktree: Optional[str] = Field(None, description="Target worktree name")
+    model: Optional[ModelType] = Field(None, description="Preferred Claude model")
+    workflow_type: Optional[WorkflowType] = Field(None, description="Workflow complexity")
+    created_at: str = Field(..., description="ISO timestamp of creation")
+    claimed_at: Optional[str] = Field(None, description="ISO timestamp when claimed")
+    completed_at: Optional[str] = Field(None, description="ISO timestamp when completed")
+    adw_id: Optional[str] = Field(None, description="ADW execution ID")
+    result: Optional[Dict[str, Any]] = Field(None, description="Execution result data")
+    error: Optional[str] = Field(None, description="Error message if failed")
+
+    def is_eligible_for_processing(self) -> bool:
+        """Check if task can be picked up."""
+        return self.status == TaskStatus.PENDING
+
+    def get_preferred_model(self) -> ModelType:
+        """Extract model preference from tags or default to sonnet."""
+        if self.model:
+            return self.model
+        model_tag = self.tags.get("model", "sonnet")
+        return ModelType.OPUS if model_tag == "opus" else ModelType.SONNET
+
+    def should_use_full_workflow(self) -> bool:
+        """Determine if complex workflow (plan+implement) is needed."""
+        if self.workflow_type:
+            return self.workflow_type == WorkflowType.COMPLEX
+        workflow_tag = self.tags.get("workflow", "simple")
+        return workflow_tag == "complex"
+
+
+class HomeServerTaskUpdate(BaseModel):
+    """Update payload sent to home server."""
+    status: TaskStatus = Field(..., description="New task status")
+    adw_id: Optional[str] = Field(None, description="ADW execution ID")
+    worktree: Optional[str] = Field(None, description="Worktree name used")
+    commit_hash: Optional[str] = Field(None, description="Git commit hash if successful")
+    error: Optional[str] = Field(None, description="Error message if failed")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
+
+
+class HomeServerCronConfig(BaseModel):
+    """Configuration for home server cron trigger."""
+    polling_interval: int = Field(default=15, ge=1, description="Polling interval in seconds")
+    home_server_url: str = Field(..., description="Base URL of home server")
+    tasks_endpoint: str = Field(default="/api/kota-tasks", description="Tasks API endpoint")
+    dry_run: bool = Field(default=False, description="Run without making changes")
+    max_concurrent_tasks: int = Field(default=3, ge=1, description="Max parallel tasks")
+    worktree_base_path: str = Field(default="trees", description="Base path for worktrees")
+    status_filter: List[TaskStatus] = Field(
+        default=[TaskStatus.PENDING],
+        description="Task statuses to fetch"
+    )
+
+
 __all__ = [
     "AgentPromptRequest",
     "AgentPromptResponse",
@@ -207,11 +290,17 @@ __all__ = [
     "GitHubLabel",
     "GitHubMilestone",
     "GitHubUser",
+    "HomeServerCronConfig",
+    "HomeServerTask",
+    "HomeServerTaskUpdate",
     "IssueClassSlashCommand",
+    "ModelType",
     "SlashCommand",
+    "TaskStatus",
     "TestResult",
     "ReviewIssue",
     "ReviewResult",
     "DocumentationResult",
+    "WorkflowType",
     "resolve_category",
 ]
