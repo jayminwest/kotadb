@@ -13,7 +13,13 @@ import os
 import shutil
 import sys
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
+
+# Add automation directory to Python path for local imports
+automation_dir = Path(__file__).parent.parent.parent
+if str(automation_dir) not in sys.path:
+    sys.path.insert(0, str(automation_dir))
 
 from adws.adw_modules import git_ops
 from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment

@@ -8,7 +8,13 @@
 from __future__ import annotations
 
 import sys
+from pathlib import Path
 from typing import Optional
+
+# Add automation directory to Python path for local imports
+automation_dir = Path(__file__).parent.parent
+if str(automation_dir) not in sys.path:
+    sys.path.insert(0, str(automation_dir))
 
 from adws.adw_modules.orchestrators import PhaseExecutionError, run_sequence
 from adws.adw_modules.utils import load_adw_env

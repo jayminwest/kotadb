@@ -33,6 +33,9 @@ automation/adws/.env.local
 .env.adws
 .env.adws.local
 
+# trees
+automation/trees/
+
 # test infrastructure
 .test-project-name
 
