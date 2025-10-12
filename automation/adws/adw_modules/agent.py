@@ -91,16 +91,14 @@ def get_claude_env(cwd: Optional[str] = None) -> Dict[str, str]:
         env["GITHUB_PAT"] = github_pat
         env["GH_TOKEN"] = github_pat
 
-    # Enforce worktree git isolation when executing in worktree context
-    if cwd:
-        cwd_path = Path(cwd)
-        if cwd_path.exists():
-            # Force git operations to stay in worktree by setting GIT_DIR and GIT_WORK_TREE
-            env["GIT_DIR"] = f"{cwd}/.git"
-            env["GIT_WORK_TREE"] = cwd
-            print(f"Worktree isolation enabled: GIT_DIR={env['GIT_DIR']}, GIT_WORK_TREE={env['GIT_WORK_TREE']}")
-        else:
-            print(f"Warning: cwd path does not exist, skipping worktree isolation: {cwd}", file=sys.stderr)
+    # Note: Git worktrees have built-in isolation when using cwd parameter.
+    # DO NOT set GIT_DIR/GIT_WORK_TREE for worktrees - in worktrees, .git is a
+    # file (not a directory) that points to the actual git directory, so setting
+    # GIT_DIR to .git breaks git operations.
+    #
+    # The cwd parameter passed to subprocess.run() is sufficient for worktree isolation.
+    # Original issue #81 was caused by /generate_branch_name template running
+    # git checkout commands, not by lack of environment variable isolation.
 
     return {key: value for key, value in env.items() if value is not None}
 
