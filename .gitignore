@@ -36,6 +36,9 @@ automation/adws/.env.local
 # test infrastructure
 .test-project-name
 
+# trees
+automation/trees/
+
 # caches
 .eslintcache
 .cache
