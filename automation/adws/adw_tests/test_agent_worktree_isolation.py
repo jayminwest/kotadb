@@ -76,14 +76,21 @@ def test_get_claude_env_without_cwd():
 
 
 def test_get_claude_env_with_valid_cwd(temp_git_repo):
-    """Test that get_claude_env() with valid cwd sets worktree isolation env vars."""
+    """Test that get_claude_env() with valid cwd does NOT set GIT_DIR/GIT_WORK_TREE.
+
+    Per agent.py lines 94-102, worktree isolation relies on the cwd parameter
+    passed to subprocess.run(), not environment variables. Setting GIT_DIR/GIT_WORK_TREE
+    breaks git operations in worktrees because .git is a file (not a directory) that
+    points to the actual git directory.
+    """
     worktree_name = "test-isolation-worktree"
     worktree_path = create_worktree(worktree_name, "develop", base_path="trees")
 
     env = get_claude_env(cwd=str(worktree_path))
 
-    assert env["GIT_DIR"] == f"{worktree_path}/.git"
-    assert env["GIT_WORK_TREE"] == str(worktree_path)
+    # Worktree isolation relies on cwd parameter, not env vars
+    assert "GIT_DIR" not in env, "GIT_DIR should not be set for worktrees"
+    assert "GIT_WORK_TREE" not in env, "GIT_WORK_TREE should not be set for worktrees"
 
 
 def test_get_claude_env_with_nonexistent_cwd():
@@ -99,34 +106,28 @@ def test_get_claude_env_with_nonexistent_cwd():
 
 
 def test_worktree_git_isolation_prevents_root_branch_change(temp_git_repo):
-    """Test that git operations in worktree with isolation env vars don't affect root branch."""
+    """Test that git operations in worktree with cwd parameter don't affect root branch."""
     worktree_name = "test-branch-isolation"
     worktree_path = create_worktree(worktree_name, "develop", base_path="trees")
 
     # Capture root branch before worktree operations
     root_branch_before = get_current_branch(cwd=temp_git_repo)
 
-    # Get environment with worktree isolation
-    env = get_claude_env(cwd=str(worktree_path))
-
-    # Simulate git operations in worktree context with isolation env vars
+    # Simulate git operations in worktree context using cwd parameter
     # Create a test commit in the worktree
     test_file = worktree_path / "test_file.txt"
     test_file.write_text("test content")
 
-    # These git commands should operate on the worktree, not root
-    env_for_subprocess = {**subprocess.os.environ, **env}
+    # These git commands should operate on the worktree due to cwd parameter
     subprocess.run(
         ["git", "add", "test_file.txt"],
         cwd=worktree_path,
-        env=env_for_subprocess,
         check=True,
         capture_output=True,
     )
     subprocess.run(
         ["git", "commit", "-m", "Test commit in worktree"],
         cwd=worktree_path,
-        env=env_for_subprocess,
         check=True,
         capture_output=True,
     )
@@ -144,19 +145,14 @@ def test_worktree_branch_operations_isolated(temp_git_repo):
     # Capture root branch
     root_branch = get_current_branch(cwd=temp_git_repo)
 
-    # Get environment with worktree isolation
-    env = get_claude_env(cwd=str(worktree_path))
-    env_for_subprocess = {**subprocess.os.environ, **env}
-
     # Verify worktree is on its own branch
     worktree_branch = get_current_branch(cwd=worktree_path)
     assert worktree_branch == worktree_name
 
-    # Perform branch operations in worktree
+    # Perform branch operations in worktree using cwd parameter
     subprocess.run(
         ["git", "status"],
         cwd=worktree_path,
-        env=env_for_subprocess,
         check=True,
         capture_output=True,
     )
@@ -179,11 +175,8 @@ def test_multiple_concurrent_worktree_executions(temp_git_repo):
     # Capture root branch
     root_branch_before = get_current_branch(cwd=temp_git_repo)
 
-    # Simulate concurrent operations in each worktree
+    # Simulate concurrent operations in each worktree using cwd parameter
     for i, worktree_path in enumerate(worktree_paths):
-        env = get_claude_env(cwd=str(worktree_path))
-        env_for_subprocess = {**subprocess.os.environ, **env}
-
         # Create unique file in each worktree
         test_file = worktree_path / f"file_{i}.txt"
         test_file.write_text(f"content {i}")
@@ -191,14 +184,12 @@ def test_multiple_concurrent_worktree_executions(temp_git_repo):
         subprocess.run(
             ["git", "add", f"file_{i}.txt"],
             cwd=worktree_path,
-            env=env_for_subprocess,
             check=True,
             capture_output=True,
         )
         subprocess.run(
             ["git", "commit", "-m", f"Commit {i}"],
             cwd=worktree_path,
-            env=env_for_subprocess,
             check=True,
             capture_output=True,
         )
@@ -209,38 +200,31 @@ def test_multiple_concurrent_worktree_executions(temp_git_repo):
 
 
 def test_worktree_isolation_with_git_log(temp_git_repo):
-    """Test that git log in worktree with isolation shows correct commit history."""
+    """Test that git log in worktree shows correct commit history via cwd parameter."""
     worktree_name = "test-git-log"
     worktree_path = create_worktree(worktree_name, "develop", base_path="trees")
 
-    # Get environment with worktree isolation
-    env = get_claude_env(cwd=str(worktree_path))
-    env_for_subprocess = {**subprocess.os.environ, **env}
-
-    # Add a commit in worktree
+    # Add a commit in worktree using cwd parameter
     test_file = worktree_path / "log_test.txt"
     test_file.write_text("log test content")
 
     subprocess.run(
         ["git", "add", "log_test.txt"],
         cwd=worktree_path,
-        env=env_for_subprocess,
         check=True,
         capture_output=True,
     )
     subprocess.run(
         ["git", "commit", "-m", "Log test commit"],
         cwd=worktree_path,
-        env=env_for_subprocess,
         check=True,
         capture_output=True,
     )
 
-    # Run git log in worktree context
+    # Run git log in worktree context using cwd parameter
     result = subprocess.run(
         ["git", "log", "--oneline", "-n", "1"],
         cwd=worktree_path,
-        env=env_for_subprocess,
         check=True,
         capture_output=True,
         text=True,

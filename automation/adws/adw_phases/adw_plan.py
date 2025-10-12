@@ -149,6 +149,13 @@ def main() -> None:
 
     make_issue_comment(issue_number, format_issue_message(adw_id, AGENT_PLANNER, "✅ Implementation plan created"))
 
+    # Enhanced diagnostics: Log git status immediately after agent execution
+    logger.info("=" * 80)
+    logger.info("DIAGNOSTIC: Git status after agent execution")
+    status_after_agent = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
+    logger.info(f"Git status output:\n{status_after_agent.stdout if status_after_agent.stdout else '(empty)'}")
+    logger.info("=" * 80)
+
     plan_file, error = locate_plan_file(plan_response.output, adw_id, logger, cwd=str(worktree_path))
     if error or not plan_file:
         logger.error(f"Plan file resolution failed: {error}")
@@ -157,6 +164,15 @@ def main() -> None:
 
     # Check plan file existence in worktree context
     plan_file_full_path = worktree_path / plan_file
+
+    # Enhanced diagnostics: Log file paths (absolute and relative)
+    logger.info("=" * 80)
+    logger.info("DIAGNOSTIC: Plan file path information")
+    logger.info(f"  Relative path (from agent): {plan_file}")
+    logger.info(f"  Absolute path (computed): {plan_file_full_path}")
+    logger.info(f"  Worktree path: {worktree_path}")
+    logger.info(f"  File exists on disk: {plan_file_full_path.exists()}")
+
     if not plan_file_full_path.exists():
         logger.error(f"Plan file missing on disk: {plan_file_full_path}")
         make_issue_comment(
@@ -167,15 +183,39 @@ def main() -> None:
 
     logger.info(f"Plan file exists on disk: {plan_file_full_path}")
 
+    # Enhanced diagnostics: Check git ls-files for plan file
+    ls_files_result = git_ops._run_git(["ls-files", plan_file], cwd=worktree_path, check=False)
+    logger.info(f"  git ls-files output: {ls_files_result.stdout if ls_files_result.stdout else '(file not tracked)'}")
+    logger.info("=" * 80)
+
     # Verify file is tracked by git (after staging by agent)
     tracked, track_error = git_ops.verify_file_in_index(plan_file, cwd=worktree_path)
     if not tracked:
         logger.warning(f"Plan file not tracked by git, adding explicitly: {plan_file}")
         logger.warning(f"Verification error: {track_error}")
+
+        # Enhanced diagnostics: Log git status before explicit staging
+        logger.info("=" * 80)
+        logger.info("DIAGNOSTIC: Git status before explicit staging")
+        status_before_staging = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
+        logger.info(f"Git status output:\n{status_before_staging.stdout if status_before_staging.stdout else '(empty)'}")
+        logger.info("=" * 80)
+
         # Explicitly add the file
         try:
             git_ops.stage_paths([plan_file], cwd=worktree_path)
             logger.info(f"Plan file staged: {plan_file}")
+
+            # Enhanced diagnostics: Log git status after explicit staging
+            logger.info("=" * 80)
+            logger.info("DIAGNOSTIC: Git status after explicit staging")
+            status_after_staging = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
+            logger.info(f"Git status output:\n{status_after_staging.stdout if status_after_staging.stdout else '(empty)'}")
+
+            # Verify file is now tracked
+            tracked_after, _ = git_ops.verify_file_in_index(plan_file, cwd=worktree_path)
+            logger.info(f"File tracked after staging: {tracked_after}")
+            logger.info("=" * 80)
         except git_ops.GitError as exc:
             logger.error(f"Failed to stage plan file: {exc}")
             make_issue_comment(
@@ -200,13 +240,39 @@ def main() -> None:
         )
         sys.exit(1)
 
-    # Log git status before commit for debugging
+    # Enhanced diagnostics: Comprehensive git state before commit
+    logger.info("=" * 80)
+    logger.info("DIAGNOSTIC: Git state before commit attempt")
     status_result = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
-    logger.info(f"Git status before commit:\n{status_result.stdout}")
+    logger.info(f"  git status --porcelain:\n{status_result.stdout if status_result.stdout else '(empty)'}")
+
+    # Check has_changes
+    has_changes = git_ops.has_changes(cwd=worktree_path)
+    logger.info(f"  has_changes() result: {has_changes}")
+
+    # Check diff-index
+    diff_index_result = git_ops._run_git(["diff-index", "--cached", "HEAD"], cwd=worktree_path, check=False)
+    logger.info(f"  git diff-index --cached HEAD:\n{diff_index_result.stdout if diff_index_result.stdout else '(empty)'}")
+
+    # List tracked files
+    ls_files_all = git_ops._run_git(["ls-files"], cwd=worktree_path, check=False)
+    logger.info(f"  git ls-files (all tracked):\n{ls_files_all.stdout if ls_files_all.stdout else '(empty)'}")
+    logger.info("=" * 80)
 
     committed, commit_error = git_ops.commit_all(commit_message, cwd=worktree_path)
     if not committed:
         logger.error(f"Plan commit failed: {commit_error}")
+
+        # Enhanced diagnostics: Additional debug info on commit failure
+        logger.error("=" * 80)
+        logger.error("DIAGNOSTIC: Additional debug info on commit failure")
+        logger.error(f"  Commit error message: {commit_error}")
+        logger.error(f"  Worktree path exists: {worktree_path.exists()}")
+        logger.error(f"  Plan file exists: {plan_file_full_path.exists()}")
+        final_status = git_ops._run_git(["status"], cwd=worktree_path, check=False)
+        logger.error(f"  git status (full):\n{final_status.stdout}")
+        logger.error("=" * 80)
+
         make_issue_comment(
             issue_number,
             format_issue_message(adw_id, AGENT_PLANNER, f"❌ Error committing plan: {commit_error}"),

@@ -282,7 +282,7 @@ def list_worktrees() -> list[dict]:
         return []
 
     worktrees = []
-    current_worktree = {}
+    current_worktree: dict[str, str] = {}
 
     for line in result.stdout.splitlines():
         if not line.strip():

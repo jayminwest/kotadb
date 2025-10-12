@@ -11,8 +11,12 @@ import pytest
 from adws.adw_modules.git_ops import (
     GitError,
     cleanup_worktree,
+    commit_all,
     create_worktree,
+    has_changes,
     list_worktrees,
+    stage_paths,
+    verify_file_in_index,
     worktree_exists,
 )
 
@@ -285,3 +289,77 @@ def test_worktree_name_generation_uniqueness(temp_git_repo):
     # Verify all cleaned up
     for wt_name in worktrees_to_create:
         assert worktree_exists(wt_name) is False
+
+
+def test_worktree_file_staging_and_commit_cycle(temp_git_repo):
+    """Test file creation → staging → commit cycle in worktree context.
+
+    This test validates the scenario described in issue #83 where plan files
+    are created by agents in worktrees and need to be staged and committed.
+    """
+    worktree_name = "test-file-staging"
+
+    # Create worktree
+    worktree_path = create_worktree(worktree_name, "develop")
+    assert worktree_path.exists()
+
+    # Verify no changes initially
+    assert has_changes(cwd=worktree_path) is False
+
+    # Create a new file (simulating agent creating plan file)
+    test_file = worktree_path / "docs" / "specs" / "plan.md"
+    test_file.parent.mkdir(parents=True, exist_ok=True)
+    test_file.write_text("# Test Plan\n\nThis is a test plan file.")
+
+    # Verify has_changes() returns True after file creation
+    assert has_changes(cwd=worktree_path) is True, "has_changes() should return True after creating new file"
+
+    # Verify file is NOT yet tracked (before staging)
+    tracked_before, _ = verify_file_in_index("docs/specs/plan.md", cwd=worktree_path)
+    assert tracked_before is False, "File should not be tracked before staging"
+
+    # Stage the file
+    stage_paths(["docs/specs/plan.md"], cwd=worktree_path)
+
+    # Verify file is NOW tracked (after staging)
+    tracked_after, error = verify_file_in_index("docs/specs/plan.md", cwd=worktree_path)
+    assert tracked_after is True, f"File should be tracked after staging. Error: {error}"
+
+    # Verify has_changes() still returns True (staged but not committed)
+    assert has_changes(cwd=worktree_path) is True, "has_changes() should return True for staged changes"
+
+    # Commit the changes
+    committed, commit_error = commit_all("chore: add test plan file", cwd=worktree_path)
+    assert committed is True, f"Commit should succeed. Error: {commit_error}"
+
+    # Verify no changes after commit
+    assert has_changes(cwd=worktree_path) is False, "has_changes() should return False after commit"
+
+    # Verify file still exists and is tracked
+    assert test_file.exists()
+    tracked_final, _ = verify_file_in_index("docs/specs/plan.md", cwd=worktree_path)
+    assert tracked_final is True, "File should remain tracked after commit"
+
+    # Cleanup
+    cleanup_worktree(worktree_name)
+
+
+def test_worktree_commit_without_changes_fails(temp_git_repo):
+    """Test that commit_all() fails when there are no changes in worktree."""
+    worktree_name = "test-no-changes"
+
+    # Create worktree
+    worktree_path = create_worktree(worktree_name, "develop")
+    assert worktree_path.exists()
+
+    # Verify no changes
+    assert has_changes(cwd=worktree_path) is False
+
+    # Attempt to commit without changes should fail
+    committed, commit_error = commit_all("chore: empty commit", cwd=worktree_path)
+    assert committed is False, "Commit should fail when no changes exist"
+    assert commit_error is not None, "Error message should be provided"
+    assert "No changes to commit" in commit_error, f"Error should mention no changes. Got: {commit_error}"
+
+    # Cleanup
+    cleanup_worktree(worktree_name)
