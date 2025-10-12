@@ -1,6 +1,6 @@
 # /generate_branch_name
 
-Use the variables to create a Git branch following KotaDB conventions, then output the branch name.
+Generate a Git branch name following KotaDB conventions. DO NOT execute any git commands.
 
 ## Variables
 - issue_type: $1 (one of `feature`, `bug`, `chore`)
@@ -14,11 +14,10 @@ Use the variables to create a Git branch following KotaDB conventions, then outp
 - Build `concise-slug` from the issue title (3–6 lowercase words, hyphen separated, alphanumeric only).
 - Ensure the branch name is ≤ 80 characters and branches originate from `develop` (flow: `feat/|bug/|chore/` → `develop` → `main`).
 
-## Run
-1. `git fetch --all --prune`
-2. `git checkout develop`
-3. `git pull origin develop`
-4. `git checkout -b <branch_name>`
+## Important
+- DO NOT run any git commands (git checkout, git fetch, git pull, etc.)
+- Only generate and return the branch name
+- The worktree-based workflow will create the actual branch
 
 ## Report
 Return only the branch name.
