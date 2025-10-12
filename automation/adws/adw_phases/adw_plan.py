@@ -132,7 +132,7 @@ def main() -> None:
         make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Error creating worktree: {exc}"))
         sys.exit(1)
 
-    plan_response = build_plan(issue, issue_command, adw_id, logger)
+    plan_response = build_plan(issue, issue_command, adw_id, logger, cwd=str(worktree_path))
     if not plan_response.success:
         logger.error(f"Plan generation failed: {plan_response.output}")
         make_issue_comment(
@@ -143,14 +143,16 @@ def main() -> None:
 
     make_issue_comment(issue_number, format_issue_message(adw_id, AGENT_PLANNER, "✅ Implementation plan created"))
 
-    plan_file, error = locate_plan_file(plan_response.output, adw_id, logger)
+    plan_file, error = locate_plan_file(plan_response.output, adw_id, logger, cwd=str(worktree_path))
     if error or not plan_file:
         logger.error(f"Plan file resolution failed: {error}")
         make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Error locating plan file: {error}"))
         sys.exit(1)
 
-    if not os.path.exists(plan_file):
-        logger.error(f"Plan file missing on disk: {plan_file}")
+    # Check plan file existence in worktree context
+    plan_file_full_path = worktree_path / plan_file
+    if not plan_file_full_path.exists():
+        logger.error(f"Plan file missing on disk: {plan_file_full_path}")
         make_issue_comment(
             issue_number,
             format_issue_message(adw_id, "ops", f"❌ Plan file missing on disk: {plan_file}"),
@@ -164,7 +166,7 @@ def main() -> None:
         format_issue_message(adw_id, "ops", f"✅ Plan file created: {plan_file}"),
     )
 
-    commit_message, error = create_commit_message(AGENT_PLANNER, issue, issue_command, adw_id, logger)
+    commit_message, error = create_commit_message(AGENT_PLANNER, issue, issue_command, adw_id, logger, cwd=str(worktree_path))
     if error or not commit_message:
         logger.error(f"Plan commit message failure: {error}")
         make_issue_comment(
@@ -202,7 +204,7 @@ def main() -> None:
 
     pr_created = False
     if pushed:
-        pr_url, pr_error = create_pull_request(worktree_name, issue, plan_file, adw_id, logger)
+        pr_url, pr_error = create_pull_request(worktree_name, issue, plan_file, adw_id, logger, cwd=str(worktree_path))
         if pr_error:
             logger.error(f"Pull request creation failed: {pr_error}")
             make_issue_comment(

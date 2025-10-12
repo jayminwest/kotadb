@@ -182,7 +182,7 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
                 stderr=subprocess.PIPE,
                 text=True,
                 env=env,
-                cwd=project_root(),
+                cwd=request.cwd or project_root(),
             )
     except subprocess.TimeoutExpired:
         error = "Error: Claude Code command timed out"
@@ -230,6 +230,7 @@ def execute_template(request: AgentTemplateRequest) -> AgentPromptResponse:
         dangerously_skip_permissions=True,
         output_file=str(output_file),
         slash_command=request.slash_command,
+        cwd=request.cwd,
     )
     return prompt_claude_code(prompt_request)
 

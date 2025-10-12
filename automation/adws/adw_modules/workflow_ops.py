@@ -187,7 +187,7 @@ def generate_worktree_name(issue_class: str, issue_number: str, adw_id: str) -> 
     return f"{clean_class}-{issue_number}-{adw_short}"
 
 
-def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Logger) -> AgentPromptResponse:
+def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Logger, cwd: Optional[str] = None) -> AgentPromptResponse:
     """Generate an implementation plan using the planner agent."""
 
     request = AgentTemplateRequest(
@@ -196,6 +196,7 @@ def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Lo
         args=[f"{issue.title}: {issue.body}"],
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"build_plan request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
@@ -203,7 +204,7 @@ def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Lo
     return response
 
 
-def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger) -> Tuple[Optional[str], Optional[str]]:
+def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger, cwd: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
     """Use the plan finder agent to convert planner output into a concrete file path."""
 
     request = AgentTemplateRequest(
@@ -212,6 +213,7 @@ def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger) -> T
         args=[plan_output],
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"locate_plan_file request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
@@ -220,7 +222,14 @@ def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger) -> T
     if not response.success:
         return None, response.output
 
+    # Extract path from response, handling markdown code blocks
     plan_path = response.output.strip()
+
+    # Try to extract from markdown code blocks (```path```)
+    code_block_match = re.search(r'```\s*([^\n`]+)\s*```', plan_path)
+    if code_block_match:
+        plan_path = code_block_match.group(1).strip()
+
     if plan_path == "0":
         return None, "No plan file returned"
     if "/" not in plan_path:
@@ -228,7 +237,7 @@ def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger) -> T
     return plan_path, None
 
 
-def implement_plan(plan_file: str, adw_id: str, logger: logging.Logger, agent_name: str | None = None) -> AgentPromptResponse:
+def implement_plan(plan_file: str, adw_id: str, logger: logging.Logger, agent_name: str | None = None, cwd: Optional[str] = None) -> AgentPromptResponse:
     """Run the implementor agent against the generated plan."""
 
     request = AgentTemplateRequest(
@@ -237,6 +246,7 @@ def implement_plan(plan_file: str, adw_id: str, logger: logging.Logger, agent_na
         args=[plan_file],
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"implement_plan request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
@@ -250,6 +260,7 @@ def create_commit_message(
     issue_class: IssueClassSlashCommand,
     adw_id: str,
     logger: logging.Logger,
+    cwd: Optional[str] = None,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Ask Claude to draft a commit message tailored to the current phase."""
 
@@ -259,6 +270,7 @@ def create_commit_message(
         args=[agent_name, issue_class.replace("/", ""), minimal_issue_payload(issue)],
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"create_commit_message request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
@@ -279,6 +291,7 @@ def create_pull_request(
     plan_file: str,
     adw_id: str,
     logger: logging.Logger,
+    cwd: Optional[str] = None,
 ) -> Tuple[Optional[str], Optional[str]]:
     """Ask Claude to create a pull request summary for the work."""
 
@@ -288,6 +301,7 @@ def create_pull_request(
         args=[branch_name, minimal_issue_payload(issue), plan_file, adw_id],
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"create_pull_request request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
@@ -360,7 +374,7 @@ def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
     return None
 
 
-def run_review(spec_file: str, adw_id: str, logger: logging.Logger) -> Tuple[Optional[ReviewResult], Optional[str]]:
+def run_review(spec_file: str, adw_id: str, logger: logging.Logger, cwd: Optional[str] = None) -> Tuple[Optional[ReviewResult], Optional[str]]:
     """Execute the reviewer agent against the provided spec file."""
 
     request = AgentTemplateRequest(
@@ -369,15 +383,13 @@ def run_review(spec_file: str, adw_id: str, logger: logging.Logger) -> Tuple[Opt
         args=[adw_id, spec_file, AGENT_REVIEWER],
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"review request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
     logger.debug(f"review response: {response.model_dump_json(indent=2)}")
 
     if not response.success:
-        if command == "/document":
-            logger.info("Retrying documentation with /docs-update")
-            return document_changes(issue, adw_id, logger, command="/docs-update")
         return None, response.output
 
     try:
@@ -408,6 +420,7 @@ def create_and_implement_patch(
     agent_name_planner: str = AGENT_PATCHER,
     agent_name_implementor: str = AGENT_IMPLEMENTOR,
     spec_path: Optional[str] = None,
+    cwd: Optional[str] = None,
 ) -> Tuple[Optional[str], AgentPromptResponse]:
     """Create a patch plan using the patch agent and immediately implement it."""
 
@@ -421,6 +434,7 @@ def create_and_implement_patch(
         args=args,
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"patch plan request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
@@ -433,7 +447,7 @@ def create_and_implement_patch(
     if not patch_file:
         return None, AgentPromptResponse(output="Patch agent returned empty path", success=False)
 
-    implement_response = implement_plan(patch_file, adw_id, logger, agent_name_implementor)
+    implement_response = implement_plan(patch_file, adw_id, logger, agent_name_implementor, cwd=cwd)
     return patch_file, implement_response
 
 
@@ -442,6 +456,7 @@ def document_changes(
     adw_id: str,
     logger: logging.Logger,
     command: str = "/document",
+    cwd: Optional[str] = None,
 ) -> Tuple[Optional[DocumentationResult], Optional[str]]:
     """Invoke the documenter agent to produce documentation updates."""
 
@@ -451,12 +466,16 @@ def document_changes(
         args=[issue.model_dump_json(by_alias=True), adw_id],
         adw_id=adw_id,
         model="sonnet",
+        cwd=cwd,
     )
     logger.debug(f"documentation request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
     logger.debug(f"documentation response: {response.model_dump_json(indent=2)}")
 
     if not response.success:
+        if command == "/document":
+            logger.info("Retrying documentation with /docs-update")
+            return document_changes(issue, adw_id, logger, command="/docs-update", cwd=cwd)
         return None, response.output
 
     try:

@@ -150,6 +150,7 @@ class AgentPromptRequest(BaseModel):
     dangerously_skip_permissions: bool = False
     output_file: str
     slash_command: Optional[str] = None
+    cwd: Optional[str] = None
 
 
 class AgentPromptResponse(BaseModel):
@@ -164,6 +165,7 @@ class AgentTemplateRequest(BaseModel):
     args: List[str]
     adw_id: str
     model: Literal["sonnet", "opus"] = "sonnet"
+    cwd: Optional[str] = None
 
 
 class ClaudeCodeResultMessage(BaseModel):

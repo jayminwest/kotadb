@@ -123,7 +123,7 @@ def main() -> None:
 
     make_issue_comment(issue_number, format_issue_message(adw_id, "ops", "✅ Starting implementation phase"))
 
-    implement_response = implement_plan(plan_file, adw_id, logger)
+    implement_response = implement_plan(plan_file, adw_id, logger, cwd=str(worktree_path))
     if not implement_response.success:
         logger.error(f"Implementation failed: {implement_response.output}")
         make_issue_comment(
@@ -169,7 +169,7 @@ def main() -> None:
         logger.info("Build phase completed successfully (no changes needed)")
         return
 
-    commit_message, error = create_commit_message(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger)
+    commit_message, error = create_commit_message(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger, cwd=str(worktree_path))
     if error or not commit_message:
         logger.error(f"Implementation commit message failure: {error}")
         make_issue_comment(
@@ -206,7 +206,7 @@ def main() -> None:
         )
 
     if pushed and state.plan_file:
-        pr_url, pr_error = create_pull_request(state.worktree_name, issue, state.plan_file, adw_id, logger)
+        pr_url, pr_error = create_pull_request(state.worktree_name, issue, state.plan_file, adw_id, logger, cwd=str(worktree_path))
         if pr_error:
             logger.error(f"Pull request update failed: {pr_error}")
             make_issue_comment(
