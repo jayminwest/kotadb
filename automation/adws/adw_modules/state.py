@@ -37,6 +37,9 @@ class ADWState:
     branch_name: Optional[str] = None
     plan_file: Optional[str] = None
     issue_class: Optional[str] = None
+    worktree_name: Optional[str] = None
+    worktree_path: Optional[str] = None
+    worktree_created_at: Optional[str] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -54,6 +57,9 @@ class ADWState:
             "branch_name": self.branch_name,
             "plan_file": self.plan_file,
             "issue_class": self.issue_class,
+            "worktree_name": self.worktree_name,
+            "worktree_path": self.worktree_path,
+            "worktree_created_at": self.worktree_created_at,
         }
         payload.update(self.extra)
         return {key: value for key, value in payload.items() if value is not None}
@@ -76,7 +82,7 @@ class ADWState:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
 
-        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class"}}
+        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at"}}
 
         return cls(
             adw_id=data.get("adw_id", adw_id),
@@ -84,6 +90,9 @@ class ADWState:
             branch_name=data.get("branch_name"),
             plan_file=data.get("plan_file"),
             issue_class=data.get("issue_class"),
+            worktree_name=data.get("worktree_name"),
+            worktree_path=data.get("worktree_path"),
+            worktree_created_at=data.get("worktree_created_at"),
             extra=extra,
         )
 

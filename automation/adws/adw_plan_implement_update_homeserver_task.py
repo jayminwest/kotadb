@@ -31,6 +31,7 @@ from rich.table import Table
 # Add parent directory to path for module imports
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
+from adws.adw_modules import git_ops
 from adws.adw_modules.agent import execute_template
 from adws.adw_modules.data_types import (
     AgentTemplateRequest,
@@ -200,46 +201,6 @@ def push_and_create_pr(
         return None
 
 
-def cleanup_worktree(
-    worktree_name: str,
-    worktree_base_path: str = "trees",
-) -> bool:
-    """Remove worktree and delete local branch.
-
-    Returns:
-        True if cleanup successful, False otherwise
-    """
-    try:
-        console.print(f"[cyan]🧹 Cleaning up worktree {worktree_name}...[/cyan]")
-
-        # Remove worktree
-        result = subprocess.run(
-            ["git", "worktree", "remove", f"{worktree_base_path}/{worktree_name}", "--force"],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode != 0:
-            console.print(f"[yellow]WARN: Failed to remove worktree: {result.stderr}[/yellow]")
-
-        # Delete local branch
-        result = subprocess.run(
-            ["git", "branch", "-D", worktree_name],
-            capture_output=True,
-            text=True,
-        )
-
-        if result.returncode != 0:
-            console.print(f"[yellow]WARN: Failed to delete branch: {result.stderr}[/yellow]")
-
-        console.print("[green]✓ Worktree cleanup complete[/green]")
-        return True
-
-    except Exception as e:
-        console.print(f"[red]ERROR: Cleanup failed: {e}[/red]")
-        return False
-
-
 @click.command()
 @click.option("--adw-id", required=True, help="ADW execution ID")
 @click.option("--worktree-name", required=True, help="Worktree name")
@@ -363,7 +324,12 @@ def main(
 
         # Optional: Clean up worktree after successful PR creation
         if pr_url and not skip_cleanup and os.getenv("ADW_CLEANUP_WORKTREES", "true").lower() == "true":
-            cleanup_worktree(worktree_name)
+            console.print(f"[cyan]🧹 Cleaning up worktree {worktree_name}...[/cyan]")
+            cleanup_success = git_ops.cleanup_worktree(worktree_name, base_path="trees", delete_branch=True)
+            if cleanup_success:
+                console.print("[green]✓ Worktree cleanup complete[/green]")
+            else:
+                console.print(f"[yellow]WARN: Worktree cleanup incomplete[/yellow]")
 
         # Display summary table
         summary_table = Table(show_header=True, box=None)

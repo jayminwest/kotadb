@@ -4,7 +4,8 @@ Synchronise documentation with recent code changes. Provide related PR/issue ide
 
 ## Git Prep
 - `git fetch --all --prune`, `git pull --rebase`, update `develop`, and ensure a clean tree (`git status --short`).
-- Create/checkout doc branch if needed (e.g., `docs/<issue>-update`), remembering documentation work still flows `docs/…` → `develop` → `main`.
+- If you're not on the feature branch, create/checkout doc branch if needed (e.g., `docs/<issue>-update`), remembering documentation work still flows `docs/…` → `develop` → `main`.
+- If you're already on the feature branch, make docs updates directly in the open PR. DO NOT CREATE A NEW docs/ branch if there is already a feature branch open. 
 
 ## Diff Analysis
 - Review `git diff` for merged changes impacting docs.

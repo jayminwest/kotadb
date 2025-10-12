@@ -16,7 +16,6 @@ from pathlib import Path
 from typing import Optional
 
 from adws.adw_modules import git_ops
-from adws.adw_modules.git_ops import GitError
 from adws.adw_modules.github import (
     extract_repo_path,
     fetch_issue,
@@ -24,7 +23,6 @@ from adws.adw_modules.github import (
     get_repo_url,
     make_issue_comment,
 )
-from adws.adw_modules.state import ADWState
 from adws.adw_modules.utils import load_adw_env
 from adws.adw_modules.workflow_ops import (
     AGENT_IMPLEMENTOR,
@@ -33,7 +31,6 @@ from adws.adw_modules.workflow_ops import (
     create_pull_request,
     ensure_state,
     format_issue_message,
-    generate_branch_name,
     implement_plan,
     persist_issue_snapshot,
     start_logger,
@@ -115,37 +112,30 @@ def main() -> None:
         else:
             logger.warning(f"Issue classification unavailable: {error}")
 
-    if not state.branch_name:
-        if not state.issue_class:
-            state.update(issue_class="/feature")
-        branch_name, error = generate_branch_name(issue, state.issue_class or "/feature", adw_id, logger)
-        if error or not branch_name:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Unable to generate branch for patch: {error}"),
-            )
-            sys.exit(1)
-        success, git_error = git_ops.create_branch(branch_name)
-        if not success:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Unable to create patch branch: {git_error}"),
-            )
-            sys.exit(1)
-        state.update(branch_name=branch_name)
-        state.save()
-    else:
-        branch_name = state.branch_name
-
-    try:
-        git_ops.checkout_branch(branch_name, create=False)
-    except GitError as exc:
-        logger.error(f"Failed to checkout branch {branch_name}: {exc}")
+    # Load worktree metadata from state
+    if not state.worktree_name or not state.worktree_path:
+        logger.error("No worktree information in state. Run plan/build phase before patch.")
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Unable to checkout patch branch: {exc}"),
+            format_issue_message(adw_id, "ops", "❌ Patch blocked: missing worktree information. Run planning first."),
         )
         sys.exit(1)
+
+    # Verify worktree exists
+    worktree_path = Path(state.worktree_path)
+    if not worktree_path.exists():
+        logger.error(f"Worktree not found at: {worktree_path}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
+        )
+        sys.exit(1)
+
+    logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, "ops", f"✅ Working in isolated worktree: {state.worktree_name}"),
+    )
 
     patch_dir = state.base_dir / "patch_requests"
     patch_dir.mkdir(parents=True, exist_ok=True)
@@ -166,7 +156,7 @@ def main() -> None:
         sys.exit(1)
 
     # Check if there are any changes to commit
-    has_changes = not git_ops.ensure_clean_worktree()
+    has_changes = not git_ops.ensure_clean_worktree(cwd=worktree_path)
 
     if not has_changes:
         logger.info("No changes detected - patch already applied or no modifications needed")
@@ -190,7 +180,7 @@ def main() -> None:
             )
             sys.exit(1)
 
-        committed, git_error = git_ops.commit_all(commit_message)
+        committed, git_error = git_ops.commit_all(commit_message, cwd=worktree_path)
         if not committed:
             make_issue_comment(
                 issue_number,
@@ -198,7 +188,7 @@ def main() -> None:
             )
             sys.exit(1)
 
-    pushed, push_error = git_ops.push_branch(branch_name)
+    pushed, push_error = git_ops.push_branch(state.worktree_name, cwd=worktree_path)
     if not pushed:
         make_issue_comment(
             issue_number,
@@ -207,10 +197,10 @@ def main() -> None:
     else:
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {branch_name}"),
+            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {state.worktree_name}"),
         )
         if state.plan_file:
-            pr_url, pr_error = create_pull_request(branch_name, issue, state.plan_file, adw_id, logger)
+            pr_url, pr_error = create_pull_request(state.worktree_name, issue, state.plan_file, adw_id, logger)
             if pr_error:
                 make_issue_comment(
                     issue_number,

@@ -48,3 +48,6 @@ __pycache__/
 # Finder (MacOS) folder config
 .DS_Store
 .adw_logs/
+
+# .mcp.json for Claude Code MCP integration
+.mcp.json

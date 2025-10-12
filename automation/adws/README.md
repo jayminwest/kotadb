@@ -15,7 +15,7 @@ adws/
 ├── adw_modules/          # Shared core (agents, state, git, workflows)
 │   ├── agent.py          # Claude CLI execution wrapper
 │   ├── data_types.py     # Pydantic models + command enumerations
-│   ├── git_ops.py        # git checkout/commit/push helpers
+│   ├── git_ops.py        # git checkout/commit/push + worktree management
 │   ├── github.py         # gh CLI accessors, bot annotations
 │   ├── orchestrators.py  # Composite phase runner utilities
 │   ├── state.py          # Persistent ADW state management
@@ -263,24 +263,44 @@ The system automatically routes tasks to appropriate workflows:
 
 ### Worktree Management
 
-Each task runs in an isolated git worktree at `trees/{worktree_name}/`:
-- Worktree names are auto-generated from task titles if not provided
-- Multiple tasks can run concurrently in separate worktrees
-- Worktrees are created automatically from the `develop` branch
-- Each worktree has its own working directory, preventing conflicts
+All ADW workflows (GitHub issue and home server) execute in isolated git worktrees to prevent conflicts during concurrent execution and local development.
+
+**Centralized Management** (`adw_modules/git_ops.py`):
+- `create_worktree()` - Creates isolated worktrees from base branch
+- `cleanup_worktree()` - Removes worktrees and optionally deletes branches
+- `list_worktrees()` - Lists all active worktrees
+- `worktree_exists()` - Checks worktree existence before operations
+
+**Naming Convention**:
+- GitHub workflows: `{issue_class}-{issue_number}-{adw_id[:8]}`
+- Home server workflows: Auto-generated from task title or explicit via `--worktree-name`
+- ADW ID component ensures uniqueness for concurrent executions
+
+**Lifecycle**:
+- Created: Before agent execution (plan phase for GitHub, trigger for home server)
+- Used: All subsequent phase scripts load worktree path from state
+- Cleaned up: Automatically after successful PR creation (configurable)
+
+**Configuration**:
+- `ADW_CLEANUP_WORKTREES=true` - Automatic cleanup after PR (default: true)
+- `ADW_CLEANUP_ON_FAILURE=false` - Cleanup on workflow failure (default: false, useful for debugging)
+- `ADW_WORKTREE_BASE_PATH=trees` - Base directory for worktrees (default: trees)
+- `--skip-cleanup` CLI flag - Preserve worktree for manual inspection
 
 Example worktree structure:
 ```
 kota-db-ts/
 ├── .git/                  # Shared git repository
 ├── trees/
+│   ├── feat-65-b83b443a/
+│   │   └── kota-db-ts/    # GitHub issue #65 worktree
 │   ├── feat-rate-limiting/
-│   │   └── kota-db-ts/    # Isolated working directory
+│   │   └── kota-db-ts/    # Home server task worktree
 │   └── bug-auth-fix/
 │       └── kota-db-ts/    # Another isolated working directory
 └── agents/
-    ├── abc123/            # ADW execution artifacts
-    └── def456/
+    ├── b83b443a/          # ADW execution artifacts for issue #65
+    └── abc123/            # ADW execution artifacts for home server task
 ```
 
 ### Model Selection
@@ -388,15 +408,20 @@ Example output:
 ### Worktree Management Issues
 
 **Issue**: Worktrees not being cleaned up after PR creation
-**Symptoms**: `trees/` directory accumulates subdirectories like `trees/feat-issue-47-29d2a677/`
+**Symptoms**: `trees/` directory accumulates subdirectories like `trees/feat-65-b83b443a/`
 **Solution**:
 1. Check `ADW_CLEANUP_WORKTREES` setting in `adws/.env` (default: `true`)
 2. Verify the PR creation was successful (cleanup only runs after successful PR)
 3. Check for `--skip-cleanup` flag in workflow invocation
+4. Review cleanup logs in `logs/kota-db-ts/<env>/<adw_id>/`
 
 **Issue**: Want to preserve worktree for debugging
 **Solutions**:
-- **Temporary**: Run workflow with `--skip-cleanup` flag
+- **Temporary (GitHub workflows)**: Run plan phase with `--skip-cleanup` flag
+  ```bash
+  uv run adws/adw_phases/adw_plan.py 123 --skip-cleanup
+  ```
+- **Temporary (Home server workflows)**: Run workflow with `--skip-cleanup` flag
   ```bash
   uv run adws/adw_build_update_homeserver_task.py \
     --adw-id abc123 \
@@ -409,23 +434,41 @@ Example output:
   ```bash
   ADW_CLEANUP_WORKTREES=false
   ```
+- **Debugging failures**: Enable cleanup on failure
+  ```bash
+  ADW_CLEANUP_ON_FAILURE=true  # Default: false (preserves worktree for inspection)
+  ```
 
 **Issue**: Stale worktrees preventing new task execution
-**Symptoms**: `fatal: 'trees/feat-xyz' already exists`
-**Solution**: Manually clean up stale worktrees
+**Symptoms**: `fatal: 'trees/feat-xyz' already exists` or `fatal: 'feat-xyz' is already checked out`
+**Solution**: Manually clean up stale worktrees using centralized function or git commands
 ```bash
+# Option 1: Use centralized cleanup function (recommended)
+# From Python script or interactive shell:
+from adw_modules.git_ops import cleanup_worktree
+cleanup_worktree(worktree_name="feat-xyz", base_path="trees", delete_branch=True)
+
+# Option 2: Manual git commands
 # List all worktrees
 git worktree list
 
-# Remove specific worktree
-git worktree remove trees/feat-xyz
+# Remove specific worktree (force flag handles uncommitted changes)
+git worktree remove trees/feat-xyz --force
 
 # Remove corresponding branch (if no longer needed)
-git branch -D feat/xyz
+git branch -D feat-xyz
 
 # Prune stale worktree metadata
 git worktree prune
 ```
+
+**Issue**: Concurrent workflows conflict on git operations
+**Symptoms**: `fatal: Unable to create '.git/index.lock': File exists` or merge conflicts
+**Solution**:
+1. Verify each workflow uses unique worktree name (ADW ID ensures uniqueness)
+2. Check worktree names with `git worktree list`
+3. Ensure no manual git operations in worktree directories during agent execution
+4. Review state files to confirm worktree isolation: `cat agents/<adw_id>/adw_state.json`
 
 ### Home Server Integration Issues
 

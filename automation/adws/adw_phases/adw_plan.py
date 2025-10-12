@@ -12,11 +12,12 @@ import logging
 import os
 import shutil
 import sys
+from datetime import datetime
 from typing import Optional
 
 from adws.adw_modules import git_ops
 from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
-from adws.adw_modules.utils import load_adw_env
+from adws.adw_modules.utils import load_adw_env, resolve_worktree_path
 from adws.adw_modules.workflow_ops import (
     AGENT_PLANNER,
     build_plan,
@@ -26,6 +27,7 @@ from adws.adw_modules.workflow_ops import (
     ensure_state,
     format_issue_message,
     generate_branch_name,
+    generate_worktree_name,
     locate_plan_file,
     persist_issue_snapshot,
     start_logger,
@@ -102,18 +104,33 @@ def main() -> None:
         make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Error generating branch: {error}"))
         sys.exit(1)
 
-    success, git_error = git_ops.create_branch(branch_name)
-    if not success:
-        logger.error(f"Branch creation failed: {git_error}")
-        make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Error creating branch: {git_error}"))
-        sys.exit(1)
+    # Generate worktree name
+    worktree_base_path = os.getenv("ADW_WORKTREE_BASE_PATH", "trees")
+    worktree_name = generate_worktree_name(issue_command, issue_number, adw_id)
+    logger.info(f"Generated worktree name: {worktree_name}")
 
-    state.update(branch_name=branch_name)
-    state.save()
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", f"✅ Working on branch: {branch_name}"),
-    )
+    # Create worktree with isolated branch
+    try:
+        worktree_path = git_ops.create_worktree(worktree_name, "develop", base_path=worktree_base_path)
+        logger.info(f"Created worktree at: {worktree_path}")
+
+        # Store worktree metadata in state
+        state.update(
+            branch_name=worktree_name,  # The worktree creates its own branch
+            worktree_name=worktree_name,
+            worktree_path=str(worktree_path),
+            worktree_created_at=datetime.now().isoformat(),
+        )
+        state.save()
+
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"✅ Created isolated worktree: {worktree_name}"),
+        )
+    except git_ops.GitError as exc:
+        logger.error(f"Worktree creation failed: {exc}")
+        make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Error creating worktree: {exc}"))
+        sys.exit(1)
 
     plan_response = build_plan(issue, issue_command, adw_id, logger)
     if not plan_response.success:
@@ -156,7 +173,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    committed, commit_error = git_ops.commit_all(commit_message)
+    committed, commit_error = git_ops.commit_all(commit_message, cwd=worktree_path)
     if not committed:
         logger.error(f"Plan commit failed: {commit_error}")
         make_issue_comment(
@@ -170,7 +187,7 @@ def main() -> None:
         format_issue_message(adw_id, AGENT_PLANNER, "✅ Plan committed"),
     )
 
-    pushed, push_error = git_ops.push_branch(branch_name)
+    pushed, push_error = git_ops.push_branch(worktree_name, cwd=worktree_path)
     if not pushed:
         logger.error(f"Branch push failed: {push_error}")
         make_issue_comment(
@@ -180,11 +197,12 @@ def main() -> None:
     else:
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {branch_name}"),
+            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {worktree_name}"),
         )
 
+    pr_created = False
     if pushed:
-        pr_url, pr_error = create_pull_request(branch_name, issue, plan_file, adw_id, logger)
+        pr_url, pr_error = create_pull_request(worktree_name, issue, plan_file, adw_id, logger)
         if pr_error:
             logger.error(f"Pull request creation failed: {pr_error}")
             make_issue_comment(
@@ -195,6 +213,25 @@ def main() -> None:
             make_issue_comment(
                 issue_number,
                 format_issue_message(adw_id, "ops", f"✅ Pull request created: {pr_url}"),
+            )
+            pr_created = True
+
+    # Cleanup worktree after successful PR creation (respects ADW_CLEANUP_WORKTREES env var)
+    cleanup_enabled = os.getenv("ADW_CLEANUP_WORKTREES", "true").lower() == "true"
+    if pr_created and cleanup_enabled:
+        logger.info(f"Cleaning up worktree: {worktree_name}")
+        cleanup_success = git_ops.cleanup_worktree(worktree_name, base_path=worktree_base_path, delete_branch=False)
+        if cleanup_success:
+            logger.info("Worktree cleanup completed")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", "✅ Worktree cleaned up"),
+            )
+        else:
+            logger.warning(f"Worktree cleanup failed, manual cleanup may be required: trees/{worktree_name}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"⚠️ Worktree cleanup incomplete: trees/{worktree_name}"),
             )
 
     state.save()

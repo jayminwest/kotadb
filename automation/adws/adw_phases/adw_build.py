@@ -12,13 +12,14 @@ import logging
 import os
 import shutil
 import sys
+from pathlib import Path
 from typing import Optional
 
 from adws.adw_modules import git_ops
 from adws.adw_modules.git_ops import GitError
 from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
 from adws.adw_modules.state import ADWState, StateNotFoundError
-from adws.adw_modules.utils import load_adw_env
+from adws.adw_modules.utils import load_adw_env, resolve_worktree_path
 from adws.adw_modules.workflow_ops import (
     AGENT_IMPLEMENTOR,
     classify_issue,
@@ -82,13 +83,30 @@ def main() -> None:
         logger.error(f"Unable to resolve repository: {exc}")
         sys.exit(1)
 
-    if not state.branch_name:
-        logger.error("No branch name in state. Run adws/adw_plan.py first.")
+    # Load worktree metadata from state
+    if not state.worktree_name or not state.worktree_path:
+        logger.error("No worktree information in state. Run adws/adw_plan.py first.")
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "ops", "❌ Missing branch information. Run planning first."),
+            format_issue_message(adw_id, "ops", "❌ Missing worktree information. Run planning first."),
         )
         sys.exit(1)
+
+    # Verify worktree exists
+    worktree_path = Path(state.worktree_path)
+    if not worktree_path.exists():
+        logger.error(f"Worktree not found at: {worktree_path}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
+        )
+        sys.exit(1)
+
+    logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
+    make_issue_comment(
+        issue_number,
+        format_issue_message(adw_id, "ops", f"✅ Working in isolated worktree: {state.worktree_name}"),
+    )
 
     plan_file = ensure_plan_exists(state, issue_number)
     if not os.path.exists(plan_file):
@@ -98,17 +116,6 @@ def main() -> None:
             format_issue_message(adw_id, "ops", f"❌ Plan file missing: {plan_file}"),
         )
         sys.exit(1)
-
-    try:
-        git_ops.checkout_branch(state.branch_name, create=False)
-    except GitError as exc:
-        logger.error(f"Failed to checkout branch {state.branch_name}: {exc}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Failed to checkout branch {state.branch_name}: {exc}"),
-        )
-        sys.exit(1)
-    logger.info(f"Checked out branch {state.branch_name}")
 
     issue = fetch_issue(issue_number, repo_path)
     persist_issue_snapshot(state, issue)
@@ -141,7 +148,7 @@ def main() -> None:
             state.save()
 
     # Check if there are any changes to commit
-    has_changes = not git_ops.ensure_clean_worktree()
+    has_changes = not git_ops.ensure_clean_worktree(cwd=worktree_path)
 
     if not has_changes:
         logger.info("No changes detected - implementation already complete or no modifications needed")
@@ -171,7 +178,7 @@ def main() -> None:
         )
         sys.exit(1)
 
-    committed, commit_error = git_ops.commit_all(commit_message)
+    committed, commit_error = git_ops.commit_all(commit_message, cwd=worktree_path)
     if not committed:
         logger.error(f"Implementation commit failed: {commit_error}")
         make_issue_comment(
@@ -185,7 +192,7 @@ def main() -> None:
         format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed"),
     )
 
-    pushed, push_error = git_ops.push_branch(state.branch_name)
+    pushed, push_error = git_ops.push_branch(state.worktree_name, cwd=worktree_path)
     if not pushed:
         logger.error(f"Branch push failed: {push_error}")
         make_issue_comment(
@@ -195,11 +202,11 @@ def main() -> None:
     else:
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {state.branch_name}"),
+            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {state.worktree_name}"),
         )
 
     if pushed and state.plan_file:
-        pr_url, pr_error = create_pull_request(state.branch_name, issue, state.plan_file, adw_id, logger)
+        pr_url, pr_error = create_pull_request(state.worktree_name, issue, state.plan_file, adw_id, logger)
         if pr_error:
             logger.error(f"Pull request update failed: {pr_error}")
             make_issue_comment(

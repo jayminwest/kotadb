@@ -12,13 +12,14 @@ import logging
 import os
 import shutil
 import sys
+from pathlib import Path
 from typing import Optional
 
 from adws.adw_modules import git_ops
 from adws.adw_modules.git_ops import GitError
 from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
 from adws.adw_modules.state import ADWState, StateNotFoundError
-from adws.adw_modules.utils import load_adw_env
+from adws.adw_modules.utils import load_adw_env, resolve_worktree_path
 from adws.adw_modules.workflow_ops import (
     AGENT_REVIEWER,
     find_spec_file,
@@ -82,27 +83,26 @@ def main() -> None:
         logger.error(f"Unable to resolve repository: {exc}")
         sys.exit(1)
 
-    if not state.branch_name:
-        logger.error("No branch name stored in state. Run build phase before review.")
+    # Load worktree metadata from state
+    if not state.worktree_name or not state.worktree_path:
+        logger.error("No worktree information in state. Run plan/build phase before review.")
         make_issue_comment(
             issue_number,
-            format_issue_message(state.adw_id, "ops", "❌ Review blocked: missing branch information."),
+            format_issue_message(state.adw_id, "ops", "❌ Review blocked: missing worktree information."),
         )
         sys.exit(1)
 
-    try:
-        git_ops.checkout_branch(state.branch_name)
-    except GitError as exc:
-        logger.error(f"Failed to checkout branch {state.branch_name}: {exc}")
+    # Verify worktree exists
+    worktree_path = Path(state.worktree_path)
+    if not worktree_path.exists():
+        logger.error(f"Worktree not found at: {worktree_path}")
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                state.adw_id,
-                "ops",
-                f"❌ Review blocked: unable to checkout branch {state.branch_name}: {exc}",
-            ),
+            format_issue_message(state.adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
         )
         sys.exit(1)
+
+    logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
 
     issue = fetch_issue(str(issue_number), repo_path)
     issue_payload = issue.model_dump(mode="json") if hasattr(issue, "model_dump") else issue.dict()

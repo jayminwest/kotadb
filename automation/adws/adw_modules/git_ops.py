@@ -162,18 +162,141 @@ def finalize_git_operations(
             raise GitError(push_result.stderr or "git push failed")
 
 
+def create_worktree(worktree_name: str, base_branch: str, base_path: str = "trees") -> Path:
+    """Create a git worktree in the specified base path.
+
+    Args:
+        worktree_name: Name for the worktree directory and branch
+        base_branch: Base branch to branch from (e.g., 'develop')
+        base_path: Base directory for worktrees (default: 'trees')
+
+    Returns:
+        Path to the created worktree
+
+    Raises:
+        GitError: If worktree creation fails
+    """
+    worktree_path = project_root() / base_path / worktree_name
+
+    # Create base path if it doesn't exist
+    worktree_path.parent.mkdir(parents=True, exist_ok=True)
+
+    # Create worktree with new branch
+    args = ["worktree", "add", str(worktree_path), "-b", worktree_name, base_branch]
+    _run_git(args)
+
+    return worktree_path
+
+
+def cleanup_worktree(worktree_name: str, base_path: str = "trees", delete_branch: bool = True) -> bool:
+    """Remove a git worktree and optionally delete its branch.
+
+    Args:
+        worktree_name: Name of the worktree to remove
+        base_path: Base directory for worktrees (default: 'trees')
+        delete_branch: Whether to delete the associated branch (default: True)
+
+    Returns:
+        True if cleanup successful, False otherwise
+    """
+    worktree_path = project_root() / base_path / worktree_name
+
+    # Check if worktree exists before attempting removal
+    if not worktree_exists(worktree_name, base_path):
+        return False
+
+    success = True
+
+    # Remove worktree (force flag handles uncommitted changes)
+    result = _run_git(["worktree", "remove", str(worktree_path), "--force"], check=False)
+    if not result.ok:
+        success = False
+
+    # Prune stale worktree metadata
+    _run_git(["worktree", "prune"], check=False)  # Non-critical, ignore result
+
+    # Delete associated branch if requested
+    if delete_branch:
+        result = _run_git(["branch", "-D", worktree_name], check=False)
+        if not result.ok:
+            success = False
+
+    return success
+
+
+def list_worktrees() -> list[dict]:
+    """List all git worktrees with their metadata.
+
+    Returns:
+        List of worktree dictionaries with keys: worktree, HEAD, branch
+    """
+    result = _run_git(["worktree", "list", "--porcelain"], check=False)
+    if not result.ok:
+        return []
+
+    worktrees = []
+    current_worktree = {}
+
+    for line in result.stdout.splitlines():
+        if not line.strip():
+            if current_worktree:
+                worktrees.append(current_worktree)
+                current_worktree = {}
+            continue
+
+        if line.startswith("worktree "):
+            current_worktree["worktree"] = line.split(" ", 1)[1]
+        elif line.startswith("HEAD "):
+            current_worktree["HEAD"] = line.split(" ", 1)[1]
+        elif line.startswith("branch "):
+            current_worktree["branch"] = line.split(" ", 1)[1]
+
+    # Add last worktree if not empty
+    if current_worktree:
+        worktrees.append(current_worktree)
+
+    return worktrees
+
+
+def worktree_exists(worktree_name: str, base_path: str = "trees") -> bool:
+    """Check if a worktree exists at the expected path.
+
+    Args:
+        worktree_name: Name of the worktree to check
+        base_path: Base directory for worktrees (default: 'trees')
+
+    Returns:
+        True if worktree exists, False otherwise
+    """
+    worktrees = list_worktrees()
+    expected_suffix = f"{base_path}/{worktree_name}"
+
+    for wt in worktrees:
+        wt_path = wt.get("worktree", "")
+        # Check if the worktree path ends with base_path/worktree_name
+        # This handles both absolute paths and different root directories (e.g., in tests)
+        if wt_path.endswith(expected_suffix):
+            return True
+
+    return False
+
+
 __all__ = [
     "GitCommandResult",
     "GitError",
     "checkout_branch",
+    "cleanup_worktree",
     "commit",
     "commit_all",
     "create_branch",
+    "create_worktree",
     "ensure_branch",
     "ensure_clean_worktree",
     "finalize_git_operations",
     "get_current_branch",
+    "list_worktrees",
     "push",
     "push_branch",
     "stage_paths",
+    "worktree_exists",
 ]

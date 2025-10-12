@@ -63,6 +63,7 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When debugging ADW orchestration, logging, or state persistence
     - When working with automation directory structure (adw_phases/, adw_modules/, adw_triggers/)
     - When updating automation trigger systems or home server integration
+    - When troubleshooting worktree isolation or cleanup behavior
 
 - docs/vision/*.md
   - Conditions:
@@ -148,3 +149,14 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When troubleshooting slash command template loading in automation layer
     - When understanding the migration from `automation/.claude/commands/` to root `.claude/commands/`
     - When verifying command path resolution in ADW workflows
+
+- docs/specs/feature-65-worktree-isolation-cleanup.md
+  - Conditions:
+    - When working on issue #65 or modifying worktree isolation implementation
+    - When implementing or debugging centralized worktree management in `adw_modules/git_ops.py`
+    - When troubleshooting worktree creation, cleanup, or lifecycle issues
+    - When understanding ADW state tracking for worktree metadata
+    - When debugging concurrent workflow conflicts or git lock errors
+    - When modifying cleanup behavior (ADW_CLEANUP_WORKTREES, ADW_CLEANUP_ON_FAILURE flags)
+    - When integrating worktree isolation into new phase scripts
+    - When testing or validating worktree-based workflow execution

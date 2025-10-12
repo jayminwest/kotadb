@@ -168,9 +168,11 @@ All application code is located in the `app/` directory.
 ### AI Developer Workflows (automation/adws/)
 Python-based automation pipeline for autonomous GitHub issue workflows:
 - `adw_plan.py`, `adw_build.py`, `adw_test.py`, `adw_review.py`, `adw_document.py`: Phase scripts for SDLC automation
-- `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops, GitHub integration, state management)
+- `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops with worktree isolation, GitHub integration, state management)
 - `adw_tests/`: Pytest suite for workflow validation
 - `trigger_webhook.py`, `trigger_cron.py`: Webhook and polling-based trigger systems
+
+All workflows execute in isolated git worktrees (`trees/`) to prevent conflicts during concurrent agent execution and local development. Worktrees are automatically created before agent execution and cleaned up after successful PR creation (configurable via `ADW_CLEANUP_WORKTREES` environment variable).
 
 The agentic layer operates on the application layer (in `app/`) to automate development workflows. See `automation/adws/README.md` for complete automation architecture and usage examples.
 

@@ -165,6 +165,28 @@ def generate_branch_name(
     return branch_name, None
 
 
+def generate_worktree_name(issue_class: str, issue_number: str, adw_id: str) -> str:
+    """Generate a unique worktree name for the workflow.
+
+    Args:
+        issue_class: Issue class (feat, bug, chore)
+        issue_number: Issue number as string
+        adw_id: ADW execution ID
+
+    Returns:
+        Worktree name in format: {issue_class}-{issue_number}-{adw_id[:8]}
+
+    Example:
+        >>> generate_worktree_name("feat", "65", "abc123def456")
+        'feat-65-abc123de'
+    """
+    # Remove leading slash if present
+    clean_class = issue_class.lstrip("/")
+    # Use first 8 chars of ADW ID for uniqueness without excessive length
+    adw_short = adw_id[:8]
+    return f"{clean_class}-{issue_number}-{adw_short}"
+
+
 def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Logger) -> AgentPromptResponse:
     """Generate an implementation plan using the planner agent."""
 
@@ -531,6 +553,7 @@ __all__ = [
     "format_issue_message",
     "find_spec_file",
     "generate_branch_name",
+    "generate_worktree_name",
     "implement_plan",
     "locate_plan_file",
     "lockfile_changed",

@@ -12,10 +12,10 @@ import logging
 import os
 import shutil
 import sys
+from pathlib import Path
 from typing import Optional
 
 from adws.adw_modules import git_ops
-from adws.adw_modules.git_ops import GitError
 from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
 from adws.adw_modules.state import ADWState, StateNotFoundError
 from adws.adw_modules.utils import load_adw_env
@@ -83,27 +83,26 @@ def main() -> None:
         logger.error(f"Unable to resolve repository: {exc}")
         sys.exit(1)
 
-    if not state.branch_name:
-        logger.error("No branch name stored in state. Run build phase before documentation.")
+    # Load worktree metadata from state
+    if not state.worktree_name or not state.worktree_path:
+        logger.error("No worktree information in state. Run plan/build phase before documentation.")
         make_issue_comment(
             issue_number,
-            format_issue_message(state.adw_id, "ops", "❌ Documentation blocked: missing branch information."),
+            format_issue_message(state.adw_id, "ops", "❌ Documentation blocked: missing worktree information."),
         )
         sys.exit(1)
 
-    try:
-        git_ops.checkout_branch(state.branch_name)
-    except GitError as exc:
-        logger.error(f"Failed to checkout branch {state.branch_name}: {exc}")
+    # Verify worktree exists
+    worktree_path = Path(state.worktree_path)
+    if not worktree_path.exists():
+        logger.error(f"Worktree not found at: {worktree_path}")
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                state.adw_id,
-                "ops",
-                f"❌ Documentation blocked: unable to checkout branch {state.branch_name}: {exc}",
-            ),
+            format_issue_message(state.adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
         )
         sys.exit(1)
+
+    logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
 
     issue = fetch_issue(str(issue_number), repo_path)
     issue_payload = issue.model_dump(mode="json") if hasattr(issue, "model_dump") else issue.dict()
@@ -146,7 +145,7 @@ def main() -> None:
         format_issue_message(state.adw_id, AGENT_DOCUMENTOR, "\n".join(summary_lines)),
     )
 
-    if doc_result.documentation_created and not git_ops.ensure_clean_worktree():
+    if doc_result.documentation_created and not git_ops.ensure_clean_worktree(cwd=worktree_path):
         if not state.issue_class:
             issue_command, classify_error = classify_issue(issue, state.adw_id, logger)
             if issue_command:
@@ -169,7 +168,7 @@ def main() -> None:
                 format_issue_message(state.adw_id, AGENT_DOCUMENTOR, f"❌ Error drafting documentation commit: {commit_error}"),
             )
             sys.exit(1)
-        committed, git_error = git_ops.commit_all(commit_message)
+        committed, git_error = git_ops.commit_all(commit_message, cwd=worktree_path)
         if not committed:
             logger.error(f"Documentation commit failed: {git_error}")
             make_issue_comment(
@@ -178,7 +177,7 @@ def main() -> None:
             )
             sys.exit(1)
 
-        pushed, push_error = git_ops.push_branch(state.branch_name)
+        pushed, push_error = git_ops.push_branch(state.worktree_name, cwd=worktree_path)
         if not pushed:
             logger.error(f"Failed to push documentation branch: {push_error}")
             make_issue_comment(
@@ -188,10 +187,10 @@ def main() -> None:
         else:
             make_issue_comment(
                 issue_number,
-                format_issue_message(state.adw_id, "ops", f"✅ Branch pushed: {state.branch_name}"),
+                format_issue_message(state.adw_id, "ops", f"✅ Branch pushed: {state.worktree_name}"),
             )
             if state.plan_file:
-                pr_url, pr_error = create_pull_request(state.branch_name, issue, state.plan_file, state.adw_id, logger)
+                pr_url, pr_error = create_pull_request(state.worktree_name, issue, state.plan_file, state.adw_id, logger)
                 if pr_error:
                     make_issue_comment(
                         issue_number,
