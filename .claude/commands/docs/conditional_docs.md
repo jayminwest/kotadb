@@ -59,8 +59,10 @@ Use this reference to decide which KotaDB documentation sources to consult befor
 - automation/adws/README.md
   - Conditions:
     - When implementing or modifying modules under `automation/adws/adw_modules/**`
-    - When updating ADW phase scripts (`adw_plan.py`, `adw_build.py`, etc.)
+    - When updating ADW phase scripts (`adw_phases/adw_plan.py`, `adw_phases/adw_build.py`, etc.)
     - When debugging ADW orchestration, logging, or state persistence
+    - When working with automation directory structure (adw_phases/, adw_modules/, adw_triggers/)
+    - When updating automation trigger systems or home server integration
 
 - docs/vision/*.md
   - Conditions:

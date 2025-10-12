@@ -31,7 +31,7 @@ def main() -> None:
     logger = start_logger(adw_id, "adw_sdlc")
     logger.info(f"Starting full SDLC composite | issue #{issue_number} | adw_id={adw_id}")
 
-    steps = ("adw_plan.py", "adw_build.py", "adw_test.py", "adw_review.py", "adw_document.py")
+    steps = ("adw_phases/adw_plan.py", "adw_phases/adw_build.py", "adw_phases/adw_test.py", "adw_phases/adw_review.py", "adw_phases/adw_document.py")
     try:
         run_sequence(steps, issue_number, adw_id, logger)
     except PhaseExecutionError as exc:

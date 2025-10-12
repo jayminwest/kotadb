@@ -22,15 +22,17 @@ adws/
 │   ├── ts_commands.py    # Bun validation command catalogue
 │   ├── utils.py          # Env loading, logging, JSON helpers
 │   └── workflow_ops.py   # Agent wrappers for plan/build/test/review/etc.
-├── adw_plan.py           # Plan phase (classify → branch → plan → PR)
-├── adw_build.py          # Build phase (implement plan + push)
-├── adw_test.py           # Validation phase (Bun lint/typecheck/test/build)
-├── adw_review.py         # Review phase (Claude review + reporting)
-├── adw_document.py       # Documentation phase (docs-update + commits)
-├── adw_patch.py          # Patch phase (comment-driven quick fixes)
-├── adw_plan_build*.py    # Composite orchestrators chaining phases
-├── adw_sdlc.py           # Full SDLC (plan → build → test → review → docs)
+├── adw_phases/           # Single-phase execution scripts
+│   ├── adw_plan.py       # Plan phase (classify → branch → plan → PR)
+│   ├── adw_build.py      # Build phase (implement plan + push)
+│   ├── adw_test.py       # Validation phase (Bun lint/typecheck/test/build)
+│   ├── adw_review.py     # Review phase (Claude review + reporting)
+│   ├── adw_document.py   # Documentation phase (docs-update + commits)
+│   └── adw_patch.py      # Patch phase (comment-driven quick fixes)
+├── adw_sdlc.py           # Full SDLC orchestrator (plan → build → test → review → docs)
 ├── adw_tests/            # Pytest suite covering utilities and workflows
+├── adw_triggers/         # Automation trigger systems
+│   └── adw_trigger_cron_homeserver.py  # Home server task poller
 ├── trigger_cron.py       # Poll-based trigger that launches a workflow
 ├── trigger_webhook.py    # FastAPI webhook trigger (comment driven)
 └── health_check.py       # Environment readiness probe
@@ -40,16 +42,16 @@ adws/
 
 ## Phase Scripts
 
-Each single-phase script expects `ISSUE_NUMBER [ADW_ID]` and persists progress to `agents/<adw_id>/adw_state.json`:
+Each single-phase script (located in `adw_phases/`) expects `ISSUE_NUMBER [ADW_ID]` and persists progress to `agents/<adw_id>/adw_state.json`:
 
-- `adw_plan.py` — classify the issue, generate a branch + plan file, commit the plan, and open/update the PR.
-- `adw_build.py` — resume from state, implement the plan, commit code, and push.
-- `adw_test.py` — run Bun lint/typecheck/test/build (auto-includes `bun install` if lockfiles changed) and record results.
-- `adw_review.py` — run the reviewer agent against the spec, summarise findings, and block on unresolved blockers.
-- `adw_document.py` — produce documentation updates via `/document` (or `/docs-update` fallback) and commit/push changes.
-- `adw_patch.py` — apply targeted fixes when an issue/comment contains the `adw_patch` keyword.
+- `adw_phases/adw_plan.py` — classify the issue, generate a branch + plan file, commit the plan, and open/update the PR.
+- `adw_phases/adw_build.py` — resume from state, implement the plan, commit code, and push.
+- `adw_phases/adw_test.py` — run Bun lint/typecheck/test/build (auto-includes `bun install` if lockfiles changed) and record results.
+- `adw_phases/adw_review.py` — run the reviewer agent against the spec, summarise findings, and block on unresolved blockers.
+- `adw_phases/adw_document.py` — produce documentation updates via `/document` (or `/docs-update` fallback) and commit/push changes.
+- `adw_phases/adw_patch.py` — apply targeted fixes when an issue/comment contains the `adw_patch` keyword.
 
-Composite runners (e.g. `adw_plan_build_test.py`, `adw_sdlc.py`) simply chain single-phase scripts using `adw_modules.orchestrators.run_sequence`.
+The SDLC orchestrator (`adw_sdlc.py`) chains single-phase scripts using `adw_modules.orchestrators.run_sequence`.
 
 ---
 
@@ -102,14 +104,19 @@ Dotenv loading order: repository `.env` ➜ `ADW_ENV_FILE` (if set) ➜ `adws/.e
 # Health check prerequisites
 uv run adws/health_check.py --json
 
-# Plan + build + test pipeline for issue #123
-uv run adws/adw_plan_build_test.py 123
+# Full SDLC workflow for issue #123
+uv run adws/adw_sdlc.py 123
 
-# Restart a run with a known ADW id
-uv run adws/adw_build.py 123 deadbeef
+# Run individual phases
+uv run adws/adw_phases/adw_plan.py 123
+uv run adws/adw_phases/adw_build.py 123
+uv run adws/adw_phases/adw_test.py 123
+
+# Restart a phase with a known ADW id
+uv run adws/adw_phases/adw_build.py 123 deadbeef
 
 # Patch mode (requires `adw_patch` keyword in issue/comment)
-uv run adws/adw_patch.py 123 deadbeef
+uv run adws/adw_phases/adw_patch.py 123 deadbeef
 ```
 
 ---
@@ -117,19 +124,20 @@ uv run adws/adw_patch.py 123 deadbeef
 ## Automation Triggers
 
 - **Cron poller** (`uv run adws/trigger_cron.py`)
-  Polls open issues every 20 seconds. A workflow launches when the latest comment (excluding ADW bot posts) is exactly `adw`. The cron trigger runs `adw_plan_build_test.py` by default.
+  Polls open issues every 20 seconds. A workflow launches when the latest comment (excluding ADW bot posts) is exactly `adw`. The cron trigger runs the full SDLC workflow by default.
 
 - **Webhook server** (`PORT=8001 uv run adws/trigger_webhook.py`)
   FastAPI endpoint that reacts to issue comment commands. Examples:
-  - `/adw plan-build-test` → `adw_plan_build_test.py`
-  - `/adw review` → `adw_review.py`
+  - `/adw plan` → `adw_phases/adw_plan.py`
+  - `/adw build` → `adw_phases/adw_build.py`
+  - `/adw review` → `adw_phases/adw_review.py`
   - `/adw sdlc` → `adw_sdlc.py`
   The webhook injects `ADW_WORKFLOW` into the runner container so the appropriate script executes.
 
 - **Home Server Integration** (`uv run adws/adw_triggers/adw_trigger_cron_homeserver.py`)
   Polls a custom home server endpoint (via Tailscale) for pending tasks. Each task runs in an isolated git worktree with automatic status synchronization. See [Home Server Integration](#home-server-integration) section below for details.
 
-Both surfaces write logs beneath `logs/kota-db-ts/…` so bot activity is observable.
+All triggers write logs beneath `logs/kota-db-ts/…` so bot activity is observable.
 
 ---
 
