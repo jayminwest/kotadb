@@ -183,6 +183,10 @@ def main() -> None:
         )
         sys.exit(1)
 
+    # Log git status before commit for debugging
+    status_result = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
+    logger.info(f"Git status before commit:\n{status_result.stdout}")
+
     committed, commit_error = git_ops.commit_all(commit_message, cwd=worktree_path)
     if not committed:
         logger.error(f"Implementation commit failed: {commit_error}")

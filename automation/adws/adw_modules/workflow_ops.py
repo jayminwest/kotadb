@@ -201,6 +201,7 @@ def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Lo
     logger.debug(f"build_plan request: {request.model_dump_json(indent=2, by_alias=True)}")
     response = execute_template(request)
     logger.debug(f"build_plan response: {response.model_dump_json(indent=2)}")
+    logger.info("Plan generation complete, checking for created files...")
     return response
 
 
@@ -234,6 +235,15 @@ def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger, cwd:
         return None, "No plan file returned"
     if "/" not in plan_path:
         return None, f"Invalid plan path returned: {plan_path}"
+
+    # Log the absolute path for debugging
+    if cwd:
+        from pathlib import Path
+        absolute_path = Path(cwd) / plan_path
+        logger.info(f"Plan file located: {plan_path} (absolute: {absolute_path})")
+    else:
+        logger.info(f"Plan file located: {plan_path}")
+
     return plan_path, None
 
 
@@ -273,6 +283,7 @@ def create_commit_message(
         cwd=cwd,
     )
     logger.debug(f"create_commit_message request: {request.model_dump_json(indent=2, by_alias=True)}")
+    logger.info(f"Preparing commit in worktree: {cwd if cwd else 'default'}")
     response = execute_template(request)
     logger.debug(f"create_commit_message response: {response.model_dump_json(indent=2)}")
 

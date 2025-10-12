@@ -405,6 +405,38 @@ Example output:
 
 ## Troubleshooting
 
+### File Path and Git Staging Issues
+
+**Issue**: "No changes to commit" errors despite agents creating files
+**Symptoms**: Commit fails with "No changes to commit in worktree" even though files were created
+**Root Cause**: Agent used absolute paths instead of relative paths, causing git staging mismatches
+**Solution**:
+1. All agent prompts now include path handling instructions (chore.md, feature.md, bug.md)
+2. Agents must use relative paths (e.g., `docs/specs/plan.md`) not absolute paths
+3. Pre-commit validation now checks if files are tracked before attempting commit
+4. Enhanced logging shows git status and file paths for debugging
+
+**Diagnostic Commands**:
+```bash
+# Check git status in worktree
+cd trees/<worktree-name>
+git status --porcelain
+
+# Verify file is tracked
+git ls-files --error-unmatch docs/specs/plan.md
+
+# Run validation tool
+python3 automation/adws/scripts/validate-worktree-setup.py <worktree-name>
+```
+
+**Issue**: Git staging failures for plan files
+**Symptoms**: Files exist on disk but git reports "No changes to commit"
+**Solution**:
+1. Verify agent used relative paths in Write/Edit tool calls
+2. Check execution logs for absolute path warnings
+3. Manually stage files if needed: `git add docs/specs/plan.md`
+4. Phase scripts now explicitly stage plan files before commit
+
 ### Worktree Management Issues
 
 **Issue**: Worktrees not being cleaned up after PR creation

@@ -2,6 +2,14 @@
 
 Draft a KotaDB feature implementation plan using the issue context passed in `$ARGUMENTS` (provide JSON with issue number, title, summary, and constraints).
 
+**CRITICAL - Worktree Path Handling:**
+- You are executing in an isolated git worktree directory
+- Your CWD is the worktree root (e.g., `/project/trees/feat-123-abc12345`)
+- ALL file paths in Write, Edit, Read tools MUST be relative to CWD
+- ✅ Correct: `docs/specs/feature-123-plan.md`
+- ❌ Wrong: `/project/trees/feat-123-abc12345/docs/specs/feature-123-plan.md`
+- Using absolute paths will cause git staging failures and commit errors
+
 ## Instructions
 - **Verify issue labels first**: Run `gh issue view <issue-number> --json labels` to ensure the issue has labels from all four categories (component, priority, effort, status). If labels are missing, apply them before proceeding.
 - Create a new markdown plan under `docs/specs/` named `feature-<issue-number>-<slug>.md` (e.g., `docs/specs/feature-1024-event-streaming.md`).

@@ -54,6 +54,32 @@ def ensure_clean_worktree(cwd: Path | None = None) -> bool:
     return status.stdout.strip() == ""
 
 
+def has_changes(cwd: Path | None = None) -> bool:
+    """Check if the working tree has any modifications (staged or unstaged).
+
+    Returns:
+        True if there are changes to commit, False if working tree is clean
+    """
+    status = _run_git(["status", "--porcelain"], cwd=cwd, check=False)
+    return status.stdout.strip() != ""
+
+
+def verify_file_in_index(file_path: str, cwd: Path | None = None) -> tuple[bool, Optional[str]]:
+    """Verify that a file is tracked in the git index.
+
+    Args:
+        file_path: Path to the file (relative to cwd)
+        cwd: Working directory for git command
+
+    Returns:
+        Tuple of (is_tracked: bool, error_message: Optional[str])
+    """
+    result = _run_git(["ls-files", "--error-unmatch", file_path], cwd=cwd, check=False)
+    if result.ok:
+        return True, None
+    return False, f"File not tracked by git: {file_path}"
+
+
 def ensure_branch(branch_name: str, base: str | None = None, cwd: Path | None = None) -> str:
     """Ensure a branch exists locally, creating it from base if necessary."""
 
@@ -99,16 +125,37 @@ def stage_paths(paths: Sequence[str] | None = None, cwd: Path | None = None) -> 
 
 
 def commit(message: str, allow_empty: bool = False, cwd: Path | None = None) -> GitCommandResult:
-    """Create a git commit with the given message."""
+    """Create a git commit with the given message.
 
+    Returns:
+        GitCommandResult with enhanced error messages when commit fails
+    """
     args = ["commit", "-m", message]
     if allow_empty:
         args.append("--allow-empty")
-    return _run_git(args, cwd=cwd, check=False)
+    result = _run_git(args, cwd=cwd, check=False)
+
+    # Provide clearer error message when nothing to commit
+    if not result.ok and not result.stderr:
+        # Empty stderr usually means nothing to commit
+        return GitCommandResult(
+            args=result.args,
+            stdout=result.stdout,
+            stderr="No changes to commit",
+            returncode=result.returncode,
+        )
+    return result
 
 
 def commit_all(message: str, allow_empty: bool = False, cwd: Path | None = None) -> tuple[bool, Optional[str]]:
-    """Stage all changes and commit them."""
+    """Stage all changes and commit them.
+
+    Returns:
+        Tuple of (success: bool, error_message: Optional[str])
+    """
+    # Check if there are changes to commit (unless allow_empty is True)
+    if not allow_empty and not has_changes(cwd=cwd):
+        return False, "No changes to commit in worktree"
 
     try:
         stage_paths(cwd=cwd)
@@ -294,9 +341,11 @@ __all__ = [
     "ensure_clean_worktree",
     "finalize_git_operations",
     "get_current_branch",
+    "has_changes",
     "list_worktrees",
     "push",
     "push_branch",
     "stage_paths",
+    "verify_file_in_index",
     "worktree_exists",
 ]

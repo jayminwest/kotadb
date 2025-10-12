@@ -2,6 +2,14 @@
 
 Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lean, auditable steps that unblock the requested upkeep.
 
+**CRITICAL - Worktree Path Handling:**
+- You are executing in an isolated git worktree directory
+- Your CWD is the worktree root (e.g., `/project/trees/chore-123-abc12345`)
+- ALL file paths in Write, Edit, Read tools MUST be relative to CWD
+- ✅ Correct: `docs/specs/chore-123-plan.md`
+- ❌ Wrong: `/project/trees/chore-123-abc12345/docs/specs/chore-123-plan.md`
+- Using absolute paths will cause git staging failures and commit errors
+
 ## Instructions
 - **Verify issue labels first**: Run `gh issue view <issue-number> --json labels` to ensure the issue has labels from all four categories (component, priority, effort, status). If labels are missing, apply them before proceeding.
 - Create a markdown plan under `docs/specs/` named `chore-<issue-number>-<slug>.md` (e.g., `docs/specs/chore-1450-refresh-deps.md`).

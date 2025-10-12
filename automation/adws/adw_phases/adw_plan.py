@@ -165,6 +165,25 @@ def main() -> None:
         )
         sys.exit(1)
 
+    logger.info(f"Plan file exists on disk: {plan_file_full_path}")
+
+    # Verify file is tracked by git (after staging by agent)
+    tracked, track_error = git_ops.verify_file_in_index(plan_file, cwd=worktree_path)
+    if not tracked:
+        logger.warning(f"Plan file not tracked by git, adding explicitly: {plan_file}")
+        logger.warning(f"Verification error: {track_error}")
+        # Explicitly add the file
+        try:
+            git_ops.stage_paths([plan_file], cwd=worktree_path)
+            logger.info(f"Plan file staged: {plan_file}")
+        except git_ops.GitError as exc:
+            logger.error(f"Failed to stage plan file: {exc}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"❌ Error staging plan file: {exc}"),
+            )
+            sys.exit(1)
+
     state.update(plan_file=plan_file)
     state.save()
     make_issue_comment(
@@ -180,6 +199,10 @@ def main() -> None:
             format_issue_message(adw_id, AGENT_PLANNER, f"❌ Error creating plan commit: {error}"),
         )
         sys.exit(1)
+
+    # Log git status before commit for debugging
+    status_result = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
+    logger.info(f"Git status before commit:\n{status_result.stdout}")
 
     committed, commit_error = git_ops.commit_all(commit_message, cwd=worktree_path)
     if not committed:
