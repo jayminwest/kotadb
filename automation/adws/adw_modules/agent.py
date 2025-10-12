@@ -64,8 +64,13 @@ def convert_jsonl_to_json(jsonl_file: str) -> str:
     return json_file
 
 
-def get_claude_env() -> Dict[str, str]:
-    """Return the environment variables required for Claude Code execution."""
+def get_claude_env(cwd: Optional[str] = None) -> Dict[str, str]:
+    """Return the environment variables required for Claude Code execution.
+
+    Args:
+        cwd: Optional working directory path. If provided and valid, enforces
+             worktree git isolation by setting GIT_DIR and GIT_WORK_TREE.
+    """
 
     env = {
         "ANTHROPIC_API_KEY": os.getenv("ANTHROPIC_API_KEY"),
@@ -85,6 +90,17 @@ def get_claude_env() -> Dict[str, str]:
     if github_pat:
         env["GITHUB_PAT"] = github_pat
         env["GH_TOKEN"] = github_pat
+
+    # Enforce worktree git isolation when executing in worktree context
+    if cwd:
+        cwd_path = Path(cwd)
+        if cwd_path.exists():
+            # Force git operations to stay in worktree by setting GIT_DIR and GIT_WORK_TREE
+            env["GIT_DIR"] = f"{cwd}/.git"
+            env["GIT_WORK_TREE"] = cwd
+            print(f"Worktree isolation enabled: GIT_DIR={env['GIT_DIR']}, GIT_WORK_TREE={env['GIT_WORK_TREE']}")
+        else:
+            print(f"Warning: cwd path does not exist, skipping worktree isolation: {cwd}", file=sys.stderr)
 
     return {key: value for key, value in env.items() if value is not None}
 
@@ -172,7 +188,7 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     if request.dangerously_skip_permissions:
         cmd.append("--dangerously-skip-permissions")
 
-    env = get_claude_env() or None
+    env = get_claude_env(cwd=request.cwd) or None
 
     try:
         with open(output_path, "w", encoding="utf-8") as handle:

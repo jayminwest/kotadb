@@ -502,6 +502,27 @@ git worktree prune
 3. Ensure no manual git operations in worktree directories during agent execution
 4. Review state files to confirm worktree isolation: `cat agents/<adw_id>/adw_state.json`
 
+**Issue**: Claude Code agents switch root repository branch during worktree execution
+**Symptoms**: Root repository switches to worktree branch names (e.g., `chore/81-abc123`), local development branch is lost
+**Root Cause**: Git operations performed by agents weren't scoped to worktree despite `cwd` being set
+**Solution**: Fixed in #81 via `GIT_DIR` and `GIT_WORK_TREE` environment variables
+- `get_claude_env()` now accepts optional `cwd` parameter
+- When `cwd` is provided, sets `GIT_DIR={cwd}/.git` and `GIT_WORK_TREE={cwd}`
+- Forces all git operations to stay within worktree boundaries
+- Preserves root repository branch stability during concurrent workflows
+**Verification**:
+```bash
+# Before executing workflow
+ROOT_BRANCH=$(git branch --show-current)
+echo "Root branch: $ROOT_BRANCH"
+
+# Execute workflow in worktree
+uv run adws/adw_phases/adw_plan.py 81
+
+# After execution - should be unchanged
+[ "$(git branch --show-current)" == "$ROOT_BRANCH" ] && echo "✅ Isolation preserved" || echo "❌ Branch changed"
+```
+
 ### Home Server Integration Issues
 
 **Issue**: Tasks not being picked up from home server

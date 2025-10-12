@@ -160,3 +160,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When modifying cleanup behavior (ADW_CLEANUP_WORKTREES, ADW_CLEANUP_ON_FAILURE flags)
     - When integrating worktree isolation into new phase scripts
     - When testing or validating worktree-based workflow execution
+
+- docs/specs/chore-81-adw-agent-worktree-branch-isolation.md
+  - Conditions:
+    - When working on issue #81 or debugging ADW worktree branch isolation
+    - When agents are switching branches in root repository instead of staying in worktree
+    - When investigating GIT_DIR/GIT_WORK_TREE environment variable behavior
+    - When troubleshooting git operations executed by Claude Code agents
+    - When modifying agent.py environment construction logic (get_claude_env function)
+    - When root repository branch changes unexpectedly during ADW execution
