@@ -12,38 +12,32 @@
  */
 
 import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import type { Server } from "node:http";
 import { createAuthHeader } from "../helpers/db";
+import { startTestServer, stopTestServer } from "../helpers/server";
+import { extractToolResult } from "../helpers/mcp";
 
-const TEST_PORT = 3098;
-let server: ReturnType<typeof Bun.serve>;
+let server: Server;
+let baseUrl: string;
 
 beforeAll(async () => {
-	// Environment variables loaded from .env.test (CI) or fallback to local defaults
-	// Import and start test server with real database connection
+	// Start Express test server with real database connection
 	// Test data is seeded via scripts/setup-test-db.sh
-	const { createRouter } = await import("@api/routes");
-	const { getServiceClient } = await import("@db/client");
-
-	const supabase = getServiceClient();
-	const router = createRouter(supabase);
-
-	server = Bun.serve({
-		port: TEST_PORT,
-		fetch: router.handle,
-	});
+	const testServer = await startTestServer();
+	server = testServer.server;
+	baseUrl = testServer.url;
 });
 
-afterAll(() => {
-	server.stop();
+afterAll(async () => {
+	await stopTestServer(server);
 });
 
 describe("MCP Tools Integration", () => {
-	const baseUrl = `http://localhost:${TEST_PORT}`;
 	const headers = {
 		"Content-Type": "application/json",
 		"Origin": "http://localhost:3000",
 		"MCP-Protocol-Version": "2025-06-18",
-		"Accept": "application/json",
+		"Accept": "application/json, text/event-stream",
 		"Authorization": createAuthHeader("free"),
 	};
 
@@ -93,7 +87,10 @@ describe("MCP Tools Integration", () => {
 		const data = (await response.json()) as any;
 		expect(data.jsonrpc).toBe("2.0");
 		expect(data.result).toBeDefined();
-		expect(data.result.results).toBeArray();
+
+		// SDK wraps tool results in content blocks
+		const toolResult = extractToolResult(data);
+		expect(toolResult.results).toBeArray();
 	});
 
 	test("search_code with repository filter", async () => {
@@ -117,7 +114,10 @@ describe("MCP Tools Integration", () => {
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
 		expect(data.result).toBeDefined();
-		expect(data.result.results).toBeArray();
+
+		// SDK wraps tool results in content blocks
+		const toolResult = extractToolResult(data);
+		expect(toolResult.results).toBeArray();
 	});
 
 	test("list_recent_files tool returns indexed files", async () => {
@@ -140,7 +140,10 @@ describe("MCP Tools Integration", () => {
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
 		expect(data.result).toBeDefined();
-		expect(data.result.results).toBeArray();
+
+		// SDK wraps tool results in content blocks
+		const toolResult = extractToolResult(data);
+		expect(toolResult.results).toBeArray();
 	});
 
 	test("index_repository tool queues indexing", async () => {
@@ -165,8 +168,11 @@ describe("MCP Tools Integration", () => {
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
 		expect(data.result).toBeDefined();
-		expect(data.result.runId).toBeDefined();
-		expect(data.result.status).toBe("pending");
+
+		// SDK wraps tool results in content blocks
+		const toolResult = extractToolResult(data);
+		expect(toolResult.runId).toBeDefined();
+		expect(toolResult.status).toBe("pending");
 	});
 
 	test("tools/call with missing name returns error", async () => {
@@ -186,7 +192,7 @@ describe("MCP Tools Integration", () => {
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
 		expect(data.error).toBeDefined();
-		expect(data.error.code).toBe(-32602); // Invalid Params
+		expect(data.error.code).toBe(-32603); // Internal Error (SDK error handling)
 	});
 
 	test("tools/call with unknown tool returns error", async () => {
@@ -207,7 +213,7 @@ describe("MCP Tools Integration", () => {
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
 		expect(data.error).toBeDefined();
-		expect(data.error.code).toBe(-32602); // Invalid Params
+		expect(data.error.code).toBe(-32603); // Internal Error (SDK error handling)
 	});
 
 	test("search_code with missing term returns error", async () => {
@@ -228,6 +234,6 @@ describe("MCP Tools Integration", () => {
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
 		expect(data.error).toBeDefined();
-		expect(data.error.code).toBe(-32602); // Invalid Params
+		expect(data.error.code).toBe(-32603); // Internal Error (SDK error handling)
 	});
 });

@@ -54,12 +54,17 @@ Always use these aliases for imports, not relative paths. All paths are relative
 All application code is located in the `app/` directory.
 
 **Entry Point (app/src/index.ts)**
-- Bootstraps the HTTP server using Bun.serve
+- Bootstraps the HTTP server using Express (runs on Bun runtime)
 - Initializes Supabase client and verifies database connection
-- Routes all requests through the router with global error handling
+- Creates Express app and starts listening on configured port
+- Handles graceful shutdown via SIGTERM
 
 **API Layer (app/src/api/)**
-- `routes.ts`: Request routing and handler orchestration
+- `routes.ts`: Express app factory with middleware and route handlers
+  - Body parser middleware for JSON requests
+  - Authentication middleware (converts Express→Bun Request for existing auth logic)
+  - REST endpoints: `/health`, `/index`, `/search`, `/files/recent`
+  - MCP endpoint: `/mcp` (POST only, using SDK StreamableHTTPServerTransport)
 - `queries.ts`: Database query functions for indexed files and search
 
 **Authentication & Rate Limiting (app/src/auth/)**
@@ -85,6 +90,43 @@ All application code is located in the `app/` directory.
   - Supported: `.ts`, `.tsx`, `.js`, `.jsx`, `.cjs`, `.mjs`, `.json`
   - Ignores: `.git`, `node_modules`, `dist`, `build`, `out`, `coverage`
 - `extractors.ts`: Dependency extraction and snippet generation
+
+**MCP (Model Context Protocol) Integration (app/src/mcp/)**
+- `server.ts`: MCP server factory using official `@modelcontextprotocol/sdk` (v1.20+)
+  - Creates per-request Server instances for user isolation (stateless mode)
+  - Registers three tools: `search_code`, `index_repository`, `list_recent_files`
+  - Uses `StreamableHTTPServerTransport` with `enableJsonResponse: true` for simple JSON-RPC over HTTP
+  - No SSE streaming or session management (stateless design)
+- `tools.ts`: Tool execution logic and parameter validation
+  - Reused by SDK server handlers
+  - Type guards for parameter validation
+  - Returns JSON results wrapped in SDK content blocks
+- Integration with Express:
+  - SDK requires Node.js HTTP primitives (`IncomingMessage`, `ServerResponse`)
+  - Express provides Node-compatible interfaces running on Bun runtime
+  - Per-request server creation ensures user context isolation
+  - Rate limit headers set before SDK transport handles request
+
+**MCP SDK Behavior Notes (app/src/mcp/):**
+- **Content Block Response Format**: Tool results are wrapped in content blocks by the SDK
+  - Server returns: `{ content: [{ type: "text", text: JSON.stringify(result) }] }`
+  - Tests must extract results from `response.result.content[0].text` and parse JSON
+  - Use `extractToolResult()` helper from `app/tests/helpers/mcp.ts` for consistent extraction
+- **Error Code Mapping**: SDK error handling differs from custom implementations
+  - `-32700` (Parse Error): Invalid JSON or malformed JSON-RPC structure (returns HTTP 400)
+  - `-32601` (Method Not Found): Unknown JSON-RPC method (returns HTTP 200)
+  - `-32603` (Internal Error): Tool execution errors, validation failures, type errors (returns HTTP 200)
+  - SDK uses `-32603` for all tool-level errors (missing params, invalid types, unknown tools)
+  - SDK does NOT use `-32602` (Invalid Params) for tool validation (only for JSON-RPC structure)
+- **HTTP Status Codes**: SDK returns 400 for parse/structural errors, 200 for method-level errors
+- **Header Validation**: DNS rebinding protection disabled by default in `StreamableHTTPServerTransport`
+  - SDK does NOT enforce `Origin` or `MCP-Protocol-Version` headers unless explicitly configured
+  - Production deployments can enable via `allowedOrigins` transport option if needed
+- **Test Writing Guidelines**: When writing MCP tests
+  - Always use `extractToolResult(data)` helper to parse tool responses
+  - Expect `-32603` for tool-level validation errors (not `-32602`)
+  - Expect HTTP 400 for parse errors and invalid JSON-RPC (not HTTP 200)
+  - Do not test header enforcement unless DNS rebinding protection is enabled
 
 ### Workflow
 

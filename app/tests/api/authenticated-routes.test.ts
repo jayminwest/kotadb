@@ -20,31 +20,23 @@
  */
 
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
-import { getTestApiKey, createAuthHeader } from "../helpers/db";
+import type { Server } from "node:http";
+import { getTestApiKey } from "../helpers/db";
+import { startTestServer, stopTestServer } from "../helpers/server";
 
-const TEST_PORT = 3100;
-const BASE_URL = `http://localhost:${TEST_PORT}`;
+let server: Server;
+let BASE_URL: string;
 const TEST_API_KEY = getTestApiKey("free");
 
-let server: ReturnType<typeof Bun.serve>;
-
 beforeAll(async () => {
-  // Environment variables loaded from .env.test (CI) or fallback to local defaults
-  // Start test server with real database
-  const { createRouter } = await import("@api/routes");
-  const { getServiceClient } = await import("@db/client");
-
-  const supabase = getServiceClient();
-  const router = createRouter(supabase);
-
-  server = Bun.serve({
-    port: TEST_PORT,
-    fetch: router.handle,
-  });
+  // Start Express test server with real database
+  const testServer = await startTestServer();
+  server = testServer.server;
+  BASE_URL = testServer.url;
 });
 
-afterAll(() => {
-  server.stop();
+afterAll(async () => {
+  await stopTestServer(server);
 });
 
 describe("Authenticated Routes", () => {
