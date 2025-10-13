@@ -36,12 +36,22 @@ Use Conventional Commits format:
 <optional body>
 ```
 
-Types: feat, fix, chore, docs, refactor, test, style
+**Valid types**: feat, fix, chore, docs, refactor, test, style, perf, ci, build
 
-Examples:
-- `feat(api): add rate limiting middleware`
-- `fix(auth): resolve API key validation bug`
-- `chore(deps): update TypeScript to 5.3`
+**CRITICAL: Avoid Meta-Commentary Patterns**
+
+Do NOT include these phrases in the commit message first line:
+- ❌ `based on`, `the commit should`, `here is`, `this commit`
+- ❌ `i can see`, `looking at`, `the changes`, `let me`
+
+These patterns indicate agent reasoning leakage and will fail validation.
+
+**Examples:**
+- ✅ `feat(api): add rate limiting middleware`
+- ✅ `fix(auth): resolve API key validation bug`
+- ✅ `chore(deps): update TypeScript to 5.3`
+- ❌ `Based on the changes, the commit should add rate limiting`
+- ❌ `Looking at the diff, this commit fixes auth bugs`
 
 ## Expected Output
 

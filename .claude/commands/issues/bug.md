@@ -73,6 +73,13 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 - `bun test`
 - `bun run build`
 - <additional targeted checks aligned with `/validate-implementation` Level 2 or Level 3, depending on impact>
+
+## Commit Message Validation
+All commits for this bug fix will be validated. Ensure commit messages:
+- Follow Conventional Commits format: `<type>(<scope>): <subject>`
+- Valid types: feat, fix, chore, docs, test, refactor, perf, ci, build, style
+- **AVOID meta-commentary patterns**: "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me"
+- Use direct statements: `fix: resolve search filter bug` not `Looking at the changes, this commit fixes the search filter bug`
 ```
 
 ## Report

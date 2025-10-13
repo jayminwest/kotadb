@@ -277,38 +277,137 @@ def create_commit_message(
     adw_id: str,
     logger: logging.Logger,
     cwd: Optional[str] = None,
+    max_retries: int = 3,
 ) -> Tuple[Optional[str], Optional[str]]:
-    """Ask Claude to draft a commit message tailored to the current phase."""
+    """Ask Claude to draft a commit message tailored to the current phase.
 
-    request = AgentTemplateRequest(
-        agent_name=f"{agent_name}_committer",
-        slash_command="/commit",
-        args=[agent_name, issue_class.replace("/", ""), minimal_issue_payload(issue)],
-        adw_id=adw_id,
-        model="sonnet",
-        cwd=cwd,
-    )
-    logger.debug(f"create_commit_message request: {request.model_dump_json(indent=2, by_alias=True)}")
-    logger.info(f"Preparing commit in worktree: {cwd if cwd else 'default'}")
-    response = execute_template(request)
-    logger.debug(f"create_commit_message response: {response.model_dump_json(indent=2)}")
+    Args:
+        agent_name: Agent name for the commit (e.g., "sdlc_planner")
+        issue: GitHub issue payload
+        issue_class: Issue classification slash command (e.g., "/chore")
+        adw_id: ADW execution ID
+        logger: Logger instance for tracking
+        cwd: Working directory (worktree path) for git operations
+        max_retries: Maximum retry attempts on validation failure (default: 3)
 
-    if not response.success:
-        return None, response.output
+    Returns:
+        Tuple of (commit_message, error_message):
+        - commit_message: Valid commit message string if successful
+        - error_message: Error description if failed after all retries
 
-    message = response.output.strip()
-    if not message:
-        return None, "Empty commit message returned"
+    Behavior:
+        - On validation failure, feeds error back to agent with instructions to fix
+        - Retries up to max_retries times before giving up
+        - Logs all retry attempts and validation failures for debugging
+    """
+    from .agent import AgentPromptRequest, prompt_claude_code
+    from pathlib import Path
 
-    # Validate commit message format
-    is_valid, validation_error = validate_commit_message(message)
-    if not is_valid:
-        logger.error(f"Commit message validation failed: {validation_error}")
-        logger.error(f"Invalid message was: {message}")
-        return None, validation_error
+    previous_error: Optional[str] = None
+    previous_invalid_message: Optional[str] = None
 
-    logger.info("Commit message validated successfully")
-    return message, None
+    for attempt in range(max_retries):
+        if attempt > 0:
+            logger.info(f"Retry attempt {attempt + 1}/{max_retries} for commit message generation")
+
+        # Build request - use retry prompt if we have a previous validation error
+        if attempt > 0 and previous_error and previous_invalid_message:
+            # Construct a retry prompt with validation feedback
+            retry_prompt = f"""Your previous commit message failed validation:
+
+Invalid message: {previous_invalid_message}
+
+Validation error: {previous_error}
+
+Please generate a new commit message that follows the required format:
+- Format: <type>(<scope>): <subject>
+- Type must be one of: feat, fix, chore, docs, test, refactor, perf, ci, build, style
+- Subject must be 1-72 characters
+- Do NOT include meta-commentary like "based on", "the commit should", "here is", etc.
+- Example: "chore: 86 - fix git staging validation"
+
+Review the git diff (run git diff HEAD to see what changed) and provide ONLY the corrected commit message, nothing else."""
+
+            logger.info("Feeding validation error back to agent via direct prompt")
+
+            # Use prompt_claude_code directly for retry with custom prompt
+            from .utils import run_logs_dir
+            run_dir = run_logs_dir(adw_id) / f"{agent_name}_committer" / f"retry_{attempt}"
+            run_dir.mkdir(parents=True, exist_ok=True)
+            output_file = run_dir / "raw_output.jsonl"
+
+            retry_request = AgentPromptRequest(
+                prompt=retry_prompt,
+                adw_id=adw_id,
+                agent_name=f"{agent_name}_committer",
+                model="sonnet",
+                dangerously_skip_permissions=True,
+                output_file=str(output_file),
+                slash_command="/commit_retry",
+                cwd=cwd,
+            )
+            response = prompt_claude_code(retry_request)
+
+            if not response.success:
+                logger.warning(f"Retry agent execution failed (attempt {attempt + 1}): {response.output}")
+                if attempt < max_retries - 1:
+                    continue
+                return None, response.output
+
+            message = response.output.strip()
+        else:
+            # First attempt - use standard commit template
+            request = AgentTemplateRequest(
+                agent_name=f"{agent_name}_committer",
+                slash_command="/commit",
+                args=[agent_name, issue_class.replace("/", ""), minimal_issue_payload(issue)],
+                adw_id=adw_id,
+                model="sonnet",
+                cwd=cwd,
+            )
+            logger.debug(f"create_commit_message request (attempt {attempt + 1}): {request.model_dump_json(indent=2, by_alias=True)}")
+            if attempt == 0:
+                logger.info(f"Preparing commit in worktree: {cwd if cwd else 'default'}")
+
+            response = execute_template(request)
+            logger.debug(f"create_commit_message response (attempt {attempt + 1}): {response.model_dump_json(indent=2)}")
+
+            if not response.success:
+                if attempt < max_retries - 1:
+                    logger.warning(f"Agent execution failed (attempt {attempt + 1}): {response.output}")
+                    continue
+                return None, response.output
+
+            message = response.output.strip()
+
+        # Check if message is empty
+        if not message:
+            if attempt < max_retries - 1:
+                logger.warning(f"Empty commit message returned (attempt {attempt + 1})")
+                continue
+            return None, "Empty commit message returned after all retries"
+
+        # Validate commit message format
+        is_valid, validation_error = validate_commit_message(message)
+        if not is_valid:
+            logger.warning(f"Commit message validation failed (attempt {attempt + 1}/{max_retries}): {validation_error}")
+            logger.warning(f"Invalid message was: {message}")
+
+            if attempt < max_retries - 1:
+                # Store error for next iteration
+                previous_error = validation_error
+                previous_invalid_message = message
+                logger.info("Will retry with validation feedback in next iteration")
+                continue
+            else:
+                # Exhausted all retries
+                return None, f"Commit message validation failed after {max_retries} attempts. Last error: {validation_error}"
+
+        logger.info(f"Commit message validated successfully on attempt {attempt + 1}")
+        return message, None
+
+    # Should never reach here, but just in case
+    return None, f"Commit message generation failed after {max_retries} attempts"
 
 
 def create_pull_request(

@@ -7,8 +7,10 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 - Consult `.claude/commands/docs/conditional_docs.md` for any documentation that matches the implementation scope.
 - Execute tasks in the documented order, touching only the files listed unless the plan explicitly allows otherwise.
 - Keep commits incremental and logically grouped. Use Conventional Commit subjects referencing the issue.
+  - **CRITICAL**: Avoid meta-commentary patterns in commit messages (e.g., "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me")
+  - These patterns will fail validation. Use direct statements: `feat: add search filters` not `Based on the changes, the commit should add search filters`
 - Stay on the correct work branch (`feat/`, `bug/`, `chore/`, etc.) that will merge into `develop` before promotion to `main`.
-- When scoped tasks are complete, rerun the plan’s validation level, ensure the tree is clean, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so the PR opens with a title ending in the issue number (e.g. `feat: add search filters (#210)`).
+- When scoped tasks are complete, rerun the plan's validation level, ensure the tree is clean, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so the PR opens with a title ending in the issue number (e.g. `feat: add search filters (#210)`).
 
 ## Anti-Mock Guardrails
 - Read `/anti-mock` before touching tests; do not introduce new stub helpers (`createMock*`, fake clients, manual spies).

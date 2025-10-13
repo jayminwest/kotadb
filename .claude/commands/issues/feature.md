@@ -84,6 +84,13 @@ Plan for validation using the levels defined in `/validate-implementation`. Feat
 - `bun run build`
 Document any domain-specific scripts (seed data, preview builds) required for full coverage.
 
+## Commit Message Validation
+All commits for this feature will be validated. Ensure commit messages:
+- Follow Conventional Commits format: `<type>(<scope>): <subject>`
+- Valid types: feat, fix, chore, docs, test, refactor, perf, ci, build, style
+- **AVOID meta-commentary patterns**: "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me"
+- Use direct statements: `feat: add event streaming API` not `Based on the plan, this commit adds event streaming`
+
 ## Report
 Summarise the plan in 2-3 bullets highlighting key technical decisions and risks.
 

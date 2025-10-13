@@ -59,6 +59,13 @@ Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lea
 - `bun run build`
 - <supplemental checks chosen from `/validate-implementation` based on impact level>
 
+## Commit Message Validation
+All commits for this chore will be validated. Ensure commit messages:
+- Follow Conventional Commits format: `<type>(<scope>): <subject>`
+- Valid types: feat, fix, chore, docs, test, refactor, perf, ci, build, style
+- **AVOID meta-commentary patterns**: "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me"
+- Use direct statements: `chore: refresh dependencies` not `Based on the plan, the commit should refresh dependencies`
+
 ## Deliverables
 - Code changes
 - Config updates
