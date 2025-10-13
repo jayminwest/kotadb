@@ -46,7 +46,7 @@ def parse_jsonl_output(output_file: str) -> Tuple[List[Dict[str, Any]], Optional
         with open(output_file, "r", encoding="utf-8") as handle:
             messages = [json.loads(line) for line in handle if line.strip()]
     except Exception as exc:  # noqa: BLE001
-        print(f"Error parsing JSONL file: {exc}", file=sys.stderr)
+        sys.stderr.write(f"Error parsing JSONL file: {exc}\n")
         return [], None
 
     result_message = next((msg for msg in reversed(messages) if msg.get("type") == "result"), None)
@@ -60,7 +60,7 @@ def convert_jsonl_to_json(jsonl_file: str) -> str:
     messages, _ = parse_jsonl_output(jsonl_file)
     with open(json_file, "w", encoding="utf-8") as handle:
         json.dump(messages, handle, indent=2)
-    print(f"Created JSON file: {json_file}")
+    sys.stdout.write(f"Created JSON file: {json_file}\n")
     return json_file
 
 
@@ -123,7 +123,7 @@ def save_prompt(
     prompt_file = prompt_dir / f"{command_name}.txt"
     with open(prompt_file, "w", encoding="utf-8") as handle:
         handle.write(prompt)
-    print(f"Saved prompt to: {prompt_file}")
+    sys.stdout.write(f"Saved prompt to: {prompt_file}\n")
 
 
 def command_template_path(slash_command: str) -> Path:
@@ -200,19 +200,19 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
             )
     except subprocess.TimeoutExpired:
         error = "Error: Claude Code command timed out"
-        print(error, file=sys.stderr)
+        sys.stderr.write(f"{error}\n")
         return AgentPromptResponse(output=error, success=False, session_id=None)
     except Exception as exc:  # noqa: BLE001
         error = f"Error executing Claude Code: {exc}"
-        print(error, file=sys.stderr)
+        sys.stderr.write(f"{error}\n")
         return AgentPromptResponse(output=error, success=False, session_id=None)
 
     if result.returncode != 0:
         error = f"Claude Code error: {result.stderr}"
-        print(error, file=sys.stderr)
+        sys.stderr.write(f"{error}\n")
         return AgentPromptResponse(output=error, success=False, session_id=None)
 
-    print(f"Output saved to: {output_path}")
+    sys.stdout.write(f"Output saved to: {output_path}\n")
     messages, result_message = parse_jsonl_output(str(output_path))
     convert_jsonl_to_json(str(output_path))
 

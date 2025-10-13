@@ -15,6 +15,7 @@ import argparse
 import json
 import os
 import subprocess
+import sys
 import tempfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional
@@ -223,20 +224,20 @@ def main(argv: List[str] | None = None) -> int:
     )
 
     if args.json:
-        print(payload.model_dump_json(indent=2, by_alias=True))
+        sys.stdout.write(f"{payload.model_dump_json(indent=2, by_alias=True)}\n")
     else:
         overall = "OK" if payload.success else "FAIL"
-        print(f"Overall status: {overall} ({payload.timestamp})")
+        sys.stdout.write(f"Overall status: {overall} ({payload.timestamp})\n")
         for name in targets:
             result = results[name]
             status = "OK" if result.success else "FAIL"
-            print(f"[{status}] {name}")
+            sys.stdout.write(f"[{status}] {name}\n")
             if result.error:
-                print(f"  - error: {result.error}")
+                sys.stdout.write(f"  - error: {result.error}\n")
             if result.warning:
-                print(f"  - warning: {result.warning}")
+                sys.stdout.write(f"  - warning: {result.warning}\n")
             for key, value in result.details.items():
-                print(f"  - {key}: {value}")
+                sys.stdout.write(f"  - {key}: {value}\n")
 
     if args.issue:
         summary_emoji = "✅" if payload.success else "❌"
@@ -249,9 +250,9 @@ def main(argv: List[str] | None = None) -> int:
 
         try:
             make_issue_comment(args.issue, "\n".join(comment_lines))
-            print(f"Posted health check summary to issue #{args.issue}")
+            sys.stdout.write(f"Posted health check summary to issue #{args.issue}\n")
         except Exception as exc:  # noqa: BLE001
-            print(f"Failed to post health check comment: {exc}", file=sys.stderr)
+            sys.stderr.write(f"Failed to post health check comment: {exc}\n")
 
     return 0 if payload.success else 1
 

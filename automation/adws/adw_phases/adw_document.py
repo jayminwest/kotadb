@@ -49,7 +49,7 @@ def check_env(logger: logging.Logger) -> None:
 
 def parse_args(argv: list[str]) -> tuple[str, Optional[str]]:
     if len(argv) < 2:
-        print("Usage: uv run adws/adw_document.py <issue-number> [adw-id]", file=sys.stderr)
+        sys.stderr.write("Usage: uv run adws/adw_document.py <issue-number> [adw-id]" + "\n")
         sys.exit(1)
     issue_number = argv[1]
     adw_id = argv[2] if len(argv) > 2 else None

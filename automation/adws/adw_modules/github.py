@@ -75,7 +75,7 @@ def fetch_issue(issue_number: str, repo_path: str) -> GitHubIssue:
         ) from exc
 
     if result.returncode != 0:
-        print(result.stderr, file=sys.stderr)
+        sys.stderr.write(f"{result.stderr}\n")
         raise RuntimeError(f"Failed to fetch issue {issue_number}")
 
     issue_data = json.loads(result.stdout)
@@ -92,7 +92,7 @@ def make_issue_comment(issue_number: str, comment: str) -> None:
 
     result = subprocess.run(cmd, capture_output=True, text=True, env=env)
     if result.returncode != 0:
-        print(f"Error posting comment: {result.stderr}", file=sys.stderr)
+        sys.stderr.write(f"Error posting comment: {result.stderr}\n")
         raise RuntimeError("Failed to post GitHub issue comment")
 
 
@@ -115,7 +115,7 @@ def mark_issue_in_progress(issue_number: str) -> None:
     ]
     label_result = subprocess.run(label_cmd, capture_output=True, text=True, env=env)
     if label_result.returncode != 0:
-        print(f"Note: Could not add 'in_progress' label: {label_result.stderr}")
+        sys.stdout.write(f"Note: Could not add 'in_progress' label: {label_result.stderr}\n")
 
     assign_cmd = [
         "gh",
@@ -152,13 +152,13 @@ def fetch_open_issues(repo_path: str) -> List[GitHubIssueListItem]:
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=env)
     except subprocess.CalledProcessError as exc:  # pragma: no cover - upstream failure surface
-        print(f"ERROR: Failed to fetch open issues: {exc.stderr}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Failed to fetch open issues: {exc.stderr}\n")
         return []
 
     try:
         issues_data = json.loads(result.stdout)
     except json.JSONDecodeError as exc:  # pragma: no cover - malformed CLI output
-        print(f"ERROR: Unable to parse issue list JSON: {exc}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Unable to parse issue list JSON: {exc}\n")
         return []
 
     return [GitHubIssueListItem(**issue) for issue in issues_data]
@@ -183,13 +183,13 @@ def fetch_issue_comments(repo_path: str, issue_number: int) -> List[Dict[str, ob
     try:
         result = subprocess.run(cmd, capture_output=True, text=True, check=True, env=env)
     except subprocess.CalledProcessError as exc:  # pragma: no cover
-        print(f"ERROR: Failed to fetch comments for issue #{issue_number}: {exc.stderr}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Failed to fetch comments for issue #{issue_number}: {exc.stderr}\n")
         return []
 
     try:
         payload = json.loads(result.stdout)
     except json.JSONDecodeError as exc:  # pragma: no cover
-        print(f"ERROR: Unable to parse comments JSON for issue #{issue_number}: {exc}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Unable to parse comments JSON for issue #{issue_number}: {exc}\n")
         return []
 
     comments = payload.get("comments", [])

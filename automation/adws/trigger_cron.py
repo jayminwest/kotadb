@@ -37,7 +37,7 @@ try:
     REPO_URL = get_repo_url()
     REPO_PATH = extract_repo_path(REPO_URL)
 except ValueError as exc:  # pragma: no cover - misconfigured environment
-    print(f"ERROR: {exc}", file=sys.stderr)
+    sys.stderr.write(f"ERROR: {exc}\n")
     sys.exit(1)
 
 processed_issues: Set[int] = set()
@@ -47,7 +47,7 @@ shutdown_requested = False
 
 def signal_handler(signum: int, _frame: object) -> None:
     global shutdown_requested
-    print(f"INFO: Received signal {signum}; shutting down after current cycle.")
+    sys.stdout.write(f"INFO: Received signal {signum}; shutting down after current cycle.\n")
     shutdown_requested = True
 
 
@@ -77,7 +77,7 @@ def trigger_workflow(issue_number: int) -> bool:
     script = Path(__file__).resolve().parent / "adw_plan_build_test.py"
     cmd = ["uv", "run", str(script), str(issue_number)]
 
-    print(f"INFO: Launching workflow for issue #{issue_number} → {' '.join(cmd)}")
+    sys.stdout.write(f"INFO: Launching workflow for issue #{issue_number} → {' '.join(cmd)}\n")
     try:
         result = subprocess.run(
             cmd,
@@ -87,38 +87,38 @@ def trigger_workflow(issue_number: int) -> bool:
             env=os.environ.copy(),
         )
     except Exception as exc:  # noqa: BLE001 - propagate failure for visibility
-        print(f"ERROR: Exception while triggering issue #{issue_number}: {exc}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Exception while triggering issue #{issue_number}: {exc}\n")
         return False
 
     if result.returncode == 0:
-        print(f"INFO: Workflow completed for issue #{issue_number}.")
+        sys.stdout.write(f"INFO: Workflow completed for issue #{issue_number}.\n")
         return True
 
     if result.stdout.strip():
-        print(f"ERROR: Workflow stdout for issue #{issue_number}:\n{result.stdout}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Workflow stdout for issue #{issue_number}:\n{result.stdout}\n")
     if result.stderr.strip():
-        print(f"ERROR: Workflow stderr for issue #{issue_number}:\n{result.stderr}", file=sys.stderr)
+        sys.stderr.write(f"ERROR: Workflow stderr for issue #{issue_number}:\n{result.stderr}\n")
     return False
 
 
 def check_and_process_issues() -> None:
     if shutdown_requested:
-        print("INFO: Shutdown requested; skipping poll cycle.")
+        sys.stdout.write("INFO: Shutdown requested; skipping poll cycle.\n")
         return
 
-    print("INFO: Starting poll cycle…")
+    sys.stdout.write("INFO: Starting poll cycle…\n")
     start = time.time()
 
     issues = fetch_open_issues(REPO_PATH)
     if not issues:
-        print("INFO: No open issues detected.")
+        sys.stdout.write("INFO: No open issues detected.\n")
         return
 
     qualifying = [issue.number for issue in issues if should_process_issue(issue.number)]
 
     for issue_number in qualifying:
         if shutdown_requested:
-            print("INFO: Shutdown requested mid-cycle; stopping triggers.")
+            sys.stdout.write("INFO: Shutdown requested mid-cycle; stopping triggers.\n")
             break
 
         if issue_number in processed_issues:
@@ -127,16 +127,16 @@ def check_and_process_issues() -> None:
         if trigger_workflow(issue_number):
             processed_issues.add(issue_number)
         else:
-            print(f"WARN: Issue #{issue_number} will be retried next cycle.")
+            sys.stdout.write(f"WARN: Issue #{issue_number} will be retried next cycle.\n")
 
     duration = time.time() - start
-    print(f"INFO: Poll cycle finished in {duration:.2f}s; total processed this run: {len(processed_issues)}")
+    sys.stdout.write(f"INFO: Poll cycle finished in {duration:.2f}s; total processed this run: {len(processed_issues)}\n")
 
 
 def main() -> None:
-    print("INFO: Starting ADW cron trigger")
-    print(f"INFO: Repository: {REPO_PATH}")
-    print("INFO: Poll interval: 20 seconds")
+    sys.stdout.write("INFO: Starting ADW cron trigger\n")
+    sys.stdout.write(f"INFO: Repository: {REPO_PATH}\n")
+    sys.stdout.write("INFO: Poll interval: 20 seconds\n")
 
     signal.signal(signal.SIGINT, signal_handler)
     signal.signal(signal.SIGTERM, signal_handler)
@@ -147,7 +147,7 @@ def main() -> None:
         schedule.run_pending()
         time.sleep(1)
 
-    print("INFO: Cron trigger exiting")
+    sys.stdout.write("INFO: Cron trigger exiting\n")
 
 
 if __name__ == "__main__":

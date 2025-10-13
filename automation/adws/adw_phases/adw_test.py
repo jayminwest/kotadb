@@ -75,7 +75,7 @@ def main() -> None:
     adw_id = args.adw_id
 
     if not adw_id:
-        print("adw_id is required for test phase (use value from planning stage).", file=sys.stderr)
+        sys.stderr.write("adw_id is required for test phase (use value from planning stage)." + "\n")
         sys.exit(1)
 
     logger = start_logger(adw_id, "adw_test")

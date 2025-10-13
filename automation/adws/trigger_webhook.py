@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 import subprocess
+import sys
 from pathlib import Path
 
 import uvicorn
@@ -119,7 +120,7 @@ async def github_webhook(request: Request) -> dict[str, object]:
         issue = payload.get("issue", {})
         issue_number = issue.get("number")
 
-        print(f"Received webhook event={event_type} action={action} issue={issue_number}")
+        sys.stdout.write(f"Received webhook event={event_type} action={action} issue={issue_number}\n")
 
         trigger_reason: str | None = None
         workflow_script: str | None = None
@@ -187,9 +188,9 @@ async def github_webhook(request: Request) -> dict[str, object]:
             adw_id,
         ]
 
-        print(
+        sys.stdout.write(
             f"Launching background workflow for issue #{issue_number} "
-            f"({trigger_reason}) using {workflow_script} → {' '.join(docker_cmd)}"
+            f"({trigger_reason}) using {workflow_script} → {' '.join(docker_cmd)}\n"
         )
 
         subprocess.Popen(  # noqa: S603 - intentional background execution
@@ -212,7 +213,7 @@ async def github_webhook(request: Request) -> dict[str, object]:
             "logs": str(relative_log_dir),
         }
     except Exception as exc:  # noqa: BLE001 - ensure webhook ack
-        print(f"Error handling webhook: {exc}")
+        sys.stderr.write(f"Error handling webhook: {exc}\n")
         return {"status": "error", "message": "Internal webhook error"}
 
 
@@ -249,5 +250,5 @@ async def health() -> dict[str, object]:
 
 
 if __name__ == "__main__":
-    print(f"Starting webhook server on http://0.0.0.0:{PORT}")
+    sys.stdout.write(f"Starting webhook server on http://0.0.0.0:{PORT}\n")
     uvicorn.run(app, host="0.0.0.0", port=PORT)
