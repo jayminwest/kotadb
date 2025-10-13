@@ -169,3 +169,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When troubleshooting git operations executed by Claude Code agents
     - When modifying agent.py environment construction logic (get_claude_env function)
     - When root repository branch changes unexpectedly during ADW execution
+
+- .claude/commands/docs/prompt-code-alignment.md
+  - Conditions:
+    - When creating or modifying slash command templates in `.claude/commands/`
+    - When debugging ADW workflow failures related to agent output parsing
+    - When Python functions fail to parse template responses (parse errors, empty values, type mismatches)
+    - When template changes break automation workflows
+    - When implementing new workflow phases that require agent interaction
+    - When reviewing PRs that modify slash command templates

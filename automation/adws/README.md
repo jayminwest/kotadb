@@ -354,6 +354,48 @@ The home server integration adds several new slash commands (see `.claude/comman
 - `/build`: Direct implementation workflow
 - `/plan`: Create implementation plans for complex tasks
 
+### Template Development Guidelines
+
+Slash command templates in `.claude/commands/` define contracts between AI agents and Python automation code. Misalignment between template output and Python parsing logic causes workflow failures.
+
+**Key Principles**:
+- Templates are **executable specifications** - treat them like API contracts
+- Changes to template output format can break automation workflows
+- Python functions expect specific output formats (strings, paths, JSON, etc.)
+- Use relative paths consistently to maintain worktree isolation
+
+**Template Categories**:
+1. **Message-Only**: Return single string values (`/commit`, `/generate_branch_name`, `/classify_issue`)
+2. **Path Resolution**: Return file paths (`/find_plan_file`, `/patch`)
+3. **Action**: Perform file modifications (`/implement`, `/chore`, `/bug`, `/feature`, `/pull_request`)
+4. **Structured Data**: Return JSON (`/review`, `/document`)
+
+**Common Pitfalls** (lessons from #84):
+- Executing actions when Python expects only message output (e.g., `/commit` running git commands)
+- Including explanatory text with output (e.g., "The branch name is: feat/xyz")
+- Using absolute paths instead of relative paths (breaks worktree isolation)
+- Returning incomplete JSON structures (missing required fields)
+- Premature cleanup in multi-phase workflows (removing worktrees before subsequent phases)
+
+**Testing Checklist**:
+- [ ] Test template output with consuming Python function
+- [ ] Verify output format matches category expectations
+- [ ] Use relative paths consistently (never absolute)
+- [ ] For JSON templates, ensure all required fields are present
+- [ ] Run full workflow integration test with real issue
+
+**Complete Reference**: See `.claude/commands/docs/prompt-code-alignment.md` for:
+- Detailed template-to-function mappings
+- Output format requirements by category
+- Common misalignment patterns with fixes
+- Manual and automated testing methodologies
+- Case studies from recent fixes (#84, #87)
+
+**Recent Template Fixes**:
+- `/commit` template (#84): Fixed to return message string instead of executing git commands
+- `/find_plan_file` template (#84): Enhanced parsing to handle git status prefixes and multiple code blocks
+- Planning templates (#84): Removed premature worktree cleanup instructions
+
 ### Architecture
 
 **Trigger Flow**:
