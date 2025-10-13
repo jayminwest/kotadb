@@ -24,6 +24,7 @@ from .github import ADW_BOT_IDENTIFIER
 from .state import ADWState, ensure_adw_id as core_ensure_adw_id
 from .ts_commands import Command, serialize_commands, validation_commands
 from .utils import parse_json, project_root, setup_logger
+from .validation import validate_commit_message
 
 AGENT_PLANNER = "sdlc_planner"
 AGENT_IMPLEMENTOR = "sdlc_implementor"
@@ -298,6 +299,15 @@ def create_commit_message(
     message = response.output.strip()
     if not message:
         return None, "Empty commit message returned"
+
+    # Validate commit message format
+    is_valid, validation_error = validate_commit_message(message)
+    if not is_valid:
+        logger.error(f"Commit message validation failed: {validation_error}")
+        logger.error(f"Invalid message was: {message}")
+        return None, validation_error
+
+    logger.info("Commit message validated successfully")
     return message, None
 
 

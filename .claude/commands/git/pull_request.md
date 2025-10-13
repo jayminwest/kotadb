@@ -11,6 +11,8 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 ## Preconditions
 - Working tree is clean (`git status --short` empty) and the current branch matches `<branch_name>`.
 - All commits for the issue exist locally and remotely (`feat/`, `bug/`, `chore/`, etc. → `develop` → `main`).
+- **Commit messages validated**: All commit messages follow Conventional Commits format (verified by validation system)
+- **Staged files verified**: All files mentioned in plan are properly staged (verified by validation system)
 - Level 2 or higher validation from `/validate-implementation` has been rerun with passing results captured for the PR body.
 - Anti-mock evidence is ready: note which real-service suites ran, data seeded, and any temporary skips with follow-up issues.
 - Plan document and issue references are up to date with final status and validation notes.
@@ -20,8 +22,10 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 2. `git fetch --all --prune` – make sure remotes are current.
 3. `git status --short` – confirm no unstaged or untracked files remain.
 4. `git log origin/develop..HEAD --oneline` – review commits that will ship.
-5. `gh pr status` – ensure the branch does not already have an open PR.
-6. Re-run the selected validation level; fix issues immediately before continuing.
+5. **Verify commit messages**: Review commit messages with `git log --oneline` to ensure Conventional Commits format
+6. **Verify PR description**: Ensure validation evidence section is complete with actual command output
+7. `gh pr status` – ensure the branch does not already have an open PR.
+8. Re-run the selected validation level; fix issues immediately before continuing.
 
 ## Prepare Metadata
 - Parse `issue_json` for `issue_type`, number, and title.

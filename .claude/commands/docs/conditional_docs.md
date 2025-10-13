@@ -184,3 +184,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When template changes break automation workflows
     - When implementing new workflow phases that require agent interaction
     - When reviewing PRs that modify slash command templates
+
+- docs/adws/validation.md
+  - Conditions:
+    - When working with ADW workflow quality, validation rules, or commit/PR output formatting
+    - When debugging validation failures (commit message format, PR description, file staging)
+    - When implementing or modifying validation logic in `adw_modules/validation.py`
+    - When investigating historical bad outputs from PR #90 or similar quality issues
+    - When creating tests for validation functions
+    - When agents generate malformed commit messages or PR descriptions
