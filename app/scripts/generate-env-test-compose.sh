@@ -20,9 +20,24 @@ if ! command -v docker &> /dev/null; then
     exit 1
 fi
 
+# Detect execution context and set compose file path
+# If running from app/ directory (local/worktree), use ../docker-compose.test.yml
+# If running from repo root (CI), use docker-compose.test.yml
+if [ -f "../docker-compose.test.yml" ]; then
+    # Running from app/ directory
+    COMPOSE_FILE="../docker-compose.test.yml"
+elif [ -f "docker-compose.test.yml" ]; then
+    # Running from repository root
+    COMPOSE_FILE="docker-compose.test.yml"
+else
+    echo "❌ Error: Cannot locate docker-compose.test.yml"
+    echo "Tried: ../docker-compose.test.yml (app/ context) and docker-compose.test.yml (repo root context)"
+    exit 1
+fi
+
 # Get container ports using docker compose port command
-KONG_PORT=$(docker compose -p "$PROJECT_NAME" port kong 8000 2>/dev/null | cut -d: -f2)
-DB_PORT=$(docker compose -p "$PROJECT_NAME" port db 5432 2>/dev/null | cut -d: -f2)
+KONG_PORT=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port kong 8000 2>/dev/null | cut -d: -f2)
+DB_PORT=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port db 5432 2>/dev/null | cut -d: -f2)
 
 if [ -z "$KONG_PORT" ] || [ -z "$DB_PORT" ]; then
     echo "❌ Error: Could not determine container ports"

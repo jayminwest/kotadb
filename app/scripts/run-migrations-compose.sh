@@ -14,8 +14,25 @@ fi
 
 echo "🔄 Running migrations for project: $PROJECT_NAME"
 
+# Detect execution context and set paths accordingly
+# If running from app/ directory (local/worktree), use ../docker-compose.test.yml and supabase/migrations
+# If running from repo root (CI), use docker-compose.test.yml and app/supabase/migrations
+if [ -d "supabase/migrations" ]; then
+    # Running from app/ directory
+    COMPOSE_FILE="../docker-compose.test.yml"
+    MIGRATION_DIR="supabase/migrations"
+elif [ -d "app/supabase/migrations" ]; then
+    # Running from repository root
+    COMPOSE_FILE="docker-compose.test.yml"
+    MIGRATION_DIR="app/supabase/migrations"
+else
+    echo "❌ Error: Cannot locate migration directory"
+    echo "Tried: supabase/migrations (app/ context) and app/supabase/migrations (repo root context)"
+    exit 1
+fi
+
 # Get database container port
-DB_PORT=$(docker compose -p "$PROJECT_NAME" port db 5432 | cut -d: -f2)
+DB_PORT=$(docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" port db 5432 | cut -d: -f2)
 
 if [ -z "$DB_PORT" ]; then
     echo "❌ Error: Could not determine database port"
@@ -26,15 +43,7 @@ fi
 echo "📡 Database port: $DB_PORT"
 
 # Run each migration file in order
-# Use app/supabase/migrations for the actual PostgreSQL migrations
-# (app/src/db/migrations has the source, but may have old SQLite files or rollbacks)
-MIGRATION_DIR="app/supabase/migrations"
 MIGRATION_COUNT=0
-
-if [ ! -d "$MIGRATION_DIR" ]; then
-    echo "❌ Error: Migration directory not found: $MIGRATION_DIR"
-    exit 1
-fi
 
 # Sort migrations by filename (lexicographic/timestamp order)
 for migration in $(ls -1 "$MIGRATION_DIR"/*.sql 2>/dev/null | sort); do
@@ -49,7 +58,7 @@ for migration in $(ls -1 "$MIGRATION_DIR"/*.sql 2>/dev/null | sort); do
     echo "  ▶ Applying $MIGRATION_FILE..."
 
     # Run migration inside the container using docker exec
-    docker compose -p "$PROJECT_NAME" exec -T db psql \
+    docker compose -p "$PROJECT_NAME" -f "$COMPOSE_FILE" exec -T db psql \
         -U postgres \
         -d postgres \
         -v ON_ERROR_STOP=1 \

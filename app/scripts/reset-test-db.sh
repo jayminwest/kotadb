@@ -17,7 +17,7 @@ PROJECT_NAME=$(cat .test-project-name)
 echo "📝 Using project: $PROJECT_NAME"
 
 # Check if containers are running
-if ! docker compose -p "$PROJECT_NAME" ps | grep -q "Up"; then
+if ! docker compose -p "$PROJECT_NAME" -f ../docker-compose.test.yml ps | grep -q "Up"; then
     echo "❌ Error: Docker Compose stack is not running"
     echo "Start with: bun run test:setup"
     exit 1
@@ -30,7 +30,7 @@ fi
 
 # Drop and recreate database schema
 echo "🗑️  Dropping all tables..."
-docker compose -p "$PROJECT_NAME" exec -T db psql -U postgres -d postgres -c "
+docker compose -p "$PROJECT_NAME" -f ../docker-compose.test.yml exec -T db psql -U postgres -d postgres -c "
 DO \$\$ DECLARE
     r RECORD;
 BEGIN

@@ -23,7 +23,7 @@ fi
 echo "🧹 Cleaning up Docker Compose stack: $PROJECT_NAME"
 
 # Stop and remove containers, networks, and volumes
-docker compose -p "$PROJECT_NAME" down -v 2>/dev/null || true
+docker compose -p "$PROJECT_NAME" -f ../docker-compose.test.yml down -v 2>/dev/null || true
 
 # Remove the project name file if it exists
 if [ -f .test-project-name ]; then
