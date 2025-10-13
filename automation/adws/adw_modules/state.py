@@ -40,6 +40,7 @@ class ADWState:
     worktree_name: Optional[str] = None
     worktree_path: Optional[str] = None
     worktree_created_at: Optional[str] = None
+    test_project_name: Optional[str] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -60,6 +61,7 @@ class ADWState:
             "worktree_name": self.worktree_name,
             "worktree_path": self.worktree_path,
             "worktree_created_at": self.worktree_created_at,
+            "test_project_name": self.test_project_name,
         }
         payload.update(self.extra)
         return {key: value for key, value in payload.items() if value is not None}
@@ -82,7 +84,7 @@ class ADWState:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
 
-        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at"}}
+        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at", "test_project_name"}}
 
         return cls(
             adw_id=data.get("adw_id", adw_id),
@@ -93,6 +95,7 @@ class ADWState:
             worktree_name=data.get("worktree_name"),
             worktree_path=data.get("worktree_path"),
             worktree_created_at=data.get("worktree_created_at"),
+            test_project_name=data.get("test_project_name"),
             extra=extra,
         )
 

@@ -152,6 +152,51 @@ Unless overridden by the plan or environment, the build/test phases enforce (fro
 
 The test phase automatically injects `bun install` when a recognised lockfile is dirty. Extend `ts_commands.py` if project-specific commands are needed.
 
+### Test Environment Provisioning
+
+The test phase (`adw_phases/adw_test.py`) automatically provisions isolated test environments for each ADW run to ensure tests execute against real Supabase infrastructure without conflicts.
+
+**Automatic Lifecycle**:
+- **Setup**: Before validation commands run, provisions isolated Docker Compose stack
+- **Execution**: Tests run against dedicated test environment with generated `.env.test`
+- **Teardown**: After validation completes (success or failure), cleans up containers and volumes
+
+**Isolation Mechanism**:
+- Each ADW run gets unique `PROJECT_NAME`: `kotadb-adw-{adw_id}`
+- Docker Compose handles dynamic port allocation automatically
+- No port conflicts between concurrent ADW test runs
+- Each environment has isolated PostgreSQL database
+
+**Resource Requirements**:
+- RAM: ~300-500MB per test environment
+- Startup Time: ~30-45 seconds for full Supabase stack
+- Cleanup Time: ~5-10 seconds
+
+**Configuration**:
+Test environment state is tracked in ADW state (`test_project_name` field) for lifecycle management.
+
+**Troubleshooting**:
+
+*Orphaned Test Environments*:
+```bash
+# Check for orphaned containers
+docker ps -a | grep kotadb-adw
+
+# Manual cleanup if needed
+docker compose -p kotadb-adw-{adw_id} down -v
+```
+
+*Setup Failures*:
+- Verify Docker is running: `docker info`
+- Check available disk space: `df -h /var/lib/docker`
+- Review test phase logs: `logs/kota-db-ts/{env}/{adw_id}/adw_test/execution.log`
+- Ensure bun is available in worktree: `cd trees/{worktree} && which bun`
+
+*Timeout Issues*:
+- Test environment setup timeout: 180 seconds (3 minutes)
+- Test environment teardown timeout: 60 seconds (1 minute)
+- If timeouts occur frequently, check Docker performance and available resources
+
 ---
 
 ## Containerised Deployment (Optional)

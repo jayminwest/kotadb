@@ -12,6 +12,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 from dataclasses import asdict
 from pathlib import Path
@@ -60,6 +61,62 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
         help="Skip automatic dependency install even if lockfiles changed",
     )
     return parser.parse_args(argv[1:])
+
+
+def setup_test_environment(worktree_path: Path, adw_id: str, logger: logging.Logger) -> str:
+    """Provision isolated test environment with unique project name."""
+    project_name = f"kotadb-adw-{adw_id}"
+    app_dir = worktree_path / "app"
+
+    logger.info(f"Provisioning test environment with PROJECT_NAME={project_name}")
+
+    try:
+        result = subprocess.run(
+            ["bun", "run", "test:setup"],
+            cwd=app_dir,
+            env={**os.environ, "PROJECT_NAME": project_name},
+            capture_output=True,
+            text=True,
+            timeout=180,
+        )
+
+        if result.returncode != 0:
+            raise RuntimeError(
+                f"Test environment setup failed (exit {result.returncode}): {result.stderr}"
+            )
+
+        logger.info(f"Test environment provisioned successfully: {project_name}")
+        return project_name
+
+    except subprocess.TimeoutExpired:
+        raise RuntimeError("Test environment setup timed out after 180 seconds")
+
+
+def teardown_test_environment(worktree_path: Path, project_name: str, logger: logging.Logger) -> None:
+    """Tear down test environment (best-effort cleanup)."""
+    app_dir = worktree_path / "app"
+
+    logger.info(f"Tearing down test environment: {project_name}")
+
+    try:
+        result = subprocess.run(
+            ["bun", "run", "test:teardown"],
+            cwd=app_dir,
+            env={**os.environ, "PROJECT_NAME": project_name},
+            capture_output=True,
+            text=True,
+            timeout=60,
+        )
+
+        if result.returncode != 0:
+            logger.warning(f"Test environment teardown had errors: {result.stderr}")
+        else:
+            logger.info(f"Test environment cleaned up successfully: {project_name}")
+
+    except subprocess.TimeoutExpired:
+        logger.warning("Test environment teardown timed out after 60 seconds")
+    except Exception as exc:
+        logger.warning(f"Test environment teardown failed: {exc}")
 
 
 def load_existing_state(adw_id: str) -> ADWState:
@@ -119,6 +176,19 @@ def main() -> None:
 
     logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
 
+    # Provision isolated test environment
+    try:
+        project_name = setup_test_environment(worktree_path, adw_id, logger)
+        state.update(test_project_name=project_name)
+        state.save()
+    except Exception as exc:
+        logger.error(f"Test environment provisioning failed: {exc}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Test environment setup failed: {exc}"),
+        )
+        sys.exit(1)
+
     issue = fetch_issue(issue_number, repo_path)
     persist_issue_snapshot(state, issue)
     state.save()
@@ -129,44 +199,54 @@ def main() -> None:
             state.update(issue_class=issue_command)
             state.save()
 
-    lockfile_dirty = lockfile_changed(cwd=worktree_path)
-    commands = validation_commands(lockfile_dirty and not args.skip_install)
-    serialized_commands = serialize_validation(commands)
+    try:
+        lockfile_dirty = lockfile_changed(cwd=worktree_path)
+        commands = validation_commands(lockfile_dirty and not args.skip_install)
+        serialized_commands = serialize_validation(commands)
 
-    make_issue_comment(
-        issue_number,
-        f"{format_issue_message(adw_id, 'ops', '✅ Starting validation run')}\\n"
-        f"Commands:\\n" + "\\n".join(f"- `{entry['cmd']}`" for entry in serialized_commands),
-    )
+        make_issue_comment(
+            issue_number,
+            f"{format_issue_message(adw_id, 'ops', '✅ Starting validation run')}\\n"
+            f"Commands:\\n" + "\\n".join(f"- `{entry['cmd']}`" for entry in serialized_commands),
+        )
 
-    results = run_validation_commands(commands, cwd=worktree_path)
-    success, summary = summarize_validation_results(results)
+        results = run_validation_commands(commands, cwd=worktree_path)
+        success, summary = summarize_validation_results(results)
 
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, AGENT_TESTER, summary),
-    )
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, AGENT_TESTER, summary),
+        )
 
-    if not success:
-        logger.error("Validation run failed")
-        sys.exit(1)
+        if not success:
+            logger.error("Validation run failed")
+            sys.exit(1)
 
-    # Persist latest status for downstream phases
-    state.update(
-        last_validation=json.dumps([asdict(result) for result in results], indent=2),
-        last_validation_success=True,
-    )
-    state.save()
+        # Persist latest status for downstream phases
+        state.update(
+            last_validation=json.dumps([asdict(result) for result in results], indent=2),
+            last_validation_success=True,
+        )
+        state.save()
 
-    make_issue_comment(
-        issue_number,
-        format_issue_message(adw_id, "ops", "✅ Validation phase completed"),
-    )
-    make_issue_comment(
-        issue_number,
-        f"{format_issue_message(adw_id, 'ops', '📋 Test phase state')}\\n```json\\n{json.dumps(state.data, indent=2)}\\n```",
-    )
-    logger.info("Validation completed successfully")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", "✅ Validation phase completed"),
+        )
+        make_issue_comment(
+            issue_number,
+            f"{format_issue_message(adw_id, 'ops', '📋 Test phase state')}\\n```json\\n{json.dumps(state.data, indent=2)}\\n```",
+        )
+        logger.info("Validation completed successfully")
+
+    finally:
+        # Always tear down test environment, even on failure
+        if state.get("test_project_name"):
+            teardown_test_environment(
+                worktree_path,
+                state.get("test_project_name"),
+                logger
+            )
 
 
 if __name__ == "__main__":
