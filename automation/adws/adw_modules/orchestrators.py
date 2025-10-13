@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import os
 import subprocess
-from typing import Iterable, Sequence
+from typing import Sequence
 
 
 class PhaseExecutionError(RuntimeError):

@@ -45,7 +45,7 @@ def main() -> None:
     if returncode == 0:
         print(f"   ✅ CWD: {stdout}")
     else:
-        print(f"   ❌ Failed to determine CWD")
+        print("   ❌ Failed to determine CWD")
 
     # Check 3: Git status
     print("\n3. Checking git status...")
@@ -56,13 +56,13 @@ def main() -> None:
         else:
             print("   ✅ Clean worktree (no changes)")
     else:
-        print(f"   ❌ Git status failed")
+        print("   ❌ Git status failed")
 
     # Check 4: Test file creation and tracking
     print("\n4. Testing file creation and git tracking...")
     test_file = worktree_path / "test-validation.txt"
     test_file.write_text("validation test")
-    print(f"   Created test file: test-validation.txt")
+    print("   Created test file: test-validation.txt")
 
     # Check if git detects the file
     returncode, stdout, _ = run_command(["git", "status", "--porcelain"], cwd=worktree_path)

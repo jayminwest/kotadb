@@ -1,4 +1,3 @@
-import json
 
 from adws.adw_modules.utils import parse_json
 

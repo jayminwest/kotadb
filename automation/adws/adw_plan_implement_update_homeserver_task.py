@@ -329,7 +329,7 @@ def main(
             if cleanup_success:
                 console.print("[green]✓ Worktree cleanup complete[/green]")
             else:
-                console.print(f"[yellow]WARN: Worktree cleanup incomplete[/yellow]")
+                console.print("[yellow]WARN: Worktree cleanup incomplete[/yellow]")
 
         # Display summary table
         summary_table = Table(show_header=True, box=None)

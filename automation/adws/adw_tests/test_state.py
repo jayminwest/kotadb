@@ -6,7 +6,6 @@ import pytest
 
 
 def test_state_persistence(tmp_path: Path, monkeypatch: pytest.MonkeyPatch) -> None:
-    from adws import adw_modules
     from adws.adw_modules import state as state_module
 
     monkeypatch.setattr(state_module, "project_root", lambda: tmp_path)

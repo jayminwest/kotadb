@@ -13,7 +13,6 @@ from pathlib import Path
 
 import uvicorn
 from fastapi import FastAPI, Request
-from typing import Tuple
 
 from adws.adw_modules.github import ADW_BOT_IDENTIFIER
 from adws.adw_modules.utils import load_adw_env, make_adw_id, project_root, run_logs_dir

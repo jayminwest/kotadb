@@ -17,7 +17,6 @@ from .data_types import (
     DocumentationResult,
     GitHubIssue,
     IssueClassSlashCommand,
-    ReviewIssue,
     ReviewResult,
 )
 from .git_ops import GitError

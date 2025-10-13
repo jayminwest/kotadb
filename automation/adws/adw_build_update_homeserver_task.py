@@ -293,7 +293,7 @@ def main(
             if cleanup_success:
                 console.print("[green]✓ Worktree cleanup complete[/green]")
             else:
-                console.print(f"[yellow]WARN: Worktree cleanup incomplete[/yellow]")
+                console.print("[yellow]WARN: Worktree cleanup incomplete[/yellow]")
 
         # Generate workflow summary
         summary = {
