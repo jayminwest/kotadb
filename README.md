@@ -232,7 +232,7 @@ automation/            # Agentic layer (Python AI developer workflows)
   adws/                # ADW automation scripts and modules
   docker/              # ADW-specific Docker images
 
-.claude/commands/      # Claude Code slash commands (shared across layers)
+.claude/commands/      # Claude Code slash commands (see .claude/commands/README.md for organization details)
 .github/workflows/     # CI workflows (app-ci.yml for application tests)
 docs/                  # Documentation (schema, specs, setup guides)
 ```

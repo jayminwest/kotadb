@@ -10,6 +10,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
 
 ## Conditional Documentation
 
+- .claude/commands/README.md
+  - Conditions:
+    - When adding new slash commands and determining subdirectory placement
+    - When understanding Claude Code slash command discovery and organization
+    - When onboarding developers to the command structure after #58 reorganization
+
 - README.md
   - Conditions:
     - When you are new to the repository or need an overview of tooling and workflows
