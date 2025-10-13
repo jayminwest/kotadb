@@ -266,7 +266,7 @@ def implement_plan(...) -> AgentPromptResponse:
 - May include markdown formatting around JSON, but JSON block must be valid
 - No trailing commas, no comments in JSON
 
-**Example - `/review` template** (.claude/commands/automation/review.md):
+**Example - `/review` template** (.claude/commands/workflows/review.md):
 ```markdown
 # /review
 
@@ -281,9 +281,11 @@ Return a JSON object matching this schema:
   "review_issues": [            // Array of issues found (empty if none)
     {
       "review_issue_number": number,
-      "issue_severity": "blocker" | "warning" | "suggestion",
+      "issue_severity": "blocker" | "tech_debt" | "skippable",
       "issue_description": string,
-      "issue_resolution": string
+      "issue_resolution": string,
+      "screenshot_path": string | null,
+      "screenshot_url": string | null
     }
   ]
 }
@@ -325,13 +327,15 @@ def run_review(...) -> Tuple[Optional[ReviewResult], Optional[str]]:
     return result, None
 ```
 
-**Pydantic model schema** (adw_modules/data_types.py):
+**Pydantic model schema** (adw_modules/data_types.py:193-210):
 ```python
 class ReviewIssue(BaseModel):
     review_issue_number: int
-    issue_severity: Literal["blocker", "warning", "suggestion"]
+    issue_severity: Literal["blocker", "tech_debt", "skippable"]
     issue_description: str
     issue_resolution: str
+    screenshot_path: Optional[str] = None
+    screenshot_url: Optional[str] = None
 
 class ReviewResult(BaseModel):
     success: bool

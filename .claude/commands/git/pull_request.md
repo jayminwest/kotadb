@@ -70,4 +70,30 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 - Double-check the PR body captures anti-mock evidence and that labels (e.g., `methodology:anti-mock`) are applied when relevant.
 
 ## Report
-Return only the PR URL.
+Return only the PR URL as plain text on a single line.
+
+**DO NOT include:**
+- Explanatory text (e.g., "Successfully created pull request!", "The PR is ready for review")
+- Markdown formatting (no **bold**, no ` ``` blocks`)
+- Multiple lines or additional commentary
+- PR metadata (title, description, etc.)
+
+**Correct output:**
+```
+https://github.com/user/kota-db-ts/pull/123
+```
+
+**INCORRECT output (do NOT do this):**
+```
+Successfully created pull request!
+
+PR URL: https://github.com/user/kota-db-ts/pull/123
+
+The pull request is now ready for review. It includes validation evidence and anti-mock compliance notes.
+```
+
+```
+**Pull Request Created**
+
+https://github.com/user/kota-db-ts/pull/123
+```

@@ -20,7 +20,40 @@ Synchronise documentation with recent code changes. Provide related PR/issue ide
 6. Push the documentation branch (`git push -u origin <branch>`) and execute `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so the PR opens immediately; ensure the PR title ends with the issue number (e.g. `docs: refresh api usage (#210)`).
 7. If you create significant new documentation, add or update the relevant entry in `.claude/commands/docs/conditional_docs.md`.
 
-## Reporting
-- Summary of documentation sections updated with file paths.
-- Validation or preview steps performed.
-- PR URL (or confirmation it was appended to an existing PR) and remaining follow-ups (translations, screenshots, release notes).
+## CRITICAL: Output Format Requirements
+
+This template is used as a fallback by automation when `/document` fails. Return a JSON object matching this exact schema:
+
+```json
+{
+  "success": boolean,
+  "documentation_created": boolean,
+  "documentation_path": string | null,
+  "summary": string | null,
+  "error_message": string | null
+}
+```
+
+**Field Requirements:**
+- `success`: `true` if task completed successfully, `false` if errors occurred
+- `documentation_created`: `true` if docs were created/updated, `false` if not needed
+- `documentation_path`: Relative path to main doc file if updated (e.g., `README.md`, `CLAUDE.md`), `null` if none
+- `summary`: 2-4 sentence description including PR URL if created, validation performed, and follow-ups needed
+- `error_message`: Error description if `success: false`, `null` otherwise
+
+**DO NOT include:**
+- Markdown formatting around JSON (no ``` backticks in output)
+- Explanatory text (e.g., "Here is the documentation result:")
+- Comments within JSON
+- Trailing commas
+
+**Example output:**
+```json
+{
+  "success": true,
+  "documentation_created": true,
+  "documentation_path": "CLAUDE.md",
+  "summary": "Updated CLAUDE.md to document new rate limiting middleware and response headers. Updated conditional_docs.md with new spec reference. PR created at https://github.com/user/kota-db-ts/pull/123. No translations or screenshots needed.",
+  "error_message": null
+}
+```

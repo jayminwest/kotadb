@@ -45,6 +45,37 @@ Before creating the PR, select and execute the appropriate validation level:
 - Verify the PR body includes validation evidence and the title suffix `(#<issue-number>)`.
 
 ## Report
-- Provide a concise bullet list of the implementation work performed.
-- Note the validation level chosen and each command executed with pass/fail status.
-- Include the output of `git diff --stat` to summarise file/line changes.
+Provide a concise bullet list of the implementation work performed.
+
+**DO NOT include:**
+- Markdown formatting (no **bold**, no ` ``` blocks`, no # headers)
+- Explanatory preambles (e.g., "Here is the implementation report:")
+- Multiple paragraph descriptions
+
+**Correct output:**
+```
+- Modified app/src/api/routes.ts: added rate limiting middleware (45 lines)
+- Created app/tests/api/rate-limit.test.ts: 15 integration tests added
+- Updated app/src/auth/middleware.ts: integrated rate limit checks
+- Validation: Level 2 selected (feature with new endpoints)
+- Commands executed: lint (pass), typecheck (pass), integration tests (pass, 133/133)
+- Real-service evidence: Supabase query logs show rate limit increments in api_keys table
+- git diff --stat: 4 files changed, 156 insertions(+), 12 deletions(-)
+- Pushed branch feat/26-abc12345-rate-limiting
+- Created PR: https://github.com/user/repo/pull/123
+```
+
+**INCORRECT output (do NOT do this):**
+```
+# Implementation Report
+
+I have successfully completed the implementation! Here's what I did:
+
+**Files Modified:**
+- Modified `app/src/api/routes.ts` to add the rate limiting middleware
+
+**Validation:**
+All tests passed successfully! The validation level was Level 2.
+
+You can view the pull request at: https://github.com/user/repo/pull/123
+```

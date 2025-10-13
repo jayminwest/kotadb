@@ -76,5 +76,28 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 ```
 
 ## Report
-- Provide a bullet summary of the strategy.
-- Print the relative `docs/specs/` path for the generated plan.
+Provide a 2-3 bullet summary of the fix strategy and risks.
+
+**Important Notes:**
+- The plan file path will be automatically detected by `/find_plan_file` agent
+- Focus output on summarizing the fix approach, not the file location
+- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
+
+**Correct output:**
+```
+- Created bug fix plan for missing search results issue
+- Root cause: RLS policy incorrectly filtering user-scoped queries
+- Fix strategy: update policy predicate, add regression tests
+- Risk: policy change affects all search endpoints, requires careful validation
+```
+
+**INCORRECT output (do NOT do this):**
+```
+# Bug Fix Plan
+
+**Summary:** I've created a comprehensive bug fix plan!
+
+The plan file is located at: **docs/specs/bug-2210-missing-search-results.md**
+
+This plan addresses...
+```

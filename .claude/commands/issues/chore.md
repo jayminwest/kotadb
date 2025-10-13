@@ -66,5 +66,27 @@ Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lea
 ```
 
 ## Report
-- Summarise key actions in bullets.
-- Output the relative path to the new `docs/specs/` plan.
+Summarise the plan in 2-3 bullets highlighting key changes and risks.
+
+**Important Notes:**
+- The plan file path will be automatically detected by `/find_plan_file` agent
+- Focus output on summarizing what was planned, not the file location
+- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
+
+**Correct output:**
+```
+- Created chore plan for dependency refresh (bun 1.1.x upgrade)
+- Plan covers lockfile updates, test validation, and CI verification
+- Low risk: no breaking changes expected, validation confirms compatibility
+```
+
+**INCORRECT output (do NOT do this):**
+```
+# Chore Plan Created
+
+I have successfully created a maintenance plan!
+
+**Plan location:** docs/specs/chore-1450-refresh-deps.md
+
+The plan includes...
+```
