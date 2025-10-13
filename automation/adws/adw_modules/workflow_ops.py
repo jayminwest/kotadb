@@ -225,10 +225,16 @@ def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger, cwd:
     # Extract path from response, handling markdown code blocks
     plan_path = response.output.strip()
 
-    # Try to extract from markdown code blocks (```path```)
-    code_block_match = re.search(r'```\s*([^\n`]+)\s*```', plan_path)
-    if code_block_match:
-        plan_path = code_block_match.group(1).strip()
+    # Try to extract from markdown code blocks - use the LAST one (most specific)
+    # Agents often include git output in first block and the final path in last block
+    code_blocks = re.findall(r'```\s*([^\n`]+)\s*```', plan_path)
+    if code_blocks:
+        plan_path = code_blocks[-1].strip()  # Use last code block
+
+    # Strip git status prefixes like "?? ", "M ", "A ", etc.
+    git_status_prefix = re.match(r'^[?MAD!]{1,2}\s+', plan_path)
+    if git_status_prefix:
+        plan_path = plan_path[git_status_prefix.end():].strip()
 
     if plan_path == "0":
         return None, "No plan file returned"

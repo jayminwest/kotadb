@@ -188,41 +188,8 @@ def main() -> None:
     logger.info(f"  git ls-files output: {ls_files_result.stdout if ls_files_result.stdout else '(file not tracked)'}")
     logger.info("=" * 80)
 
-    # Verify file is tracked by git (after staging by agent)
-    tracked, track_error = git_ops.verify_file_in_index(plan_file, cwd=worktree_path)
-    if not tracked:
-        logger.warning(f"Plan file not tracked by git, adding explicitly: {plan_file}")
-        logger.warning(f"Verification error: {track_error}")
-
-        # Enhanced diagnostics: Log git status before explicit staging
-        logger.info("=" * 80)
-        logger.info("DIAGNOSTIC: Git status before explicit staging")
-        status_before_staging = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
-        logger.info(f"Git status output:\n{status_before_staging.stdout if status_before_staging.stdout else '(empty)'}")
-        logger.info("=" * 80)
-
-        # Explicitly add the file
-        try:
-            git_ops.stage_paths([plan_file], cwd=worktree_path)
-            logger.info(f"Plan file staged: {plan_file}")
-
-            # Enhanced diagnostics: Log git status after explicit staging
-            logger.info("=" * 80)
-            logger.info("DIAGNOSTIC: Git status after explicit staging")
-            status_after_staging = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
-            logger.info(f"Git status output:\n{status_after_staging.stdout if status_after_staging.stdout else '(empty)'}")
-
-            # Verify file is now tracked
-            tracked_after, _ = git_ops.verify_file_in_index(plan_file, cwd=worktree_path)
-            logger.info(f"File tracked after staging: {tracked_after}")
-            logger.info("=" * 80)
-        except git_ops.GitError as exc:
-            logger.error(f"Failed to stage plan file: {exc}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Error staging plan file: {exc}"),
-            )
-            sys.exit(1)
+    # NOTE: We do NOT stage the file here. Staging will happen AFTER commit message generation
+    # to avoid the issue where agent invocation clears the git staging area (issue #86).
 
     state.update(plan_file=plan_file)
     state.save()
@@ -231,12 +198,41 @@ def main() -> None:
         format_issue_message(adw_id, "ops", f"✅ Plan file created: {plan_file}"),
     )
 
+    # CRITICAL FIX (#86): Generate commit message BEFORE staging to prevent staging loss
+    # Agent invocation between staging and commit causes git staging area to be cleared.
+    # By generating the message first, we can stage and commit immediately without
+    # any intervening agent calls that might affect git state.
+    logger.info("=" * 80)
+    logger.info("FIX #86: Generating commit message BEFORE staging operations")
+    logger.info("=" * 80)
+
     commit_message, error = create_commit_message(AGENT_PLANNER, issue, issue_command, adw_id, logger, cwd=str(worktree_path))
     if error or not commit_message:
         logger.error(f"Plan commit message failure: {error}")
         make_issue_comment(
             issue_number,
             format_issue_message(adw_id, AGENT_PLANNER, f"❌ Error creating plan commit: {error}"),
+        )
+        sys.exit(1)
+
+    logger.info(f"Commit message generated successfully (length: {len(commit_message)} chars)")
+
+    # Now stage the file immediately after generating commit message (no agent calls in between)
+    logger.info("Staging plan file immediately after commit message generation")
+    try:
+        git_ops.stage_paths([plan_file], cwd=worktree_path)
+        logger.info(f"Plan file staged: {plan_file}")
+
+        # Verify staging worked
+        tracked_after, _ = git_ops.verify_file_in_index(plan_file, cwd=worktree_path)
+        if not tracked_after:
+            raise git_ops.GitError(f"File staging verification failed for {plan_file}")
+        logger.info("Staging verification: SUCCESS")
+    except git_ops.GitError as exc:
+        logger.error(f"Failed to stage plan file: {exc}")
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", f"❌ Error staging plan file: {exc}"),
         )
         sys.exit(1)
 
@@ -314,8 +310,11 @@ def main() -> None:
             pr_created = True
 
     # Cleanup worktree after successful PR creation (respects ADW_CLEANUP_WORKTREES env var)
+    # NOTE: Cleanup is disabled when ADW_SKIP_PLAN_CLEANUP=true (e.g., during multi-phase SDLC workflows)
     cleanup_enabled = os.getenv("ADW_CLEANUP_WORKTREES", "true").lower() == "true"
-    if pr_created and cleanup_enabled:
+    skip_plan_cleanup = os.getenv("ADW_SKIP_PLAN_CLEANUP", "false").lower() == "true"
+
+    if pr_created and cleanup_enabled and not skip_plan_cleanup:
         logger.info(f"Cleaning up worktree: {worktree_name}")
         cleanup_success = git_ops.cleanup_worktree(worktree_name, base_path=worktree_base_path, delete_branch=False)
         if cleanup_success:
@@ -330,6 +329,8 @@ def main() -> None:
                 issue_number,
                 format_issue_message(adw_id, "ops", f"⚠️ Worktree cleanup incomplete: trees/{worktree_name}"),
             )
+    elif skip_plan_cleanup:
+        logger.info("Skipping worktree cleanup (ADW_SKIP_PLAN_CLEANUP=true, preserving for subsequent phases)")
 
     state.save()
     make_issue_comment(

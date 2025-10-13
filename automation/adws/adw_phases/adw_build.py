@@ -112,8 +112,10 @@ def main() -> None:
     )
 
     plan_file = ensure_plan_exists(state, issue_number)
-    if not os.path.exists(plan_file):
-        logger.error(f"Plan file missing: {plan_file}")
+    # Check plan file exists in worktree (plan_file is relative path)
+    plan_file_full_path = worktree_path / plan_file
+    if not plan_file_full_path.exists():
+        logger.error(f"Plan file missing: {plan_file} (absolute: {plan_file_full_path})")
         make_issue_comment(
             issue_number,
             format_issue_message(adw_id, "ops", f"❌ Plan file missing: {plan_file}"),
