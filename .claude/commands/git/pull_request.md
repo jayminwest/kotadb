@@ -29,7 +29,23 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 
 ## Prepare Metadata
 - Parse `issue_json` for `issue_type`, number, and title.
-- PR title format: `<issue_type>: <short summary> (#<issue_number>)` where `issue_type` is lower-case (`feature`, `bug`, `chore`, etc.).
+- **Determine PR type** (planning vs implementation):
+  1. Run `git diff origin/develop...HEAD --name-only` to get list of changed files
+  2. Count lines changed outside `docs/` with `git diff origin/develop...HEAD --stat | grep -v 'docs/' | tail -1`
+  3. If PR contains ONLY changes to `docs/specs/*.md` files → **planning PR**
+  4. If PR contains changes to `app/src/`, `automation/`, or >50 lines outside `docs/` → **implementation PR**
+- **PR title format**:
+  - **Planning PRs**: `<issue_type>: add [specification|plan] for <feature name> (#<issue_number>)`
+    - Extract feature name from issue title (remove "feat:", "chore:", etc. prefix)
+    - Use "specification" for chore-type issues, "plan" for feature-type issues
+  - **Implementation PRs**: `<issue_type>: <imperative verb> <feature name> (#<issue_number>)`
+    - Extract imperative description from issue title (remove issue type prefix)
+    - If issue title starts with "add specification" or "add plan", replace with appropriate implementation verb:
+      - For feat issues: use "implement" (e.g., "implement structured output validation")
+      - For bug issues: use "fix" (e.g., "fix rate limiting edge case")
+      - For chore issues: use verb from issue title or "update" (e.g., "update CI configuration")
+    - Otherwise use the issue title as-is (already has imperative verb)
+  - All `issue_type` values are lower-case: `feat`, `bug`, `chore`, `docs`, `refactor`, `test`
 - Compose the PR body including:
   - Summary of changes
   - Validation evidence section (see template below)
