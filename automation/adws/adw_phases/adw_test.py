@@ -32,7 +32,7 @@ from adws.adw_modules.workflow_ops import (
     format_issue_message,
     lockfile_changed,
     persist_issue_snapshot,
-    run_validation_commands,
+    run_validation_with_resolution,
     serialize_validation,
     start_logger,
     summarize_validation_results,
@@ -256,8 +256,24 @@ def main() -> None:
             f"Commands:\\n" + "\\n".join(f"- `{entry['cmd']}`" for entry in serialized_commands),
         )
 
-        results = run_validation_commands(commands, cwd=worktree_path, logger=logger)
-        success, summary = summarize_validation_results(results)
+        # Check if agent resolution is enabled (default: true)
+        enable_resolution = os.getenv("ADW_ENABLE_RESOLUTION", "true").lower() == "true"
+
+        if enable_resolution:
+            results, success = run_validation_with_resolution(
+                commands=commands,
+                worktree_path=worktree_path,
+                adw_id=adw_id,
+                issue_number=issue_number,
+                logger=logger,
+                max_attempts=3,
+            )
+        else:
+            from adws.adw_modules.workflow_ops import run_validation_commands
+            results = run_validation_commands(commands, cwd=worktree_path, logger=logger)
+            success = all(r.ok for r in results)
+
+        _, summary = summarize_validation_results(results)
 
         make_issue_comment(
             issue_number,
@@ -284,6 +300,29 @@ def main() -> None:
                     f"**Label**: {failed_result.label}",
                     f"**Exit code**: {failed_result.returncode}",
                     "",
+                ]
+
+                # Add resolution attempt details if enabled
+                if enable_resolution:
+                    retry_count = state.get("validation_retry_count", 0)
+                    error_details.extend([
+                        f"**Resolution attempts**: {retry_count}",
+                        "",
+                    ])
+
+                    # Include last resolution attempts (truncated to 500 chars)
+                    last_attempts = state.get("last_resolution_attempts", "")
+                    if last_attempts:
+                        truncated_attempts = truncate(last_attempts, limit=500)
+                        error_details.extend([
+                            "**Resolution history**:",
+                            "```",
+                            truncated_attempts,
+                            "```",
+                            "",
+                        ])
+
+                error_details.extend([
                     "**Stderr**:",
                     "```",
                     truncate(failed_result.stderr) if failed_result.stderr else "(empty)",
@@ -293,7 +332,7 @@ def main() -> None:
                     "```",
                     truncate(failed_result.stdout) if failed_result.stdout else "(empty)",
                     "```",
-                ]
+                ])
                 error_message = "\n".join(error_details)
 
                 make_issue_comment(

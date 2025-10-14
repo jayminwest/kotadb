@@ -275,7 +275,9 @@ The ADW system implements resilience patterns to handle transient failures and a
 - `validation_retry_count`: Number of validation retry attempts performed
 - `resolution_attempted`: Per-result flag indicating agent resolution was attempted
 
-**Future Integration**: Resolution retry loop available but not integrated into test phase by default. To enable, modify `adw_test.py` to call `run_validation_with_resolution()` instead of `run_validation_commands()`.
+**Integration Status**: Enabled by default as of #132. Resolution retry loop is integrated into test phase and enabled by default. To disable, set `ADW_ENABLE_RESOLUTION=false` in environment.
+
+**Rollback Procedure**: If resolution retry loop causes production issues, disable immediately with `ADW_ENABLE_RESOLUTION=false`. This reverts test phase to original fail-fast behavior without requiring code changes.
 
 ---
 
