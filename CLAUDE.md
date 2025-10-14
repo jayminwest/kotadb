@@ -176,6 +176,15 @@ All workflows execute in isolated git worktrees (`trees/`) to prevent conflicts 
 
 The agentic layer operates on the application layer (in `app/`) to automate development workflows. See `automation/adws/README.md` for complete automation architecture and usage examples.
 
+**ADW Observability**:
+- `automation/adws/scripts/analyze_logs.py`: Automated log analysis for ADW success rates and failure patterns
+  - Parses execution logs from `automation/logs/kota-db-ts/{env}/{adw_id}/adw_sdlc/execution.log`
+  - Correlates with agent state from `automation/agents/{adw_id}/adw_state.json`
+  - Outputs text, JSON, or markdown reports with success rates, phase funnels, and failure distributions
+  - CI integration via `.github/workflows/adw-metrics.yml` (daily analysis with alerting)
+  - Key metrics: success rate, phase progression, worktree staleness, failure patterns by phase
+  - Usage: `uv run automation/adws/scripts/analyze_logs.py --format json --hours 24`
+
 ### CI/CD Testing Infrastructure
 **GitHub Actions Workflows**:
 - **Application CI** (`.github/workflows/app-ci.yml`): Tests the TypeScript/Bun application layer

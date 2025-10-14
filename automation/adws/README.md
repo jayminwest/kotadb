@@ -616,6 +616,117 @@ curl -X POST https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/stats \
 
 ---
 
+## Log Analysis
+
+The ADW system includes automated log analysis tooling to surface critical metrics and failure patterns from execution logs and agent state.
+
+### Quick Start
+
+```bash
+# Text output to stdout (default)
+uv run automation/adws/scripts/analyze_logs.py
+
+# JSON output for programmatic consumption
+uv run automation/adws/scripts/analyze_logs.py --format json
+
+# Markdown report to file
+uv run automation/adws/scripts/analyze_logs.py --format markdown --output file --output-file report.md
+
+# Analyze last 48 hours
+uv run automation/adws/scripts/analyze_logs.py --hours 48
+
+# Analyze staging environment
+uv run automation/adws/scripts/analyze_logs.py --env staging
+```
+
+### Key Metrics
+
+The log analysis script extracts and aggregates:
+- **Success rate**: `(completed_runs / total_runs) * 100`
+- **Phase funnel**: Runs reaching each phase (plan → build → test → review → document)
+- **Failure distribution**: Count by phase and root cause category
+- **Issue distribution**: Runs per issue number with outcome breakdown
+- **Worktree metrics**: Active, completed, and stale worktree counts
+- **Temporal analysis**: Success rate trends over configurable time windows
+
+### Output Formats
+
+**Text**: Human-readable stdout output with emojis and formatted tables
+**JSON**: Structured data for CI integration and programmatic analysis
+**Markdown**: GitHub-friendly reports compatible with issue comments
+
+### CI Integration
+
+The log analysis runs daily via GitHub Actions (`.github/workflows/adw-metrics.yml`):
+- **Schedule**: Daily at 00:00 UTC
+- **Outputs**: JSON metrics artifact + markdown summary in workflow output
+- **Alerting**: Posts issue comment when success rate < 50%
+- **Artifacts**: 90-day retention for historical tracking
+
+Trigger manually:
+```bash
+gh workflow run adw-metrics.yml --ref develop
+```
+
+### Data Sources
+
+**Execution Logs**: `automation/logs/kota-db-ts/{env}/{adw_id}/adw_sdlc/execution.log`
+- Issue number extraction
+- Phase progression tracking
+- Failure pattern analysis
+- Error message aggregation
+
+**Agent State**: `automation/agents/{adw_id}/adw_state.json`
+- Worktree metadata correlation
+- Branch name tracking
+- Plan file references
+- Timestamp analysis for staleness detection
+
+### Monitoring Best Practices
+
+**Daily Review**:
+1. Check success rate trend (target: >80%)
+2. Identify top 3 failure phases
+3. Review error patterns for systemic issues
+
+**Weekly Review**:
+1. Analyze 7-day success rate trend
+2. Identify issues with multiple failed attempts
+3. Clean up stale worktrees (>7 days old)
+
+**Alerting Thresholds**:
+- **50% success rate**: Investigation recommended (automatic issue comment in CI)
+- **20% success rate**: Critical threshold (CI workflow fails)
+
+### Example Output
+
+```
+═══════════════════════════════════════════════════════════════════════════════
+ADW Agentic Run Analysis - Last 24 Hours
+Analysis Time: 2025-10-13 19:04:10
+Environment: local
+═══════════════════════════════════════════════════════════════════════════════
+
+📊 SUMMARY METRICS
+───────────────────────────────────────────────────────────────────────────────
+Total runs analyzed: 18
+
+Outcome Distribution:
+  • failed_at_adw_test          :  9 runs ( 50.0%)
+  • failed_at_adw_plan          :  4 runs ( 22.2%)
+  • failed_at_adw_build         :  4 runs ( 22.2%)
+  • in_progress                 :  1 runs (  5.6%)
+
+Phase Reach (how many runs got to each phase):
+  • adw_plan     : 18 runs (100.0%)
+  • adw_build    : 13 runs ( 72.2%)
+  • adw_test     :  9 runs ( 50.0%)
+  • adw_review   :  0 runs (  0.0%)
+  • adw_document :  0 runs (  0.0%)
+```
+
+---
+
 ## Troubleshooting
 
 ### File Path and Git Staging Issues

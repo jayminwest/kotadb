@@ -1,0 +1,160 @@
+name: ADW Metrics Analysis
+
+on:
+  schedule:
+    # Run daily at 00:00 UTC
+    - cron: '0 0 * * *'
+  workflow_dispatch:
+    inputs:
+      hours:
+        description: 'Time window in hours to analyze'
+        required: false
+        default: '24'
+      alert_threshold:
+        description: 'Success rate threshold for alerts (0-100)'
+        required: false
+        default: '50'
+
+permissions:
+  contents: read
+  issues: write
+
+jobs:
+  analyze:
+    name: Analyze ADW Logs
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+          cache-dependency-glob: 'automation/uv.lock'
+
+      - name: Install dependencies
+        run: |
+          cd automation
+          uv sync --frozen
+
+      - name: Run log analysis (JSON)
+        id: analysis
+        run: |
+          cd automation
+          HOURS="${{ github.event.inputs.hours || '24' }}"
+          uv run adws/scripts/analyze_logs.py --format json --hours "$HOURS" --env local > metrics.json
+          cat metrics.json
+
+      - name: Parse metrics
+        id: parse
+        run: |
+          SUCCESS_RATE=$(jq -r '.summary.success_rate' automation/metrics.json)
+          TOTAL_RUNS=$(jq -r '.summary.total_runs' automation/metrics.json)
+          FAILED_RUNS=$(jq -r '[.runs[] | select(.failures | length > 0)] | length' automation/metrics.json)
+
+          echo "success_rate=$SUCCESS_RATE" >> $GITHUB_OUTPUT
+          echo "total_runs=$TOTAL_RUNS" >> $GITHUB_OUTPUT
+          echo "failed_runs=$FAILED_RUNS" >> $GITHUB_OUTPUT
+
+          echo "Success Rate: $SUCCESS_RATE%"
+          echo "Total Runs: $TOTAL_RUNS"
+          echo "Failed Runs: $FAILED_RUNS"
+
+      - name: Upload metrics artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: adw-metrics-${{ github.run_number }}
+          path: automation/metrics.json
+          retention-days: 90
+
+      - name: Generate markdown summary
+        run: |
+          cd automation
+          HOURS="${{ github.event.inputs.hours || '24' }}"
+          uv run adws/scripts/analyze_logs.py --format markdown --hours "$HOURS" --env local > summary.md
+          cat summary.md >> $GITHUB_STEP_SUMMARY
+
+      - name: Check alert threshold
+        id: check_threshold
+        run: |
+          SUCCESS_RATE="${{ steps.parse.outputs.success_rate }}"
+          THRESHOLD="${{ github.event.inputs.alert_threshold || '50' }}"
+
+          if (( $(echo "$SUCCESS_RATE < $THRESHOLD" | bc -l) )); then
+            echo "alert=true" >> $GITHUB_OUTPUT
+            echo "Alert triggered: Success rate ($SUCCESS_RATE%) is below threshold ($THRESHOLD%)"
+          else
+            echo "alert=false" >> $GITHUB_OUTPUT
+            echo "No alert: Success rate ($SUCCESS_RATE%) is above threshold ($THRESHOLD%)"
+          fi
+
+      - name: Create issue comment on low success rate
+        if: steps.check_threshold.outputs.alert == 'true' && github.event_name == 'schedule'
+        uses: actions/github-script@v7
+        with:
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          script: |
+            const successRate = '${{ steps.parse.outputs.success_rate }}';
+            const totalRuns = '${{ steps.parse.outputs.total_runs }}';
+            const failedRuns = '${{ steps.parse.outputs.failed_runs }}';
+            const threshold = '${{ github.event.inputs.alert_threshold || '50' }}';
+            const runUrl = `${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}`;
+
+            const body = `## 🚨 ADW Success Rate Alert
+
+            **Success Rate**: ${successRate}% (below ${threshold}% threshold)
+            **Total Runs**: ${totalRuns}
+            **Failed Runs**: ${failedRuns}
+            **Analysis Period**: Last 24 hours
+
+            The ADW system success rate has fallen below the alert threshold. Please review the [detailed metrics](${runUrl}) and investigate failure patterns.
+
+            ### Quick Actions
+            1. Review recent failure logs in \`automation/logs/kota-db-ts/local/\`
+            2. Check for common failure patterns in test/plan/build phases
+            3. Verify environment setup and dependencies
+
+            ---
+            *Automated alert from \`adw-metrics.yml\` workflow*`;
+
+            // Find or create tracking issue for alerts
+            const issues = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'automation,alert',
+              per_page: 1
+            });
+
+            if (issues.data.length > 0) {
+              // Comment on existing alert issue
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: issues.data[0].number,
+                body: body
+              });
+            } else {
+              // Create new alert issue
+              await github.rest.issues.create({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                title: `ADW Success Rate Alert: ${successRate}% (below ${threshold}%)`,
+                body: body,
+                labels: ['automation', 'alert', 'priority:high']
+              });
+            }
+
+      - name: Fail workflow if critical threshold
+        if: ${{ fromJSON(steps.parse.outputs.success_rate) < 20 }}
+        run: |
+          echo "CRITICAL: Success rate is below 20%. Failing workflow."
+          exit 1

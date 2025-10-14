@@ -203,3 +203,13 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When debugging git identity configuration for worktree tests
     - When working on issue #79 or automation CI integration tasks
     - When CI badge status is incorrect or workflow needs updating
+
+- docs/specs/feature-105-automated-log-analysis-reports.md
+  - Conditions:
+    - When working on issue #105 or modifying ADW log analysis functionality
+    - When implementing automated reporting for ADW success rates and failure patterns
+    - When creating scripts under `automation/adws/scripts/` for log parsing
+    - When adding CI workflows for daily metrics analysis
+    - When integrating log analysis with GitHub Actions or cron systems
+    - When troubleshooting ADW observability, metrics calculation, or report generation
+    - When extending analysis to include agent state introspection from `automation/agents/`

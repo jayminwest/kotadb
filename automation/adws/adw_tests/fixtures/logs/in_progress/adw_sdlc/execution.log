@@ -1,0 +1,7 @@
+2025-10-13 13:00:00 - INFO - ADW Logger initialized - ID: test_run_999
+2025-10-13 13:00:00 - DEBUG - Log file: /path/to/logs
+2025-10-13 13:00:01 - INFO - Starting ADW workflow for issue #92
+2025-10-13 13:00:01 - INFO - Running adw_phases/adw_plan.py
+2025-10-13 13:00:30 - INFO - Plan phase completed successfully
+2025-10-13 13:00:30 - INFO - Running adw_phases/adw_build.py
+2025-10-13 13:05:00 - INFO - Build phase in progress...
