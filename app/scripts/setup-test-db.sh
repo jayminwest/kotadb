@@ -117,15 +117,6 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
     sleep 2
 done
 
-# Generate .env.test from container ports
-echo "🔧 Generating .env.test from container ports..."
-./scripts/generate-env-test-compose.sh "$PROJECT_NAME"
-
-# Load environment variables for migrations
-if [ -f .env.test ]; then
-    export $(grep -v '^#' .env.test | xargs)
-fi
-
 # Run migrations (now that auth schema exists from GoTrue)
 echo "🔄 Running migrations..."
 ./scripts/run-migrations-compose.sh "$PROJECT_NAME"
@@ -140,11 +131,12 @@ MAX_ATTEMPTS=30
 ATTEMPT=0
 
 while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
-    # Check if all services are healthy (db, auth, rest, kong = 4)
+    # Check if all services with healthchecks are healthy (db, auth, kong = 3)
+    # Note: PostgREST (rest) doesn't have a healthcheck, so we only wait for 3 services
     HEALTHY_COUNT=$(docker compose -p "$PROJECT_NAME" -f ../docker-compose.test.yml ps --format json 2>/dev/null | \
         grep -c '"Health":"healthy"' || echo "0")
 
-    if [ "$HEALTHY_COUNT" -ge 4 ]; then
+    if [ "$HEALTHY_COUNT" -ge 3 ]; then
         echo "✅ All services are healthy!"
         break
     fi
@@ -157,29 +149,43 @@ while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
         exit 1
     fi
 
-    echo "  Waiting for services ($HEALTHY_COUNT/4 healthy)... ($ATTEMPT/$MAX_ATTEMPTS)"
+    echo "  Waiting for services ($HEALTHY_COUNT/3 healthy)... ($ATTEMPT/$MAX_ATTEMPTS)"
     sleep 2
 done
+
+# Generate .env.test from container ports (now that all services are running)
+echo "🔧 Generating .env.test from container ports..."
+./scripts/generate-env-test-compose.sh "$PROJECT_NAME"
+
+# Load environment variables for seeding
+if [ -f .env.test ]; then
+    export $(grep -v '^#' .env.test | xargs)
+fi
 
 # Seed test data
 echo "🌱 Seeding test data..."
 PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME < supabase/seed.sql > /dev/null 2>&1
 
+# Save project name for final output (before unsetting)
+SAVED_PROJECT_NAME="$PROJECT_NAME"
+
 # Disable trap now that setup is complete
+# Note: We unset PROJECT_NAME so cleanup handler won't run on successful exit
+unset PROJECT_NAME
 trap - EXIT INT TERM
 
 echo "✅ Docker Compose test setup complete!"
 echo ""
 echo "Services:"
-echo "  Kong Gateway:  http://localhost:$(docker compose -p "$PROJECT_NAME" -f ../docker-compose.test.yml port kong 8000 | cut -d: -f2)"
-echo "  Database:      postgresql://postgres:postgres@localhost:$(docker compose -p "$PROJECT_NAME" -f ../docker-compose.test.yml port db 5432 | cut -d: -f2)/postgres"
+echo "  Kong Gateway:  http://localhost:$(docker compose -p "$SAVED_PROJECT_NAME" -f ../docker-compose.test.yml port kong 8000 | cut -d: -f2)"
+echo "  Database:      postgresql://postgres:postgres@localhost:$(docker compose -p "$SAVED_PROJECT_NAME" -f ../docker-compose.test.yml port db 5432 | cut -d: -f2)/postgres"
 echo ""
 echo "Test API Keys:"
 echo "  Free tier:  kota_free_test1234567890ab_0123456789abcdef0123456789abcdef"
 echo "  Solo tier:  kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef"
 echo "  Team tier:  kota_team_team1234567890ab_0123456789abcdef0123456789abcdef"
 echo ""
-echo "Project Name:  $PROJECT_NAME"
+echo "Project Name:  $SAVED_PROJECT_NAME"
 echo "  (stored in .test-project-name)"
 echo ""
 echo "💡 Tip: Run 'bun test' to run the test suite"
