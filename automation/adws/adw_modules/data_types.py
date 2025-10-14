@@ -7,7 +7,7 @@ from datetime import datetime
 from enum import Enum
 from typing import Any, Dict, List, Literal, Optional
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, ConfigDict, Field
 
 CommandType = Literal["feature", "bug", "chore", "schema", "support"]
 
@@ -112,6 +112,8 @@ class GitHubComment(BaseModel):
 class GitHubIssueListItem(BaseModel):
     """Subset of issue fields used for polling workflows."""
 
+    model_config = ConfigDict(populate_by_name=True)
+
     number: int
     title: str
     body: str
@@ -119,11 +121,10 @@ class GitHubIssueListItem(BaseModel):
     created_at: datetime = Field(alias="createdAt")
     updated_at: datetime = Field(alias="updatedAt")
 
-    class Config:
-        populate_by_name = True
-
 
 class GitHubIssue(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     number: int
     title: str
     body: str
@@ -137,9 +138,6 @@ class GitHubIssue(BaseModel):
     updated_at: datetime = Field(alias="updatedAt")
     closed_at: Optional[datetime] = Field(None, alias="closedAt")
     url: str
-
-    class Config:
-        populate_by_name = True
 
 
 class AgentPromptRequest(BaseModel):
