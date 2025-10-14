@@ -484,27 +484,51 @@ def ensure_plan_exists(state: ADWState, issue_number: str | None = None) -> str:
     raise ValueError("No plan file found in ADW state.")
 
 
-def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None) -> List[ValidationCommandResult]:
-    """Execute validation commands and capture their results."""
+def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None, logger: logging.Logger | None = None) -> List[ValidationCommandResult]:
+    """Execute validation commands and capture their results.
+
+    Args:
+        commands: Iterable of Command objects to execute
+        cwd: Working directory for command execution
+        logger: Optional logger for detailed command execution logging
+
+    Returns:
+        List of ValidationCommandResult objects with command outcomes
+    """
 
     results: List[ValidationCommandResult] = []
     for command in commands:
+        if logger:
+            logger.info(f"Running validation command: {command.label} ({' '.join(command.argv)})")
+
         process = subprocess.run(
             command.argv,
             capture_output=True,
             text=True,
             cwd=cwd or project_root(),
         )
-        results.append(
-            ValidationCommandResult(
-                label=command.label,
-                command=command.argv,
-                returncode=process.returncode,
-                stdout=process.stdout.strip(),
-                stderr=process.stderr.strip(),
-            )
+
+        result = ValidationCommandResult(
+            label=command.label,
+            command=command.argv,
+            returncode=process.returncode,
+            stdout=process.stdout.strip(),
+            stderr=process.stderr.strip(),
         )
+        results.append(result)
+
         if process.returncode != 0:
+            if logger:
+                # Log detailed error information for diagnostics
+                stdout_snippet = result.stdout[:500] if result.stdout else "(empty)"
+                stderr_snippet = result.stderr[:500] if result.stderr else "(empty)"
+                logger.error(
+                    f"Validation command failed: {command.label}\n"
+                    f"  Exit code: {process.returncode}\n"
+                    f"  Command: {' '.join(command.argv)}\n"
+                    f"  Stdout (first 500 chars): {stdout_snippet}\n"
+                    f"  Stderr (first 500 chars): {stderr_snippet}"
+                )
             break
     return results
 

@@ -1131,6 +1131,56 @@ uv run adws/adw_phases/adw_plan.py 81
 
 ### Validation Failures
 
+#### Test Phase Error Diagnostics
+
+The test phase (`adw_phases/adw_test.py`) includes enhanced error reporting to surface actionable diagnostics when validation commands fail.
+
+**Features**:
+- **Detailed execution logs**: Full command output logged to `logs/kota-db-ts/{env}/{adw_id}/adw_test/execution.log`
+- **GitHub issue comments**: Actionable error details posted automatically on failure
+- **State persistence**: Failed validation results persisted to `agents/{adw_id}/adw_state.json` for post-mortem analysis
+
+**Enhanced Error Information**:
+When a validation command fails, the test phase now reports:
+- Command label and full argv
+- Exit code
+- Stderr output (truncated to 2000 chars)
+- Stdout output (truncated to 2000 chars)
+
+**Example Enhanced Error Comment**:
+```markdown
+🤖 abc-123_ops: ❌ Validation command failed
+
+**Command**: `bun run lint`
+**Label**: Lint check
+**Exit code**: 1
+
+**Stderr**:
+```
+error: 'unused-var' is defined but never used
+  at src/api/routes.ts:45:7
+```
+
+**Stdout**:
+```
+Linting 142 files...
+Found 1 error
+```
+```
+
+**Diagnostic Commands**:
+```bash
+# View detailed execution logs with full command output
+cat logs/kota-db-ts/{env}/{adw_id}/adw_test/execution.log
+
+# View persisted validation results for post-mortem
+cat agents/{adw_id}/adw_state.json | jq .last_validation
+
+# Check test environment health
+cd trees/{worktree-name}
+ls -la app/package.json app/.env.test
+```
+
 **Issue**: Tests passing locally but failing in CI
 **Common Causes**:
 1. **Port mismatch**: Local tests use port `54326`, CI may differ

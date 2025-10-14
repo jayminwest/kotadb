@@ -200,6 +200,15 @@ def main() -> None:
             state.save()
 
     try:
+        # Pre-validation health checks (non-blocking)
+        app_package_json = worktree_path / "app" / "package.json"
+        app_env_test = worktree_path / "app" / ".env.test"
+
+        if not app_package_json.exists():
+            logger.warning(f"Worktree structure check: app/package.json not found at {app_package_json}")
+        if not app_env_test.exists():
+            logger.warning(f"Test environment check: app/.env.test not found at {app_env_test}")
+
         lockfile_dirty = lockfile_changed(cwd=worktree_path)
         commands = validation_commands(lockfile_dirty and not args.skip_install)
         serialized_commands = serialize_validation(commands)
@@ -210,7 +219,7 @@ def main() -> None:
             f"Commands:\\n" + "\\n".join(f"- `{entry['cmd']}`" for entry in serialized_commands),
         )
 
-        results = run_validation_commands(commands, cwd=worktree_path)
+        results = run_validation_commands(commands, cwd=worktree_path, logger=logger)
         success, summary = summarize_validation_results(results)
 
         make_issue_comment(
@@ -218,16 +227,45 @@ def main() -> None:
             format_issue_message(adw_id, AGENT_TESTER, summary),
         )
 
-        if not success:
-            logger.error("Validation run failed")
-            sys.exit(1)
-
-        # Persist latest status for downstream phases
+        # Always persist validation results for post-mortem analysis, regardless of outcome
         state.update(
             last_validation=json.dumps([asdict(result) for result in results], indent=2),
-            last_validation_success=True,
+            last_validation_success=success,
         )
         state.save()
+
+        if not success:
+            # Extract first failed result for detailed error reporting
+            failed_result = next((r for r in results if not r.ok), None)
+            if failed_result:
+                # Truncate outputs to 2000 chars with ellipsis
+                def truncate(text: str, limit: int = 2000) -> str:
+                    return text[:limit] + "..." if len(text) > limit else text
+
+                error_details = [
+                    f"**Command**: `{' '.join(failed_result.command)}`",
+                    f"**Label**: {failed_result.label}",
+                    f"**Exit code**: {failed_result.returncode}",
+                    "",
+                    "**Stderr**:",
+                    "```",
+                    truncate(failed_result.stderr) if failed_result.stderr else "(empty)",
+                    "```",
+                    "",
+                    "**Stdout**:",
+                    "```",
+                    truncate(failed_result.stdout) if failed_result.stdout else "(empty)",
+                    "```",
+                ]
+                error_message = "\n".join(error_details)
+
+                make_issue_comment(
+                    issue_number,
+                    f"{format_issue_message(adw_id, 'ops', '❌ Validation command failed')}\\n\\n{error_message}",
+                )
+
+            logger.error("Validation run failed")
+            sys.exit(1)
 
         make_issue_comment(
             issue_number,
