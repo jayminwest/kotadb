@@ -24,14 +24,11 @@ adws/
 │   ├── ts_commands.py    # Bun validation command catalogue
 │   ├── utils.py          # Env loading, logging, JSON helpers
 │   └── workflow_ops.py   # Agent wrappers for plan/build/test/review/etc.
-├── adw_phases/           # Single-phase execution scripts
-│   ├── adw_plan.py       # Plan phase (classify → branch → plan → PR)
-│   ├── adw_build.py      # Build phase (implement plan + push)
-│   ├── adw_test.py       # Validation phase (Bun lint/typecheck/test/build)
-│   ├── adw_review.py     # Review phase (Claude review + reporting)
-│   ├── adw_document.py   # Documentation phase (docs-update + commits)
-│   └── adw_patch.py      # Patch phase (comment-driven quick fixes)
-├── adw_sdlc.py           # Full SDLC orchestrator (plan → build → test → review → docs)
+├── adw_phases/           # Single-phase execution scripts (3-phase architecture as of #136)
+│   ├── adw_plan.py       # Plan phase (classify → branch → plan)
+│   ├── adw_build.py      # Build phase (implement plan → commit → push → PR)
+│   └── adw_review.py     # Review phase (Claude review + reporting)
+├── adw_sdlc.py           # Full SDLC orchestrator (plan → build → review)
 ├── adw_tests/            # Pytest suite covering utilities and workflows
 ├── adw_triggers/         # Automation trigger systems
 │   └── adw_trigger_cron_homeserver.py  # Home server task poller
@@ -44,14 +41,20 @@ adws/
 
 ## Phase Scripts
 
+**3-Phase Architecture** (simplified in PR #136):
+
 Each single-phase script (located in `adw_phases/`) expects `ISSUE_NUMBER [ADW_ID]` and persists progress to `agents/<adw_id>/adw_state.json`:
 
-- `adw_phases/adw_plan.py` — classify the issue, generate a branch + plan file, commit the plan, and open/update the PR.
-- `adw_phases/adw_build.py` — resume from state, implement the plan, commit code, and push.
-- `adw_phases/adw_test.py` — run Bun lint/typecheck/test/build (auto-includes `bun install` if lockfiles changed) and record results.
-- `adw_phases/adw_review.py` — run the reviewer agent against the spec, summarise findings, and block on unresolved blockers.
-- `adw_phases/adw_document.py` — produce documentation updates via `/document` (or `/docs-update` fallback) and commit/push changes.
-- `adw_phases/adw_patch.py` — apply targeted fixes when an issue/comment contains the `adw_patch` keyword.
+- `adw_phases/adw_plan.py` — classify the issue, generate a branch + plan file, and commit the plan (PR creation deferred to build phase).
+- `adw_phases/adw_build.py` — resume from state, implement the plan, commit code, push, and create/update the PR.
+- `adw_phases/adw_review.py` — run the reviewer agent against the spec, summarize findings, and block on unresolved blockers.
+
+**Removed Phases** (as of #136):
+- `adw_test.py` — Validation phase (removed: 367 lines)
+- `adw_document.py` — Documentation phase (removed: 232 lines)
+- `adw_patch.py` — Patch workflow (removed: 244 lines)
+
+**Rationale**: The 5-phase architecture achieved 0% success rate across 57 runs due to over-engineering. The simplified 3-phase flow (plan → build → review) targets >80% completion rate by focusing on core functionality and deferring PR creation until implementation is complete.
 
 The SDLC orchestrator (`adw_sdlc.py`) chains single-phase scripts using `adw_modules.orchestrators.run_sequence`.
 
@@ -159,16 +162,13 @@ uv run adws/health_check.py --json
 # Full SDLC workflow for issue #123
 uv run adws/adw_sdlc.py 123
 
-# Run individual phases
+# Run individual phases (3-phase architecture)
 uv run adws/adw_phases/adw_plan.py 123
 uv run adws/adw_phases/adw_build.py 123
-uv run adws/adw_phases/adw_test.py 123
+uv run adws/adw_phases/adw_review.py 123
 
 # Restart a phase with a known ADW id
 uv run adws/adw_phases/adw_build.py 123 deadbeef
-
-# Patch mode (requires `adw_patch` keyword in issue/comment)
-uv run adws/adw_phases/adw_patch.py 123 deadbeef
 ```
 
 ---
@@ -179,11 +179,11 @@ uv run adws/adw_phases/adw_patch.py 123 deadbeef
   Polls open issues every 20 seconds. A workflow launches when the latest comment (excluding ADW bot posts) is exactly `adw`. The cron trigger runs the full SDLC workflow by default.
 
 - **Webhook server** (`PORT=8001 uv run adws/trigger_webhook.py`)
-  FastAPI endpoint that reacts to issue comment commands. Examples:
+  FastAPI endpoint that reacts to issue comment commands. Examples (3-phase architecture):
   - `/adw plan` → `adw_phases/adw_plan.py`
   - `/adw build` → `adw_phases/adw_build.py`
   - `/adw review` → `adw_phases/adw_review.py`
-  - `/adw sdlc` → `adw_sdlc.py`
+  - `/adw sdlc` → `adw_sdlc.py` (runs all 3 phases)
   The webhook injects `ADW_WORKFLOW` into the runner container so the appropriate script executes.
 
 - **Home Server Integration** (`uv run adws/adw_triggers/adw_trigger_cron_homeserver.py`)
@@ -198,86 +198,16 @@ All triggers write logs beneath `logs/kota-db-ts/…` so bot activity is observa
 
 ## Validation Defaults
 
-Unless overridden by the plan or environment, the build/test phases enforce (from `../app/` directory):
+**Note**: As of PR #136, the automated test phase has been removed. Validation commands are no longer automatically executed by the ADW system. Developers should run validation manually before creating PRs:
 
-1. `cd ../app && bun run lint`
-2. `cd ../app && bun run typecheck`
-3. `cd ../app && bun test`
-4. `cd ../app && bun run build`
-
-The test phase automatically injects `bun install` when a recognised lockfile is dirty. Extend `ts_commands.py` if project-specific commands are needed.
-
-### Test Environment Provisioning
-
-The test phase (`adw_phases/adw_test.py`) automatically provisions isolated test environments for each ADW run to ensure tests execute against real Supabase infrastructure without conflicts.
-
-**Automatic Lifecycle**:
-- **Setup**: Before validation commands run, provisions isolated Docker Compose stack
-- **Execution**: Tests run against dedicated test environment with generated `.env.test`
-- **Teardown**: After validation completes (success or failure), cleans up containers and volumes
-
-**Isolation Mechanism**:
-- Each ADW run gets unique `PROJECT_NAME`: `kotadb-adw-{adw_id}`
-- Docker Compose handles dynamic port allocation automatically
-- No port conflicts between concurrent ADW test runs
-- Each environment has isolated PostgreSQL database
-
-**Resource Requirements**:
-- RAM: ~300-500MB per test environment
-- Startup Time: ~30-45 seconds for full Supabase stack
-- Cleanup Time: ~5-10 seconds
-
-**Configuration**:
-Test environment state is tracked in ADW state (`test_project_name` field) for lifecycle management.
-
-**Troubleshooting**:
-
-*Orphaned Test Environments*:
 ```bash
-# Check for orphaned containers
-docker ps -a | grep kotadb-adw
-
-# Manual cleanup if needed
-docker compose -p kotadb-adw-{adw_id} down -v
+cd app && bun run lint       # Lint check
+cd app && bun run typecheck  # Type checking
+cd app && bun test           # Test suite
+cd app && bun run build      # Production build
 ```
 
-*Setup Failures*:
-- Verify Docker is running: `docker info`
-- Check available disk space: `df -h /var/lib/docker`
-- Review test phase logs: `logs/kota-db-ts/{env}/{adw_id}/adw_test/execution.log`
-- Ensure bun is available in worktree: `cd trees/{worktree} && which bun`
-
-*Timeout Issues*:
-- Test environment setup timeout: 180 seconds (3 minutes) with exponential backoff retry (2s, 4s, 8s delays)
-- Test environment teardown timeout: 60 seconds (1 minute)
-- If timeouts occur frequently, check Docker performance and available resources
-
-### Agent-Friendly Resilience Patterns
-
-The ADW system implements resilience patterns to handle transient failures and agent self-correction instead of fail-fast behavior.
-
-**Key Features**:
-- **Continue-on-error validation**: Collects all validation failures before deciding to exit
-- **Exponential backoff retry**: Test environment provisioning retries 3 times with 2s/4s/8s delays
-- **Agent resolution loop** (opt-in): Pass validation failures back to agents for self-correction (max 3 attempts)
-- **Smart bailout**: Exits early if agent can't resolve any failures
-
-**Resolution Functions** (`adw_modules/`):
-- `run_validation_commands()`: Collects all failures (no longer breaks on first failure)
-- `run_validation_with_resolution()`: Validation + retry loop with agent feedback
-- `agent_resolution.py`: Agent resolution coordination and state tracking
-
-**Slash Commands**:
-- `/resolve_failed_validation`: Agent-driven validation failure resolution template
-
-**State Tracking**:
-- `last_resolution_attempts`: JSON string of resolution history for debugging
-- `validation_retry_count`: Number of validation retry attempts performed
-- `resolution_attempted`: Per-result flag indicating agent resolution was attempted
-
-**Integration Status**: Enabled by default as of #132. Resolution retry loop is integrated into test phase and enabled by default. To disable, set `ADW_ENABLE_RESOLUTION=false` in environment.
-
-**Rollback Procedure**: If resolution retry loop causes production issues, disable immediately with `ADW_ENABLE_RESOLUTION=false`. This reverts test phase to original fail-fast behavior without requiring code changes.
+The `ts_commands.py` module retains validation command definitions for potential future reintegration or manual use.
 
 ---
 
@@ -715,15 +645,15 @@ Example phase task:
 
 ### Phase Routing
 
-The trigger automatically routes tasks to phase scripts based on `tags.phase`:
+The trigger automatically routes tasks to phase scripts based on `tags.phase` (3-phase architecture as of #136):
 
 | Phase | Script | Purpose |
 |-------|--------|---------|
 | plan | `adw_phases/adw_plan.py` | Create implementation plan |
-| build | `adw_phases/adw_build.py` | Implement plan |
-| test | `adw_phases/adw_test.py` | Run validation commands |
+| build | `adw_phases/adw_build.py` | Implement plan and create PR |
 | review | `adw_phases/adw_review.py` | Code review |
-| document | `adw_phases/adw_document.py` | Generate documentation |
+
+**Note**: Test and document phases were removed in PR #136. Phase tasks with `tags.phase: "test"` or `tags.phase: "document"` will be rejected.
 
 ### Task Creation via Slash Commands
 
@@ -733,8 +663,8 @@ Create phase tasks using the `/tasks:create` slash command:
 # Create a build phase task
 /tasks:create build "Execute build phase for issue #110" 110 abc-123 feat-110-example high
 
-# Create a test phase task
-/tasks:create test "Run validation for issue #110" 110 abc-123 feat-110-example medium
+# Create a review phase task
+/tasks:create review "Run code review for issue #110" 110 abc-123 feat-110-example medium
 ```
 
 Query phase tasks using `/tasks:query_phase`:
@@ -746,8 +676,8 @@ Query phase tasks using `/tasks:query_phase`:
 # Query all in-progress tasks
 /tasks:query_phase all in_progress
 
-# Query completed test tasks
-/tasks:query_phase test completed 50
+# Query completed review tasks
+/tasks:query_phase review completed 50
 ```
 
 Update task status using `/tasks:update_status`:
@@ -835,16 +765,11 @@ All trigger events are logged to `.adw_logs/api_trigger/YYYYMMDD.log` in JSON fo
 
 **Selective Phase Retry**:
 ```bash
-# Create task to re-run only the test phase
-/tasks:create test "Retry validation after fixing flaky test" 110 abc-123 feat-110-example high
+# Create task to re-run only the build phase
+/tasks:create build "Retry implementation after fixing dependency issue" 110 abc-123 feat-110-example high
 ```
 
-**Parallel Phase Execution** (Future):
-```bash
-# Create independent review and document tasks that can run concurrently
-/tasks:create review "Code review for issue #110" 110 abc-123 feat-110-example medium
-/tasks:create document "Generate docs for issue #110" 110 abc-123 feat-110-example medium
-```
+**Note**: With the 3-phase architecture (plan → build → review), the build phase now includes PR creation. The review phase runs after the PR is created.
 
 **API-Driven Workflows**:
 External systems can create phase tasks via the kota-tasks MCP API, enabling:
@@ -892,7 +817,7 @@ External systems can create phase tasks via the kota-tasks MCP API, enabling:
 
 **Issue**: Phase script not found
 **Symptoms**: Task marked as failed with "No phase script found" error
-**Solution**: Verify phase name in `tags.phase` is one of: plan, build, test, review, document
+**Solution**: Verify phase name in `tags.phase` is one of: plan, build, review (test and document phases were removed in #136)
 
 ---
 
@@ -923,7 +848,7 @@ uv run automation/adws/scripts/analyze_logs.py --env staging
 
 The log analysis script extracts and aggregates:
 - **Success rate**: `(completed_runs / total_runs) * 100`
-- **Phase funnel**: Runs reaching each phase (plan → build → test → review → document)
+- **Phase funnel**: Runs reaching each phase (plan → build → review) — updated for 3-phase architecture as of #136
 - **Failure distribution**: Count by phase and root cause category
 - **Issue distribution**: Runs per issue number with outcome breakdown
 - **Worktree metrics**: Active, completed, and stale worktree counts
@@ -1000,9 +925,9 @@ Outcome Distribution:
 Phase Reach (how many runs got to each phase):
   • adw_plan     : 18 runs (100.0%)
   • adw_build    : 13 runs ( 72.2%)
-  • adw_test     :  9 runs ( 50.0%)
   • adw_review   :  0 runs (  0.0%)
-  • adw_document :  0 runs (  0.0%)
+
+Note: adw_test and adw_document phases removed in PR #136
 ```
 
 ---
@@ -1158,55 +1083,24 @@ uv run adws/adw_phases/adw_plan.py 81
 
 ### Validation Failures
 
-#### Test Phase Error Diagnostics
+**Note**: As of PR #136, the automated test phase (`adw_test.py`) has been removed. Validation is now a manual responsibility.
 
-The test phase (`adw_phases/adw_test.py`) includes enhanced error reporting to surface actionable diagnostics when validation commands fail.
+**Manual Validation**:
+Developers should run validation commands manually before creating PRs:
 
-**Features**:
-- **Detailed execution logs**: Full command output logged to `logs/kota-db-ts/{env}/{adw_id}/adw_test/execution.log`
-- **GitHub issue comments**: Actionable error details posted automatically on failure
-- **State persistence**: Failed validation results persisted to `agents/{adw_id}/adw_state.json` for post-mortem analysis
-
-**Enhanced Error Information**:
-When a validation command fails, the test phase now reports:
-- Command label and full argv
-- Exit code
-- Stderr output (truncated to 2000 chars)
-- Stdout output (truncated to 2000 chars)
-
-**Example Enhanced Error Comment**:
-```markdown
-🤖 abc-123_ops: ❌ Validation command failed
-
-**Command**: `bun run lint`
-**Label**: Lint check
-**Exit code**: 1
-
-**Stderr**:
-```
-error: 'unused-var' is defined but never used
-  at src/api/routes.ts:45:7
-```
-
-**Stdout**:
-```
-Linting 142 files...
-Found 1 error
-```
-```
-
-**Diagnostic Commands**:
 ```bash
-# View detailed execution logs with full command output
-cat logs/kota-db-ts/{env}/{adw_id}/adw_test/execution.log
-
-# View persisted validation results for post-mortem
-cat agents/{adw_id}/adw_state.json | jq .last_validation
-
-# Check test environment health
-cd trees/{worktree-name}
-ls -la app/package.json app/.env.test
+cd app && bun run lint       # Lint check
+cd app && bun run typecheck  # Type checking
+cd app && bun test           # Test suite
+cd app && bun run build      # Production build
 ```
+
+**CI Validation**:
+GitHub Actions still runs full validation on all PRs via `.github/workflows/app-ci.yml`:
+- Automated test suite (133 tests)
+- Lint and type checking
+- Migration sync validation
+- Environment variable validation
 
 **Issue**: Tests passing locally but failing in CI
 **Common Causes**:
@@ -1217,17 +1111,12 @@ ls -la app/package.json app/.env.test
 **Solution**:
 ```bash
 # Reset local test database to match CI state
-bun run test:reset
-bun test
+cd app && bun run test:reset
+cd app && bun test
 
 # Regenerate .env.test from Supabase status
-bun run test:env
+cd app && bun run test:env
 ```
-
-**Issue**: Rate limit tests failing intermittently
-**Symptoms**: Cache timing tests show flaky behavior
-**Cause**: Time-dependent assertions in tests
-**Workaround**: These are known flaky tests, rerun if failed (tracked in test comments)
 
 ### Workflow Execution Issues
 

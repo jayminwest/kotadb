@@ -194,7 +194,10 @@ All application code is located in the `app/` directory.
 
 ### AI Developer Workflows (automation/adws/)
 Python-based automation pipeline for autonomous GitHub issue workflows:
-- `adw_plan.py`, `adw_build.py`, `adw_test.py`, `adw_review.py`, `adw_document.py`: Phase scripts for SDLC automation
+- **3-Phase Architecture** (as of #136): `adw_plan.py` → `adw_build.py` → `adw_review.py`
+  - Plan phase: Issue classification and implementation planning
+  - Build phase: Implementation and PR creation
+  - Review phase: Automated code review and reporting
 - `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops with worktree isolation, GitHub integration, state management)
 - `adw_tests/`: Pytest suite for workflow validation
 - `trigger_webhook.py`, `trigger_cron.py`: Webhook and polling-based trigger systems
@@ -202,6 +205,8 @@ Python-based automation pipeline for autonomous GitHub issue workflows:
 All workflows execute in isolated git worktrees (`trees/`) to prevent conflicts during concurrent agent execution and local development. Worktrees are automatically created before agent execution and cleaned up after successful PR creation (configurable via `ADW_CLEANUP_WORKTREES` environment variable).
 
 The agentic layer operates on the application layer (in `app/`) to automate development workflows. See `automation/adws/README.md` for complete automation architecture and usage examples.
+
+**Recent Simplification** (PR #136): The ADW system was simplified from a 5-phase to a 3-phase flow by removing broken test/document/patch phases (519 lines deleted). PR creation was moved from plan phase to build phase to ensure PRs only open after successful implementation. Target completion rate: >80%.
 
 **ADW Observability**:
 - `automation/adws/scripts/analyze_logs.py`: Automated log analysis for ADW success rates and failure patterns
