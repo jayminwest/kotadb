@@ -189,6 +189,9 @@ uv run adws/adw_phases/adw_patch.py 123 deadbeef
 - **Home Server Integration** (`uv run adws/adw_triggers/adw_trigger_cron_homeserver.py`)
   Polls a custom home server endpoint (via Tailscale) for pending tasks. Each task runs in an isolated git worktree with automatic status synchronization. See [Home Server Integration](#home-server-integration) section below for details.
 
+- **API-Driven Phase Task Trigger** (`uv run adws/adw_triggers/adw_trigger_api_tasks.py`)
+  Polls the kota-tasks MCP server for pending phase tasks and routes them to individual phase scripts (plan, build, test, review, document). Enables phase-level workflow orchestration with concurrent task execution. See [API-Driven Phase Execution](#api-driven-phase-execution) section below for details.
+
 All triggers write logs beneath `logs/kota-db-ts/…` so bot activity is observable.
 
 ---
@@ -613,6 +616,256 @@ curl -X POST https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/stats \
 # Verify trigger continues operating if stats endpoint unavailable
 # Expected: Warning messages in trigger logs, but task processing continues
 ```
+
+---
+
+## API-Driven Phase Execution
+
+The API-driven phase task trigger enables phase-level workflow orchestration by polling the kota-tasks MCP server for pending phase tasks and routing them to individual phase scripts. This architecture enables selective phase retry, concurrent phase execution, and API-driven task creation.
+
+### Setup
+
+1. Configure MCP server in `.mcp.json` (already configured):
+   ```json
+   {
+     "mcpServers": {
+       "kota-tasks": {
+         "type": "http",
+         "url": "http://localhost:3000/mcp",
+         "headers": {
+           "Authorization": "Bearer <api_key>"
+         }
+       }
+     }
+   }
+   ```
+
+2. Start the API trigger:
+   ```bash
+   # Continuous polling (default: 10 second interval)
+   uv run adws/adw_triggers/adw_trigger_api_tasks.py
+
+   # Run once and exit
+   uv run adws/adw_triggers/adw_trigger_api_tasks.py --once
+
+   # Custom configuration
+   uv run adws/adw_triggers/adw_trigger_api_tasks.py \
+     --polling-interval 15 \
+     --max-concurrent 3 \
+     --verbose
+   ```
+
+### Task Structure
+
+Phase tasks in the kota-tasks MCP server must include:
+- `task_id`: Unique identifier (UUID)
+- `title`: Short description
+- `status`: Current status (pending/claimed/in_progress/completed/failed)
+- `priority`: Priority level (low/medium/high)
+- `tags.phase`: Phase name (plan, build, test, review, document)
+- `tags.issue_number`: GitHub issue number
+- `tags.worktree`: Worktree name for execution
+- `tags.parent_adw_id`: Parent ADW execution ID for tracking
+
+Example phase task:
+```json
+{
+  "task_id": "550e8400-e29b-41d4-a716-446655440000",
+  "project_id": "kotadb",
+  "title": "Build phase: Issue #110",
+  "description": "Execute build phase for issue #110",
+  "status": "pending",
+  "priority": "high",
+  "tags": {
+    "phase": "build",
+    "issue_number": "110",
+    "worktree": "feat-110-example",
+    "parent_adw_id": "abc-123"
+  },
+  "created_at": "2025-10-13T14:30:00Z"
+}
+```
+
+### Phase Routing
+
+The trigger automatically routes tasks to phase scripts based on `tags.phase`:
+
+| Phase | Script | Purpose |
+|-------|--------|---------|
+| plan | `adw_phases/adw_plan.py` | Create implementation plan |
+| build | `adw_phases/adw_build.py` | Implement plan |
+| test | `adw_phases/adw_test.py` | Run validation commands |
+| review | `adw_phases/adw_review.py` | Code review |
+| document | `adw_phases/adw_document.py` | Generate documentation |
+
+### Task Creation via Slash Commands
+
+Create phase tasks using the `/tasks:create` slash command:
+
+```bash
+# Create a build phase task
+/tasks:create build "Execute build phase for issue #110" 110 abc-123 feat-110-example high
+
+# Create a test phase task
+/tasks:create test "Run validation for issue #110" 110 abc-123 feat-110-example medium
+```
+
+Query phase tasks using `/tasks:query_phase`:
+
+```bash
+# Query pending build tasks
+/tasks:query_phase build pending 10
+
+# Query all in-progress tasks
+/tasks:query_phase all in_progress
+
+# Query completed test tasks
+/tasks:query_phase test completed 50
+```
+
+Update task status using `/tasks:update_status`:
+
+```bash
+# Mark task as completed
+/tasks:update_status <task_id> completed '{"exit_code": 0}'
+
+# Mark task as failed
+/tasks:update_status <task_id> failed null "Build failed: compilation errors"
+```
+
+### Task Lifecycle
+
+1. **pending**: Task created and waiting to be picked up
+2. **claimed**: Trigger picked up the task (not yet started)
+3. **in_progress**: Phase script is executing
+4. **completed**: Phase succeeded (includes result data)
+5. **failed**: Phase failed (includes error message)
+
+### Concurrent Execution
+
+The trigger supports concurrent phase task execution with configurable limits:
+
+```bash
+# Allow up to 5 concurrent phase tasks
+uv run adws/adw_triggers/adw_trigger_api_tasks.py --max-concurrent 5
+```
+
+**Concurrency Features**:
+- Independent phases from different issues run in parallel
+- Worktree isolation prevents git conflicts
+- Each task tracked individually with separate logs
+- Task deduplication prevents re-execution
+
+### Monitoring
+
+The trigger provides real-time status display:
+
+```
+┌─────────────────── 🔄 API-Driven Phase Task Trigger ───────────────────┐
+│  Status             Running                                             │
+│  Max Concurrent     5                                                   │
+│  Active Tasks       3                                                   │
+│  Checks Performed   127                                                 │
+│  Tasks Claimed      45                                                  │
+│  Tasks Completed    42                                                  │
+│  Tasks Failed       3                                                   │
+│  Errors             0                                                   │
+│  Last Check         14:32:15                                            │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+### Structured Logging
+
+All trigger events are logged to `.adw_logs/api_trigger/YYYYMMDD.log` in JSON format:
+
+```json
+{
+  "timestamp": "2025-10-13T14:32:15.123456",
+  "event": "phase_task_started",
+  "task_id": "550e8400-e29b-41d4-a716-446655440000",
+  "phase": "build",
+  "issue_number": "110",
+  "worktree": "feat-110-example",
+  "adw_id": "abc-123"
+}
+```
+
+### Configuration Options
+
+**CLI Flags**:
+- `--polling-interval <seconds>`: Polling frequency (default: 10)
+- `--max-concurrent <number>`: Max parallel tasks (default: 5)
+- `--dry-run`: Show tasks without executing
+- `--once`: Run single check and exit
+- `--verbose`: Show detailed output
+- `--log-file <path>`: Custom log file path
+
+**Environment Variables**:
+- `KOTA_TASKS_MCP_SERVER`: MCP server name (default: kota-tasks)
+- `KOTA_TASKS_PROJECT_ID`: Project identifier (default: kotadb)
+
+### Use Cases
+
+**Selective Phase Retry**:
+```bash
+# Create task to re-run only the test phase
+/tasks:create test "Retry validation after fixing flaky test" 110 abc-123 feat-110-example high
+```
+
+**Parallel Phase Execution** (Future):
+```bash
+# Create independent review and document tasks that can run concurrently
+/tasks:create review "Code review for issue #110" 110 abc-123 feat-110-example medium
+/tasks:create document "Generate docs for issue #110" 110 abc-123 feat-110-example medium
+```
+
+**API-Driven Workflows**:
+External systems can create phase tasks via the kota-tasks MCP API, enabling:
+- Event-driven triggers (e.g., GitHub webhook → create build task)
+- Scheduled phase execution (e.g., nightly test runs)
+- Manual phase triggering from dashboards
+- Integration with external workflow orchestrators
+
+### Architecture
+
+**Task API Module** (`adws/adw_modules/tasks_api.py`):
+- Python wrappers for MCP task operations
+- Executes MCP tools via Claude Code CLI `--mcp` flag
+- Functions: `create_phase_task()`, `update_task_status()`, `get_task()`, `list_tasks()`
+- Error handling for MCP server connectivity issues
+
+**Trigger** (`adws/adw_triggers/adw_trigger_api_tasks.py`):
+- Polls kota-tasks API for pending phase tasks
+- Routes tasks to phase scripts based on `tags.phase`
+- Updates task status throughout lifecycle
+- Manages concurrent task execution with configurable limits
+- Graceful shutdown handling (SIGINT/SIGTERM)
+
+**Slash Commands** (`.claude/commands/tasks/`):
+- `/tasks:create` - Create phase task with metadata
+- `/tasks:update_status` - Update task status
+- `/tasks:query_phase` - Query tasks by phase filter
+
+### Troubleshooting
+
+**Issue**: Tasks not being picked up
+**Diagnostics**:
+1. Verify MCP server is accessible:
+   ```bash
+   claude --mcp kota-tasks__tasks_list --args '{"project_id":"kotadb"}'
+   ```
+2. Check task status (only `pending` tasks are claimed)
+3. Review trigger logs in `.adw_logs/api_trigger/`
+
+**Issue**: Task status not updating
+**Diagnostics**:
+1. Check MCP server connectivity
+2. Verify task_id exists: `claude --mcp kota-tasks__tasks_get --args '{"task_id":"<task_id>"}'`
+3. Review phase script execution logs
+
+**Issue**: Phase script not found
+**Symptoms**: Task marked as failed with "No phase script found" error
+**Solution**: Verify phase name in `tags.phase` is one of: plan, build, test, review, document
 
 ---
 
