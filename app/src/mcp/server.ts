@@ -9,17 +9,17 @@
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
-	ListToolsRequestSchema,
 	CallToolRequestSchema,
+	ListToolsRequestSchema,
 } from "@modelcontextprotocol/sdk/types.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import {
-	SEARCH_CODE_TOOL,
 	INDEX_REPOSITORY_TOOL,
 	LIST_RECENT_FILES_TOOL,
-	executeSearchCode,
+	SEARCH_CODE_TOOL,
 	executeIndexRepository,
 	executeListRecentFiles,
+	executeSearchCode,
 } from "./tools";
 
 /**
@@ -49,11 +49,7 @@ export function createMcpServer(context: McpServerContext): Server {
 	// Register tools/list handler
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
 		return {
-			tools: [
-				SEARCH_CODE_TOOL,
-				INDEX_REPOSITORY_TOOL,
-				LIST_RECENT_FILES_TOOL,
-			],
+			tools: [SEARCH_CODE_TOOL, INDEX_REPOSITORY_TOOL, LIST_RECENT_FILES_TOOL],
 		};
 	});
 
@@ -118,6 +114,6 @@ export function createMcpServer(context: McpServerContext): Server {
 export function createMcpTransport(): StreamableHTTPServerTransport {
 	return new StreamableHTTPServerTransport({
 		sessionIdGenerator: undefined, // Stateless mode
-		enableJsonResponse: true,      // JSON mode (not SSE)
+		enableJsonResponse: true, // JSON mode (not SSE)
 	});
 }

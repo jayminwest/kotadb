@@ -3,7 +3,7 @@
  * Uses local PostgreSQL test database instead of mocks
  */
 
-import { createClient, type SupabaseClient } from "@supabase/supabase-js";
+import { type SupabaseClient, createClient } from "@supabase/supabase-js";
 
 /**
  * Test database connection details
@@ -41,8 +41,7 @@ export const TEST_API_KEYS = {
 	free: "kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 	solo: "kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
 	team: "kota_team_team1234567890ab_0123456789abcdef0123456789abcdef",
-	disabled:
-		"kota_free_disabled12345678_0123456789abcdef0123456789abcdef",
+	disabled: "kota_free_disabled12345678_0123456789abcdef0123456789abcdef",
 };
 
 /**
@@ -168,7 +167,8 @@ export async function createTestRepository(overrides?: {
 }): Promise<string> {
 	const client = getSupabaseTestClient();
 	const repoId = crypto.randomUUID();
-	const fullName = overrides?.fullName || `test-user/test-repo-${repoId.slice(0, 8)}`;
+	const fullName =
+		overrides?.fullName || `test-user/test-repo-${repoId.slice(0, 8)}`;
 	const userId = overrides?.userId;
 	const orgId = overrides?.orgId;
 

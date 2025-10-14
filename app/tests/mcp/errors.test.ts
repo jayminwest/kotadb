@@ -11,7 +11,7 @@
  * - DATABASE_URL (defaults to postgresql://postgres:postgres@localhost:5434/postgres)
  */
 
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Server } from "node:http";
 import { createAuthHeader } from "../helpers/db";
 import { startTestServer, stopTestServer } from "../helpers/server";
@@ -33,10 +33,10 @@ afterAll(async () => {
 describe("MCP JSON-RPC Error Handling", () => {
 	const headers = {
 		"Content-Type": "application/json",
-		"Origin": "http://localhost:3000",
+		Origin: "http://localhost:3000",
 		"MCP-Protocol-Version": "2025-06-18",
-		"Accept": "application/json, text/event-stream",
-		"Authorization": createAuthHeader("free"),
+		Accept: "application/json, text/event-stream",
+		Authorization: createAuthHeader("free"),
 	};
 
 	test("invalid JSON body returns -32700 Parse Error", async () => {

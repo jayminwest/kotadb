@@ -1,22 +1,22 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 
 export interface IndexRequest {
-  repository: string;
-  ref?: string;
-  localPath?: string;
+	repository: string;
+	ref?: string;
+	localPath?: string;
 }
 
 export interface IndexedFile {
-  id?: string; // UUID in Postgres
-  projectRoot: string; // Repository ID for compatibility
-  path: string;
-  content: string;
-  dependencies: string[];
-  indexedAt: Date;
+	id?: string; // UUID in Postgres
+	projectRoot: string; // Repository ID for compatibility
+	path: string;
+	content: string;
+	dependencies: string[];
+	indexedAt: Date;
 }
 
 export interface ApiContext {
-  supabase: SupabaseClient;
+	supabase: SupabaseClient;
 }
 
 /**

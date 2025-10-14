@@ -11,7 +11,7 @@
  * - DATABASE_URL (defaults to postgresql://postgres:postgres@localhost:5434/postgres)
  */
 
-import { describe, expect, test, beforeAll, afterAll } from "bun:test";
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Server } from "node:http";
 import { createAuthHeader } from "../helpers/db";
 import { startTestServer, stopTestServer } from "../helpers/server";
@@ -31,16 +31,15 @@ afterAll(async () => {
 });
 
 describe("MCP Handshake", () => {
-
 	test("successful initialize with valid headers", async () => {
 		const response = await fetch(`${baseUrl}/mcp`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				"Origin": "http://localhost:3000",
+				Origin: "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
-				"Accept": "application/json, text/event-stream",
-				"Authorization": createAuthHeader("free"),
+				Accept: "application/json, text/event-stream",
+				Authorization: createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -69,10 +68,10 @@ describe("MCP Handshake", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				"Origin": "http://localhost:3000",
+				Origin: "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
-				"Accept": "application/json, text/event-stream",
-				"Authorization": createAuthHeader("free"),
+				Accept: "application/json, text/event-stream",
+				Authorization: createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -102,10 +101,10 @@ describe("MCP Handshake", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				"Origin": "http://localhost:3000",
+				Origin: "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
-				"Accept": "application/json, text/event-stream",
-				"Authorization": createAuthHeader("free"),
+				Accept: "application/json, text/event-stream",
+				Authorization: createAuthHeader("free"),
 			},
 			body: "invalid json{",
 		});
@@ -122,10 +121,10 @@ describe("MCP Handshake", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
-				"Origin": "http://localhost:3000",
+				Origin: "http://localhost:3000",
 				"MCP-Protocol-Version": "2025-06-18",
-				"Accept": "application/json, text/event-stream",
-				"Authorization": createAuthHeader("free"),
+				Accept: "application/json, text/event-stream",
+				Authorization: createAuthHeader("free"),
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",

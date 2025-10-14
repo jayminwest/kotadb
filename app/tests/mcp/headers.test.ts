@@ -1,8 +1,8 @@
 import { describe, expect, test } from "bun:test";
 import {
+	parseAccept,
 	validateOrigin,
 	validateProtocolVersion,
-	parseAccept,
 } from "@mcp/headers";
 
 describe("MCP Header Validation", () => {

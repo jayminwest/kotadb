@@ -2,9 +2,6 @@
  * MCP tool definitions and execution adapters
  */
 
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type { IndexRequest } from "@shared/index";
-import { buildSnippet } from "@indexer/extractors";
 import {
 	ensureRepository,
 	listRecentFiles,
@@ -13,6 +10,9 @@ import {
 	searchFiles,
 	updateIndexRunStatus,
 } from "@api/queries";
+import { buildSnippet } from "@indexer/extractors";
+import type { IndexRequest } from "@shared/index";
+import type { SupabaseClient } from "@supabase/supabase-js";
 import { invalidParams } from "./jsonrpc";
 
 /**
@@ -44,12 +44,12 @@ export const SEARCH_CODE_TOOL: ToolDefinition = {
 			},
 			repository: {
 				type: "string",
-				description:
-					"Optional: Filter results to a specific repository ID",
+				description: "Optional: Filter results to a specific repository ID",
 			},
 			limit: {
 				type: "number",
-				description: "Optional: Maximum number of results (default: 20, max: 100)",
+				description:
+					"Optional: Maximum number of results (default: 20, max: 100)",
 			},
 		},
 		required: ["term"],
@@ -73,7 +73,8 @@ export const INDEX_REPOSITORY_TOOL: ToolDefinition = {
 			},
 			ref: {
 				type: "string",
-				description: "Optional: Git ref/branch to checkout (default: main/master)",
+				description:
+					"Optional: Git ref/branch to checkout (default: main/master)",
 			},
 			localPath: {
 				type: "string",
@@ -97,7 +98,8 @@ export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
 		properties: {
 			limit: {
 				type: "number",
-				description: "Optional: Maximum number of files to return (default: 10)",
+				description:
+					"Optional: Maximum number of files to return (default: 10)",
 			},
 		},
 	},
@@ -119,7 +121,8 @@ function isSearchParams(
 	if (typeof params !== "object" || params === null) return false;
 	const p = params as Record<string, unknown>;
 	if (typeof p.term !== "string") return false;
-	if (p.repository !== undefined && typeof p.repository !== "string") return false;
+	if (p.repository !== undefined && typeof p.repository !== "string")
+		return false;
 	if (p.limit !== undefined && typeof p.limit !== "number") return false;
 	return true;
 }
@@ -185,7 +188,10 @@ export async function executeIndexRepository(
 	userId: string,
 ): Promise<unknown> {
 	if (!isIndexParams(params)) {
-		throw invalidParams(requestId, "Invalid parameters for index_repository tool");
+		throw invalidParams(
+			requestId,
+			"Invalid parameters for index_repository tool",
+		);
 	}
 
 	const indexRequest: IndexRequest = {
@@ -196,13 +202,26 @@ export async function executeIndexRepository(
 
 	// Ensure repository exists in database
 	const repositoryId = await ensureRepository(supabase, userId, indexRequest);
-	const runId = await recordIndexRun(supabase, indexRequest, userId, repositoryId);
+	const runId = await recordIndexRun(
+		supabase,
+		indexRequest,
+		userId,
+		repositoryId,
+	);
 
 	// Queue async indexing workflow
 	queueMicrotask(() =>
-		runIndexingWorkflow(supabase, indexRequest, runId, userId, repositoryId).catch((error) => {
+		runIndexingWorkflow(
+			supabase,
+			indexRequest,
+			runId,
+			userId,
+			repositoryId,
+		).catch((error) => {
 			console.error("Indexing workflow failed", error);
-			updateIndexRunStatus(supabase, runId, "failed", error.message).catch(console.error);
+			updateIndexRunStatus(supabase, runId, "failed", error.message).catch(
+				console.error,
+			);
 		}),
 	);
 
@@ -223,7 +242,10 @@ export async function executeListRecentFiles(
 	userId: string,
 ): Promise<unknown> {
 	if (!isListRecentParams(params)) {
-		throw invalidParams(requestId, "Invalid parameters for list_recent_files tool");
+		throw invalidParams(
+			requestId,
+			"Invalid parameters for list_recent_files tool",
+		);
 	}
 
 	const limit =
@@ -241,7 +263,6 @@ export async function executeListRecentFiles(
 		})),
 	};
 }
-
 
 /**
  * Main tool call dispatcher

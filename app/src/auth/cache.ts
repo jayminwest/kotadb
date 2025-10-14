@@ -11,12 +11,12 @@ import type { Tier } from "@auth/context";
  * Cached validation result with expiry timestamp.
  */
 export interface CacheEntry {
-  userId: string;
-  tier: Tier;
-  orgId?: string;
-  keyId: string;
-  rateLimitPerHour: number;
-  expiresAt: number;
+	userId: string;
+	tier: Tier;
+	orgId?: string;
+	keyId: string;
+	rateLimitPerHour: number;
+	expiresAt: number;
 }
 
 /**
@@ -42,19 +42,19 @@ const cache = new Map<string, CacheEntry>();
  * @returns Cached entry if valid, null otherwise
  */
 export function getCachedValidation(keyId: string): CacheEntry | null {
-  const entry = cache.get(keyId);
+	const entry = cache.get(keyId);
 
-  if (!entry) {
-    return null;
-  }
+	if (!entry) {
+		return null;
+	}
 
-  // Check if entry has expired
-  if (Date.now() > entry.expiresAt) {
-    cache.delete(keyId);
-    return null;
-  }
+	// Check if entry has expired
+	if (Date.now() > entry.expiresAt) {
+		cache.delete(keyId);
+		return null;
+	}
 
-  return entry;
+	return entry;
 }
 
 /**
@@ -64,21 +64,21 @@ export function getCachedValidation(keyId: string): CacheEntry | null {
  * @param entry - Validation result to cache
  */
 export function setCachedValidation(
-  keyId: string,
-  entry: Omit<CacheEntry, "expiresAt">
+	keyId: string,
+	entry: Omit<CacheEntry, "expiresAt">,
 ): void {
-  // Enforce max cache size by evicting oldest entry
-  if (cache.size >= MAX_CACHE_SIZE) {
-    const firstKey = cache.keys().next().value;
-    if (firstKey) {
-      cache.delete(firstKey);
-    }
-  }
+	// Enforce max cache size by evicting oldest entry
+	if (cache.size >= MAX_CACHE_SIZE) {
+		const firstKey = cache.keys().next().value;
+		if (firstKey) {
+			cache.delete(firstKey);
+		}
+	}
 
-  cache.set(keyId, {
-    ...entry,
-    expiresAt: Date.now() + CACHE_TTL_MS,
-  });
+	cache.set(keyId, {
+		...entry,
+		expiresAt: Date.now() + CACHE_TTL_MS,
+	});
 }
 
 /**
@@ -86,14 +86,14 @@ export function setCachedValidation(
  * Useful for testing and emergency cache invalidation.
  */
 export function clearCache(): void {
-  cache.clear();
+	cache.clear();
 }
 
 /**
  * Get current cache size (for monitoring and testing)
  */
 export function getCacheSize(): number {
-  return cache.size;
+	return cache.size;
 }
 
 /**
@@ -101,19 +101,21 @@ export function getCacheSize(): number {
  * Runs every 60 seconds to prevent memory bloat.
  */
 function cleanupExpiredEntries(): void {
-  const now = Date.now();
-  let removed = 0;
+	const now = Date.now();
+	let removed = 0;
 
-  for (const [keyId, entry] of cache.entries()) {
-    if (now > entry.expiresAt) {
-      cache.delete(keyId);
-      removed++;
-    }
-  }
+	for (const [keyId, entry] of cache.entries()) {
+		if (now > entry.expiresAt) {
+			cache.delete(keyId);
+			removed++;
+		}
+	}
 
-  if (removed > 0) {
-    console.log(`[Cache] Evicted ${removed} expired entries (size: ${cache.size})`);
-  }
+	if (removed > 0) {
+		console.log(
+			`[Cache] Evicted ${removed} expired entries (size: ${cache.size})`,
+		);
+	}
 }
 
 // Start periodic cleanup

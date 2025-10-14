@@ -37,9 +37,7 @@ export interface InitializeResult {
 /**
  * Handle initialize request from MCP client
  */
-export function handleInitialize(
-	_params: InitializeRequest,
-): InitializeResult {
+export function handleInitialize(_params: InitializeRequest): InitializeResult {
 	return {
 		protocolVersion: "2025-06-18",
 		capabilities: {

@@ -6,30 +6,30 @@
  * Secrets are bcrypt-hashed before storage (never stored in plaintext).
  */
 
-import bcrypt from "bcryptjs";
 import { randomBytes } from "node:crypto";
 import type { Tier } from "@auth/context";
 import { getServiceClient } from "@db/client";
+import bcrypt from "bcryptjs";
 
 /**
  * Rate limit defaults for each tier (requests per hour).
  */
 export const TIER_RATE_LIMITS = {
-  free: 100,
-  solo: 1000,
-  team: 10000,
+	free: 100,
+	solo: 1000,
+	team: 10000,
 } as const;
 
 /**
  * Input parameters for API key generation.
  */
 export interface GenerateApiKeyInput {
-  /** User UUID from auth.users table */
-  userId: string;
-  /** Subscription tier (determines rate limit) */
-  tier: Tier;
-  /** Optional organization ID for team tier */
-  orgId?: string;
+	/** User UUID from auth.users table */
+	userId: string;
+	/** Subscription tier (determines rate limit) */
+	tier: Tier;
+	/** Optional organization ID for team tier */
+	orgId?: string;
 }
 
 /**
@@ -37,16 +37,16 @@ export interface GenerateApiKeyInput {
  * Contains the full key (with plaintext secret) - this is the ONLY time the secret is visible.
  */
 export interface GenerateApiKeyOutput {
-  /** Full API key string (kota_<tier>_<keyId>_<secret>) */
-  apiKey: string;
-  /** Public key ID portion (stored in database, used for lookups) */
-  keyId: string;
-  /** Subscription tier */
-  tier: Tier;
-  /** Rate limit for this key (requests per hour) */
-  rateLimitPerHour: number;
-  /** Timestamp of key creation */
-  createdAt: Date;
+	/** Full API key string (kota_<tier>_<keyId>_<secret>) */
+	apiKey: string;
+	/** Public key ID portion (stored in database, used for lookups) */
+	keyId: string;
+	/** Subscription tier */
+	tier: Tier;
+	/** Rate limit for this key (requests per hour) */
+	rateLimitPerHour: number;
+	/** Timestamp of key creation */
+	createdAt: Date;
 }
 
 /**
@@ -61,20 +61,21 @@ export interface GenerateApiKeyOutput {
  * @returns 12-character key ID (e.g., "ab1cd2ef3gh4")
  */
 export function generateKeyId(): string {
-  // Generate random bytes and convert to base62 (alphanumeric only, no underscores)
-  // This avoids conflicts with the underscore delimiter in key format
-  const alphabet = "0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
-  const bytes = randomBytes(12);
-  let result = "";
+	// Generate random bytes and convert to base62 (alphanumeric only, no underscores)
+	// This avoids conflicts with the underscore delimiter in key format
+	const alphabet =
+		"0123456789ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz";
+	const bytes = randomBytes(12);
+	let result = "";
 
-  for (let i = 0; i < 12; i++) {
-    const byte = bytes[i];
-    if (byte !== undefined) {
-      result += alphabet[byte % alphabet.length];
-    }
-  }
+	for (let i = 0; i < 12; i++) {
+		const byte = bytes[i];
+		if (byte !== undefined) {
+			result += alphabet[byte % alphabet.length];
+		}
+	}
 
-  return result;
+	return result;
 }
 
 /**
@@ -89,8 +90,8 @@ export function generateKeyId(): string {
  * @returns 36-character hex secret (e.g., "0123456789abcdef0123456789abcdef0123")
  */
 export function generateSecret(): string {
-  // Generate 18 random bytes, convert to hex (36 chars)
-  return randomBytes(18).toString("hex");
+	// Generate 18 random bytes, convert to hex (36 chars)
+	return randomBytes(18).toString("hex");
 }
 
 /**
@@ -135,89 +136,91 @@ const MAX_COLLISION_RETRIES = 3;
  * ```
  */
 export async function generateApiKey(
-  input: GenerateApiKeyInput
+	input: GenerateApiKeyInput,
 ): Promise<GenerateApiKeyOutput> {
-  const { userId, tier, orgId } = input;
+	const { userId, tier, orgId } = input;
 
-  // Validate tier
-  const validTiers: Tier[] = ["free", "solo", "team"];
-  if (!validTiers.includes(tier)) {
-    throw new Error(`Invalid tier: ${tier}. Must be one of: ${validTiers.join(", ")}`);
-  }
+	// Validate tier
+	const validTiers: Tier[] = ["free", "solo", "team"];
+	if (!validTiers.includes(tier)) {
+		throw new Error(
+			`Invalid tier: ${tier}. Must be one of: ${validTiers.join(", ")}`,
+		);
+	}
 
-  // Validate userId
-  if (!userId || typeof userId !== "string") {
-    throw new Error("userId is required and must be a string");
-  }
+	// Validate userId
+	if (!userId || typeof userId !== "string") {
+		throw new Error("userId is required and must be a string");
+	}
 
-  // Get rate limit for tier
-  const rateLimitPerHour = TIER_RATE_LIMITS[tier];
+	// Get rate limit for tier
+	const rateLimitPerHour = TIER_RATE_LIMITS[tier];
 
-  // Retry loop for collision handling
-  let lastError: Error | null = null;
-  for (let attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt++) {
-    try {
-      // Generate cryptographic components
-      const keyId = generateKeyId();
-      const secret = generateSecret();
+	// Retry loop for collision handling
+	let lastError: Error | null = null;
+	for (let attempt = 0; attempt < MAX_COLLISION_RETRIES; attempt++) {
+		try {
+			// Generate cryptographic components
+			const keyId = generateKeyId();
+			const secret = generateSecret();
 
-      // Hash secret with bcrypt (10 rounds)
-      // This matches the validator's expectations
-      const secretHash = await bcrypt.hash(secret, 10);
+			// Hash secret with bcrypt (10 rounds)
+			// This matches the validator's expectations
+			const secretHash = await bcrypt.hash(secret, 10);
 
-      // Construct full key string (format: kota_<tier>_<keyId>_<secret>)
-      const apiKey = `kota_${tier}_${keyId}_${secret}`;
+			// Construct full key string (format: kota_<tier>_<keyId>_<secret>)
+			const apiKey = `kota_${tier}_${keyId}_${secret}`;
 
-      // Insert into database
-      const supabase = getServiceClient();
-      const { data, error } = await supabase
-        .from("api_keys")
-        .insert({
-          user_id: userId,
-          key_id: keyId,
-          secret_hash: secretHash,
-          tier,
-          rate_limit_per_hour: rateLimitPerHour,
-          enabled: true,
-          metadata: orgId ? { org_id: orgId } : {},
-        })
-        .select("created_at")
-        .single();
+			// Insert into database
+			const supabase = getServiceClient();
+			const { data, error } = await supabase
+				.from("api_keys")
+				.insert({
+					user_id: userId,
+					key_id: keyId,
+					secret_hash: secretHash,
+					tier,
+					rate_limit_per_hour: rateLimitPerHour,
+					enabled: true,
+					metadata: orgId ? { org_id: orgId } : {},
+				})
+				.select("created_at")
+				.single();
 
-      if (error) {
-        // Check if this is a unique constraint violation on key_id
-        // Supabase error code for unique violation: "23505"
-        if (error.code === "23505" && error.message.includes("key_id")) {
-          console.warn(
-            `[Auth] key_id collision detected (attempt ${attempt + 1}/${MAX_COLLISION_RETRIES}): ${keyId}`
-          );
-          lastError = new Error(`key_id collision: ${error.message}`);
-          continue; // Retry with new key_id
-        }
+			if (error) {
+				// Check if this is a unique constraint violation on key_id
+				// Supabase error code for unique violation: "23505"
+				if (error.code === "23505" && error.message.includes("key_id")) {
+					console.warn(
+						`[Auth] key_id collision detected (attempt ${attempt + 1}/${MAX_COLLISION_RETRIES}): ${keyId}`,
+					);
+					lastError = new Error(`key_id collision: ${error.message}`);
+					continue; // Retry with new key_id
+				}
 
-        // Other database errors (not collision-related)
-        throw new Error(`Failed to create API key: ${error.message}`);
-      }
+				// Other database errors (not collision-related)
+				throw new Error(`Failed to create API key: ${error.message}`);
+			}
 
-      // Success!
-      return {
-        apiKey,
-        keyId,
-        tier,
-        rateLimitPerHour,
-        createdAt: new Date(data.created_at),
-      };
-    } catch (err) {
-      // Re-throw non-collision errors immediately
-      if (err instanceof Error && !err.message.includes("key_id collision")) {
-        throw err;
-      }
-      lastError = err instanceof Error ? err : new Error(String(err));
-    }
-  }
+			// Success!
+			return {
+				apiKey,
+				keyId,
+				tier,
+				rateLimitPerHour,
+				createdAt: new Date(data.created_at),
+			};
+		} catch (err) {
+			// Re-throw non-collision errors immediately
+			if (err instanceof Error && !err.message.includes("key_id collision")) {
+				throw err;
+			}
+			lastError = err instanceof Error ? err : new Error(String(err));
+		}
+	}
 
-  // All retries exhausted
-  throw new Error(
-    `Failed to generate unique API key after ${MAX_COLLISION_RETRIES} attempts. Last error: ${lastError?.message}`
-  );
+	// All retries exhausted
+	throw new Error(
+		`Failed to generate unique API key after ${MAX_COLLISION_RETRIES} attempts. Last error: ${lastError?.message}`,
+	);
 }

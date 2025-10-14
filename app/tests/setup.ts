@@ -12,8 +12,8 @@
  * Usage: bun test --preload ./tests/setup.ts
  */
 
-import { existsSync, readFileSync } from "fs";
-import { resolve } from "path";
+import { existsSync, readFileSync } from "node:fs";
+import { resolve } from "node:path";
 
 const ENV_TEST_PATH = resolve(import.meta.dir, "../.env.test");
 
@@ -43,6 +43,7 @@ function loadEnvTest(): void {
 			const match = line.match(/^([^=]+)=(.*)$/);
 			if (match) {
 				const [, key, value] = match;
+				if (!key || !value) continue;
 				const trimmedKey = key.trim();
 				const trimmedValue = value.trim();
 
