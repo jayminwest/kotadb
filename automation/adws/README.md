@@ -540,6 +540,80 @@ Example output:
 └────────────────────────────────────────────────────────────────────────┘
 ```
 
+### Statistics Reporting
+
+The trigger automatically reports statistics to the home server for remote monitoring and alerting. This enables observability without requiring direct terminal access.
+
+**Configuration Options**:
+- `--stats-enabled/--no-stats-enabled`: Enable/disable stats reporting (default: enabled)
+- `--stats-interval <seconds>`: Reporting frequency in seconds (default: 60, minimum: 10)
+- `--stats-endpoint <path>`: API endpoint for stats (default: `/api/kota-tasks/stats`)
+- `--trigger-id <id>`: Custom trigger identifier (default: auto-generated from hostname + timestamp)
+
+**Environment Variables**:
+- `HOMESERVER_STATS_ENABLED`: Enable stats reporting (`true` or `false`)
+- `HOMESERVER_STATS_INTERVAL`: Reporting interval in seconds
+- `HOMESERVER_STATS_ENDPOINT`: Stats API endpoint path
+
+**Example Configuration**:
+```bash
+# Using CLI flags
+uv run adws/adw_triggers/adw_trigger_cron_homeserver.py \
+  --stats-interval 30 \
+  --trigger-id production-trigger-001
+
+# Using environment variables
+export HOMESERVER_STATS_ENABLED=true
+export HOMESERVER_STATS_INTERVAL=45
+uv run adws/adw_triggers/adw_trigger_cron_homeserver.py
+
+# Disable stats reporting
+uv run adws/adw_triggers/adw_trigger_cron_homeserver.py --no-stats-enabled
+```
+
+**Stats Payload Example**:
+```json
+{
+  "trigger_id": "kota-trigger-hostname-20251013142530",
+  "hostname": "jaymins-mac-pro",
+  "stats": {
+    "checks": 42,
+    "tasks_started": 12,
+    "worktrees_created": 8,
+    "homeserver_updates": 15,
+    "errors": 0,
+    "uptime_seconds": 3600,
+    "last_check": "14:32:15",
+    "active_workflows": 2
+  },
+  "timestamp": "2025-10-13T14:32:15.123456"
+}
+```
+
+**Failure Behavior**:
+- Stats reporting errors are non-blocking (logged but don't crash trigger)
+- Error count increments on reporting failures
+- Trigger continues normal task processing regardless of stats reporting status
+
+**Manual Testing**:
+```bash
+# Test stats endpoint with curl
+curl -X POST https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/stats \
+  -H "Content-Type: application/json" \
+  -d '{
+    "trigger_id": "test-trigger-001",
+    "hostname": "test-host",
+    "stats": {"checks": 1, "errors": 0, "uptime_seconds": 60},
+    "timestamp": "2025-10-13T14:00:00Z"
+  }'
+
+# Observe stats updates in home server logs
+# Expected: POST requests every 60 seconds (default interval)
+
+# Verify trigger continues operating if stats endpoint unavailable
+# Expected: Warning messages in trigger logs, but task processing continues
+```
+
 ---
 
 ## Troubleshooting

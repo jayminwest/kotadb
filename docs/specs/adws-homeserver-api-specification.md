@@ -452,7 +452,63 @@ GET /api/tasks/kotadb/task-001
 
 ---
 
-### 9. Delete Task (DELETE)
+### 9. Report Trigger Stats (POST)
+
+**Endpoint**: `POST /api/kota-tasks/stats`
+
+**Purpose**: Receive periodic statistics reports from ADW triggers for monitoring and alerting
+
+**Request Body**:
+```json
+{
+  "trigger_id": "kota-trigger-hostname-20251013142530",
+  "hostname": "jaymins-mac-pro",
+  "stats": {
+    "checks": 42,
+    "tasks_started": 12,
+    "worktrees_created": 8,
+    "homeserver_updates": 15,
+    "errors": 0,
+    "uptime_seconds": 3600,
+    "last_check": "14:32:15",
+    "active_workflows": 2
+  },
+  "timestamp": "2025-10-13T14:32:15.123456"
+}
+```
+
+**Required Fields**:
+- `trigger_id` (string, unique trigger identifier)
+- `hostname` (string, hostname where trigger is running)
+- `stats` (object, statistics dictionary)
+- `timestamp` (string, ISO 8601 timestamp)
+
+**Response**: `200 OK`
+```json
+{
+  "status": "received",
+  "trigger_id": "kota-trigger-hostname-20251013142530"
+}
+```
+
+**Error Response**: `500 Internal Server Error`
+```json
+{
+  "error": "Failed to store stats",
+  "details": "Database connection error"
+}
+```
+
+**Notes**:
+- Stats reports are sent periodically (default: every 60 seconds)
+- Triggers continue operating even if stats reporting fails
+- Home server can use stats for health monitoring and alerting
+- `uptime_seconds` calculated from trigger start time
+- `active_workflows` shows currently running tasks
+
+---
+
+### 10. Delete Task (DELETE)
 
 **Endpoint**: `DELETE /api/tasks/kotadb/{task_id}`
 
@@ -836,6 +892,7 @@ CREATE INDEX idx_adw_id ON kota_tasks(adw_id);
 - [ ] Implement POST `/api/tasks/kotadb/{task_id}/fail` (fail task)
 - [ ] Implement PATCH `/api/tasks/kotadb/{task_id}` (update task)
 - [ ] Implement DELETE `/api/tasks/kotadb/{task_id}` (delete task)
+- [ ] Implement POST `/api/kota-tasks/stats` (receive trigger stats)
 - [ ] Add validation for status transitions
 - [ ] Add error handling and consistent error responses
 - [ ] Configure CORS (if needed)

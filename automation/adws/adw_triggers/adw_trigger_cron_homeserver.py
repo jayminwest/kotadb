@@ -45,6 +45,7 @@ from adws.adw_modules.data_types import (
     HomeServerCronConfig,
     HomeServerTask,
     TaskStatus,
+    TriggerStatsReport,
 )
 from adws.adw_modules.utils import load_adw_env
 
@@ -61,6 +62,7 @@ stats = {
     "homeserver_updates": 0,
     "errors": 0,
     "last_check": None,
+    "uptime_start": time.time(),
 }
 
 
@@ -287,6 +289,50 @@ class HomeServerTaskManager:
 
         return name if name else None
 
+    def report_stats(
+        self, trigger_id: str, stats_dict: Dict[str, Any], stats_endpoint: str
+    ) -> bool:
+        """Report trigger statistics to home server."""
+        try:
+            import socket
+
+            # Calculate uptime in seconds
+            uptime_start = stats_dict.get("uptime_start", time.time())
+            uptime_seconds = int(time.time() - uptime_start)
+
+            # Build stats payload
+            stats_report = TriggerStatsReport(
+                trigger_id=trigger_id,
+                hostname=socket.gethostname(),
+                stats={
+                    "checks": stats_dict.get("checks", 0),
+                    "tasks_started": stats_dict.get("tasks_started", 0),
+                    "worktrees_created": stats_dict.get("worktrees_created", 0),
+                    "homeserver_updates": stats_dict.get("homeserver_updates", 0),
+                    "errors": stats_dict.get("errors", 0),
+                    "uptime_seconds": uptime_seconds,
+                    "last_check": stats_dict.get("last_check"),
+                }
+            )
+
+            url = f"{self.base_url}{stats_endpoint}"
+            response = requests.post(
+                url,
+                json=stats_report.model_dump(),
+                timeout=self.timeout
+            )
+            response.raise_for_status()
+
+            return True
+        except requests.exceptions.RequestException as e:
+            console.print(f"[yellow]WARN: Failed to report stats: {e}[/yellow]")
+            stats["errors"] += 1
+            return False
+        except Exception as e:
+            console.print(f"[yellow]WARN: Unexpected error reporting stats: {e}[/yellow]")
+            stats["errors"] += 1
+            return False
+
 
 class HomeServerCronTrigger:
     """Manages the cron-based polling and task delegation."""
@@ -297,6 +343,7 @@ class HomeServerCronTrigger:
         verbose: bool = False,
         quiet: bool = False,
         log_file: Optional[str] = None,
+        trigger_id: Optional[str] = None,
     ):
         self.config = config
         self.task_manager = HomeServerTaskManager(
@@ -305,6 +352,16 @@ class HomeServerCronTrigger:
         self.active_tasks: Dict[str, subprocess.Popen] = {}
         self.processed_tasks = set()
         self.workflow_monitor = WorkflowMonitor(verbose=verbose, quiet=quiet)
+
+        # Generate trigger ID (hostname + timestamp for uniqueness)
+        import socket
+        if trigger_id:
+            self.trigger_id = trigger_id
+        else:
+            hostname = socket.gethostname().split(".")[0]  # Strip domain
+            timestamp = datetime.now().strftime("%Y%m%d%H%M%S")
+            self.trigger_id = f"kota-trigger-{hostname}-{timestamp}"
+
         self._setup_logging(log_file)
 
     def _setup_logging(self, log_file: Optional[str] = None) -> None:
@@ -394,6 +451,26 @@ class HomeServerCronTrigger:
             console.print(f"[red]ERROR: Exception creating worktree: {e}[/red]")
             stats["errors"] += 1
             return False
+
+    def _report_stats_callback(self) -> None:
+        """Callback to report stats to home server."""
+        if not self.config.stats_reporting_enabled:
+            return
+
+        # Include active tasks count from workflow monitor
+        active_count = len(self.workflow_monitor.active_workflows)
+        stats["active_workflows"] = active_count
+
+        success = self.task_manager.report_stats(
+            self.trigger_id,
+            stats,
+            self.config.stats_endpoint
+        )
+
+        if success:
+            self._log_event("stats_reported", trigger_id=self.trigger_id)
+        else:
+            self._log_event("stats_report_failed", trigger_id=self.trigger_id)
 
     def delegate_task(
         self, task: HomeServerTask, worktree_name: str, adw_id: str
@@ -651,7 +728,18 @@ class HomeServerCronTrigger:
         signal.signal(signal.SIGINT, signal_handler)
         signal.signal(signal.SIGTERM, signal_handler)
 
+        # Schedule task processing
         schedule.every(self.config.polling_interval).seconds.do(self.process_tasks)
+
+        # Schedule stats reporting if enabled
+        if self.config.stats_reporting_enabled:
+            schedule.every(self.config.stats_reporting_interval).seconds.do(
+                self._report_stats_callback
+            )
+            console.print(
+                f"[dim]Stats reporting enabled (interval: {self.config.stats_reporting_interval}s, "
+                f"endpoint: {self.config.stats_endpoint}, trigger_id: {self.trigger_id})[/dim]"
+            )
 
         while not shutdown_requested:
             schedule.run_pending()
@@ -709,6 +797,27 @@ class HomeServerCronTrigger:
     default=None,
     help="Path to log file for structured events (default: .adw_logs/cron/trigger_YYYYMMDD.log)",
 )
+@click.option(
+    "--stats-enabled/--no-stats-enabled",
+    default=lambda: os.getenv("HOMESERVER_STATS_ENABLED", "true").lower() == "true",
+    help="Enable stats reporting to home server (default: true)",
+)
+@click.option(
+    "--stats-interval",
+    default=lambda: int(os.getenv("HOMESERVER_STATS_INTERVAL", "60")),
+    type=int,
+    help="Stats reporting interval in seconds (minimum 10, default: 60)",
+)
+@click.option(
+    "--stats-endpoint",
+    default=lambda: os.getenv("HOMESERVER_STATS_ENDPOINT", "/api/kota-tasks/stats"),
+    help="Stats reporting endpoint path (default: /api/kota-tasks/stats)",
+)
+@click.option(
+    "--trigger-id",
+    default=None,
+    help="Custom trigger identifier (default: auto-generated from hostname + timestamp)",
+)
 def main(
     home_server_url: str,
     tasks_endpoint: str,
@@ -719,6 +828,10 @@ def main(
     verbose: bool,
     quiet: bool,
     log_file: Optional[str],
+    stats_enabled: bool,
+    stats_interval: int,
+    stats_endpoint: str,
+    trigger_id: Optional[str],
 ) -> None:
     """Home server cron trigger for AI Developer Workflows."""
     config = HomeServerCronConfig(
@@ -727,10 +840,13 @@ def main(
         polling_interval=polling_interval,
         max_concurrent_tasks=max_concurrent,
         dry_run=dry_run,
+        stats_reporting_enabled=stats_enabled,
+        stats_reporting_interval=stats_interval,
+        stats_endpoint=stats_endpoint,
     )
 
     trigger = HomeServerCronTrigger(
-        config, verbose=verbose, quiet=quiet, log_file=log_file
+        config, verbose=verbose, quiet=quiet, log_file=log_file, trigger_id=trigger_id
     )
 
     if once:

@@ -266,6 +266,14 @@ class HomeServerTaskUpdate(BaseModel):
     timestamp: str = Field(default_factory=lambda: datetime.now().isoformat())
 
 
+class TriggerStatsReport(BaseModel):
+    """Statistics report payload sent to home server."""
+    trigger_id: str = Field(..., description="Unique trigger identifier")
+    hostname: str = Field(..., description="Hostname where trigger is running")
+    stats: Dict[str, Any] = Field(..., description="Statistics dictionary")
+    timestamp: str = Field(default_factory=lambda: datetime.now().isoformat(), description="ISO timestamp of report")
+
+
 class HomeServerCronConfig(BaseModel):
     """Configuration for home server cron trigger."""
     polling_interval: int = Field(default=15, ge=1, description="Polling interval in seconds")
@@ -278,6 +286,9 @@ class HomeServerCronConfig(BaseModel):
         default=[TaskStatus.PENDING],
         description="Task statuses to fetch"
     )
+    stats_reporting_enabled: bool = Field(default=True, description="Enable stats reporting to home server")
+    stats_reporting_interval: int = Field(default=60, ge=10, description="Stats reporting interval in seconds (minimum 10)")
+    stats_endpoint: str = Field(default="/api/kota-tasks/stats", description="Stats reporting endpoint")
 
 
 __all__ = [
@@ -305,6 +316,7 @@ __all__ = [
     "ReviewIssue",
     "ReviewResult",
     "DocumentationResult",
+    "TriggerStatsReport",
     "WorkflowType",
     "resolve_category",
 ]
