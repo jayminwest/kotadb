@@ -57,13 +57,23 @@ LOCKFILE_NAMES = ("bun.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml"
 
 @dataclass
 class ValidationCommandResult:
-    """Outcome of running a validation command."""
+    """Outcome of running a validation command.
+
+    Attributes:
+        label: Human-readable command label (e.g., "Lint", "Type Check")
+        command: Command argv list
+        returncode: Exit code from process execution
+        stdout: Standard output from command
+        stderr: Standard error from command
+        resolution_attempted: Whether agent resolution was attempted for this failure
+    """
 
     label: str
     command: Sequence[str]
     returncode: int
     stdout: str
     stderr: str
+    resolution_attempted: bool = False
 
     @property
     def ok(self) -> bool:
@@ -487,13 +497,16 @@ def ensure_plan_exists(state: ADWState, issue_number: str | None = None) -> str:
 def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None, logger: logging.Logger | None = None) -> List[ValidationCommandResult]:
     """Execute validation commands and capture their results.
 
+    Collects all validation failures instead of exiting on first failure (continue-on-error).
+    This enables comprehensive failure reporting and agent resolution of multiple issues.
+
     Args:
         commands: Iterable of Command objects to execute
         cwd: Working directory for command execution
         logger: Optional logger for detailed command execution logging
 
     Returns:
-        List of ValidationCommandResult objects with command outcomes
+        List of ValidationCommandResult objects with command outcomes for all executed commands
     """
 
     results: List[ValidationCommandResult] = []
@@ -529,8 +542,105 @@ def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None
                     f"  Stdout (first 500 chars): {stdout_snippet}\n"
                     f"  Stderr (first 500 chars): {stderr_snippet}"
                 )
-            break
+            # Continue to next command instead of breaking (continue-on-error pattern)
     return results
+
+
+def run_validation_with_resolution(
+    commands: Iterable[Command],
+    worktree_path: Path,
+    adw_id: str,
+    issue_number: str,
+    logger: logging.Logger,
+    max_attempts: int = 3,
+) -> Tuple[List[ValidationCommandResult], bool]:
+    """Execute validation commands with agent resolution retry loop for failures.
+
+    Implements resilience pattern: run validations, attempt agent resolution on failures,
+    re-run validations, repeat up to max_attempts. Uses smart bailout (exits early if
+    agent can't resolve anything).
+
+    Args:
+        commands: Iterable of Command objects to execute
+        worktree_path: Path to git worktree for file operations
+        adw_id: ADW execution ID for tracking
+        issue_number: GitHub issue number for context
+        logger: Logger instance for tracking retry attempts
+        max_attempts: Maximum retry attempts (default: 3)
+
+    Returns:
+        Tuple of (results, success):
+        - results: List of ValidationCommandResult objects from final attempt
+        - success: True if all validations passed, False otherwise
+
+    Behavior:
+        - Attempt 1: Run all validations, collect failures
+        - If failures exist: invoke agent resolution for each failed command
+        - Attempts 2-N: Re-run validations, track newly resolved failures
+        - Smart bailout: Exit early if resolved_count == 0 (agent can't fix)
+        - Track resolution attempts in result objects via resolution_attempted flag
+    """
+    from .agent_resolution import resolve_validation_failure, track_resolution_attempt
+    from .state import ADWState
+
+    state = ADWState.load(adw_id)
+
+    for attempt in range(1, max_attempts + 1):
+        logger.info(f"Validation attempt {attempt}/{max_attempts}")
+
+        # Run all validation commands (continue-on-error)
+        results = run_validation_commands(commands, cwd=worktree_path, logger=logger)
+
+        # Check if all passed
+        failed_results = [r for r in results if not r.ok]
+        if not failed_results:
+            logger.info(f"All validations passed on attempt {attempt}")
+            return results, True
+
+        # If this is the last attempt, don't try resolution
+        if attempt >= max_attempts:
+            logger.warning(f"Validation failed after {max_attempts} attempts")
+            return results, False
+
+        # Attempt agent resolution for each failure
+        logger.info(f"Found {len(failed_results)} failed validations, attempting agent resolution")
+        resolved_count = 0
+
+        for failed_result in failed_results:
+            logger.info(f"Attempting resolution for: {failed_result.label}")
+
+            resolution_success = resolve_validation_failure(
+                result=failed_result,
+                adw_id=adw_id,
+                worktree_path=worktree_path,
+                logger=logger,
+            )
+
+            # Mark that resolution was attempted
+            failed_result.resolution_attempted = True
+
+            # Track resolution attempt in state
+            track_resolution_attempt(
+                state=state,
+                result=failed_result,
+                resolution_success=resolution_success,
+                logger=logger,
+            )
+
+            if resolution_success:
+                resolved_count += 1
+
+        logger.info(f"Agent resolution: {resolved_count}/{len(failed_results)} attempts succeeded")
+
+        # Smart bailout: if agent couldn't resolve anything, exit early
+        if resolved_count == 0:
+            logger.warning("Smart bailout: agent resolved 0 failures, stopping retry loop")
+            return results, False
+
+        logger.info(f"Proceeding to attempt {attempt + 1} after resolution")
+
+    # Should never reach here due to loop logic, but provide fallback
+    return results, False
 
 
 def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
@@ -759,6 +869,7 @@ __all__ = [
     "persist_issue_snapshot",
     "record_git_failure",
     "run_validation_commands",
+    "run_validation_with_resolution",
     "serialize_validation",
     "start_logger",
     "run_review",

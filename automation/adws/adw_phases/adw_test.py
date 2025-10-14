@@ -63,33 +63,70 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     return parser.parse_args(argv[1:])
 
 
-def setup_test_environment(worktree_path: Path, adw_id: str, logger: logging.Logger) -> str:
-    """Provision isolated test environment with unique project name."""
+def setup_test_environment(worktree_path: Path, adw_id: str, logger: logging.Logger, max_attempts: int = 3) -> str:
+    """Provision isolated test environment with unique project name.
+
+    Implements exponential backoff retry (3 attempts with 2s, 4s, 8s delays) to handle
+    transient Docker/infrastructure failures gracefully.
+
+    Args:
+        worktree_path: Path to the git worktree
+        adw_id: ADW execution ID for unique project naming
+        logger: Logger instance for tracking retry attempts
+        max_attempts: Maximum retry attempts (default: 3)
+
+    Returns:
+        Project name string if provisioning succeeds
+
+    Raises:
+        RuntimeError: If all retry attempts fail
+    """
+    import time
+
     project_name = f"kotadb-adw-{adw_id}"
     app_dir = worktree_path / "app"
 
-    logger.info(f"Provisioning test environment with PROJECT_NAME={project_name}")
+    last_error: Exception | None = None
 
-    try:
-        result = subprocess.run(
-            ["bun", "run", "test:setup"],
-            cwd=app_dir,
-            env={**os.environ, "PROJECT_NAME": project_name},
-            capture_output=True,
-            text=True,
-            timeout=180,
-        )
+    for attempt in range(1, max_attempts + 1):
+        if attempt > 1:
+            delay = 2 ** (attempt - 1)  # 2s, 4s, 8s
+            logger.info(f"Retry attempt {attempt}/{max_attempts} after {delay}s delay")
+            time.sleep(delay)
+        else:
+            logger.info(f"Provisioning test environment with PROJECT_NAME={project_name}")
 
-        if result.returncode != 0:
-            raise RuntimeError(
-                f"Test environment setup failed (exit {result.returncode}): {result.stderr}"
+        try:
+            result = subprocess.run(
+                ["bun", "run", "test:setup"],
+                cwd=app_dir,
+                env={**os.environ, "PROJECT_NAME": project_name},
+                capture_output=True,
+                text=True,
+                timeout=180,
             )
 
-        logger.info(f"Test environment provisioned successfully: {project_name}")
-        return project_name
+            if result.returncode != 0:
+                last_error = RuntimeError(
+                    f"Test environment setup failed (exit {result.returncode}): {result.stderr}"
+                )
+                logger.warning(f"Attempt {attempt}/{max_attempts} failed: {last_error}")
+                if attempt < max_attempts:
+                    continue
+                raise last_error
 
-    except subprocess.TimeoutExpired:
-        raise RuntimeError("Test environment setup timed out after 180 seconds")
+            logger.info(f"Test environment provisioned successfully on attempt {attempt}: {project_name}")
+            return project_name
+
+        except subprocess.TimeoutExpired as exc:
+            last_error = RuntimeError(f"Test environment setup timed out after 180 seconds")
+            logger.warning(f"Attempt {attempt}/{max_attempts} timed out")
+            if attempt < max_attempts:
+                continue
+            raise last_error
+
+    # Should never reach here, but provide fallback
+    raise last_error if last_error else RuntimeError("Test environment setup failed after all attempts")
 
 
 def teardown_test_environment(worktree_path: Path, project_name: str, logger: logging.Logger) -> None:

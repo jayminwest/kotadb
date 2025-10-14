@@ -248,9 +248,34 @@ docker compose -p kotadb-adw-{adw_id} down -v
 - Ensure bun is available in worktree: `cd trees/{worktree} && which bun`
 
 *Timeout Issues*:
-- Test environment setup timeout: 180 seconds (3 minutes)
+- Test environment setup timeout: 180 seconds (3 minutes) with exponential backoff retry (2s, 4s, 8s delays)
 - Test environment teardown timeout: 60 seconds (1 minute)
 - If timeouts occur frequently, check Docker performance and available resources
+
+### Agent-Friendly Resilience Patterns
+
+The ADW system implements resilience patterns to handle transient failures and agent self-correction instead of fail-fast behavior.
+
+**Key Features**:
+- **Continue-on-error validation**: Collects all validation failures before deciding to exit
+- **Exponential backoff retry**: Test environment provisioning retries 3 times with 2s/4s/8s delays
+- **Agent resolution loop** (opt-in): Pass validation failures back to agents for self-correction (max 3 attempts)
+- **Smart bailout**: Exits early if agent can't resolve any failures
+
+**Resolution Functions** (`adw_modules/`):
+- `run_validation_commands()`: Collects all failures (no longer breaks on first failure)
+- `run_validation_with_resolution()`: Validation + retry loop with agent feedback
+- `agent_resolution.py`: Agent resolution coordination and state tracking
+
+**Slash Commands**:
+- `/resolve_failed_validation`: Agent-driven validation failure resolution template
+
+**State Tracking**:
+- `last_resolution_attempts`: JSON string of resolution history for debugging
+- `validation_retry_count`: Number of validation retry attempts performed
+- `resolution_attempted`: Per-result flag indicating agent resolution was attempted
+
+**Future Integration**: Resolution retry loop available but not integrated into test phase by default. To enable, modify `adw_test.py` to call `run_validation_with_resolution()` instead of `run_validation_commands()`.
 
 ---
 

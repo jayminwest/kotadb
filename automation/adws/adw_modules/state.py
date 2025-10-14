@@ -30,7 +30,12 @@ class StateNotFoundError(FileNotFoundError):
 
 @dataclass
 class ADWState:
-    """Simple JSON-backed state container for ADW workflows."""
+    """Simple JSON-backed state container for ADW workflows.
+
+    Resolution tracking fields (stored in extra):
+        - last_resolution_attempts: JSON string of resolution history for debugging
+        - validation_retry_count: Number of validation retry attempts performed
+    """
 
     adw_id: str
     issue_number: Optional[str] = None
