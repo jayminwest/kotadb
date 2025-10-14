@@ -19,7 +19,6 @@ report.[0-9]_.[0-9]_.[0-9]_.[0-9]_.json
 
 # automation artifacts
 /automation/agents/
-automation/uv.lock
 
 # dotenv environment variable files
 .env

@@ -1,5 +1,7 @@
 # KotaDB AI Developer Workflow (ADW)
 
+![Automation CI](https://github.com/jayminwest/kota-db-ts/workflows/Automation%20CI/badge.svg)
+
 The ADW toolchain automates the SDLC loop for GitHub issues by coordinating Claude Code agents, Bun validation, GitHub CLI, and git operations. The implementation mirrors the modular TAC stack while preserving KotaDB-specific validation defaults.
 
 All entrypoints are declared as `uv run` scripts so they execute without bespoke virtualenv setup.
@@ -70,6 +72,56 @@ uv run pytest adws/adw_tests
 ```
 
 The tests avoid live API calls by using temporary directories and subprocess stubs.
+
+---
+
+## CI Integration
+
+The automation layer test suite runs automatically in GitHub Actions on every push and pull request affecting `automation/**` paths.
+
+**Workflow**: `.github/workflows/automation-ci.yml`
+
+**What runs**:
+1. Python syntax check on all modules and phase scripts
+2. Full pytest suite (48+ tests) with verbose output
+3. Environment: Python 3.12 + uv package manager with dependency caching
+
+**Local execution** (matches CI exactly):
+```bash
+# Syntax check
+cd automation && python3 -m py_compile adws/adw_modules/*.py adws/adw_phases/*.py
+
+# Install dependencies and run tests
+cd automation && uv sync && uv run pytest adws/adw_tests/ -v --tb=short
+```
+
+**CI Features**:
+- Path filtering: Only runs when automation code changes
+- Git identity configured for worktree tests
+- Dependency caching via `astral-sh/setup-uv@v5`
+- Target runtime: < 2 minutes
+- Status badge reflects latest build state
+
+**Troubleshooting CI Failures**:
+
+*Syntax Errors*:
+- Check Python syntax locally: `python3 -m py_compile <file>`
+- Verify imports resolve: `cd automation && uv run python3 -c "import adws.adw_modules.utils"`
+
+*Test Failures*:
+- Run specific test: `cd automation && uv run pytest adws/adw_tests/test_<name>.py -v`
+- Check for environment differences (git config, file permissions)
+- Review test logs in GitHub Actions output
+
+*Dependency Issues*:
+- Regenerate lockfile: `cd automation && uv sync`
+- Verify lockfile committed: `git status uv.lock`
+- Check for version conflicts: `uv pip list`
+
+*Git Operation Failures*:
+- Worktree tests require git identity (configured in CI)
+- Check git version: `git --version` (2.25+ recommended)
+- Verify test isolation: Each test uses temporary directories
 
 ---
 

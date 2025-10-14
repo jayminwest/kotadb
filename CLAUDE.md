@@ -189,6 +189,15 @@ The agentic layer operates on the application layer (in `app/`) to automate deve
   - Teardown via `app/scripts/cleanup-test-containers.sh` in cleanup step (always runs)
   - Migrations applied directly to containerized Postgres via `psql` (bypasses Supabase CLI)
 
+- **Automation CI** (`.github/workflows/automation-ci.yml`): Tests the Python automation layer
+  - Runs pytest suite (63 tests) for ADW workflow validation
+  - Python syntax check on all modules (`adws/adw_modules/*.py`, `adws/adw_phases/*.py`)
+  - Uses `uv` package manager with dependency caching for fast builds
+  - Configures git identity for worktree isolation tests
+  - Path filtering: only runs on changes to `automation/**`
+  - Validates automation infrastructure without external service dependencies
+  - Target runtime: < 2 minutes for full test suite execution
+
 **Test Environment Variable Loading Strategy**:
 - **Problem**: CI uses dynamic Docker Compose ports, but tests were hardcoding `localhost:54322`
 - **Solution**: Tests now read from environment variables with fallback to local defaults

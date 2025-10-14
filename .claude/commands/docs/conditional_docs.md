@@ -193,3 +193,13 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When investigating historical bad outputs from PR #90 or similar quality issues
     - When creating tests for validation functions
     - When agents generate malformed commit messages or PR descriptions
+
+- .github/workflows/automation-ci.yml
+  - Conditions:
+    - When working on automation layer CI infrastructure or testing pipeline
+    - When troubleshooting pytest failures in GitHub Actions
+    - When modifying Python test setup, syntax checking, or dependency installation
+    - When adding new Python modules that need validation in CI
+    - When debugging git identity configuration for worktree tests
+    - When working on issue #79 or automation CI integration tasks
+    - When CI badge status is incorrect or workflow needs updating
