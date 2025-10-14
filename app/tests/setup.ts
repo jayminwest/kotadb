@@ -22,9 +22,11 @@ const ENV_TEST_PATH = resolve(import.meta.dir, "../.env.test");
  */
 function loadEnvTest(): void {
 	if (!existsSync(ENV_TEST_PATH)) {
-		console.log(
-			"[Test Setup] .env.test not found, using fallback values from test helpers",
-		);
+		if (process.env.DEBUG === '1') {
+			console.log(
+				"[Test Setup] .env.test not found, using fallback values from test helpers",
+			);
+		}
 		return;
 	}
 
@@ -55,13 +57,17 @@ function loadEnvTest(): void {
 			}
 		}
 
-		console.log(`[Test Setup] Loaded ${loadedCount} variables from .env.test`);
-		console.log(
-			`[Test Setup] SUPABASE_URL: ${process.env.SUPABASE_URL || "not set"}`,
-		);
+		if (process.env.DEBUG === '1') {
+			console.log(`[Test Setup] Loaded ${loadedCount} variables from .env.test`);
+			console.log(
+				`[Test Setup] SUPABASE_URL: ${process.env.SUPABASE_URL || "not set"}`,
+			);
+		}
 	} catch (error) {
 		console.error("[Test Setup] Failed to load .env.test:", error);
-		console.log("[Test Setup] Using fallback values from test helpers");
+		if (process.env.DEBUG === '1') {
+			console.log("[Test Setup] Using fallback values from test helpers");
+		}
 	}
 }
 

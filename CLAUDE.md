@@ -20,6 +20,7 @@ cd app && bun --watch src/index.ts          # Watch mode for development
 ### Testing and type-checking
 ```bash
 cd app && bun test                          # Run test suite
+DEBUG=1 cd app && bun test                  # Verbose test output (auth logs, setup details)
 cd app && bunx tsc --noEmit                # Type-check without emitting files
 cd app && bun run test:validate-migrations # Validate migration sync (see below)
 cd app && bun run test:validate-env        # Detect hardcoded environment URLs in tests

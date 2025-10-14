@@ -9,6 +9,11 @@ import type { AuthContext } from "@auth/context";
 import { enforceRateLimit } from "@auth/rate-limit";
 import { updateLastUsed, validateApiKey } from "@auth/validator";
 
+// Conditional logging for test environment
+const isTestEnv = process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
+const isDebug = process.env.DEBUG === '1';
+const shouldLog = !isTestEnv || isDebug;
+
 /**
  * Result of authentication request.
  * Either returns context (success) or response (failure).
@@ -77,7 +82,9 @@ export async function authenticateRequest(
 
 	if (!validation) {
 		// Log failed authentication attempt (keyId if parseable)
-		console.warn("[Auth] Invalid API key attempt");
+		if (shouldLog) {
+			console.warn("[Auth] Invalid API key attempt");
+		}
 
 		return {
 			response: new Response(
@@ -106,9 +113,11 @@ export async function authenticateRequest(
 	}
 
 	// Log successful authentication
-	console.log(
-		`[Auth] Success - userId: ${context.userId}, keyId: ${context.keyId}, tier: ${context.tier}`,
-	);
+	if (shouldLog) {
+		console.log(
+			`[Auth] Success - userId: ${context.userId}, keyId: ${context.keyId}, tier: ${context.tier}`,
+		);
+	}
 
 	// Enforce rate limit
 	const rateLimit = await enforceRateLimit(
@@ -117,9 +126,11 @@ export async function authenticateRequest(
 	);
 
 	if (!rateLimit.allowed) {
-		console.warn(
-			`[Auth] Rate limit exceeded - keyId: ${context.keyId}, limit: ${context.rateLimitPerHour}`,
-		);
+		if (shouldLog) {
+			console.warn(
+				`[Auth] Rate limit exceeded - keyId: ${context.keyId}, limit: ${context.rateLimitPerHour}`,
+			);
+		}
 
 		return {
 			response: new Response(
