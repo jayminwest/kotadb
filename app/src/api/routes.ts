@@ -3,6 +3,8 @@ import type { RateLimitResult } from "@auth/rate-limit";
 import { buildSnippet } from "@indexer/extractors";
 import { createMcpServer, createMcpTransport } from "@mcp/server";
 import type { AuthContext, IndexRequest } from "@shared/index";
+import type { ValidationRequest } from "@validation/types";
+import { validateOutput } from "@validation/schemas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import express, {
 	type Express,
@@ -196,6 +198,31 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			res
 				.status(500)
 				.json({ error: `Failed to list files: ${(error as Error).message}` });
+		}
+	});
+
+	// POST /validate-output - Validate command output against schema
+	app.post("/validate-output", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const payload = req.body as Partial<ValidationRequest>;
+
+		if (!payload?.schema) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Field 'schema' is required" });
+		}
+
+		if (!payload?.output) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Field 'output' is required" });
+		}
+
+		try {
+			const result = validateOutput(payload.schema, payload.output);
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json(result);
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			res.status(500).json({ error: `Validation failed: ${(error as Error).message}` });
 		}
 	});
 

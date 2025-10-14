@@ -19,7 +19,8 @@
 			"@db/*": ["src/db/*"],
 			"@indexer/*": ["src/indexer/*"],
 			"@shared/*": ["src/types/*"],
-			"@mcp/*": ["src/mcp/*"]
+			"@mcp/*": ["src/mcp/*"],
+			"@validation/*": ["src/validation/*"]
 		},
 		"types": ["bun-types", "node"]
 	},

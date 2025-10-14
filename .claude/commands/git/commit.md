@@ -111,3 +111,16 @@ chore: 86 - validate and document git staging fix
 ```
 
 **Remember**: Your response IS the commit message. Nothing more, nothing less.
+
+## Output Schema
+
+This command's output is validated against the following schema:
+
+```json
+{
+  "type": "string",
+  "pattern": "^(feat|fix|chore|docs|test|refactor|perf|ci|build|style)(\\([^)]+\\))?: [0-9]+ - .{1,50}"
+}
+```
+
+The output must be a single-line commit message following Conventional Commits format with an issue number and description of 1-50 characters.

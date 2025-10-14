@@ -43,9 +43,12 @@ Note: The Docker build context for application services (`dev`, `home`) is set t
 ### Path Aliases
 The project uses TypeScript path aliases defined in `app/tsconfig.json`:
 - `@api/*` → `src/api/*`
+- `@auth/*` → `src/auth/*`
 - `@db/*` → `src/db/*`
 - `@indexer/*` → `src/indexer/*`
 - `@shared/*` → `src/types/*`
+- `@mcp/*` → `src/mcp/*`
+- `@validation/*` → `src/validation/*`
 
 Always use these aliases for imports, not relative paths. All paths are relative to the `app/` directory.
 
@@ -63,7 +66,7 @@ All application code is located in the `app/` directory.
 - `routes.ts`: Express app factory with middleware and route handlers
   - Body parser middleware for JSON requests
   - Authentication middleware (converts Express→Bun Request for existing auth logic)
-  - REST endpoints: `/health`, `/index`, `/search`, `/files/recent`
+  - REST endpoints: `/health`, `/index`, `/search`, `/files/recent`, `/validate-output`
   - MCP endpoint: `/mcp` (POST only, using SDK StreamableHTTPServerTransport)
 - `queries.ts`: Database query functions for indexed files and search
 
@@ -128,6 +131,23 @@ All application code is located in the `app/` directory.
   - Expect HTTP 400 for parse errors and invalid JSON-RPC (not HTTP 200)
   - Do not test header enforcement unless DNS rebinding protection is enabled
 
+**Validation (app/src/validation/)**
+- `schemas.ts`: Core validation logic using Zod for command output validation
+  - Converts JSON schema objects to Zod schemas
+  - Validates strings (with pattern/length constraints), numbers, booleans, arrays, objects
+  - Returns structured validation errors with path and message
+- `types.ts`: TypeScript types for validation API (ValidationRequest, ValidationResponse, ValidationError)
+- `common-schemas.ts`: Reusable schema helpers for common patterns
+  - `FilePathOutput(extension?)`: Validates relative file paths (no leading slash)
+  - `JSONBlockOutput(schema)`: Validates JSON structure (with markdown extraction)
+  - `MarkdownSectionOutput(sections)`: Validates markdown with required sections
+  - `PlainTextOutput(options)`: Validates plain text with length/format constraints
+- Integration with Express:
+  - POST `/validate-output` endpoint validates command outputs against schemas
+  - Requires authentication (API key via Bearer token)
+  - Rate limiting applied (consumes user's hourly quota)
+  - Returns `{valid: true}` or `{valid: false, errors: [{path, message}]}`
+
 ### Workflow
 
 **Authentication & Rate Limiting Flow** (all authenticated endpoints):
@@ -151,6 +171,13 @@ All application code is located in the `app/` directory.
 - Full-text search on content
 - Optional filters: `project` (project_root), `limit`
 - Returns results with context snippets
+
+**POST /validate-output** validates command outputs against schemas:
+- Accepts JSON payload: `{schema: object, output: string}`
+- Schema format: JSON-compatible Zod schema (type, pattern, minLength, maxLength, etc.)
+- Returns validation result: `{valid: boolean, errors?: [{path, message}]}`
+- Use case: Automation layer validates slash command outputs before parsing
+- Command templates include schemas in `## Output Schema` section
 
 **Rate Limit Response Headers** (all authenticated endpoints):
 - `X-RateLimit-Limit`: Total requests allowed per hour for the tier

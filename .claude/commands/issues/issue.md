@@ -37,3 +37,33 @@ Create a rigorously labeled GitHub issue capturing the upcoming work. Follow thi
 
 - Provide the new issue number, link, and key metadata (title, labels).
 - Note any follow-up tasks (e.g., attach logs/screenshots, notify stakeholders).
+
+## Output Schema
+
+This command's output is validated against the following schema:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "number": {
+      "type": "number"
+    },
+    "title": {
+      "type": "string"
+    },
+    "summary": {
+      "type": "string"
+    },
+    "constraints": {
+      "type": "array",
+      "items": {
+        "type": "string"
+      }
+    }
+  },
+  "required": ["number", "title", "summary"]
+}
+```
+
+The output should be a JSON object containing the issue number, title, summary, and optional constraints array.

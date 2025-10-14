@@ -24,3 +24,13 @@ export interface ApiContext {
  * @see src/auth/context.ts for detailed documentation
  */
 export type { AuthContext, AuthenticatedRequest, Tier } from "@auth/context";
+
+/**
+ * Validation types for command output validation.
+ * @see src/validation/types.ts for detailed documentation
+ */
+export type {
+  ValidationRequest,
+  ValidationResponse,
+  ValidationError
+} from "@validation/types";

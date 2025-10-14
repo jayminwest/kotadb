@@ -116,3 +116,16 @@ This workflow is suitable for:
 - Changes affecting multiple system components
 
 For simple tasks, use the `/build` workflow instead.
+
+## Output Schema
+
+This command's output is validated against the following schema:
+
+```json
+{
+  "type": "string",
+  "pattern": "^docs/specs/.*\\.md$"
+}
+```
+
+The output must be a relative path starting with `docs/specs/` and ending with `.md` extension.
