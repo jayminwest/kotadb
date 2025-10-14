@@ -3,7 +3,15 @@
 # dependencies = ["python-dotenv", "pydantic"]
 # ///
 
-"""End-to-end SDLC workflow orchestrator."""
+"""Simplified 3-phase SDLC workflow orchestrator (plan → build → review).
+
+Simplified ADW flow focuses on core functionality:
+- Plan phase: create implementation plan and commit to branch
+- Build phase: implement plan, commit changes, push branch, create PR
+- Review phase: automated code review and feedback
+
+Test and documentation phases deferred until core flow stabilizes (80% success rate target).
+"""
 
 from __future__ import annotations
 
@@ -37,7 +45,7 @@ def main() -> None:
     issue_number, provided_adw_id = parse_args(sys.argv)
     adw_id, _ = ensure_state(provided_adw_id, issue_number)
     logger = start_logger(adw_id, "adw_sdlc")
-    logger.info(f"Starting full SDLC composite | issue #{issue_number} | adw_id={adw_id}")
+    logger.info(f"Starting simplified SDLC workflow | issue #{issue_number} | adw_id={adw_id}")
 
     # Create environment for multi-phase execution
     # Skip worktree cleanup in plan phase since subsequent phases need the worktree
@@ -45,14 +53,16 @@ def main() -> None:
     sdlc_env["ADW_SKIP_PLAN_CLEANUP"] = "true"
     logger.info("Multi-phase mode: worktree cleanup deferred to final phase")
 
-    steps = ("adw_phases/adw_plan.py", "adw_phases/adw_build.py", "adw_phases/adw_test.py", "adw_phases/adw_review.py", "adw_phases/adw_document.py")
+    # Simplified 3-phase flow: plan → build → review
+    # Test and document phases removed until basics stabilize
+    steps = ("adw_phases/adw_plan.py", "adw_phases/adw_build.py", "adw_phases/adw_review.py")
     try:
         run_sequence(steps, issue_number, adw_id, logger, env=sdlc_env)
     except PhaseExecutionError as exc:
         logger.error(str(exc))
         sys.exit(exc.returncode)
 
-    logger.info("Full SDLC workflow completed successfully")
+    logger.info("Simplified SDLC workflow completed successfully")
 
 
 if __name__ == "__main__":

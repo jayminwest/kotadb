@@ -24,7 +24,6 @@ from .github import ADW_BOT_IDENTIFIER
 from .state import ADWState, ensure_adw_id as core_ensure_adw_id
 from .ts_commands import Command, serialize_commands, validation_commands
 from .utils import parse_json, project_root, setup_logger
-from .validation import validate_commit_message
 
 AGENT_PLANNER = "sdlc_planner"
 AGENT_IMPLEMENTOR = "sdlc_implementor"
@@ -53,6 +52,79 @@ AVAILABLE_ADW_WORKFLOWS = [
 ]
 
 LOCKFILE_NAMES = ("bun.lock", "package-lock.json", "yarn.lock", "pnpm-lock.yaml")
+
+# Conventional Commits pattern with type and optional scope
+# Format: <type>(<scope>): <subject>
+# Subject must be 1-72 characters to stay within commit message best practices
+COMMIT_MESSAGE_PATTERN = re.compile(
+    r'^(feat|fix|chore|docs|test|refactor|perf|ci|build|style)(\(.+\))?: .{1,72}',
+    re.MULTILINE
+)
+
+# Meta-commentary patterns that indicate agent reasoning leakage
+# These patterns signal the agent is explaining the commit rather than providing it
+META_COMMENTARY_PATTERNS = [
+    r'\bbased on\b',
+    r'\bthe commit should\b',
+    r'\bhere is\b',
+    r'\bthis commit\b',
+    r'\bi can see\b',
+    r'\blooking at\b',
+    r'\bthe changes\b',
+    r'\blet me\b',
+]
+
+
+def validate_commit_message(message: str) -> Tuple[bool, Optional[str]]:
+    """Validate commit message follows Conventional Commits format.
+
+    Checks:
+    1. Message starts with valid conventional commit type
+    2. Optional scope in parentheses after type
+    3. Colon and space after type/scope
+    4. Subject line is 1-72 characters
+    5. No meta-commentary or agent reasoning patterns
+
+    Args:
+        message: Commit message to validate
+
+    Returns:
+        Tuple of (is_valid, error_message)
+        - is_valid: True if message is valid
+        - error_message: Descriptive error if invalid, None if valid
+
+    Examples:
+        >>> validate_commit_message("feat: add user authentication")
+        (True, None)
+
+        >>> validate_commit_message("Based on the changes, the commit should...")
+        (False, "Commit message contains meta-commentary...")
+    """
+    if not message or not message.strip():
+        return False, "Commit message is empty"
+
+    # Get first line for format checking
+    first_line = message.strip().split('\n')[0]
+
+    # Check for meta-commentary patterns in first line only (higher signal of agent confusion)
+    # Body text can legitimately contain these phrases in context
+    for pattern in META_COMMENTARY_PATTERNS:
+        if re.search(pattern, first_line, re.IGNORECASE):
+            return False, (
+                f"Commit message contains meta-commentary pattern '{pattern}'. "
+                f"Expected valid Conventional Commit format like: 'feat: add new feature'"
+            )
+
+    # Check Conventional Commits format
+    if not COMMIT_MESSAGE_PATTERN.match(first_line):
+        return False, (
+            f"Commit message does not follow Conventional Commits format. "
+            f"Expected format: '<type>(<scope>): <subject>' where type is one of: "
+            f"feat, fix, chore, docs, test, refactor, perf, ci, build, style. "
+            f"Received: '{first_line}'"
+        )
+
+    return True, None
 
 
 @dataclass
@@ -502,14 +574,21 @@ def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None
 
     Args:
         commands: Iterable of Command objects to execute
-        cwd: Working directory for command execution
+        cwd: Working directory for command execution (worktree path)
         logger: Optional logger for detailed command execution logging
 
     Returns:
         List of ValidationCommandResult objects with command outcomes for all executed commands
+
+    Note:
+        Validation commands run from the app/ directory by default.
+        If cwd is provided (worktree path), commands run from app/ within that worktree.
     """
 
     results: List[ValidationCommandResult] = []
+    # Validation commands execute from app/ directory (where package.json lives)
+    validation_cwd = (cwd / "app") if cwd else (project_root() / "app")
+
     for command in commands:
         if logger:
             logger.info(f"Running validation command: {command.label} ({' '.join(command.argv)})")
@@ -518,7 +597,7 @@ def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None
             command.argv,
             capture_output=True,
             text=True,
-            cwd=cwd or project_root(),
+            cwd=validation_cwd,
         )
 
         result = ValidationCommandResult(
@@ -544,103 +623,6 @@ def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None
                 )
             # Continue to next command instead of breaking (continue-on-error pattern)
     return results
-
-
-def run_validation_with_resolution(
-    commands: Iterable[Command],
-    worktree_path: Path,
-    adw_id: str,
-    issue_number: str,
-    logger: logging.Logger,
-    max_attempts: int = 3,
-) -> Tuple[List[ValidationCommandResult], bool]:
-    """Execute validation commands with agent resolution retry loop for failures.
-
-    Implements resilience pattern: run validations, attempt agent resolution on failures,
-    re-run validations, repeat up to max_attempts. Uses smart bailout (exits early if
-    agent can't resolve anything).
-
-    Args:
-        commands: Iterable of Command objects to execute
-        worktree_path: Path to git worktree for file operations
-        adw_id: ADW execution ID for tracking
-        issue_number: GitHub issue number for context
-        logger: Logger instance for tracking retry attempts
-        max_attempts: Maximum retry attempts (default: 3)
-
-    Returns:
-        Tuple of (results, success):
-        - results: List of ValidationCommandResult objects from final attempt
-        - success: True if all validations passed, False otherwise
-
-    Behavior:
-        - Attempt 1: Run all validations, collect failures
-        - If failures exist: invoke agent resolution for each failed command
-        - Attempts 2-N: Re-run validations, track newly resolved failures
-        - Smart bailout: Exit early if resolved_count == 0 (agent can't fix)
-        - Track resolution attempts in result objects via resolution_attempted flag
-    """
-    from .agent_resolution import resolve_validation_failure, track_resolution_attempt
-    from .state import ADWState
-
-    state = ADWState.load(adw_id)
-
-    for attempt in range(1, max_attempts + 1):
-        logger.info(f"Validation attempt {attempt}/{max_attempts}")
-
-        # Run all validation commands (continue-on-error)
-        results = run_validation_commands(commands, cwd=worktree_path, logger=logger)
-
-        # Check if all passed
-        failed_results = [r for r in results if not r.ok]
-        if not failed_results:
-            logger.info(f"All validations passed on attempt {attempt}")
-            return results, True
-
-        # If this is the last attempt, don't try resolution
-        if attempt >= max_attempts:
-            logger.warning(f"Validation failed after {max_attempts} attempts")
-            return results, False
-
-        # Attempt agent resolution for each failure
-        logger.info(f"Found {len(failed_results)} failed validations, attempting agent resolution")
-        resolved_count = 0
-
-        for failed_result in failed_results:
-            logger.info(f"Attempting resolution for: {failed_result.label}")
-
-            resolution_success = resolve_validation_failure(
-                result=failed_result,
-                adw_id=adw_id,
-                worktree_path=worktree_path,
-                logger=logger,
-            )
-
-            # Mark that resolution was attempted
-            failed_result.resolution_attempted = True
-
-            # Track resolution attempt in state
-            track_resolution_attempt(
-                state=state,
-                result=failed_result,
-                resolution_success=resolution_success,
-                logger=logger,
-            )
-
-            if resolution_success:
-                resolved_count += 1
-
-        logger.info(f"Agent resolution: {resolved_count}/{len(failed_results)} attempts succeeded")
-
-        # Smart bailout: if agent couldn't resolve anything, exit early
-        if resolved_count == 0:
-            logger.warning("Smart bailout: agent resolved 0 failures, stopping retry loop")
-            return results, False
-
-        logger.info(f"Proceeding to attempt {attempt + 1} after resolution")
-
-    # Should never reach here due to loop logic, but provide fallback
-    return results, False
 
 
 def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
@@ -869,10 +851,10 @@ __all__ = [
     "persist_issue_snapshot",
     "record_git_failure",
     "run_validation_commands",
-    "run_validation_with_resolution",
     "serialize_validation",
     "start_logger",
     "run_review",
     "summarize_validation_results",
     "summarize_review_result",
+    "validate_commit_message",
 ]

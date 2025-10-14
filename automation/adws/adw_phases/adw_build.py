@@ -3,7 +3,10 @@
 # dependencies = ["python-dotenv", "pydantic"]
 # ///
 
-"""Build phase for the AI Developer Workflow."""
+"""Build phase for the AI Developer Workflow (simplified 5-step flow).
+
+Implements plan, commits changes, pushes branch, and creates PR after successful implementation.
+"""
 
 from __future__ import annotations
 
@@ -214,19 +217,23 @@ def main() -> None:
             format_issue_message(adw_id, "ops", f"✅ Branch pushed: {state.worktree_name}"),
         )
 
-    if pushed and state.plan_file:
+    if pushed and state.plan_file and not state.pr_created:
         pr_url, pr_error = create_pull_request(state.worktree_name, issue, state.plan_file, adw_id, logger, cwd=str(worktree_path))
         if pr_error:
-            logger.error(f"Pull request update failed: {pr_error}")
+            logger.error(f"Pull request creation failed: {pr_error}")
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Error updating pull request: {pr_error}"),
+                format_issue_message(adw_id, "ops", f"❌ Error creating pull request: {pr_error}"),
             )
         elif pr_url:
+            logger.info(f"Pull request created: {pr_url}")
+            state.update(pr_created=True)
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "ops", f"✅ Pull request updated: {pr_url}"),
+                format_issue_message(adw_id, "ops", f"✅ Pull request created: {pr_url}"),
             )
+    elif state.pr_created:
+        logger.info("Pull request already exists, skipping creation")
 
     state.save()
     make_issue_comment(

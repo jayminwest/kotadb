@@ -3,7 +3,10 @@
 # dependencies = ["python-dotenv", "pydantic"]
 # ///
 
-"""Plan phase for the AI Developer Workflow."""
+"""Plan phase for the AI Developer Workflow (simplified 5-step flow).
+
+Creates plan document and commits to branch. PR creation deferred to build phase.
+"""
 
 from __future__ import annotations
 
@@ -29,7 +32,6 @@ from adws.adw_modules.workflow_ops import (
     build_plan,
     classify_issue,
     create_commit_message,
-    create_pull_request,
     ensure_state,
     format_issue_message,
     generate_branch_name,
@@ -288,49 +290,37 @@ def main() -> None:
             format_issue_message(adw_id, "ops", f"❌ Error pushing branch: {push_error}"),
         )
     else:
+        logger.info("Branch pushed successfully. PR will be created after implementation.")
+        state.update(pr_created=False)
         make_issue_comment(
             issue_number,
-            format_issue_message(adw_id, "ops", f"✅ Branch pushed: {worktree_name}"),
+            format_issue_message(adw_id, "ops", "✅ Branch pushed (PR pending implementation)"),
         )
 
-    pr_created = False
-    if pushed:
-        pr_url, pr_error = create_pull_request(worktree_name, issue, plan_file, adw_id, logger, cwd=str(worktree_path))
-        if pr_error:
-            logger.error(f"Pull request creation failed: {pr_error}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Error creating pull request: {pr_error}"),
-            )
-        elif pr_url:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"✅ Pull request created: {pr_url}"),
-            )
-            pr_created = True
-
-    # Cleanup worktree after successful PR creation (respects ADW_CLEANUP_WORKTREES env var)
+    # Worktree cleanup after plan phase
     # NOTE: Cleanup is disabled when ADW_SKIP_PLAN_CLEANUP=true (e.g., during multi-phase SDLC workflows)
-    cleanup_enabled = os.getenv("ADW_CLEANUP_WORKTREES", "true").lower() == "true"
-    skip_plan_cleanup = os.getenv("ADW_SKIP_PLAN_CLEANUP", "false").lower() == "true"
+    # PR creation moved to build phase, so worktree should be preserved by default
+    skip_plan_cleanup = os.getenv("ADW_SKIP_PLAN_CLEANUP", "true").lower() == "true"
 
-    if pr_created and cleanup_enabled and not skip_plan_cleanup:
-        logger.info(f"Cleaning up worktree: {worktree_name}")
-        cleanup_success = git_ops.cleanup_worktree(worktree_name, base_path=worktree_base_path, delete_branch=False)
-        if cleanup_success:
-            logger.info("Worktree cleanup completed")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "✅ Worktree cleaned up"),
-            )
-        else:
-            logger.warning(f"Worktree cleanup failed, manual cleanup may be required: trees/{worktree_name}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", f"⚠️ Worktree cleanup incomplete: trees/{worktree_name}"),
-            )
-    elif skip_plan_cleanup:
+    if skip_plan_cleanup:
         logger.info("Skipping worktree cleanup (ADW_SKIP_PLAN_CLEANUP=true, preserving for subsequent phases)")
+    elif pushed:
+        cleanup_enabled = os.getenv("ADW_CLEANUP_WORKTREES", "true").lower() == "true"
+        if cleanup_enabled:
+            logger.info(f"Cleaning up worktree: {worktree_name}")
+            cleanup_success = git_ops.cleanup_worktree(worktree_name, base_path=worktree_base_path, delete_branch=False)
+            if cleanup_success:
+                logger.info("Worktree cleanup completed")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", "✅ Worktree cleaned up"),
+                )
+            else:
+                logger.warning(f"Worktree cleanup failed, manual cleanup may be required: trees/{worktree_name}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, "ops", f"⚠️ Worktree cleanup incomplete: trees/{worktree_name}"),
+                )
 
     state.save()
     make_issue_comment(
