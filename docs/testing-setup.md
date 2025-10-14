@@ -58,7 +58,7 @@ This script will:
 bun test
 ```
 
-The test suite connects to Supabase Local using auto-generated credentials from `.env.test`.
+The test suite automatically loads environment variables from `.env.test` via a preload script (`app/tests/setup.ts`). No manual `export` or `source` commands are required - tests will automatically use credentials from the Docker Compose stack.
 
 ### 3. Check Service Status
 
@@ -205,13 +205,31 @@ const apiKey = TEST_API_KEYS.solo;
 
 ### Test Environment Variables
 
-Tests automatically set these environment variables:
+Tests automatically load environment variables from `.env.test` via a preload script (`app/tests/setup.ts`). This script:
 
-```typescript
-process.env.SUPABASE_URL = "http://localhost:5434";
-process.env.SUPABASE_SERVICE_KEY = "test-service-key-local";
-process.env.SUPABASE_ANON_KEY = "test-anon-key-local";
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
+1. Runs before all tests (via `bun test --preload ./tests/setup.ts`)
+2. Parses `.env.test` and loads variables into `process.env`
+3. Falls back to hardcoded defaults if `.env.test` doesn't exist
+
+**Automatic Loading (Recommended):**
+```bash
+# Just run tests - .env.test is loaded automatically
+bun test
+```
+
+**Manual Loading (Alternative):**
+```bash
+# Export variables manually if needed
+export $(grep -v '^#' .env.test | xargs)
+bun test
+```
+
+The `.env.test` file typically contains:
+```bash
+SUPABASE_URL=http://localhost:<dynamic-port>
+SUPABASE_SERVICE_KEY=<generated-jwt>
+SUPABASE_ANON_KEY=<generated-jwt>
+DATABASE_URL=postgresql://postgres:postgres@localhost:<dynamic-port>/postgres
 ```
 
 ### Example Test

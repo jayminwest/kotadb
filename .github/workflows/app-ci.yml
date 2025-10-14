@@ -52,8 +52,9 @@ jobs:
 
       - name: Test
         run: |
-          # Source .env.test for Supabase credentials
-          export $(grep -v '^#' ../.env.test | xargs)
+          # Tests automatically load .env.test via preload script (tests/setup.ts)
+          # No manual export needed - keeping for backwards compatibility
+          export $(grep -v '^#' ../.env.test | xargs) || true
           bun test
 
       - name: Teardown Docker Compose test stack

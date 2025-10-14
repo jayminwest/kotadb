@@ -8,7 +8,7 @@
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
-    "test": "bun test",
+    "test": "bun test --preload ./tests/setup.ts",
     "check": "bun run typecheck",
     "typecheck": "bunx tsc --noEmit",
     "build": "bun run typecheck",

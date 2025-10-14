@@ -209,11 +209,13 @@ The agentic layer operates on the application layer (in `app/`) to automate deve
 
 **Test Environment Variable Loading Strategy**:
 - **Problem**: CI uses dynamic Docker Compose ports, but tests were hardcoding `localhost:54322`
-- **Solution**: Tests now read from environment variables with fallback to local defaults
+- **Solution**: Tests automatically load `.env.test` via preload script before running
 - **Implementation**:
-  - `app/tests/helpers/db.ts` reads `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` from `process.env`
+  - `app/tests/setup.ts`: Preload script that parses `.env.test` and loads into `process.env`
+  - `app/package.json`: Test script uses `bun test --preload ./tests/setup.ts`
+  - `app/tests/helpers/db.ts`: Reads `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` from `process.env` with fallback to defaults
   - All test files removed hardcoded env var assignments (lines like `process.env.SUPABASE_URL = "http://localhost:54322"`)
-  - CI workflow exports `app/.env.test` variables via `export $(grep -v '^#' .env.test | xargs)` before running tests
-  - Local development: falls back to standard ports (54322, 5434) when env vars not set
+  - CI workflow: Preload script automatically loads `app/.env.test` (no manual export needed)
+  - Local development: Preload script loads `.env.test` automatically, falls back to standard ports if file missing
 - **Validation**: Run `cd app && bun run test:validate-env` to detect hardcoded environment variable assignments in tests
-- **Result**: Tests respect dynamic ports from `app/.env.test` in CI while maintaining local dev compatibility
+- **Result**: Tests automatically respect dynamic ports from `app/.env.test` in both CI and local development
