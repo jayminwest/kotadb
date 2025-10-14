@@ -1,5 +1,6 @@
 import type { IndexRequest, IndexedFile } from "@shared/index";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
 
 export interface SearchOptions {
 	repositoryId?: string;
@@ -48,17 +49,20 @@ export async function recordIndexRun(
  * @param id - Index job UUID
  * @param status - New status value
  * @param errorMessage - Optional error message if status is "failed"
+ * @param stats - Optional statistics to store in metadata (files indexed, symbols extracted)
  */
 export async function updateIndexRunStatus(
 	client: SupabaseClient,
 	id: string,
 	status: string,
 	errorMessage?: string,
+	stats?: { files_indexed?: number; symbols_extracted?: number },
 ): Promise<void> {
 	const updateData: {
 		status: string;
 		completed_at?: string;
 		error_message?: string;
+		metadata?: Record<string, unknown>;
 	} = {
 		status,
 	};
@@ -69,6 +73,10 @@ export async function updateIndexRunStatus(
 
 	if (errorMessage) {
 		updateData.error_message = errorMessage;
+	}
+
+	if (stats) {
+		updateData.metadata = stats;
 	}
 
 	const { error } = await client
@@ -121,6 +129,54 @@ export async function saveIndexedFiles(
 	}
 
 	return count ?? files.length;
+}
+
+/**
+ * Store symbols extracted from AST into database.
+ *
+ * Symbols are associated with their file via file_id foreign key.
+ * Upsert strategy handles re-indexing by updating existing symbols.
+ *
+ * @param client - Supabase client instance
+ * @param symbols - Array of extracted symbols
+ * @param fileId - UUID of the indexed file
+ * @returns Number of symbols stored
+ */
+export async function storeSymbols(
+	client: SupabaseClient,
+	symbols: ExtractedSymbol[],
+	fileId: string,
+): Promise<number> {
+	if (symbols.length === 0) {
+		return 0;
+	}
+
+	const records = symbols.map((symbol) => ({
+		file_id: fileId,
+		name: symbol.name,
+		kind: symbol.kind,
+		line_start: symbol.lineStart,
+		line_end: symbol.lineEnd,
+		signature: symbol.signature,
+		documentation: symbol.documentation,
+		metadata: {
+			column_start: symbol.columnStart,
+			column_end: symbol.columnEnd,
+			is_exported: symbol.isExported,
+			is_async: symbol.isAsync,
+			access_modifier: symbol.accessModifier,
+		},
+	}));
+
+	const { error, count } = await client.from("symbols").upsert(records, {
+		onConflict: "file_id,name,line_start",
+	});
+
+	if (error) {
+		throw new Error(`Failed to store symbols: ${error.message}`);
+	}
+
+	return count ?? symbols.length;
 }
 
 /**
@@ -272,6 +328,8 @@ export async function runIndexingWorkflow(
 	const { existsSync } = await import("node:fs");
 	const { prepareRepository } = await import("@indexer/repos");
 	const { discoverSources, parseSourceFile } = await import("@indexer/parsers");
+	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
+	const { extractSymbols } = await import("@indexer/symbol-extractor");
 
 	const repo = await prepareRepository(request);
 
@@ -289,7 +347,40 @@ export async function runIndexingWorkflow(
 	).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
 	await saveIndexedFiles(client, records, userId, repositoryId);
-	await updateIndexRunStatus(client, runId, "completed");
+
+	// Extract and store symbols for each file
+	const symbolStats = await Promise.all(
+		records.map(async (file) => {
+			if (!isSupportedForAST(file.path)) return 0;
+
+			const ast = parseFile(file.path, file.content);
+			if (!ast) return 0;
+
+			const symbols = extractSymbols(ast, file.path);
+
+			// Get the file_id from database
+			const { data: fileRecord } = await client
+				.from("indexed_files")
+				.select("id")
+				.eq("repository_id", repositoryId)
+				.eq("path", file.path)
+				.single();
+
+			if (!fileRecord) {
+				console.warn(`Could not find file record for ${file.path}`);
+				return 0;
+			}
+
+			return await storeSymbols(client, symbols, fileRecord.id);
+		}),
+	);
+
+	const totalSymbols = symbolStats.reduce((sum, count) => sum + count, 0);
+
+	await updateIndexRunStatus(client, runId, "completed", undefined, {
+		files_indexed: records.length,
+		symbols_extracted: totalSymbols,
+	});
 }
 
 /**
