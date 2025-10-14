@@ -66,24 +66,48 @@ Looking at the diff, the changes add rate limiting
 1. `git diff HEAD` (for context only, to understand the changes)
 
 ## Report
-Return **ONLY** the commit subject line as plain text on a single line.
+
+**OUTPUT FORMAT (CRITICAL):**
+
+Your response will be used DIRECTLY as the commit message without any parsing or extraction. You MUST output EXACTLY one line containing ONLY the commit message in the format:
+
+```
+<type>: <issue_number> - <description>
+```
+
+**ABSOLUTE REQUIREMENTS:**
+1. **First character** of your response must be a valid type (`chore`, `feat`, `fix`, etc.)
+2. **No preamble** - do not write ANYTHING before the commit message
+3. **No postamble** - do not write ANYTHING after the commit message
+4. **No explanation** - your ENTIRE response is the commit message itself
+5. **Single line only** - no line breaks, no additional sentences
 
 **DO NOT include:**
-- Explanatory text (e.g., "The commit message is:", "I generated:")
-- Markdown formatting (no **bold**, no ` ``` blocks`)
-- Multiple lines or additional commentary
-- Any of the forbidden meta-commentary patterns
+- ❌ "Based on the git status..." or "Based on the staged work..."
+- ❌ "The commit message is:" or "Here's the commit message:"
+- ❌ "I can see that..." or "Looking at the changes..."
+- ❌ "Since this is a..." or any contextual explanation
+- ❌ Markdown formatting (no **bold**, no ` ``` blocks`)
+- ❌ Multiple lines or additional commentary
+- ❌ ANY text before or after the commit message
 
-**Correct output:**
+**✅ CORRECT output (this is your ENTIRE response):**
 ```
 chore: 98 - document test path resolution strategy
 ```
 
-**INCORRECT output (do NOT do this):**
+**❌ INCORRECT output (do NOT do this):**
 ```
 Based on the changes, the commit message should be:
 
-**chore: 98 - document test path resolution strategy**
-
-This commit documents the test path resolution strategy.
+chore: 98 - document test path resolution strategy
 ```
+
+**❌ ALSO INCORRECT (do NOT do this):**
+```
+Based on the staged work (plan specification file for issue #86), here's the commit message:
+
+chore: 86 - validate and document git staging fix
+```
+
+**Remember**: Your response IS the commit message. Nothing more, nothing less.

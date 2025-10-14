@@ -354,7 +354,22 @@ Review the git diff (run git diff HEAD to see what changed) and provide ONLY the
                     continue
                 return None, response.output
 
-            message = response.output.strip()
+            raw_message = response.output.strip()
+
+            # Post-process retry response (same as main path)
+            if '\n' in raw_message:
+                lines = [line.strip() for line in raw_message.splitlines() if line.strip()]
+                commit_pattern = r'^(feat|fix|chore|docs|test|refactor|perf|ci|build|style)(\(.+?\))?:\s*.+'
+                for line in lines:
+                    if re.match(commit_pattern, line):
+                        logger.info(f"[Retry] Extracted commit message from multi-line response: {line}")
+                        message = line
+                        break
+                else:
+                    message = lines[-1] if lines else raw_message
+                    logger.info(f"[Retry] Used last line from multi-line response: {message}")
+            else:
+                message = raw_message
         else:
             # First attempt - use standard commit template
             request = AgentTemplateRequest(
@@ -379,6 +394,22 @@ Review the git diff (run git diff HEAD to see what changed) and provide ONLY the
                 return None, response.output
 
             message = response.output.strip()
+
+        # Post-process: Strip meta-commentary if present (thinking tokens workaround)
+        # Extract the last line that looks like a commit message if multi-line response
+        if '\n' in message:
+            lines = [line.strip() for line in message.splitlines() if line.strip()]
+            # Find the first line that matches conventional commit format
+            commit_pattern = r'^(feat|fix|chore|docs|test|refactor|perf|ci|build|style)(\(.+?\))?:\s*.+'
+            for line in lines:
+                if re.match(commit_pattern, line):
+                    logger.info(f"Extracted commit message from multi-line response: {line}")
+                    message = line
+                    break
+            else:
+                # If no valid commit found, use the last non-empty line
+                message = lines[-1] if lines else message
+                logger.info(f"Used last line from multi-line response: {message}")
 
         # Check if message is empty
         if not message:
