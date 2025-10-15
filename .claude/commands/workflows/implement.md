@@ -9,8 +9,22 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 - Keep commits incremental and logically grouped. Use Conventional Commit subjects referencing the issue.
   - **CRITICAL**: Avoid meta-commentary patterns in commit messages (e.g., "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me")
   - These patterns will fail validation. Use direct statements: `feat: add search filters` not `Based on the changes, the commit should add search filters`
+  - Create commits after completing logical units of work (e.g., after implementing a module, after adding tests, after updating docs)
+  - **For ADW agents**: Use the `git_commit` MCP tool for automated workflows:
+    ```typescript
+    // Query workflow state for context
+    const state = await mcp.call("adw_get_state", { adw_id: "<adw_id>" });
+
+    // Create incremental commit
+    await mcp.call("git_commit", {
+      adw_id: "<adw_id>",
+      message: "feat: add rate limiter middleware",
+      files: ["app/src/middleware/rate-limit.ts"]  // Optional: specific files
+    });
+    ```
+  - **For manual development**: Use standard git commands: `git add <files> && git commit -m "message"`
 - Stay on the correct work branch (`feat/`, `bug/`, `chore/`, etc.) that will merge into `develop` before promotion to `main`.
-- When scoped tasks are complete, rerun the plan's validation level, ensure the tree is clean, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so the PR opens with a title ending in the issue number (e.g. `feat: add search filters (#210)`).
+- When scoped tasks are complete, rerun the plan's validation level, ensure the tree is clean, and push the branch so a PR can be created with a title ending in the issue number (e.g. `feat: add search filters (#210)`).
 
 ## Anti-Mock Guardrails
 - Read `/anti-mock` before touching tests; do not introduce new stub helpers (`createMock*`, fake clients, manual spies).
@@ -43,8 +57,8 @@ Before creating the PR, select and execute the appropriate validation level:
 
 ## Final Steps
 - After validation passes, confirm `git status --short` is clean apart from intended artifacts.
-- Push the branch (`git push -u origin <branch>`), then run `/pull_request <branch> <issue_json> <plan_path> <adw_id>`.
-- Verify the PR body includes validation evidence and the title suffix `(#<issue-number>)`.
+- Push the branch (`git push -u origin <branch>`).
+- Verify the PR body will include validation evidence and the title suffix `(#<issue-number>)`.
 
 ## Report
 Provide a concise bullet list of the implementation work performed.

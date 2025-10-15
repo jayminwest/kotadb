@@ -23,8 +23,16 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Think critically about risk, rollout, and validation; do not leave placeholders empty.
 - Enumerate relevant code paths and new assets in their dedicated sections.
 - Incorporate `/anti-mock` guidance: plan for real Supabase coverage, failure injection, and follow-up for any unavoidable skips.
-- Ensure the plan’s final tasks rerun validation, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so a PR opens immediately (PR titles must end with the issue number, e.g. `feat: add search filters (#210)`).
+- Ensure the plan's final tasks rerun validation and push the branch so a PR can be created (PR titles must end with the issue number, e.g. `feat: add search filters (#210)`).
 - If the plan introduces new documentation areas, append or update the relevant entry in `.claude/commands/docs/conditional_docs.md`.
+
+## ADW Agent Integration
+- If executing via ADW orchestration, query workflow state via MCP instead of searching:
+  ```typescript
+  const state = await mcp.call("adw_get_state", { adw_id: "<adw_id>" });
+  const planFile = state.plan_file;  // e.g., "docs/specs/feature-145-plan.md"
+  const worktreePath = state.worktree_path;  // e.g., "trees/feat-145-abc12345"
+  ```
 
 ## Plan Format
 ```md
@@ -56,7 +64,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 ## Step by Step Tasks
 ### <ordered task group>
 - <actionable bullet in execution order>
-- Conclude with a task group that re-validates, pushes (`git push -u origin <branch>`), and runs `/pull_request <branch> <issue_json> <plan_path> <adw_id>`.
+- Conclude with a task group that re-validates and pushes (`git push -u origin <branch>`).
 
 ## Risks & Mitigations
 - <risk> → <mitigation>

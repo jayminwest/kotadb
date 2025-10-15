@@ -13,6 +13,13 @@
       "headers": {
         "Authorization": "Bearer YOUR_STAGING_API_KEY_HERE"
       }
+    },
+    "kotadb-adw": {
+      "type": "http",
+      "url": "http://localhost:4000/mcp",
+      "headers": {
+        "Authorization": "Bearer adw_orchestrator_key"
+      }
     }
   }
 }

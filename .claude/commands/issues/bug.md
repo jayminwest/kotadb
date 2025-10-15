@@ -20,9 +20,17 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 - Capture all impacted files (and any new assets) in the dedicated section so implementors have clear scope boundaries.
 - Reference the repo git flow: work from `bug/<issue-number>-<slug>` off `develop`, with `develop` promoted to `main` on release.
 - Integrate `/anti-mock` expectations: propose real Supabase test coverage, failure injection, and follow-ups for any temporary skips.
-- Ensure the plan’s closing tasks rerun validation, push the branch, and call `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so a PR is raised immediately (PR titles must end with the issue number, e.g. `fix: correct row filters (#210)`).
+- Ensure the plan's closing tasks rerun validation and push the branch so a PR can be raised (PR titles must end with the issue number, e.g. `fix: correct row filters (#210)`).
 - Consult `.claude/commands/docs/conditional_docs.md` and read only the documentation whose conditions align with the defect.
 - When the remediation introduces new documentation, add or update the relevant conditional entry so future agents can discover it quickly.
+
+## ADW Agent Integration
+- If executing via ADW orchestration, query workflow state via MCP instead of searching:
+  ```typescript
+  const state = await mcp.call("adw_get_state", { adw_id: "<adw_id>" });
+  const planFile = state.plan_file;  // e.g., "docs/specs/bug-145-plan.md"
+  const worktreePath = state.worktree_path;  // e.g., "trees/bug-145-abc12345"
+  ```
 
 ## Plan Format
 ```md
@@ -60,7 +68,7 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 ## Step by Step Tasks
 ### <ordered task group>
 - <actionable bullet in execution order>
-- End with a task group that re-validates, pushes (`git push -u origin <branch>`), and runs `/pull_request <branch> <issue_json> <plan_path> <adw_id>`.
+- End with a task group that re-validates and pushes (`git push -u origin <branch>`).
 
 ## Regression Risks
 - Adjacent features to watch
