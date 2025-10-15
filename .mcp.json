@@ -1,10 +1,17 @@
 {
   "mcpServers": {
-    "kotadb": {
+    "kotadb-local": {
       "type": "http",
       "url": "http://localhost:3000/mcp",
       "headers": {
         "Authorization": "Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef"
+      }
+    },
+    "kotadb-staging": {
+      "type": "http",
+      "url": "https://kota-db-staging.fly.dev/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_STAGING_API_KEY_HERE"
       }
     }
   }

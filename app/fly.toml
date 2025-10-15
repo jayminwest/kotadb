@@ -1,4 +1,4 @@
-app = "kota-db"
+app = "kota-db-staging"
 
 kill_signal = "SIGINT"
 kill_timeout = 5

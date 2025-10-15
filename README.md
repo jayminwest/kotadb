@@ -208,7 +208,16 @@ Build and run the service in a container:
 docker compose up dev
 ```
 
-The `dev` and `home` services use the build context from the `app/` directory. A production-flavoured service is available via the `home` target in `docker-compose.yml`. Deployments to Fly.io can leverage the baseline configuration in `fly.toml`.
+The `dev` and `home` services use the build context from the `app/` directory. A production-flavoured service is available via the `home` target in `docker-compose.yml`.
+
+## Deployment
+
+For deploying KotaDB to Fly.io (staging or production), see the comprehensive guide at [`docs/deployment.md`](docs/deployment.md). The deployment guide covers:
+- Prerequisites and Fly.io authentication
+- Staging and production environment setup
+- Supabase configuration and secret management
+- Health check validation and MCP integration testing
+- Troubleshooting common deployment issues
 
 ## Project Layout
 
