@@ -155,6 +155,7 @@ class AgentPromptResponse(BaseModel):
     output: str
     success: bool
     session_id: Optional[str] = None
+    retry_code: Optional[str] = None  # RetryCode enum value from agent.py
 
 
 class AgentTemplateRequest(BaseModel):
@@ -289,14 +290,32 @@ class HomeServerCronConfig(BaseModel):
     stats_endpoint: str = Field(default="/api/kota-tasks/stats", description="Stats reporting endpoint")
 
 
+class CheckpointData(BaseModel):
+    """Individual checkpoint within a phase."""
+    timestamp: str = Field(..., description="ISO timestamp when checkpoint was created")
+    step: str = Field(..., description="Phase step identifier (e.g., 'implementation', 'commit')")
+    files_completed: List[str] = Field(default_factory=list, description="List of files completed at this checkpoint")
+    next_action: Optional[str] = Field(None, description="Next action to resume from this checkpoint")
+    metadata: Dict[str, Any] = Field(default_factory=dict, description="Additional checkpoint-specific data")
+
+
+class CheckpointFile(BaseModel):
+    """Checkpoint file format for a phase."""
+    phase: str = Field(..., description="Phase name (plan, build, review)")
+    checkpoints: List[CheckpointData] = Field(default_factory=list, description="List of checkpoints in this phase")
+
+
 __all__ = [
     "AgentPromptRequest",
     "AgentPromptResponse",
     "AgentTemplateRequest",
+    "CheckpointData",
+    "CheckpointFile",
     "ClaudeCodeResultMessage",
     "CommandMapping",
     "CommandType",
     "COMMAND_MAPPINGS",
+    "DocumentationResult",
     "GitHubComment",
     "GitHubIssue",
     "GitHubIssueListItem",
@@ -308,12 +327,11 @@ __all__ = [
     "HomeServerTaskUpdate",
     "IssueClassSlashCommand",
     "ModelType",
+    "ReviewIssue",
+    "ReviewResult",
     "SlashCommand",
     "TaskStatus",
     "TestResult",
-    "ReviewIssue",
-    "ReviewResult",
-    "DocumentationResult",
     "TriggerStatsReport",
     "WorkflowType",
     "resolve_category",
