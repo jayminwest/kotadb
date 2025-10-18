@@ -7,8 +7,6 @@ import os
 import re
 import subprocess
 import sys
-import time
-from enum import Enum
 from pathlib import Path
 from typing import Any, Dict, List, Optional, Sequence, Tuple
 
@@ -27,16 +25,6 @@ load_adw_env()
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")
 # Commands are at repository root, one level above automation directory
 COMMANDS_ROOT = project_root().parent / ".claude" / "commands"
-
-
-class RetryCode(str, Enum):
-    """Classification of errors to determine retry behavior."""
-
-    CLAUDE_CODE_ERROR = "claude_code_error"  # CLI execution failures
-    TIMEOUT_ERROR = "timeout_error"  # Command timeouts
-    EXECUTION_ERROR = "execution_error"  # Generic subprocess errors
-    ERROR_DURING_EXECUTION = "error_during_execution"  # Agent execution failures
-    NONE = "none"  # Success or non-retryable errors
 
 
 def check_claude_installed() -> Optional[str]:
@@ -182,74 +170,12 @@ def render_slash_command_prompt(slash_command: str, args: Sequence[str]) -> str:
     return content
 
 
-def prompt_claude_code_with_retry(
-    request: AgentPromptRequest,
-    max_retries: int = 3,
-    retry_delays: Optional[List[int]] = None,
-) -> AgentPromptResponse:
-    """Execute Claude Code with retry logic for transient errors.
-
-    Args:
-        request: The prompt request configuration
-        max_retries: Maximum number of retry attempts (default: 3)
-        retry_delays: List of delays in seconds between retries (default: [1, 3, 5])
-
-    Returns:
-        AgentPromptResponse with output and retry code
-    """
-    if retry_delays is None:
-        retry_delays = [1, 3, 5]
-
-    # Ensure we have enough delays for max_retries
-    while len(retry_delays) < max_retries:
-        retry_delays.append(retry_delays[-1] + 2)  # Add incrementing delays
-
-    last_response = None
-
-    for attempt in range(max_retries + 1):  # +1 for initial attempt
-        if attempt > 0:
-            # This is a retry
-            delay = retry_delays[attempt - 1]
-            sys.stdout.write(f"Retrying after {delay}s (attempt {attempt + 1}/{max_retries + 1})...\n")
-            time.sleep(delay)
-
-        response = prompt_claude_code(request)
-        last_response = response
-
-        # Check if we should retry based on the retry code
-        if response.success or response.retry_code == RetryCode.NONE:
-            # Success or non-retryable error
-            return response
-
-        # Check if this is a retryable error
-        if response.retry_code in [
-            RetryCode.CLAUDE_CODE_ERROR,
-            RetryCode.TIMEOUT_ERROR,
-            RetryCode.EXECUTION_ERROR,
-            RetryCode.ERROR_DURING_EXECUTION,
-        ]:
-            if attempt < max_retries:
-                sys.stderr.write(f"Retryable error ({response.retry_code}): {response.output[:100]}...\n")
-                continue
-            else:
-                sys.stderr.write(f"Max retries ({max_retries}) reached. Giving up.\n")
-                return response
-
-    # Should not reach here, but return last response just in case
-    return last_response if last_response else AgentPromptResponse(
-        output="Unexpected error: no response received",
-        success=False,
-        session_id=None,
-        retry_code=RetryCode.EXECUTION_ERROR,
-    )
-
-
 def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     """Execute Claude Code with the configured prompt."""
 
     error_msg = check_claude_installed()
     if error_msg:
-        return AgentPromptResponse(output=error_msg, success=False, session_id=None, retry_code=RetryCode.CLAUDE_CODE_ERROR)
+        return AgentPromptResponse(output=error_msg, success=False, session_id=None)
 
     save_prompt(request.prompt, request.adw_id, request.agent_name, request.slash_command)
 
@@ -275,16 +201,16 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     except subprocess.TimeoutExpired:
         error = "Error: Claude Code command timed out"
         sys.stderr.write(f"{error}\n")
-        return AgentPromptResponse(output=error, success=False, session_id=None, retry_code=RetryCode.TIMEOUT_ERROR)
+        return AgentPromptResponse(output=error, success=False, session_id=None)
     except Exception as exc:  # noqa: BLE001
         error = f"Error executing Claude Code: {exc}"
         sys.stderr.write(f"{error}\n")
-        return AgentPromptResponse(output=error, success=False, session_id=None, retry_code=RetryCode.EXECUTION_ERROR)
+        return AgentPromptResponse(output=error, success=False, session_id=None)
 
     if result.returncode != 0:
         error = f"Claude Code error: {result.stderr}"
         sys.stderr.write(f"{error}\n")
-        return AgentPromptResponse(output=error, success=False, session_id=None, retry_code=RetryCode.CLAUDE_CODE_ERROR)
+        return AgentPromptResponse(output=error, success=False, session_id=None)
 
     sys.stdout.write(f"Output saved to: {output_path}\n")
     messages, result_message = parse_jsonl_output(str(output_path))
@@ -292,17 +218,10 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
 
     if result_message:
         message = ClaudeCodeResultMessage(**result_message)
-        # Detect agent execution errors from result message
-        retry_code = RetryCode.ERROR_DURING_EXECUTION if message.is_error else RetryCode.NONE
-        return AgentPromptResponse(
-            output=message.result,
-            success=not message.is_error,
-            session_id=message.session_id,
-            retry_code=retry_code,
-        )
+        return AgentPromptResponse(output=message.result, success=not message.is_error, session_id=message.session_id)
 
     raw_output = "".join(json.dumps(entry) + "\n" for entry in messages)
-    return AgentPromptResponse(output=raw_output, success=True, session_id=None, retry_code=RetryCode.NONE)
+    return AgentPromptResponse(output=raw_output, success=True, session_id=None)
 
 
 def execute_template(request: AgentTemplateRequest) -> AgentPromptResponse:
@@ -337,7 +256,6 @@ __all__ = [
     "AgentPromptResponse",
     "AgentTemplateRequest",
     "ClaudeCodeResultMessage",
-    "RetryCode",
     "check_claude_installed",
     "command_template_path",
     "convert_jsonl_to_json",
@@ -345,7 +263,6 @@ __all__ = [
     "get_claude_env",
     "parse_jsonl_output",
     "prompt_claude_code",
-    "prompt_claude_code_with_retry",
     "render_slash_command_prompt",
     "save_prompt",
 ]

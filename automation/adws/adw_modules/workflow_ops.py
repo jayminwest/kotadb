@@ -14,8 +14,6 @@ from .agent import execute_template
 from .data_types import (
     AgentPromptResponse,
     AgentTemplateRequest,
-    CheckpointData,
-    CheckpointFile,
     DocumentationResult,
     GitHubIssue,
     IssueClassSlashCommand,
@@ -820,84 +818,6 @@ def serialize_validation(commands: Iterable[Command]) -> List[dict[str, str]]:
     return serialize_commands(commands)
 
 
-def save_checkpoint(adw_id: str, phase: str, checkpoint_data: CheckpointData, logger: Optional[logging.Logger] = None) -> None:
-    """Save a checkpoint for a phase to enable resume on failure.
-
-    Args:
-        adw_id: ADW execution ID
-        phase: Phase name (plan, build, review)
-        checkpoint_data: Checkpoint data to save
-        logger: Optional logger for tracking
-    """
-    from datetime import datetime
-    from .utils import run_logs_dir
-
-    # Checkpoint file location: agents/{adw_id}/{phase}/checkpoints.json
-    checkpoint_dir = run_logs_dir(adw_id).parent / phase
-    checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    checkpoint_file_path = checkpoint_dir / "checkpoints.json"
-
-    # Load existing checkpoints or create new file
-    if checkpoint_file_path.exists():
-        try:
-            with open(checkpoint_file_path, "r", encoding="utf-8") as f:
-                checkpoint_file = CheckpointFile(**json.load(f))
-        except (json.JSONDecodeError, ValueError) as exc:
-            if logger:
-                logger.warning(f"Failed to load existing checkpoints, creating new file: {exc}")
-            checkpoint_file = CheckpointFile(phase=phase, checkpoints=[])
-    else:
-        checkpoint_file = CheckpointFile(phase=phase, checkpoints=[])
-
-    # Add new checkpoint
-    checkpoint_file.checkpoints.append(checkpoint_data)
-
-    # Atomic write with temp file
-    temp_file = checkpoint_file_path.with_suffix(".tmp")
-    with open(temp_file, "w", encoding="utf-8") as f:
-        json.dump(checkpoint_file.model_dump(mode="json"), f, indent=2)
-
-    # Rename to final location (atomic on POSIX systems)
-    temp_file.rename(checkpoint_file_path)
-
-    if logger:
-        logger.info(f"Checkpoint saved: {phase}/{checkpoint_data.step} at {checkpoint_data.timestamp}")
-
-
-def load_checkpoint(adw_id: str, phase: str, logger: Optional[logging.Logger] = None) -> Optional[CheckpointFile]:
-    """Load checkpoints for a phase.
-
-    Args:
-        adw_id: ADW execution ID
-        phase: Phase name (plan, build, review)
-        logger: Optional logger for tracking
-
-    Returns:
-        CheckpointFile if exists and valid, None otherwise
-    """
-    from .utils import run_logs_dir
-
-    checkpoint_file_path = run_logs_dir(adw_id).parent / phase / "checkpoints.json"
-
-    if not checkpoint_file_path.exists():
-        if logger:
-            logger.debug(f"No checkpoint file found for {phase}")
-        return None
-
-    try:
-        with open(checkpoint_file_path, "r", encoding="utf-8") as f:
-            checkpoint_file = CheckpointFile(**json.load(f))
-
-        if logger:
-            logger.info(f"Loaded {len(checkpoint_file.checkpoints)} checkpoints for {phase}")
-
-        return checkpoint_file
-    except (json.JSONDecodeError, ValueError) as exc:
-        if logger:
-            logger.error(f"Failed to parse checkpoint file: {exc}")
-        return None
-
-
 __all__ = [
     "AGENT_BRANCH_GENERATOR",
     "AGENT_CLASSIFIER",
@@ -926,13 +846,11 @@ __all__ = [
     "generate_branch_name",
     "generate_worktree_name",
     "implement_plan",
-    "load_checkpoint",
     "locate_plan_file",
     "lockfile_changed",
     "persist_issue_snapshot",
     "record_git_failure",
     "run_validation_commands",
-    "save_checkpoint",
     "serialize_validation",
     "start_logger",
     "run_review",

@@ -16,14 +16,6 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When understanding Claude Code slash command discovery and organization
     - When onboarding developers to the command structure after #58 reorganization
 
-- .claude/commands/worktree/spawn_interactive.md
-  - Conditions:
-    - When needing to create an isolated Claude Code development environment
-    - When working on multiple features concurrently without branch switching
-    - When wanting to inspect ADW-generated code without affecting main working directory
-    - When testing experimental changes in complete isolation
-    - When understanding ADW worktree patterns for interactive development
-
 - README.md
   - Conditions:
     - When you are new to the repository or need an overview of tooling and workflows
@@ -35,8 +27,6 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When editing files under `app/src/**` (API, indexer, database layers) and you need architecture context
     - When working with TypeScript path aliases or Bun-specific project structure
     - When clarifying validation commands or development workflows
-    - When understanding GitHub issue relationship standards and prioritization workflow (see "GitHub Issue Management and Relationship Standards" section)
-    - When working on issue dependency graphs or relationship documentation
 
 - docs/supabase-setup.md
   - Conditions:
@@ -223,14 +213,3 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When integrating log analysis with GitHub Actions or cron systems
     - When troubleshooting ADW observability, metrics calculation, or report generation
     - When extending analysis to include agent state introspection from `automation/agents/`
-
-- CLAUDE.md (GitHub Issue Management and Relationship Standards section)
-  - Conditions:
-    - When working on issue #151 or implementing issue relationship documentation standards
-    - When creating or updating spec files with relationship metadata (`## Issue Relationships` section)
-    - When building dependency graphs for issue prioritization
-    - When implementing ADW workflow improvements for context discovery
-    - When documenting relationships between issues (Depends On, Related To, Blocks, etc.)
-    - When updating GitHub issue or PR templates with relationship fields
-    - When writing commit messages with dependency metadata
-    - When prioritizing open issues based on dependency resolution
