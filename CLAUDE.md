@@ -234,9 +234,22 @@ Python-based automation pipeline for autonomous GitHub issue workflows:
 
 All workflows execute in isolated git worktrees (`trees/`) to prevent conflicts during concurrent agent execution and local development. Worktrees are automatically created before agent execution and cleaned up after successful PR creation (configurable via `ADW_CLEANUP_WORKTREES` environment variable).
 
+**Interactive Worktree Development** (added in PR #157): Use `/spawn_interactive` slash command to create isolated Claude Code development environments for:
+- Working on multiple features concurrently without branch switching
+- Inspecting ADW-generated code without affecting main working directory
+- Testing experimental changes in complete isolation
+- See `.claude/commands/worktree/spawn_interactive.md` for detailed usage
+
 The agentic layer operates on the application layer (in `app/`) to automate development workflows. See `automation/adws/README.md` for complete automation architecture and usage examples.
 
 **Recent Simplification** (PR #136): The ADW system was simplified from a 5-phase to a 3-phase flow by removing broken test/document/patch phases (519 lines deleted). PR creation was moved from plan phase to build phase to ensure PRs only open after successful implementation. Target completion rate: >80%.
+
+**Resilience Architecture** (PR #157, issue #148): Hybrid resilience system with automatic retry logic and checkpoint-based recovery:
+- Automatic retry with exponential backoff (1s, 3s, 5s) for transient errors (network issues, API rate limits, timeouts)
+- Checkpoint system saves progress at logical breakpoints for resume-after-failure capability
+- Retry codes classify error types (CLAUDE_CODE_ERROR, TIMEOUT_ERROR, EXECUTION_ERROR) for targeted recovery
+- Checkpoint storage in `agents/{adw_id}/{phase}/checkpoints.json` with atomic writes
+- See `automation/adws/README.md` "Resilience & Recovery" section for usage examples
 
 **ADW Observability**:
 - `automation/adws/scripts/analyze_logs.py`: Automated log analysis for ADW success rates and failure patterns
@@ -303,6 +316,11 @@ When working with GitHub issues, both human developers and AI agents follow rela
 - **Improved Traceability**: Clear history of how features evolved across multiple issues
 - **Faster Onboarding**: New contributors understand issue context from relationship graph
 - **Smarter Automation**: AI agents discover dependencies automatically, reducing planning errors
+
+**Issue Management Slash Commands** (added in PR #166):
+- `/issues:prioritize`: Identify highest-priority unblocked work by building dependency graphs and analyzing relationship metadata
+- `/issues:audit`: Clean up issue tracker by closing completed, obsolete, duplicate, or stale issues
+- See `.claude/commands/docs/issue-relationships.md` for relationship type definitions and documentation standards
 
 See issue #151 for complete documentation standards and implementation details.
 
