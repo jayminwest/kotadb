@@ -1,0 +1,49 @@
+name: Automation CI
+
+on:
+  push:
+    branches:
+      - main
+      - develop
+    paths:
+      - 'automation/**'
+      - '.github/workflows/automation-ci.yml'
+  pull_request:
+    paths:
+      - 'automation/**'
+      - '.github/workflows/automation-ci.yml'
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: automation
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Configure git identity for worktree tests
+        run: |
+          git config --global user.name "CI Test Runner"
+          git config --global user.email "ci@example.com"
+
+      - name: Python syntax check
+        run: python3 -m py_compile adws/adw_modules/*.py adws/adw_phases/*.py
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run pytest suite
+        run: uv run pytest adws/adw_tests/ -v --tb=short

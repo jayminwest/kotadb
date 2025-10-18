@@ -1,0 +1,12 @@
+2025-10-13 11:00:00 - INFO - ADW Logger initialized - ID: test_run_456
+2025-10-13 11:00:00 - DEBUG - Log file: /path/to/logs
+2025-10-13 11:00:01 - INFO - Starting ADW workflow for issue #84
+2025-10-13 11:00:01 - INFO - Running adw_phases/adw_plan.py
+2025-10-13 11:00:30 - INFO - Plan phase completed successfully
+2025-10-13 11:00:30 - INFO - Running adw_phases/adw_build.py
+2025-10-13 11:05:00 - INFO - Build phase completed successfully
+2025-10-13 11:05:00 - INFO - Running adw_phases/adw_test.py
+2025-10-13 11:07:00 - ERROR - Test setup failed: docker-compose.test.yml not found
+2025-10-13 11:07:00 - ERROR - open /Users/path/automation/trees/chore-84-abc/app/docker-compose.test.yml: no such file or directory
+2025-10-13 11:07:01 - ERROR - adw_phases/adw_test.py failed with exit code 1
+2025-10-13 11:07:01 - ERROR - ADW workflow failed for issue #84

@@ -1,11 +1,11 @@
 services:
   dev:
     build:
-      context: .
+      context: ./app
       target: base
     command: bun --watch src/index.ts
     volumes:
-      - .:/app
+      - ./app:/app
       - bun_cache:/root/.cache/bun
     environment:
       NODE_ENV: development
@@ -14,7 +14,7 @@ services:
 
   home:
     build:
-      context: .
+      context: ./app
       target: base
     command: bun run src/index.ts
     environment:
@@ -23,24 +23,41 @@ services:
       - "3100:3000"
     restart: unless-stopped
 
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: development
+    command: bun run dev
+    volumes:
+      - ./web:/app/web
+      - ./shared:/app/shared
+      - bun_cache_web:/root/.cache/bun
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
   adw_runner:
     build:
       context: .
-      dockerfile: docker/adw-runner.Dockerfile
+      dockerfile: automation/docker/adw-runner.Dockerfile
     image: kotadb-adw-runner:latest
     command: ["sleep", "infinity"]
 
   adw_webhook:
     build:
       context: .
-      dockerfile: docker/adw-webhook.Dockerfile
+      dockerfile: automation/docker/adw-webhook.Dockerfile
     image: kotadb-adw-webhook:latest
     depends_on:
       adw_runner:
         condition: service_started
     env_file:
       - .env
-      - adws/.env
+      - automation/adws/.env
     environment:
       PORT: ${PORT:-3000}
       ADW_RUNNER_IMAGE: ${ADW_RUNNER_IMAGE:-kotadb-adw-runner:latest}
@@ -140,7 +157,7 @@ services:
       - "54326:8000"  # Changed from 54320 to avoid conflicts
       - "54327:8443"  # Changed from 54323 to avoid conflicts
     volumes:
-      - ./supabase/kong.yml:/var/lib/kong/kong.yml:ro
+      - ./app/supabase/kong.yml:/var/lib/kong/kong.yml:ro
     restart: unless-stopped
 
   supabase-studio:
@@ -160,4 +177,5 @@ services:
 
 volumes:
   bun_cache:
+  bun_cache_web:
   supabase_db_data:

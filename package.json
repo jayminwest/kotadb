@@ -1,34 +1,10 @@
 {
-  "name": "kota-db",
+  "name": "kotadb-monorepo",
   "version": "0.1.0",
-  "description": "KotaDB indexing and API service built with Bun + TypeScript.",
   "private": true,
-  "type": "module",
-  "module": "src/index.ts",
-  "scripts": {
-    "dev": "bun --watch src/index.ts",
-    "start": "bun run src/index.ts",
-    "test": "bun test",
-    "check": "bun run typecheck",
-    "typecheck": "bunx tsc --noEmit",
-    "build": "bun run typecheck",
-    "lint": "bunx biome lint",
-    "test:setup": "./scripts/setup-test-db.sh",
-    "test:teardown": "supabase stop",
-    "test:reset": "./scripts/reset-test-db.sh",
-    "test:env": "./scripts/generate-env-test.sh",
-    "test:status": "supabase status",
-    "test:validate-migrations": "diff -r src/db/migrations supabase/migrations || echo 'WARNING: Migration directories are out of sync!'"
-  },
-  "dependencies": {
-    "bcryptjs": "^2.4.3",
-    "@supabase/supabase-js": "^2.39.0"
-  },
-  "devDependencies": {
-    "@types/node": "^22.9.0",
-    "@types/bcryptjs": "^2.4.6",
-    "bun-types": "^1.1.10",
-    "typescript": "^5.9.3",
-    "@biomejs/biome": "^1.7.3"
-  }
+  "workspaces": [
+    "app",
+    "shared",
+    "web"
+  ]
 }

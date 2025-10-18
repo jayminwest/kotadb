@@ -1,0 +1,124 @@
+name: Chore
+description: Maintenance, refactoring, or infrastructure work
+title: "chore: "
+labels: ["component:backend", "priority:low", "effort:small", "status:needs-investigation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Use this template for maintenance work, refactoring, dependency updates, or infrastructure improvements.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What maintenance or infrastructure work needs to be done?
+      placeholder: A clear description of the chore...
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this work needed? What does it improve?
+      placeholder: This will improve...
+    validations:
+      required: true
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: Scope
+      description: What files, systems, or components will be affected?
+      placeholder: |
+        - Files to modify
+        - Systems to update
+        - Dependencies to upgrade
+    validations:
+      required: false
+
+  - type: textarea
+    id: relationships
+    attributes:
+      label: Issue Relationships (Optional)
+      description: |
+        Document dependencies and related work. See `.claude/commands/docs/issue-relationships.md` for relationship types.
+      placeholder: |
+        **Depends On**: #123 (brief reason)
+        **Related To**: #456, #789
+        **Blocks**: #234
+        **Supersedes**: #100 (old approach)
+      value: |
+        **Depends On**:
+        **Related To**:
+        **Blocks**:
+        **Supersedes**:
+    validations:
+      required: false
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component does this chore affect?
+      options:
+        - backend
+        - api
+        - database
+        - testing
+        - ci-cd
+        - documentation
+        - observability
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this chore?
+      options:
+        - low
+        - medium
+        - high
+        - critical
+      default: 0
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: How much work do you expect this to take?
+      options:
+        - small
+        - medium
+        - large
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: validation
+    attributes:
+      label: Validation
+      description: How will you verify this chore is complete?
+      placeholder: |
+        - [ ] Tests pass
+        - [ ] Build succeeds
+        - [ ] Manual verification steps
+    validations:
+      required: false
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References (Optional)
+      description: Links to related documentation or external resources
+      placeholder: |
+        - Migration guide: https://...
+        - Related RFC: https://...
+    validations:
+      required: false

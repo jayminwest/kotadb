@@ -1,0 +1,10 @@
+{
+	"name": "complex-fixture",
+	"version": "1.0.0",
+	"description": "Complex TypeScript fixture for AST parsing tests with circular dependencies",
+	"main": "src/api/routes.ts",
+	"type": "module",
+	"scripts": {
+		"typecheck": "tsc --noEmit"
+	}
+}

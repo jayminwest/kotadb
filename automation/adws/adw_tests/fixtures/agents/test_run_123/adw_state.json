@@ -1,0 +1,10 @@
+{
+  "adw_id": "test_run_123",
+  "branch_name": "feature-105-test123",
+  "issue_class": "feature",
+  "issue_number": "105",
+  "plan_file": "docs/specs/feature-105-automated-log-analysis-reports.md",
+  "worktree_created_at": "2025-10-13T10:00:00",
+  "worktree_name": "feature-105-test123",
+  "worktree_path": "/path/to/trees/feature-105-test123"
+}

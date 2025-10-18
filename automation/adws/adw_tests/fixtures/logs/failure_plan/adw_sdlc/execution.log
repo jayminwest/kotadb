@@ -1,0 +1,8 @@
+2025-10-13 12:00:00 - INFO - ADW Logger initialized - ID: test_run_789
+2025-10-13 12:00:00 - DEBUG - Log file: /path/to/logs
+2025-10-13 12:00:01 - INFO - Starting ADW workflow for issue #98
+2025-10-13 12:00:01 - INFO - Running adw_phases/adw_plan.py
+2025-10-13 12:00:30 - ERROR - Commit message validation failed: Commit message contains meta-commentary
+2025-10-13 12:00:30 - ERROR - Pattern 'based on' found in commit message
+2025-10-13 12:00:31 - ERROR - adw_phases/adw_plan.py failed with exit code 1
+2025-10-13 12:00:31 - ERROR - ADW workflow failed for issue #98

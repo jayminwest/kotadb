@@ -1,0 +1,7 @@
+{
+	"name": "simple-fixture",
+	"version": "1.0.0",
+	"description": "Simple TypeScript fixture for AST parsing tests",
+	"main": "index.ts",
+	"type": "module"
+}

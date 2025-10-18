@@ -1,0 +1,27 @@
+[project]
+name = "kota-automation"
+version = "0.1.0"
+description = "KotaDB AI Developer Workflows automation layer"
+requires-python = ">=3.12"
+dependencies = [
+    "pytest>=8.0.0",
+    "pydantic>=2.0.0",
+    "python-dotenv>=1.0.0",
+    "httpx>=0.27.0",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["adws"]
+
+[tool.pytest.ini_options]
+testpaths = ["adws/adw_tests"]
+python_files = "test_*.py"
+python_classes = "Test*"
+python_functions = "test_*"
+
+[tool.uv]
+dev-dependencies = []

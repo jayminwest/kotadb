@@ -58,7 +58,7 @@ This script will:
 bun test
 ```
 
-The test suite connects to Supabase Local using auto-generated credentials from `.env.test`.
+The test suite automatically loads environment variables from `.env.test` via a preload script (`app/tests/setup.ts`). No manual `export` or `source` commands are required - tests will automatically use credentials from the Docker Compose stack.
 
 ### 3. Check Service Status
 
@@ -205,13 +205,31 @@ const apiKey = TEST_API_KEYS.solo;
 
 ### Test Environment Variables
 
-Tests automatically set these environment variables:
+Tests automatically load environment variables from `.env.test` via a preload script (`app/tests/setup.ts`). This script:
 
-```typescript
-process.env.SUPABASE_URL = "http://localhost:5434";
-process.env.SUPABASE_SERVICE_KEY = "test-service-key-local";
-process.env.SUPABASE_ANON_KEY = "test-anon-key-local";
-process.env.DATABASE_URL = "postgresql://postgres:postgres@localhost:5434/postgres";
+1. Runs before all tests (via `bun test --preload ./tests/setup.ts`)
+2. Parses `.env.test` and loads variables into `process.env`
+3. Falls back to hardcoded defaults if `.env.test` doesn't exist
+
+**Automatic Loading (Recommended):**
+```bash
+# Just run tests - .env.test is loaded automatically
+bun test
+```
+
+**Manual Loading (Alternative):**
+```bash
+# Export variables manually if needed
+export $(grep -v '^#' .env.test | xargs)
+bun test
+```
+
+The `.env.test` file typically contains:
+```bash
+SUPABASE_URL=http://localhost:<dynamic-port>
+SUPABASE_SERVICE_KEY=<generated-jwt>
+SUPABASE_ANON_KEY=<generated-jwt>
+DATABASE_URL=postgresql://postgres:postgres@localhost:<dynamic-port>/postgres
 ```
 
 ### Example Test
@@ -259,6 +277,187 @@ describe("My Feature", () => {
   });
 });
 ```
+
+## MCP Testing
+
+KotaDB provides comprehensive MCP (Model Context Protocol) integration testing with real Supabase database connections.
+
+### MCP Test Files
+
+The MCP test suite includes 9 test files covering all aspects of the MCP integration:
+
+- `app/tests/mcp/lifecycle.test.ts` - Protocol handshake and tool discovery
+- `app/tests/mcp/errors.test.ts` - JSON-RPC error handling
+- `app/tests/mcp/authentication.test.ts` - Auth and rate limiting
+- `app/tests/mcp/tool-validation.test.ts` - Parameter validation for all tools
+- `app/tests/mcp/tools.test.ts` - Tool execution tests
+- `app/tests/mcp/integration.test.ts` - End-to-end workflows
+- `app/tests/mcp/concurrent.test.ts` - Concurrency and isolation
+- `app/tests/mcp/handshake.test.ts` - Basic handshake tests
+- `app/tests/mcp/headers.test.ts` - Header validation
+
+### MCP Test Helpers
+
+Import MCP-specific test helpers from `tests/helpers/mcp.ts`:
+
+```typescript
+import {
+  sendMcpRequest,
+  extractToolResult,
+  createMcpHeaders,
+  assertToolResult,
+  assertJsonRpcError
+} from "../helpers/mcp";
+
+// Send MCP request with authentication
+const response = await sendMcpRequest(
+  baseUrl,
+  "tools/call",
+  {
+    name: "search_code",
+    arguments: { term: "Router" }
+  },
+  "free"  // tier: free, solo, or team
+);
+
+// Extract tool result from SDK content blocks
+const result = extractToolResult(response.data);
+console.log(result.results);
+
+// Assert tool result has expected fields
+assertToolResult(response.data, {
+  results: "object",
+  total: "number"
+});
+
+// Assert JSON-RPC error with code and message pattern
+assertJsonRpcError(response.data, -32603, /missing.*term/i);
+```
+
+### SDK Content Block Response Format
+
+The MCP SDK wraps tool results in content blocks. Tests must extract results using the `extractToolResult()` helper:
+
+```typescript
+// Raw SDK response
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"results\": [...], \"total\": 10}"
+      }
+    ]
+  }
+}
+
+// Extracted tool result
+const toolResult = extractToolResult(response.data);
+// => { results: [...], total: 10 }
+```
+
+### SDK Error Code Mapping
+
+The MCP SDK uses specific JSON-RPC error codes:
+
+- `-32700` (Parse Error): Invalid JSON or malformed JSON-RPC structure (returns HTTP 400)
+- `-32601` (Method Not Found): Unknown JSON-RPC method (returns HTTP 200)
+- `-32603` (Internal Error): Tool execution errors, validation failures, type errors (returns HTTP 200)
+
+**Important:** The SDK uses `-32603` for all tool-level errors, NOT `-32602` (Invalid Params).
+
+### Running MCP Tests
+
+```bash
+# Run all MCP tests
+bun test tests/mcp/
+
+# Run specific MCP test file
+bun test tests/mcp/lifecycle.test.ts
+
+# Run MCP tests with coverage
+bun test --coverage tests/mcp/
+```
+
+### Example MCP Test
+
+```typescript
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import type { Server } from "node:http";
+import { sendMcpRequest, extractToolResult } from "../helpers/mcp";
+import { startTestServer, stopTestServer } from "../helpers/server";
+
+let server: Server;
+let baseUrl: string;
+
+beforeAll(async () => {
+  const testServer = await startTestServer();
+  server = testServer.server;
+  baseUrl = testServer.url;
+});
+
+afterAll(async () => {
+  await stopTestServer(server);
+});
+
+describe("MCP Tools", () => {
+  test("search_code finds matching files", async () => {
+    const response = await sendMcpRequest(
+      baseUrl,
+      "tools/call",
+      {
+        name: "search_code",
+        arguments: { term: "Router", limit: 10 }
+      },
+      "free"
+    );
+
+    expect(response.status).toBe(200);
+    const result = extractToolResult(response.data);
+    expect(result.results).toBeArray();
+  });
+});
+```
+
+### MCP Test Fixtures
+
+Test fixtures for MCP integration testing are located in `app/tests/fixtures/mcp/`:
+
+- `sample-repository/` - Minimal test repository for indexing tests
+  - `index.ts` - Sample TypeScript file with classes and functions
+  - `utils.ts` - Sample utility functions
+  - `package.json` - Repository metadata
+- `expected-responses/` - JSON files with expected tool results for comparison
+
+Use fixtures in tests:
+
+```typescript
+import path from "node:path";
+
+const fixturePath = path.join(
+  process.cwd(),
+  "tests/fixtures/mcp/sample-repository"
+);
+
+const response = await sendMcpRequest(
+  baseUrl,
+  "tools/call",
+  {
+    name: "index_repository",
+    arguments: {
+      repository: "test/fixture-repo",
+      localPath: fixturePath
+    }
+  },
+  "free"
+);
+```
+
+### Claude Code Integration Testing
+
+For manual testing with Claude Code CLI, see [docs/guides/mcp-claude-code-integration.md](../guides/mcp-claude-code-integration.md).
 
 ## Available Package Scripts
 
@@ -463,13 +662,80 @@ cat .env.test
 
 ## CI/CD Integration
 
-The test database runs in CI via GitHub Actions services. See `.github/workflows/ci.yml` for configuration.
+KotaDB's CI environment uses **Supabase Local** via GitHub Actions to achieve **exact parity** with local testing. This follows the antimocking philosophy by ensuring CI tests run against the same full-stack Supabase environment as local development.
 
-Key steps:
-1. Start PostgreSQL service container
-2. Wait for health check
-3. Run migrations and seed data
-4. Execute test suite
+### CI Architecture
+
+The GitHub Actions workflow (`.github/workflows/ci.yml`) uses the official `supabase/setup-cli@v1` action to install Supabase CLI, then runs `.github/scripts/setup-supabase-ci.sh` to:
+
+1. **Initialize Supabase config** (if not present)
+2. **Start Supabase Local services** via `supabase start` (PostgreSQL + PostgREST + Kong + Auth)
+3. **Wait for readiness** with health checks and retries
+4. **Auto-generate `.env.test`** from `supabase status --output json`
+5. **Seed test data** from `supabase/seed.sql`
+
+### Why Supabase Local in CI?
+
+**Before (broken):** CI used plain PostgreSQL service without PostgREST or Supabase stack, causing:
+- ❌ 401 Unauthorized errors (API key validation requires PostgREST RPC)
+- ❌ Tests pass locally but fail in CI (false confidence)
+- ❌ Environment drift violates antimocking principles
+
+**After (fixed):** CI uses Supabase Local for:
+- ✅ Exact parity with local testing (same services, ports, credentials)
+- ✅ Real authentication flow (PostgREST RPC endpoints work)
+- ✅ Consistent test results (133/133 tests pass locally and in CI)
+- ✅ Antimocking compliance (no mocks/stubs to work around missing services)
+
+### CI Workflow Steps
+
+```yaml
+- name: Setup Supabase CLI
+  uses: supabase/setup-cli@v1
+  with:
+    version: latest
+
+- name: Setup Supabase Local and generate test credentials
+  run: .github/scripts/setup-supabase-ci.sh
+
+- name: Validate migration sync
+  run: bun run test:validate-migrations
+
+- name: Test
+  run: |
+    export $(grep -v '^#' .env.test | xargs)
+    bun test
+
+- name: Teardown Supabase Local
+  if: always()
+  run: supabase stop
+```
+
+### CI Execution Time
+
+Target: **Under 2 minutes** total (acceptable trade-off for testing parity)
+
+Breakdown:
+- Supabase startup: ~30-60 seconds (first run may be slower, cached thereafter)
+- Test execution: ~13.5 seconds (133 tests)
+- Migration validation, typecheck, lint: ~10-20 seconds
+
+### Troubleshooting CI Failures
+
+**401 Unauthorized errors in CI:**
+- Check `.github/scripts/setup-supabase-ci.sh` successfully generated `.env.test`
+- Verify `supabase start` completed without errors
+- Ensure test step sources `.env.test` before running `bun test`
+
+**Timeout during Supabase startup:**
+- GitHub Actions has generous Docker limits, but Supabase startup may occasionally be slow
+- Script includes 30-retry health check loop (60 seconds total timeout)
+- Check "Setup Supabase Local" step logs for startup errors
+
+**Migration sync failures:**
+- Ensure `src/db/migrations/` and `supabase/migrations/` are synchronized
+- Run `bun run test:validate-migrations` locally before pushing
+- CI runs this validation automatically to catch drift
 
 ## Antimocking Migration Complete
 

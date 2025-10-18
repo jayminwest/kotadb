@@ -1,0 +1,10 @@
+{
+  "adw_id": "test_run_456",
+  "branch_name": "chore-84-test456",
+  "issue_class": "chore",
+  "issue_number": "84",
+  "plan_file": "docs/specs/chore-84-fix-test-environment.md",
+  "worktree_created_at": "2025-10-13T11:00:00",
+  "worktree_name": "chore-84-test456",
+  "worktree_path": "/path/to/trees/chore-84-test456"
+}
