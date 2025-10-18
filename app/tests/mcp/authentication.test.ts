@@ -36,6 +36,7 @@ describe("MCP Authentication", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 			},
 			body: JSON.stringify({
 				jsonrpc: "2.0",
@@ -47,7 +48,7 @@ describe("MCP Authentication", () => {
 
 		expect(response.status).toBe(401);
 		const data = (await response.json()) as any;
-		expect(data.error).toContain("Authorization");
+		expect(data.error).toContain("API key");
 	});
 
 	test("invalid API key format returns 401", async () => {
@@ -55,6 +56,7 @@ describe("MCP Authentication", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization: "Bearer invalid_key_format",
 			},
 			body: JSON.stringify({
@@ -77,8 +79,7 @@ describe("MCP Authentication", () => {
 		);
 
 		expect(response.status).toBe(401);
-		const data = (await response.json()) as any;
-		expect(data.error).toBeDefined();
+		expect(response.data.error).toBeDefined();
 	});
 
 	test("valid free tier API key allows request", async () => {
@@ -109,6 +110,7 @@ describe("MCP Rate Limiting", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -135,6 +137,7 @@ describe("MCP Rate Limiting", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -154,6 +157,7 @@ describe("MCP Rate Limiting", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -178,6 +182,7 @@ describe("MCP Rate Limiting", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -198,6 +203,7 @@ describe("MCP Rate Limiting", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_team_team1234567890ab_0123456789abcdef0123456789abcdef",
 			},

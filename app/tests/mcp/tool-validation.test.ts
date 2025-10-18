@@ -34,6 +34,7 @@ describe("search_code Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -61,6 +62,7 @@ describe("search_code Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -104,6 +106,7 @@ describe("search_code Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -170,6 +173,7 @@ describe("index_repository Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -197,6 +201,7 @@ describe("index_repository Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -223,6 +228,7 @@ describe("index_repository Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -251,6 +257,7 @@ describe("index_repository Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -313,6 +320,7 @@ describe("list_recent_files Parameter Validation", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},

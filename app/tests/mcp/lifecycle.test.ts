@@ -183,6 +183,7 @@ describe("MCP Protocol Lifecycle", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization: "Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
 			},
 			body: JSON.stringify({

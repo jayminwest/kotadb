@@ -70,6 +70,7 @@ export async function sendMcpRequest(
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
+			Accept: "application/json, text/event-stream",
 			Authorization: createAuthHeader(tier),
 		},
 		body: JSON.stringify({
@@ -95,6 +96,7 @@ export function createMcpHeaders(
 ): Record<string, string> {
 	return {
 		"Content-Type": "application/json",
+		Accept: "application/json, text/event-stream",
 		Authorization: createAuthHeader(tier),
 	};
 }
