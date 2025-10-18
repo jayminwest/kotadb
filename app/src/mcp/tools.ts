@@ -243,7 +243,7 @@ export async function executeIndexRepository(
 
 	const indexRequest: IndexRequest = {
 		repository: validatedParams.repository,
-		ref: validatedParams.ref ?? "main",
+		ref: validatedParams.ref ?? "main", // Default to 'main' if not provided
 		localPath: validatedParams.localPath,
 	};
 
