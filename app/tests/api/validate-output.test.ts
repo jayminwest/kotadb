@@ -28,7 +28,8 @@ import type { ValidationResponse } from "@shared/types/validation";
 
 let server: Server;
 let BASE_URL: string;
-const TEST_API_KEY = getTestApiKey("free");
+// Use solo tier to avoid rate limit exhaustion when running full test suite
+const TEST_API_KEY = getTestApiKey("solo");
 
 beforeAll(async () => {
   // Start Express test server with real database

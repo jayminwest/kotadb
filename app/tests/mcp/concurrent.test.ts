@@ -106,6 +106,7 @@ describe("MCP Concurrency", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -127,6 +128,7 @@ describe("MCP Concurrency", () => {
 				method: "POST",
 				headers: {
 					"Content-Type": "application/json",
+					Accept: "application/json, text/event-stream",
 					Authorization:
 						"Bearer kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
 				},
@@ -151,6 +153,7 @@ describe("MCP Concurrency", () => {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
+				Accept: "application/json, text/event-stream",
 				Authorization:
 					"Bearer kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
 			},
@@ -262,7 +265,8 @@ describe("MCP Concurrency", () => {
 		const responses = await Promise.all(promises);
 
 		// All should return the same list of tools
-		const toolsLists = responses.map((r) => extractToolResult(r.data));
+		// tools/list returns result.tools directly (not wrapped in content blocks)
+		const toolsLists = responses.map((r) => r.data.result);
 
 		for (const toolsList of toolsLists) {
 			expect(toolsList.tools.length).toBe(3);

@@ -56,7 +56,8 @@ describe("MCP Protocol Lifecycle", () => {
 		);
 
 		expect(toolsListResponse.status).toBe(200);
-		const toolsList = extractToolResult(toolsListResponse.data);
+		// tools/list returns result.tools directly (not wrapped in content blocks)
+		const toolsList = toolsListResponse.data.result;
 		expect(toolsList.tools).toBeDefined();
 		expect(Array.isArray(toolsList.tools)).toBe(true);
 		expect(toolsList.tools.length).toBe(3);
@@ -80,8 +81,8 @@ describe("MCP Protocol Lifecycle", () => {
 
 		expect(toolCallResponse.status).toBe(200);
 		const toolResult = extractToolResult(toolCallResponse.data);
-		expect(toolResult.files).toBeDefined();
-		expect(Array.isArray(toolResult.files)).toBe(true);
+		expect(toolResult.results).toBeDefined();
+		expect(Array.isArray(toolResult.results)).toBe(true);
 	});
 
 	test("protocol version negotiation matches server version", async () => {
@@ -121,7 +122,8 @@ describe("MCP Protocol Lifecycle", () => {
 		const response = await sendMcpRequest(baseUrl, "tools/list", {}, "free");
 
 		expect(response.status).toBe(200);
-		const result = extractToolResult(response.data);
+		// tools/list returns result.tools directly (not wrapped in content blocks)
+		const result = response.data.result;
 
 		// Verify search_code tool schema
 		const searchTool = result.tools.find((t: any) => t.name === "search_code");
@@ -172,8 +174,9 @@ describe("MCP Protocol Lifecycle", () => {
 		expect(response2.status).toBe(200);
 
 		// Both responses should be identical (no state leakage)
-		const tools1 = extractToolResult(response1.data);
-		const tools2 = extractToolResult(response2.data);
+		// tools/list returns result.tools directly (not wrapped in content blocks)
+		const tools1 = response1.data.result;
+		const tools2 = response2.data.result;
 		expect(tools1.tools.length).toBe(tools2.tools.length);
 	});
 

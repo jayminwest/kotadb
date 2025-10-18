@@ -158,20 +158,45 @@ export async function executeSearchCode(
 	requestId: string | number,
 	userId: string,
 ): Promise<unknown> {
-	if (!isSearchParams(params)) {
-		throw invalidParams(requestId, "Invalid parameters for search_code tool");
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
 	}
 
-	const results = await searchFiles(supabase, params.term, userId, {
-		repositoryId: params.repository,
-		limit: params.limit,
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: term
+	if (p.term === undefined) {
+		throw new Error("Missing required parameter: term");
+	}
+	if (typeof p.term !== "string") {
+		throw new Error("Parameter 'term' must be a string");
+	}
+
+	// Validate optional parameters
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+	if (p.limit !== undefined && typeof p.limit !== "number") {
+		throw new Error("Parameter 'limit' must be a number");
+	}
+
+	const validatedParams = p as {
+		term: string;
+		repository?: string;
+		limit?: number;
+	};
+
+	const results = await searchFiles(supabase, validatedParams.term, userId, {
+		repositoryId: validatedParams.repository,
+		limit: validatedParams.limit,
 	});
 
 	return {
 		results: results.map((row) => ({
 			projectRoot: row.projectRoot,
 			path: row.path,
-			snippet: buildSnippet(row.content, params.term),
+			snippet: buildSnippet(row.content, validatedParams.term),
 			dependencies: row.dependencies,
 			indexedAt: row.indexedAt.toISOString(),
 		})),
@@ -187,17 +212,39 @@ export async function executeIndexRepository(
 	requestId: string | number,
 	userId: string,
 ): Promise<unknown> {
-	if (!isIndexParams(params)) {
-		throw invalidParams(
-			requestId,
-			"Invalid parameters for index_repository tool",
-		);
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
 	}
 
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: repository
+	if (p.repository === undefined) {
+		throw new Error("Missing required parameter: repository");
+	}
+	if (typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	// Validate optional parameters
+	if (p.ref !== undefined && typeof p.ref !== "string") {
+		throw new Error("Parameter 'ref' must be a string");
+	}
+	if (p.localPath !== undefined && typeof p.localPath !== "string") {
+		throw new Error("Parameter 'localPath' must be a string");
+	}
+
+	const validatedParams = p as {
+		repository: string;
+		ref?: string;
+		localPath?: string;
+	};
+
 	const indexRequest: IndexRequest = {
-		repository: params.repository,
-		ref: params.ref,
-		localPath: params.localPath,
+		repository: validatedParams.repository,
+		ref: validatedParams.ref ?? "main",
+		localPath: validatedParams.localPath,
 	};
 
 	// Ensure repository exists in database
