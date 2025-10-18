@@ -16,9 +16,14 @@ Create a detailed implementation plan for complex tasks before executing changes
 
 1. **Analyze the task**: Understand the requirements and scope
 2. **Research the codebase**: Use Glob and Grep to explore relevant files
-3. **Identify affected components**: Determine which parts of the system need changes
-4. **Design the solution**: Consider architecture, patterns, and best practices
-5. **Create a plan document** in `docs/specs/plan-{adw_id}.md` with the following structure:
+3. **Discover issue relationships**: Check for dependencies and related work
+   - Search for related issues: `gh issue list --search "<keywords>"`
+   - Review recent spec files in `docs/specs/` for relationship patterns
+   - Consult `.claude/commands/docs/issue-relationships.md` for relationship types
+   - Identify prerequisite work (Depends On), related context (Related To), downstream impact (Blocks)
+4. **Identify affected components**: Determine which parts of the system need changes
+5. **Design the solution**: Consider architecture, patterns, and best practices
+6. **Create a plan document** in `docs/specs/plan-{adw_id}.md` with the following structure:
 
 ## Plan Document Structure
 
@@ -32,6 +37,14 @@ Create a detailed implementation plan for complex tasks before executing changes
 ## Objective
 
 Brief summary of what needs to be accomplished (2-3 sentences).
+
+## Issue Relationships
+
+- **Depends On**: #{issue_number} ({short_title}) - {brief_rationale}
+- **Related To**: #{issue_number} ({short_title}) - {shared_context}
+- **Blocks**: #{issue_number} ({short_title}) - {what_this_enables}
+
+(Omit this section if no relationships exist. See `.claude/commands/docs/issue-relationships.md` for all relationship types.)
 
 ## Current State
 

@@ -224,13 +224,39 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When troubleshooting ADW observability, metrics calculation, or report generation
     - When extending analysis to include agent state introspection from `automation/agents/`
 
+- .claude/commands/docs/issue-relationships.md
+  - Conditions:
+    - When creating or updating spec files with relationship metadata (`## Issue Relationships` section)
+    - When creating GitHub issues and documenting dependencies or related work
+    - When building dependency graphs for issue prioritization
+    - When planning implementation and identifying prerequisite work
+    - When writing commit messages with dependency metadata (Depends-On, Related-To)
+    - When reviewing PRs and validating relationship documentation completeness
+    - When enabling AI agents to discover issue context automatically
+    - When understanding relationship types: Depends On, Related To, Blocks, Supersedes, Child Of, Follow-Up
+
 - CLAUDE.md (GitHub Issue Management and Relationship Standards section)
   - Conditions:
     - When working on issue #151 or implementing issue relationship documentation standards
-    - When creating or updating spec files with relationship metadata (`## Issue Relationships` section)
-    - When building dependency graphs for issue prioritization
+    - When understanding high-level workflow for relationship-aware issue prioritization
     - When implementing ADW workflow improvements for context discovery
-    - When documenting relationships between issues (Depends On, Related To, Blocks, etc.)
-    - When updating GitHub issue or PR templates with relationship fields
-    - When writing commit messages with dependency metadata
     - When prioritizing open issues based on dependency resolution
+
+- .claude/commands/issues/prioritize.md
+  - Conditions:
+    - When needing to identify highest-priority unblocked work across open issues
+    - When building dependency graphs to find ready-to-start issues
+    - When balancing quick wins (effort:small) with high-impact work (priority:critical/high)
+    - When identifying high-leverage issues that unblock multiple downstream tasks
+    - When validating that "Depends On" relationships are resolved before starting work
+    - When generating prioritization reports for sprint planning or team allocation
+
+- .claude/commands/issues/audit.md
+  - Conditions:
+    - When cleaning up issue tracker to close completed, obsolete, or duplicate issues
+    - When identifying issues completed via merged PRs but not formally closed
+    - When finding stale issues with no activity in 90+ days
+    - When detecting duplicate issues with similar titles or acceptance criteria
+    - When issues are superseded by architectural changes or refactors
+    - When generating audit reports for maintainer review before bulk closures
+    - When updating spec files or epic tracking after closing related issues

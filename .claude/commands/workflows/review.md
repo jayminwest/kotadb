@@ -12,6 +12,11 @@ Review the implementation against the specification and validation results.
 - Review `git diff origin/develop...HEAD` to see all implementation changes
 - Check validation evidence (test results, build output, linting)
 - Verify alignment between spec and implementation
+- **Validate issue relationships**: Ensure relationship metadata is documented if applicable
+  - Check if spec file includes `## Issue Relationships` section (if relationships exist)
+  - Verify "Depends On" issues are actually merged/closed
+  - Confirm "Related To" issues are still relevant context
+  - Validate relationship formatting follows `.claude/commands/docs/issue-relationships.md` standards
 - Identify blockers (must fix), tech debt (should fix), or skippable issues (minor)
 - Assess anti-mock compliance: no new mocks introduced, real-service coverage
 

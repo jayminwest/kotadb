@@ -16,8 +16,13 @@ Create a rigorously labeled GitHub issue capturing the upcoming work. Follow thi
 4. **Collect context**
    - Review `.claude/commands/docs/conditional_docs.md` and open only the docs whose conditions match the work (e.g., `README.md`, `CLAUDE.md`, `docs/specs/**`).
    - Capture reproduction steps or business justification as needed.
+   - **Identify issue relationships**: Check for dependencies, related work, blockers using `.claude/commands/docs/issue-relationships.md`
+     - `gh issue list --search "<keywords>"` to find related issues
+     - Review recent spec files in `docs/specs/` for relationship patterns
+     - Check git history or PRs for prerequisite work
 5. **Draft issue content**
    - Include sections for Description, Acceptance Criteria, Technical Approach (if known), Validation, and References.
+   - **Add Issue Relationships section** if any dependencies/relationships exist (see `.claude/commands/docs/issue-relationships.md`)
    - Keep titles Conventional Commit compatible (e.g., `feat: describe capability`).
 6. **Create the issue**
    - `gh issue create --title "<title>" --body-file <temp-body.md> --label "component:...,priority:...,effort:...,status:..."`

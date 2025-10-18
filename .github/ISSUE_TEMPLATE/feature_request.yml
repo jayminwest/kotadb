@@ -1,0 +1,122 @@
+name: Feature Request
+description: Propose a new feature or enhancement
+title: "feat: "
+labels: ["component:backend", "priority:medium", "effort:medium", "status:needs-investigation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for suggesting a new feature! Please provide as much detail as possible.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Description
+      description: What feature or capability do you want to add?
+      placeholder: A clear description of the feature...
+    validations:
+      required: true
+
+  - type: textarea
+    id: motivation
+    attributes:
+      label: Motivation
+      description: Why is this feature needed? What problem does it solve?
+      placeholder: This feature would help...
+    validations:
+      required: true
+
+  - type: textarea
+    id: acceptance-criteria
+    attributes:
+      label: Acceptance Criteria
+      description: What conditions must be met for this feature to be considered complete?
+      placeholder: |
+        - [ ] Criterion 1
+        - [ ] Criterion 2
+        - [ ] Criterion 3
+    validations:
+      required: false
+
+  - type: textarea
+    id: technical-approach
+    attributes:
+      label: Technical Approach (Optional)
+      description: If you have ideas about implementation, share them here
+      placeholder: This could be implemented by...
+    validations:
+      required: false
+
+  - type: textarea
+    id: relationships
+    attributes:
+      label: Issue Relationships (Optional)
+      description: |
+        Document dependencies and related work. See `.claude/commands/docs/issue-relationships.md` for relationship types.
+      placeholder: |
+        **Depends On**: #123 (brief reason)
+        **Related To**: #456, #789
+        **Blocks**: #234
+        **Child Of**: #100 (epic name)
+      value: |
+        **Depends On**:
+        **Related To**:
+        **Blocks**:
+        **Child Of**:
+        **Follow-Up**:
+    validations:
+      required: false
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component does this feature affect?
+      options:
+        - backend
+        - api
+        - database
+        - testing
+        - ci-cd
+        - documentation
+        - observability
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How important is this feature?
+      options:
+        - low
+        - medium
+        - high
+        - critical
+      default: 1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: How much work do you expect this to take?
+      options:
+        - small
+        - medium
+        - large
+      default: 1
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References (Optional)
+      description: Links to related documentation, similar features, or external resources
+      placeholder: |
+        - https://example.com/related-feature
+        - Slack thread: https://...
+    validations:
+      required: false

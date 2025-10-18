@@ -1,0 +1,142 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "fix: "
+labels: ["component:backend", "priority:medium", "effort:small", "status:needs-investigation"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting a bug! Please provide as much detail as possible to help us reproduce and fix the issue.
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What is the bug or unexpected behavior?
+      placeholder: A clear description of what went wrong...
+    validations:
+      required: true
+
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce this bug?
+      placeholder: |
+        1. Run command...
+        2. Observe error...
+        3. Expected vs actual behavior...
+    validations:
+      required: true
+
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected Behavior
+      description: What should have happened?
+      placeholder: The system should...
+    validations:
+      required: true
+
+  - type: textarea
+    id: actual
+    attributes:
+      label: Actual Behavior
+      description: What actually happened?
+      placeholder: Instead, the system...
+    validations:
+      required: true
+
+  - type: textarea
+    id: logs
+    attributes:
+      label: Error Logs / Stack Trace
+      description: Include any relevant error messages or stack traces
+      placeholder: Paste error logs here...
+      render: shell
+    validations:
+      required: false
+
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      description: What environment did this occur in?
+      placeholder: |
+        - OS: macOS / Linux / Windows
+        - Bun version: 1.x.x
+        - Node version: 20.x.x
+        - Deployment: local / staging / production
+    validations:
+      required: false
+
+  - type: textarea
+    id: relationships
+    attributes:
+      label: Issue Relationships (Optional)
+      description: |
+        Document dependencies and related work. See `.claude/commands/docs/issue-relationships.md` for relationship types.
+      placeholder: |
+        **Depends On**: #123 (brief reason)
+        **Related To**: #456, #789
+        **Blocks**: #234
+      value: |
+        **Depends On**:
+        **Related To**:
+        **Blocks**:
+    validations:
+      required: false
+
+  - type: dropdown
+    id: component
+    attributes:
+      label: Component
+      description: Which component is affected by this bug?
+      options:
+        - backend
+        - api
+        - database
+        - testing
+        - ci-cd
+        - documentation
+        - observability
+    validations:
+      required: true
+
+  - type: dropdown
+    id: priority
+    attributes:
+      label: Priority
+      description: How severe is this bug?
+      options:
+        - low
+        - medium
+        - high
+        - critical
+      default: 1
+    validations:
+      required: true
+
+  - type: dropdown
+    id: effort
+    attributes:
+      label: Estimated Effort
+      description: How much work do you expect the fix to take?
+      options:
+        - small
+        - medium
+        - large
+      default: 0
+    validations:
+      required: true
+
+  - type: textarea
+    id: references
+    attributes:
+      label: References (Optional)
+      description: Links to related issues, PRs, or external resources
+      placeholder: |
+        - Related PR: #123
+        - Similar issue: #456
+    validations:
+      required: false

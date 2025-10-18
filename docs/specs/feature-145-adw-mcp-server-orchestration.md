@@ -5,6 +5,12 @@
 - Labels: component:backend, component:ci-cd, priority:high, effort:large, status:needs-investigation
 - Strategic Context: Multi-agent framework foundation (docs/vision/2025-10-13-multi-agent-framework-investigation.md)
 
+## Issue Relationships
+
+- **Blocks**: #148 (hybrid ADW resilience) - Provides MCP infrastructure for orchestration layer
+- **Related To**: #110 (kota-tasks MCP) - Shared MCP server patterns and tooling
+- **Follow-Up**: #148 (retry logic and checkpoints) - Enhanced resilience after MCP foundation
+
 ## Overview
 
 ### Problem

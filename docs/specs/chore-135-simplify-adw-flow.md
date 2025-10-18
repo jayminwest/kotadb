@@ -1,5 +1,11 @@
 # Chore Plan: Simplify ADW Architecture to 5-Step Flow
 
+## Issue Relationships
+
+- **Supersedes**: Previous 5-phase ADW flow (plan/build/test/document/patch) - Removed broken phases
+- **Blocks**: #148 (hybrid ADW resilience) - Simplified flow enables retry logic implementation
+- **Related To**: #105 (log analysis) - Simplified flow improves success rate tracking
+
 ## Context
 
 The ADW (AI Developer Workflow) system has achieved a **0% success rate** across 57 runs in the past week due to over-engineering and architectural complexity. The system currently consists of 3,285 lines of code across 13 modules, 38 slash commands, and recursive agent invocation patterns that fail at basic functionality.

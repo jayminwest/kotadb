@@ -7,6 +7,13 @@
 - **Target Completion Rate**: 80%+ (from current ~50-60%)
 - **Branch**: `feat/148-hybrid-adw-resilience-retry-mcp`
 
+## Issue Relationships
+
+- **Depends On**: #145 (ADW MCP server orchestration) - Requires MCP server infrastructure for orchestration layer
+- **Related To**: #136 (simplify ADW flow) - Builds on simplified 3-phase architecture
+- **Related To**: #130 (agent-friendly resilience patterns) - Implements retry logic patterns
+- **Related To**: #105 (log analysis) - Improves observability for success rate tracking
+
 ## Overview
 
 ### Problem
