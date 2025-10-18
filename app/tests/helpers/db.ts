@@ -104,30 +104,6 @@ export async function resetTestDatabase(): Promise<void> {
 }
 
 /**
- * Create a test user in the database
- * Returns the created user's ID
- */
-export async function createTestUser(overrides?: {
-	email?: string;
-	id?: string;
-}): Promise<string> {
-	const client = getSupabaseTestClient();
-	const userId = overrides?.id || crypto.randomUUID();
-	const email = overrides?.email || `test-${userId}@example.com`;
-
-	const { error } = await client.from("auth.users").insert({
-		id: userId,
-		email,
-	});
-
-	if (error) {
-		throw new Error(`Failed to create test user: ${error.message}`);
-	}
-
-	return userId;
-}
-
-/**
  * Create a test organization in the database
  * Returns the created organization's ID
  */
@@ -150,7 +126,10 @@ export async function createTestOrganization(overrides?: {
 	});
 
 	if (error) {
-		throw new Error(`Failed to create test organization: ${error.message}`);
+		// Supabase error objects may lack message property - fallback to JSON serialization
+		throw new Error(
+			`Failed to create test organization: ${error.message || JSON.stringify(error)}`,
+		);
 	}
 
 	return orgId;
@@ -185,7 +164,10 @@ export async function createTestRepository(overrides?: {
 	});
 
 	if (error) {
-		throw new Error(`Failed to create test repository: ${error.message}`);
+		// Supabase error objects may lack message property - fallback to JSON serialization
+		throw new Error(
+			`Failed to create test repository: ${error.message || JSON.stringify(error)}`,
+		);
 	}
 
 	return repoId;
