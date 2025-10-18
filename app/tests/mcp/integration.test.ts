@@ -79,7 +79,7 @@ describe("MCP End-to-End Workflows", () => {
 		// Verify we found the indexed file
 		if (searchResult.results.length > 0) {
 			const found = searchResult.results.some(
-				(r: any) => r.snippet && r.snippet.includes("UserService"),
+				(r: any) => r.snippet?.includes("UserService"),
 			);
 			expect(found).toBe(true);
 		}
