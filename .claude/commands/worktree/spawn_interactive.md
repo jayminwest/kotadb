@@ -9,26 +9,30 @@ This command creates a new git worktree specifically designed for interactive Cl
 ## Inputs
 
 - `$1` (task_description): Description of the task or feature being worked on
-- `$2` (base_branch): Optional base branch to branch from (default: current branch)
+- `$2` (issue_number): Optional GitHub issue number (e.g., "123" or "#123")
+- `$3` (base_branch): Optional base branch to branch from (default: current branch)
 
 ## Workflow
 
 ### 1. Generate Worktree Name
 
-First, create a descriptive worktree name from the task description:
+First, create a descriptive worktree name from the task description and optional issue number:
 
 ```bash
-# Extract key concepts, convert to kebab-case, limit to 50 chars
-# Format: interactive-{description-slug}
-# Example: "Add rate limiting" → "interactive-add-rate-limiting"
+# Extract key concepts, convert to kebab-case, limit to 60 chars
+# Format (with issue): interactive-{issue_number}-{description-slug}
+# Format (without issue): interactive-{description-slug}
+# Example: "Add rate limiting", issue #123 → "interactive-123-add-rate-limiting"
+# Example: "Add rate limiting", no issue → "interactive-add-rate-limiting"
 ```
 
 **Naming Rules:**
 - Prefix with `interactive-` to distinguish from ADW worktrees
+- Include issue number after prefix if provided (strip '#' prefix)
 - Lowercase with hyphens (kebab-case)
 - Remove special characters (keep alphanumeric and hyphens only)
 - Collapse multiple hyphens into single hyphen
-- Maximum 50 characters total
+- Maximum 60 characters total
 - No leading/trailing hyphens
 
 ### 2. Verify Pre-conditions
@@ -97,11 +101,33 @@ After successful creation, provide the user with:
 
 ## Example Output
 
+### With Issue Number
+
+```
+✓ Created interactive worktree: interactive-123-add-rate-limiting
+
+Location: /Users/username/Projects/kota-db-ts/automation/trees/interactive-123-add-rate-limiting
+Branch: interactive-123-add-rate-limiting (based on develop)
+Issue: #123
+
+To start working in the isolated environment:
+  cd automation/trees/interactive-123-add-rate-limiting
+
+The application code is available at:
+  automation/trees/interactive-123-add-rate-limiting/app/
+
+When finished, clean up the worktree:
+  git worktree remove automation/trees/interactive-123-add-rate-limiting --force
+  git branch -D interactive-123-add-rate-limiting
+```
+
+### Without Issue Number
+
 ```
 ✓ Created interactive worktree: interactive-add-rate-limiting
 
 Location: /Users/username/Projects/kota-db-ts/automation/trees/interactive-add-rate-limiting
-Branch: interactive-add-rate-limiting (based on feat/148-hybrid-adw-resilience-retry-mcp)
+Branch: interactive-add-rate-limiting (based on develop)
 
 To start working in the isolated environment:
   cd automation/trees/interactive-add-rate-limiting
@@ -119,28 +145,28 @@ When finished, clean up the worktree:
 ### Worktree Already Exists
 
 ```
-Error: Worktree 'interactive-add-rate-limiting' already exists at:
-  automation/trees/interactive-add-rate-limiting
+Error: Worktree 'interactive-123-add-rate-limiting' already exists at:
+  automation/trees/interactive-123-add-rate-limiting
 
 To use the existing worktree:
-  cd automation/trees/interactive-add-rate-limiting
+  cd automation/trees/interactive-123-add-rate-limiting
 
 To remove and recreate:
-  git worktree remove automation/trees/interactive-add-rate-limiting --force
-  git branch -D interactive-add-rate-limiting
+  git worktree remove automation/trees/interactive-123-add-rate-limiting --force
+  git branch -D interactive-123-add-rate-limiting
 ```
 
 ### Branch Name Conflict
 
 ```
-Error: Branch 'interactive-add-rate-limiting' already exists
+Error: Branch 'interactive-123-add-rate-limiting' already exists
 
 Options:
 1. Use a different task description to generate a unique name
 2. Delete the existing branch:
-   git branch -D interactive-add-rate-limiting
+   git branch -D interactive-123-add-rate-limiting
 3. Checkout the existing branch in a worktree:
-   git worktree add automation/trees/interactive-add-rate-limiting interactive-add-rate-limiting
+   git worktree add automation/trees/interactive-123-add-rate-limiting interactive-123-add-rate-limiting
 ```
 
 ### Base Branch Not Found
@@ -195,8 +221,14 @@ This command mirrors ADW patterns from `automation/adws/adw_modules/git_ops.py`:
 - Same naming convention (kebab-case branch names)
 - Same isolation guarantees (independent working directory)
 - Compatible with ADW cleanup scripts
+- Issue number integration (when provided)
 
-The `interactive-` prefix distinguishes user-created worktrees from ADW-managed worktrees (which use format: `{type}-{issue}-{adw_id}`).
+**Naming Comparison:**
+- Interactive worktree (with issue): `interactive-{issue_number}-{description-slug}`
+- Interactive worktree (no issue): `interactive-{description-slug}`
+- ADW worktree: `{type}-{issue}-{adw_id}` (e.g., `feat-123-abc12345-add-rate-limiting`)
+
+The `interactive-` prefix distinguishes user-created worktrees from ADW-managed worktrees. Including the issue number helps correlate interactive development work with GitHub issues while maintaining clear separation from automated ADW workflows.
 
 ## Advanced Usage
 
