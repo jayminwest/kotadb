@@ -61,3 +61,6 @@ __pycache__/
 
 # .mcp.json for Claude Code MCP integration
 .mcp.json
+
+# Supabase CLI metadata
+supabase/

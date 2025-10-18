@@ -6,6 +6,7 @@ import type { AuthContext, IndexRequest } from "@shared/types";
 import type { ValidationRequest } from "@shared/types/validation";
 import { validateOutput } from "@validation/schemas";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import cors from "cors";
 import express, {
 	type Express,
 	type Request,
@@ -30,6 +31,12 @@ interface AuthenticatedRequest extends Request {
 
 export function createExpressApp(supabase: SupabaseClient): Express {
 	const app = express();
+
+	// CORS middleware - allow requests from web app
+	app.use(cors({
+		origin: true, // Allow all origins in development
+		credentials: true,
+	}));
 
 	// Body parser middleware
 	app.use(express.json());
