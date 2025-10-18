@@ -628,23 +628,57 @@ def run_validation_commands(commands: Iterable[Command], cwd: Path | None = None
 
 
 def find_spec_file(state: ADWState, logger: logging.Logger) -> Optional[str]:
-    """Locate the specification or plan file associated with the run."""
+    """Locate the specification or plan file associated with the run.
 
-    if state.plan_file and Path(state.plan_file).exists():
-        return state.plan_file
+    Searches in order:
+    1. state.plan_file relative to worktree_path (if worktree exists)
+    2. state.plan_file relative to project root
+    3. glob search in worktree docs/specs directory
+    4. glob search in main repo docs/specs directory
 
-    if state.get("plan_file") and Path(state.get("plan_file")).exists():
-        return state.get("plan_file")
+    Args:
+        state: ADW state containing plan_file and worktree metadata
+        logger: Logger for debugging path resolution
 
+    Returns:
+        Absolute path to spec file if found, None otherwise
+    """
+
+    # Try worktree-relative path first (review phase runs from main repo)
+    if state.plan_file and state.worktree_path:
+        worktree_spec = Path(state.worktree_path) / state.plan_file
+        if worktree_spec.exists():
+            logger.info(f"Found spec file in worktree: {worktree_spec}")
+            return str(worktree_spec)
+
+    # Try project-root-relative path (for non-worktree workflows)
+    if state.plan_file:
+        root_spec = project_root() / state.plan_file
+        if root_spec.exists():
+            logger.info(f"Found spec file in project root: {root_spec}")
+            return str(root_spec)
+
+    # Fallback: glob search in correct directory (docs/specs, not specs)
     issue_number = state.issue_number
     if issue_number:
-        specs_dir = project_root() / "specs"
+        # Try worktree first
+        if state.worktree_path:
+            worktree_specs_dir = Path(state.worktree_path) / "docs" / "specs"
+            if worktree_specs_dir.exists():
+                matches = sorted(worktree_specs_dir.glob(f"*{issue_number}*.md"))
+                if matches:
+                    logger.info(f"Discovered spec file via glob in worktree: {matches[0]}")
+                    return str(matches[0])
+
+        # Try main repo
+        specs_dir = project_root() / "docs" / "specs"
         if specs_dir.exists():
             matches = sorted(specs_dir.glob(f"*{issue_number}*.md"))
             if matches:
-                logger.info(f"Discovered spec file via glob: {matches[0]}")
+                logger.info(f"Discovered spec file via glob in main repo: {matches[0]}")
                 return str(matches[0])
-    logger.warning("No spec file found for review/documentation phase")
+
+    logger.warning(f"No spec file found. Searched: worktree={state.worktree_path}, plan_file={state.plan_file}, issue={issue_number}")
     return None
 
 
