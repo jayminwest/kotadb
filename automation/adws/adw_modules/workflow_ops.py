@@ -751,9 +751,24 @@ def create_and_implement_patch(
     if not response.success:
         return None, AgentPromptResponse(output=response.output, success=False)
 
+    # Extract path from response, handling markdown code blocks (matching /find_plan_file pattern)
     patch_file = response.output.strip()
+
+    # Try to extract from markdown code blocks - use the LAST one (most specific)
+    # Agents often include git output in first block and the final path in last block
+    code_blocks = re.findall(r'```\s*([^\n`]+)\s*```', patch_file)
+    if code_blocks:
+        patch_file = code_blocks[-1].strip()  # Use last code block
+
+    # Strip git status prefixes like "?? ", "M ", "A ", etc.
+    git_status_prefix = re.match(r'^[?MAD!]{1,2}\s+', patch_file)
+    if git_status_prefix:
+        patch_file = patch_file[git_status_prefix.end():].strip()
+
     if not patch_file:
         return None, AgentPromptResponse(output="Patch agent returned empty path", success=False)
+
+    logger.info(f"Patch file located: {patch_file}")
 
     implement_response = implement_plan(patch_file, adw_id, logger, agent_name_implementor, cwd=cwd)
     return patch_file, implement_response

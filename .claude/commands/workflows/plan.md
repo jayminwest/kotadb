@@ -102,14 +102,42 @@ Commands to run after implementation:
 - Level 3: Add full `bun test`, `bun run build`
 ```
 
-## Expected Output
+## CRITICAL: Output Format Requirements
 
-Return ONLY the file path to the created plan document, nothing else:
+After creating the plan file, return **ONLY** the file path as plain text on a single line.
+
+**DO NOT include:**
+- Explanatory text (e.g., "The plan file is located at:", "I created:", "Here is:")
+- Markdown formatting (no **bold**, no ` ``` blocks`, no # headers)
+- Quotes, asterisks, or other punctuation around the path
+- Multiple lines or additional commentary
+- Git status output or command results
+
+**Correct output:**
 ```
 docs/specs/plan-abc123.md
 ```
 
-Do NOT include any explanatory text or markdown formatting in the output.
+**INCORRECT outputs (do NOT do this):**
+```
+I created the plan file at:
+
+**docs/specs/plan-abc123.md**
+```
+
+```
+The plan file is located at: docs/specs/plan-abc123.md
+```
+
+```
+Based on the task, I created the following plan file:
+
+docs/specs/plan-abc123.md
+
+You can read it with: cat docs/specs/plan-abc123.md
+```
+
+**Important**: This command creates the file AND returns its path. The `/find_plan_file` command is used when you need to locate an existing plan file created by a different workflow phase.
 
 ## Notes
 

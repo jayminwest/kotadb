@@ -8,6 +8,36 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 - plan_file: $3 (relative path within `docs/specs/`)
 - adw_id: $4
 
+## CRITICAL: Output Format Requirements
+
+Return **ONLY** the PR URL as plain text on a single line.
+
+**DO NOT include:**
+- Explanatory text (e.g., "Successfully created pull request!", "The PR is ready for review")
+- Markdown formatting (no **bold**, no ` ``` blocks`)
+- Multiple lines or additional commentary
+- PR metadata (title, description, etc.)
+
+**Correct output:**
+```
+https://github.com/user/kota-db-ts/pull/123
+```
+
+**INCORRECT output (do NOT do this):**
+```
+Successfully created pull request!
+
+PR URL: https://github.com/user/kota-db-ts/pull/123
+
+The pull request is now ready for review. It includes validation evidence and anti-mock compliance notes.
+```
+
+```
+**Pull Request Created**
+
+https://github.com/user/kota-db-ts/pull/123
+```
+
 ## Preconditions
 - Working tree is clean (`git status --short` empty) and the current branch matches `<branch_name>`.
 - All commits for the issue exist locally and remotely (`feat/`, `bug/`, `chore/`, etc. → `develop` → `main`).
@@ -88,32 +118,3 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 - `gh pr view --web` (optional) to verify the rendered description and metadata.
 - Share the PR link with reviewers, ensure labels/reviewers are applied, and monitor `gh pr status` for CI progress.
 - Double-check the PR body captures anti-mock evidence and that labels (e.g., `methodology:anti-mock`) are applied when relevant.
-
-## Report
-Return only the PR URL as plain text on a single line.
-
-**DO NOT include:**
-- Explanatory text (e.g., "Successfully created pull request!", "The PR is ready for review")
-- Markdown formatting (no **bold**, no ` ``` blocks`)
-- Multiple lines or additional commentary
-- PR metadata (title, description, etc.)
-
-**Correct output:**
-```
-https://github.com/user/kota-db-ts/pull/123
-```
-
-**INCORRECT output (do NOT do this):**
-```
-Successfully created pull request!
-
-PR URL: https://github.com/user/kota-db-ts/pull/123
-
-The pull request is now ready for review. It includes validation evidence and anti-mock compliance notes.
-```
-
-```
-**Pull Request Created**
-
-https://github.com/user/kota-db-ts/pull/123
-```

@@ -194,6 +194,9 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When template changes break automation workflows
     - When implementing new workflow phases that require agent interaction
     - When reviewing PRs that modify slash command templates
+    - When enhancing output format specifications or adding CRITICAL output sections
+    - When agents add explanatory text despite templates specifying "Return only X"
+    - When implementing defensive parsing patterns for agent responses
 
 - docs/adws/validation.md
   - Conditions:

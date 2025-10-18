@@ -10,6 +10,35 @@ Based on the GitHub issue payload below, choose the correct slash command. Respo
 
 Think carefully about impact, urgency, and deliverables described in the issue before answering.
 
+## Output Schema
+
+The output must match this pattern:
+- Type: string
+- Enum: `/feature`, `/bug`, `/chore`, `0`
+- Format: Single line, no whitespace, no explanatory text
+
+**Correct outputs:**
+```
+/feature
+```
+```
+/bug
+```
+```
+/chore
+```
+```
+0
+```
+
+**INCORRECT outputs (do NOT do this):**
+```
+This issue should be classified as: /feature
+```
+```
+Based on the issue description, I recommend /chore
+```
+
 ## GitHub Issue
 
 $ARGUMENTS
