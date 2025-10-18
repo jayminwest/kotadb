@@ -470,6 +470,81 @@ KotaDB provides convenient npm/bun scripts for common test workflows:
 | `test:reset` | `./scripts/reset-test-db.sh` | Reset database to clean state and re-seed |
 | `test:env` | `./scripts/generate-env-test.sh` | Regenerate .env.test from Supabase status |
 | `test:status` | `supabase status` | Show status of all Supabase services |
+## Supabase Local Port Architecture
+
+When using Supabase Local (via Docker), multiple services run on different ports:
+
+| Port  | Service            | Purpose                                      | Usage                              |
+|-------|--------------------|--------------------------------------------- |------------------------------------|
+| 5434  | PostgreSQL         | Direct database access                       | Migrations, seed scripts, psql CLI |
+| 54322 | PostgREST          | REST API (no routing layer)                  | Direct HTTP database access        |
+| 54325 | GoTrue             | Authentication service                       | User auth operations               |
+| 54326 | Kong Gateway       | API gateway with /rest/v1/ routing           | **Supabase JS client (tests use this)** |
+
+### Critical Configuration for Tests
+
+**The Supabase JS client requires the Kong gateway port (54326), not PostgREST (54322).**
+
+Kong provides the `/rest/v1/` routing layer that the Supabase JS client expects. Direct PostgREST access doesn't include this routing, causing 404 errors when the client tries to access `/rest/v1/table_name`.
+
+**Test Configuration (`.env.test`):**
+```bash
+SUPABASE_URL=http://localhost:54326  # Kong gateway, NOT 54322
+SUPABASE_SERVICE_KEY=test-service-key-local
+SUPABASE_ANON_KEY=test-anon-key-local
+DATABASE_URL=postgresql://postgres:postgres@localhost:5434/postgres
+```
+
+All test files set these environment variables at module-level (before imports) to ensure the Supabase client initializes with correct configuration.
+
+## Troubleshooting
+
+### Tests Fail with 404 or "relation not found"
+
+**Symptom:** Tests fail with 404 errors or PostgREST returns empty results even though data exists.
+
+**Cause:** SUPABASE_URL is pointing to PostgREST (port 54322) instead of Kong gateway (port 54326).
+
+**Solution:**
+1. Check `.env.test` - should use `http://localhost:54326` (Kong gateway)
+2. Verify test files set `process.env.SUPABASE_URL = "http://localhost:54326"` at module-level
+3. Ensure imports happen AFTER environment variables are set
+
+### Tests Fail with "null API key validation" or "401 Unauthorized"
+
+**Symptom:** Auth tests fail with null validation results or unauthorized errors.
+
+**Cause:** Supabase client initialized before test environment variables were set.
+
+**Solution:**
+1. Move env var setup to top of test file (before any imports)
+2. Use dynamic imports in `beforeAll` after env vars are configured:
+   ```typescript
+   process.env.SUPABASE_URL = "http://localhost:54326";
+   // ... other env vars
+
+   beforeAll(async () => {
+     const { getServiceClient } = await import("@db/client");
+     // ... rest of setup
+   });
+   ```
+
+### Cache Timing Tests Are Flaky
+
+**Symptom:** Tests that verify cache performance fail intermittently with timing assertions.
+
+**Cause:** Real database operations have timing variance (network latency, database load).
+
+**Solution:** Use tolerance-based assertions instead of strict comparisons:
+```typescript
+// ❌ Flaky
+expect(secondDuration).toBeLessThan(firstDuration);
+
+// ✅ Stable
+expect(secondDuration).toBeLessThanOrEqual(firstDuration + 2);
+```
+
+### Port Already in Use
 
 **Example workflow:**
 

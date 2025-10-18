@@ -31,6 +31,11 @@ cd app && bun run test:validate-env        # Detect hardcoded environment URLs i
 - When adding or modifying migrations in `app/src/db/migrations/`, you **must** also update `app/supabase/migrations/`
 - Run `cd app && bun run test:validate-migrations` to check for drift between directories
 - Keep both directories synchronized to prevent test environment divergence from production schema
+./scripts/setup-test-db.sh       # Start Supabase Local test database
+./scripts/reset-test-db.sh       # Reset test database to clean state
+```
+
+**Testing Philosophy:** KotaDB follows an **antimocking philosophy**. All tests use real Supabase Local database connections instead of mocks for production parity. See `docs/testing-setup.md` for detailed configuration.
 
 ### Docker
 ```bash
@@ -113,6 +118,11 @@ All application code is located in the `app/` directory.
 - Tables: 10 tables including `api_keys`, `organizations`, `repositories`, `index_jobs`, `indexed_files`, `symbols`, `references`, `dependencies`, etc.
 - Connection: Configured via `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `SUPABASE_ANON_KEY` environment variables
 - RLS enabled for multi-tenant data isolation with user-scoped and organization-scoped policies
+- **Supabase Local Port Architecture** (for testing):
+  - Port 5434: PostgreSQL (migrations, seed scripts, psql)
+  - Port 54322: PostgREST API (raw HTTP access)
+  - Port 54325: GoTrue auth service
+  - Port 54326: Kong gateway (Supabase JS client - **use this for tests**)
 
 **Indexer (app/src/indexer/)**
 - `repos.ts`: Git repository management (clone, fetch, checkout)
