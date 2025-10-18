@@ -6,6 +6,11 @@ out
 dist
 *.tgz
 
+# Next.js
+.next
+web/.next
+web/out
+
 # code coverage
 coverage
 *.lcov

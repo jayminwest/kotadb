@@ -42,6 +42,30 @@ The server listens on port `3000` by default. Override with `PORT=4000 cd app &&
 - `cd app && bun test` – Run the Bun test suite.
 - `cd app && bunx tsc --noEmit` – Type-check the project.
 
+## Web Application
+
+KotaDB includes a Next.js web interface for code search and repository indexing.
+
+### Start the web app
+
+```bash
+# Install dependencies (from repository root)
+bun install
+
+# Start development server
+cd web && bun run dev
+```
+
+The web app will be available at `http://localhost:3001`.
+
+**Features:**
+- Code search with context snippets
+- Repository indexing interface
+- Rate limit quota tracking
+- Type-safe API integration with shared types
+
+See `web/README.md` for detailed documentation.
+
 ### Running Tests
 
 KotaDB uses real PostgreSQL database connections for testing (no mocks). The test environment uses **Docker Compose** with isolated services to ensure exact parity between local and CI testing environments, with full project isolation to prevent port conflicts.

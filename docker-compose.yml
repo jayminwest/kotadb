@@ -23,6 +23,23 @@ services:
       - "3100:3000"
     restart: unless-stopped
 
+  web:
+    build:
+      context: .
+      dockerfile: web/Dockerfile
+      target: development
+    command: bun run dev
+    volumes:
+      - ./web:/app/web
+      - ./shared:/app/shared
+      - bun_cache_web:/root/.cache/bun
+    environment:
+      NODE_ENV: development
+      NEXT_PUBLIC_API_URL: http://localhost:3000
+    ports:
+      - "3001:3001"
+    restart: unless-stopped
+
   adw_runner:
     build:
       context: .
@@ -160,4 +177,5 @@ services:
 
 volumes:
   bun_cache:
+  bun_cache_web:
   supabase_db_data:
