@@ -5,7 +5,7 @@
  * repeated expensive bcrypt comparisons and database lookups.
  */
 
-import type { Tier } from "@auth/context";
+import type { Tier } from "@shared/types/auth";
 
 /**
  * Cached validation result with expiry timestamp.

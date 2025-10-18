@@ -7,10 +7,12 @@ on:
       - develop
     paths:
       - 'app/**'
+      - 'shared/**'
       - '.github/workflows/app-ci.yml'
   pull_request:
     paths:
       - 'app/**'
+      - 'shared/**'
       - '.github/workflows/app-ci.yml'
 
 jobs:
@@ -44,7 +46,11 @@ jobs:
       - name: Validate migration sync
         run: bun run test:validate-migrations
 
-      - name: Type check
+      - name: Type check shared types
+        working-directory: shared
+        run: bunx tsc --noEmit
+
+      - name: Type check application
         run: bunx tsc --noEmit
 
       - name: Lint

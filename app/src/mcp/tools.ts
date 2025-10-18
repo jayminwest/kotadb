@@ -11,7 +11,7 @@ import {
 	updateIndexRunStatus,
 } from "@api/queries";
 import { buildSnippet } from "@indexer/extractors";
-import type { IndexRequest } from "@shared/index";
+import type { IndexRequest } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invalidParams } from "./jsonrpc";
 

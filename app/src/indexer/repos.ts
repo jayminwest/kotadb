@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
-import type { IndexRequest } from "@shared/index";
+import type { IndexRequest } from "@shared/types";
 
 export interface RepositoryContext {
 	repository: string;

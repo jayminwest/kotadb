@@ -22,7 +22,7 @@ import {
 import { saveIndexedFiles, storeSymbols } from "@api/queries";
 import { parseFile } from "@indexer/ast-parser";
 import { extractSymbols } from "@indexer/symbol-extractor";
-import type { IndexedFile } from "@shared/index";
+import type { IndexedFile } from "@shared/types";
 
 const FIXTURES_PATH = join(import.meta.dir, "../fixtures/parsing/simple");
 

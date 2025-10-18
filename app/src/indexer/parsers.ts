@@ -1,6 +1,6 @@
 import { readFile, readdir, stat } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
-import type { IndexedFile } from "@shared/index";
+import type { IndexedFile } from "@shared/types";
 import { extractDependencies } from "./extractors";
 
 const SUPPORTED_EXTENSIONS = new Set<string>([

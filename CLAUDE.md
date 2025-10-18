@@ -47,11 +47,40 @@ The project uses TypeScript path aliases defined in `app/tsconfig.json`:
 - `@auth/*` → `src/auth/*`
 - `@db/*` → `src/db/*`
 - `@indexer/*` → `src/indexer/*`
-- `@shared/*` → `src/types/*`
+- `@shared/*` → `../shared/*` (shared types for monorepo)
 - `@mcp/*` → `src/mcp/*`
 - `@validation/*` → `src/validation/*`
 
 Always use these aliases for imports, not relative paths. All paths are relative to the `app/` directory.
+
+### Shared Types Infrastructure
+The `shared/` directory at repository root contains TypeScript types shared across all projects in the monorepo (backend, frontend, CLI tools). This provides a single source of truth for API contracts, database entities, and authentication types.
+
+**When to use `@shared/types`:**
+- API request/response types (e.g., `IndexRequest`, `SearchResponse`)
+- Database entity types (e.g., `Repository`, `IndexedFile`, `Symbol`)
+- Authentication types (e.g., `AuthContext`, `Tier`, `ApiKey`)
+- Rate limiting types (e.g., `RateLimitResult`, `RateLimitHeaders`)
+- Validation types (e.g., `ValidationRequest`, `ValidationResponse`)
+
+**When to keep types in `app/src/types`:**
+- Application-specific types (e.g., `ApiContext` with Supabase client)
+- Internal implementation details not exposed via API
+- Types that depend on app-specific runtime globals (e.g., Bun's `Request` type)
+
+**Import examples:**
+```typescript
+// Import shared types for API contracts
+import type { IndexRequest, SearchResponse } from "@shared/types";
+import type { AuthContext, Tier } from "@shared/types/auth";
+import type { Repository, IndexedFile } from "@shared/types/entities";
+
+// Import app-specific types
+import type { ApiContext } from "@shared/index";
+```
+
+**Breaking changes:**
+When modifying shared types, use TypeScript compiler errors to identify all affected consumers and update them in the same PR. Shared types follow semantic versioning (breaking changes require major version bump in `shared/package.json`).
 
 ### Core Components
 

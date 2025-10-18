@@ -1,0 +1,11 @@
+{
+  "name": "@kotadb/shared",
+  "version": "0.1.0",
+  "type": "module",
+  "description": "Shared TypeScript types for KotaDB monorepo",
+  "main": "./types/index.ts",
+  "types": "./types/index.ts",
+  "exports": {
+    "./*": "./types/*"
+  }
+}

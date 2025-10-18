@@ -1,9 +1,9 @@
 import { authenticateRequest } from "@auth/middleware";
-import type { RateLimitResult } from "@auth/rate-limit";
+import type { RateLimitResult } from "@shared/types/rate-limit";
 import { buildSnippet } from "@indexer/extractors";
 import { createMcpServer, createMcpTransport } from "@mcp/server";
-import type { AuthContext, IndexRequest } from "@shared/index";
-import type { ValidationRequest } from "@validation/types";
+import type { AuthContext, IndexRequest } from "@shared/types";
+import type { ValidationRequest } from "@shared/types/validation";
 import { validateOutput } from "@validation/schemas";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import express, {

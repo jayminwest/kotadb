@@ -24,7 +24,7 @@ import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import type { Server } from "node:http";
 import { getTestApiKey } from "../helpers/db";
 import { startTestServer, stopTestServer } from "../helpers/server";
-import type { ValidationResponse } from "@validation/types";
+import type { ValidationResponse } from "@shared/types/validation";
 
 let server: Server;
 let BASE_URL: string;

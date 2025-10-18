@@ -1,4 +1,4 @@
-import type { IndexRequest, IndexedFile } from "@shared/index";
+import type { IndexRequest, IndexedFile } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
 

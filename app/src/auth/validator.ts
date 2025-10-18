@@ -5,7 +5,7 @@
  */
 
 import { getCachedValidation, setCachedValidation } from "@auth/cache";
-import type { Tier } from "@auth/context";
+import type { Tier } from "@shared/types/auth";
 import { getServiceClient } from "@db/client";
 import bcrypt from "bcryptjs";
 

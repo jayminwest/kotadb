@@ -6,27 +6,7 @@
  */
 
 import { getServiceClient } from "@db/client";
-
-/**
- * Rate limit enforcement result.
- * Contains current status and metadata for response headers.
- */
-export interface RateLimitResult {
-	/** Whether the request is allowed (within limit) */
-	allowed: boolean;
-
-	/** Requests remaining in current window */
-	remaining: number;
-
-	/** Seconds until window resets (only set when limit exceeded) */
-	retryAfter?: number;
-
-	/** Unix timestamp when window resets */
-	resetAt: number;
-
-	/** Total limit for this key's tier */
-	limit: number;
-}
+import type { RateLimitResult } from "@shared/types/rate-limit";
 
 /**
  * Enforce rate limit for API key.

@@ -18,7 +18,7 @@
 			"@auth/*": ["src/auth/*"],
 			"@db/*": ["src/db/*"],
 			"@indexer/*": ["src/indexer/*"],
-			"@shared/*": ["src/types/*"],
+			"@shared/*": ["../shared/*"],
 			"@mcp/*": ["src/mcp/*"],
 			"@validation/*": ["src/validation/*"]
 		},

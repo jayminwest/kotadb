@@ -5,7 +5,7 @@
  * authenticated request context.
  */
 
-import type { AuthContext } from "@auth/context";
+import type { AuthContext } from "@shared/types/auth";
 import { enforceRateLimit } from "@auth/rate-limit";
 import { updateLastUsed, validateApiKey } from "@auth/validator";
 

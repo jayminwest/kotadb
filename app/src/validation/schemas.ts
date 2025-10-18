@@ -5,7 +5,7 @@
  */
 
 import { z } from "zod";
-import type { ValidationResponse, ValidationError } from "./types";
+import type { ValidationResponse, ValidationError } from "@shared/types/validation";
 
 /**
  * Converts a JSON schema object to a Zod schema
