@@ -108,6 +108,58 @@ const result = await executePythonBridge("get_state", [adw_id]);
 2. **Git**: `git_commit`, `git_create_worktree`, `git_cleanup_worktree`
 3. **Validation**: `bun_validate`, `bun_validate_migrations`
 
+## Environment Configuration
+
+### Python Path Setup
+
+The MCP server spawns Python subprocesses to execute ADW operations via the Python bridge module. By default, it searches for `python3` in the system PATH, but you can configure an explicit Python executable path.
+
+**Environment Variable:**
+```bash
+PYTHON_PATH=/path/to/python3
+```
+
+**Finding Your Python Path:**
+```bash
+which python3
+# Example output: /usr/local/bin/python3
+```
+
+**Configuration File:**
+Create `.env` file in `automation/adws/mcp_server/`:
+```bash
+# Copy template
+cp .env.example .env
+
+# Edit with your Python path
+PYTHON_PATH=/usr/local/bin/python3
+```
+
+**Common Python Installation Paths:**
+- System Python (macOS/Linux): `/usr/bin/python3`
+- Homebrew (Intel Mac): `/usr/local/bin/python3`
+- Homebrew (Apple Silicon): `/opt/homebrew/bin/python3`
+- pyenv: `~/.pyenv/versions/3.12.0/bin/python3`
+- uv: `~/.cache/uv/archive-v0/{hash}/bin/python3`
+
+**Why Set PYTHON_PATH?**
+- **Reliability**: Bun runtime may inherit minimal PATH without Python directory
+- **Predictability**: Explicit paths prevent `ENOENT` spawn errors
+- **Flexibility**: Support for virtualenvs, uv environments, and custom installations
+- **Debugging**: Server logs resolved Python path on startup
+
+**Server Startup Logs:**
+```
+ADW MCP server listening on port 4000
+Using Python executable: /usr/local/bin/python3
+```
+
+If `PYTHON_PATH` is not set, the server logs a warning:
+```
+WARNING: PYTHON_PATH environment variable not set. Using default 'python3' from system PATH.
+For production use, set PYTHON_PATH to absolute path of Python executable.
+```
+
 ## Usage (Development)
 
 ```bash
@@ -121,6 +173,34 @@ curl -X POST http://localhost:4000/mcp \
 
 # Health check
 curl http://localhost:4000/health
+```
+
+## Troubleshooting
+
+### ENOENT: no such file or directory, posix_spawn 'python3'
+
+**Symptom:** MCP server starts successfully but crashes when invoking tools with error:
+```
+ENOENT: no such file or directory, posix_spawn 'python3'
+syscall: "spawn python3"
+errno: -2
+```
+
+**Cause:** Bun runtime cannot find `python3` executable in inherited PATH.
+
+**Solution:**
+1. Find your Python path: `which python3`
+2. Create `.env` file: `cp .env.example .env`
+3. Set `PYTHON_PATH` to absolute path from step 1
+4. Restart server and verify startup log shows correct path
+
+**Verification:**
+```bash
+# Test Python bridge directly
+cd automation && python3 -m adws.adw_modules.mcp_bridge list_workflows
+
+# If this works but server fails, PATH discrepancy confirmed
+# Set PYTHON_PATH environment variable to resolve
 ```
 
 ## Type Checking

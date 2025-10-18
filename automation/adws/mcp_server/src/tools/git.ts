@@ -12,6 +12,7 @@ import type {
   ToolResult,
 } from "../types.js";
 import { getAutomationDir } from "../utils/paths.js";
+import { getPythonExecutable } from "../utils/python.js";
 
 /**
  * Tool definition: Git commit
@@ -100,7 +101,7 @@ async function executePythonBridge(
   args: string[]
 ): Promise<unknown> {
   return new Promise((resolve, reject) => {
-    const process = spawn("python3", [
+    const process = spawn(getPythonExecutable(), [
       "-m",
       "adws.adw_modules.mcp_bridge",
       command,
