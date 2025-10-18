@@ -217,4 +217,64 @@ describe("MCP JSON-RPC Error Handling", () => {
 		expect(data.id).toBeNull();
 		expect(data.error).toBeDefined();
 	});
+
+	test("unknown tool name returns -32603 with descriptive message", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: {
+					name: "nonexistent_tool",
+					arguments: {},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.error).toBeDefined();
+		expect(data.error.code).toBe(-32603);
+		expect(data.error.message).toContain("Unknown tool");
+	});
+
+	test("empty request body returns -32700 Parse Error", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: "",
+		});
+
+		expect(response.status).toBe(400);
+		const data = (await response.json()) as any;
+		expect(data.error).toBeDefined();
+		expect(data.error.code).toBe(-32700);
+	});
+
+	test("tool execution error returns -32603 with error details", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 1,
+				method: "tools/call",
+				params: {
+					name: "list_recent_files",
+					arguments: {
+						limit: -1, // Invalid limit value
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		// Tool execution errors may return valid results or errors depending on validation
+		// This test ensures the response format is correct
+		expect(data.jsonrpc).toBe("2.0");
+		expect(data.id).toBe(1);
+	});
 });

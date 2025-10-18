@@ -1,0 +1,11 @@
+{
+	"results": [
+		{
+			"path": "index.ts",
+			"snippet": "export class UserService {",
+			"lineNumber": 10,
+			"repository": "test-user/sample-repository"
+		}
+	],
+	"total": 1
+}

@@ -160,6 +160,12 @@ All application code is located in the `app/` directory.
   - Expect `-32603` for tool-level validation errors (not `-32602`)
   - Expect HTTP 400 for parse errors and invalid JSON-RPC (not HTTP 200)
   - Do not test header enforcement unless DNS rebinding protection is enabled
+- **MCP Regression Testing** (issue #68, 9 test files, 100+ test cases):
+  - Comprehensive test coverage: lifecycle, errors, authentication, tool validation, integration, concurrency
+  - Test helpers: `sendMcpRequest()`, `extractToolResult()`, `assertToolResult()`, `assertJsonRpcError()`
+  - Test fixtures: `app/tests/fixtures/mcp/sample-repository/` for integration testing
+  - Claude Code integration guide: `docs/guides/mcp-claude-code-integration.md`
+  - See `docs/testing-setup.md` "MCP Testing" section for complete testing guide
 
 **Validation (app/src/validation/)**
 - `schemas.ts`: Core validation logic using Zod for command output validation

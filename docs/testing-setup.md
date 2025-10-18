@@ -278,6 +278,187 @@ describe("My Feature", () => {
 });
 ```
 
+## MCP Testing
+
+KotaDB provides comprehensive MCP (Model Context Protocol) integration testing with real Supabase database connections.
+
+### MCP Test Files
+
+The MCP test suite includes 9 test files covering all aspects of the MCP integration:
+
+- `app/tests/mcp/lifecycle.test.ts` - Protocol handshake and tool discovery
+- `app/tests/mcp/errors.test.ts` - JSON-RPC error handling
+- `app/tests/mcp/authentication.test.ts` - Auth and rate limiting
+- `app/tests/mcp/tool-validation.test.ts` - Parameter validation for all tools
+- `app/tests/mcp/tools.test.ts` - Tool execution tests
+- `app/tests/mcp/integration.test.ts` - End-to-end workflows
+- `app/tests/mcp/concurrent.test.ts` - Concurrency and isolation
+- `app/tests/mcp/handshake.test.ts` - Basic handshake tests
+- `app/tests/mcp/headers.test.ts` - Header validation
+
+### MCP Test Helpers
+
+Import MCP-specific test helpers from `tests/helpers/mcp.ts`:
+
+```typescript
+import {
+  sendMcpRequest,
+  extractToolResult,
+  createMcpHeaders,
+  assertToolResult,
+  assertJsonRpcError
+} from "../helpers/mcp";
+
+// Send MCP request with authentication
+const response = await sendMcpRequest(
+  baseUrl,
+  "tools/call",
+  {
+    name: "search_code",
+    arguments: { term: "Router" }
+  },
+  "free"  // tier: free, solo, or team
+);
+
+// Extract tool result from SDK content blocks
+const result = extractToolResult(response.data);
+console.log(result.results);
+
+// Assert tool result has expected fields
+assertToolResult(response.data, {
+  results: "object",
+  total: "number"
+});
+
+// Assert JSON-RPC error with code and message pattern
+assertJsonRpcError(response.data, -32603, /missing.*term/i);
+```
+
+### SDK Content Block Response Format
+
+The MCP SDK wraps tool results in content blocks. Tests must extract results using the `extractToolResult()` helper:
+
+```typescript
+// Raw SDK response
+{
+  "jsonrpc": "2.0",
+  "id": 1,
+  "result": {
+    "content": [
+      {
+        "type": "text",
+        "text": "{\"results\": [...], \"total\": 10}"
+      }
+    ]
+  }
+}
+
+// Extracted tool result
+const toolResult = extractToolResult(response.data);
+// => { results: [...], total: 10 }
+```
+
+### SDK Error Code Mapping
+
+The MCP SDK uses specific JSON-RPC error codes:
+
+- `-32700` (Parse Error): Invalid JSON or malformed JSON-RPC structure (returns HTTP 400)
+- `-32601` (Method Not Found): Unknown JSON-RPC method (returns HTTP 200)
+- `-32603` (Internal Error): Tool execution errors, validation failures, type errors (returns HTTP 200)
+
+**Important:** The SDK uses `-32603` for all tool-level errors, NOT `-32602` (Invalid Params).
+
+### Running MCP Tests
+
+```bash
+# Run all MCP tests
+bun test tests/mcp/
+
+# Run specific MCP test file
+bun test tests/mcp/lifecycle.test.ts
+
+# Run MCP tests with coverage
+bun test --coverage tests/mcp/
+```
+
+### Example MCP Test
+
+```typescript
+import { afterAll, beforeAll, describe, expect, test } from "bun:test";
+import type { Server } from "node:http";
+import { sendMcpRequest, extractToolResult } from "../helpers/mcp";
+import { startTestServer, stopTestServer } from "../helpers/server";
+
+let server: Server;
+let baseUrl: string;
+
+beforeAll(async () => {
+  const testServer = await startTestServer();
+  server = testServer.server;
+  baseUrl = testServer.url;
+});
+
+afterAll(async () => {
+  await stopTestServer(server);
+});
+
+describe("MCP Tools", () => {
+  test("search_code finds matching files", async () => {
+    const response = await sendMcpRequest(
+      baseUrl,
+      "tools/call",
+      {
+        name: "search_code",
+        arguments: { term: "Router", limit: 10 }
+      },
+      "free"
+    );
+
+    expect(response.status).toBe(200);
+    const result = extractToolResult(response.data);
+    expect(result.results).toBeArray();
+  });
+});
+```
+
+### MCP Test Fixtures
+
+Test fixtures for MCP integration testing are located in `app/tests/fixtures/mcp/`:
+
+- `sample-repository/` - Minimal test repository for indexing tests
+  - `index.ts` - Sample TypeScript file with classes and functions
+  - `utils.ts` - Sample utility functions
+  - `package.json` - Repository metadata
+- `expected-responses/` - JSON files with expected tool results for comparison
+
+Use fixtures in tests:
+
+```typescript
+import path from "node:path";
+
+const fixturePath = path.join(
+  process.cwd(),
+  "tests/fixtures/mcp/sample-repository"
+);
+
+const response = await sendMcpRequest(
+  baseUrl,
+  "tools/call",
+  {
+    name: "index_repository",
+    arguments: {
+      repository: "test/fixture-repo",
+      localPath: fixturePath
+    }
+  },
+  "free"
+);
+```
+
+### Claude Code Integration Testing
+
+For manual testing with Claude Code CLI, see [docs/guides/mcp-claude-code-integration.md](../guides/mcp-claude-code-integration.md).
+
 ## Available Package Scripts
 
 KotaDB provides convenient npm/bun scripts for common test workflows:

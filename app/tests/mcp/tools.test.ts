@@ -236,4 +236,166 @@ describe("MCP Tools Integration", () => {
 		expect(data.error).toBeDefined();
 		expect(data.error.code).toBe(-32603); // Internal Error (SDK error handling)
 	});
+
+	test("search_code returns snippet with context", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 9,
+				method: "tools/call",
+				params: {
+					name: "search_code",
+					arguments: {
+						term: "Router",
+						limit: 10,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		const toolResult = extractToolResult(data);
+
+		if (toolResult.results.length > 0) {
+			const firstResult = toolResult.results[0];
+			expect(firstResult).toHaveProperty("path");
+			expect(firstResult).toHaveProperty("snippet");
+			expect(firstResult.snippet).toContain("Router");
+		}
+	});
+
+	test("search_code respects limit parameter", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 10,
+				method: "tools/call",
+				params: {
+					name: "search_code",
+					arguments: {
+						term: "import",
+						limit: 3,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		const toolResult = extractToolResult(data);
+		expect(toolResult.results.length).toBeLessThanOrEqual(3);
+	});
+
+	test("search_code with no matches returns empty results", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 11,
+				method: "tools/call",
+				params: {
+					name: "search_code",
+					arguments: {
+						term: "xyznonexistentterm12345",
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		const toolResult = extractToolResult(data);
+		expect(toolResult.results).toBeArray();
+	});
+
+	test("list_recent_files returns files ordered by indexedAt", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 12,
+				method: "tools/call",
+				params: {
+					name: "list_recent_files",
+					arguments: {
+						limit: 10,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		const toolResult = extractToolResult(data);
+
+		if (toolResult.results.length > 1) {
+			// Verify files are ordered by indexedAt descending
+			const timestamps = toolResult.results.map((f: any) =>
+				new Date(f.indexedAt).getTime(),
+			);
+			for (let i = 1; i < timestamps.length; i++) {
+				expect(timestamps[i]).toBeLessThanOrEqual(timestamps[i - 1]);
+			}
+		}
+	});
+
+	test("list_recent_files respects limit parameter", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 13,
+				method: "tools/call",
+				params: {
+					name: "list_recent_files",
+					arguments: {
+						limit: 5,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		const toolResult = extractToolResult(data);
+		expect(toolResult.results.length).toBeLessThanOrEqual(5);
+	});
+
+	test("all tool results wrapped in SDK content blocks", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 14,
+				method: "tools/call",
+				params: {
+					name: "list_recent_files",
+					arguments: {},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+
+		// Verify SDK content block wrapping
+		expect(data.result.content).toBeArray();
+		expect(data.result.content.length).toBeGreaterThan(0);
+		expect(data.result.content[0]).toHaveProperty("type");
+		expect(data.result.content[0].type).toBe("text");
+		expect(data.result.content[0]).toHaveProperty("text");
+
+		// Verify text is valid JSON
+		const toolResult = extractToolResult(data);
+		expect(toolResult).toBeDefined();
+	});
 });
