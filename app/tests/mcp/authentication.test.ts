@@ -79,7 +79,8 @@ describe("MCP Authentication", () => {
 		);
 
 		expect(response.status).toBe(401);
-		expect(response.data.error).toBeDefined();
+		const data = response.data as any;
+		expect(data.error).toBeDefined();
 	});
 
 	test("valid free tier API key allows request", async () => {

@@ -251,8 +251,8 @@ describe("MCP Concurrency", () => {
 		}
 
 		// Search should succeed even with concurrent indexing
-		expect(searchResponse.status).toBe(200);
-		const searchResult = extractToolResult(searchResponse.data);
+		expect(searchResponse!.status).toBe(200);
+		const searchResult = extractToolResult(searchResponse!.data);
 		expect(searchResult.results).toBeArray();
 	});
 
