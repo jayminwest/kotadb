@@ -2,10 +2,44 @@
  * Integration test setup utilities
  */
 
-import { mkdtempSync, rmSync, writeFileSync, mkdirSync } from "fs";
+import { mkdtempSync, rmSync, writeFileSync, mkdirSync, existsSync } from "fs";
 import { tmpdir } from "os";
 import { join } from "path";
 import { execSync } from "child_process";
+
+/**
+ * Verify environment setup for integration tests
+ *
+ * Ensures PYTHON_PATH is set for Python bridge tests.
+ * Falls back to system PATH if not set (logs warning).
+ */
+export function verifyEnvironmentSetup(): void {
+  if (!process.env.PYTHON_PATH) {
+    console.warn("WARNING: PYTHON_PATH not set. Tests will use 'python3' from system PATH.");
+    console.warn("For consistent test behavior, create .env file: cp .env.example .env");
+  } else {
+    console.log(`Using Python executable: ${process.env.PYTHON_PATH}`);
+  }
+}
+
+/**
+ * Ensure test environment has required Python executable
+ *
+ * Validates Python path before running integration tests.
+ * Exits with error if Python is not accessible.
+ */
+export function ensurePythonAvailable(): void {
+  const pythonPath = process.env.PYTHON_PATH || "python3";
+  try {
+    execSync(`${pythonPath} --version`, { stdio: "ignore" });
+  } catch (error) {
+    throw new Error(
+      `Python executable not found: ${pythonPath}\n` +
+      `Please set PYTHON_PATH in .env file to absolute path of Python 3 executable.\n` +
+      `Run: which python3`
+    );
+  }
+}
 
 /**
  * Create a temporary git repository for testing

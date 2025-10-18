@@ -160,6 +160,51 @@ WARNING: PYTHON_PATH environment variable not set. Using default 'python3' from 
 For production use, set PYTHON_PATH to absolute path of Python executable.
 ```
 
+## Quick Start
+
+### 1. Environment Setup
+Create `.env` file from template:
+```bash
+cd automation/adws/mcp_server
+cp .env.example .env
+```
+
+### 2. Configure Python Path
+Find your Python installation:
+```bash
+which python3
+# Example output: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+```
+
+Edit `.env` and set `PYTHON_PATH` to the absolute path:
+```bash
+PYTHON_PATH=/Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+```
+
+### 3. Start the Server
+```bash
+bun run dev
+```
+
+Expected output:
+```
+ADW MCP server listening on port 4000
+Health check: http://localhost:4000/health
+MCP endpoint: http://localhost:4000/mcp
+Python executable validated: /Library/Frameworks/Python.framework/Versions/3.12/bin/python3
+```
+
+### 4. Verify Setup
+Test the health endpoint:
+```bash
+curl http://localhost:4000/health
+```
+
+Expected response:
+```json
+{"status":"ok","server":"kotadb-adw"}
+```
+
 ## Usage (Development)
 
 ```bash

@@ -39,3 +39,71 @@ export function getPythonExecutable(): string {
 
   return "python3";
 }
+
+/**
+ * Validation result for Python executable check.
+ */
+export interface PythonValidationResult {
+  valid: boolean;
+  path: string;
+  error?: string;
+}
+
+/**
+ * Validates that the Python executable exists and is accessible.
+ *
+ * Checks:
+ * 1. Resolves Python path using getPythonExecutable()
+ * 2. For absolute paths: verifies file exists and is executable
+ * 3. For relative paths (e.g., "python3"): assumes system PATH resolution
+ *
+ * @returns {PythonValidationResult} Validation result with path and error details
+ */
+export function validatePythonExecutable(): PythonValidationResult {
+  const pythonPath = getPythonExecutable();
+
+  // If path is relative (e.g., "python3"), trust system PATH resolution
+  // Bun's spawn() will search PATH for the executable
+  if (!pythonPath.startsWith("/")) {
+    return {
+      valid: true,
+      path: pythonPath,
+    };
+  }
+
+  // For absolute paths, verify file exists and is accessible
+  try {
+    const fs = require("fs");
+
+    // Check if file exists
+    if (!fs.existsSync(pythonPath)) {
+      return {
+        valid: false,
+        path: pythonPath,
+        error: `Python executable not found at path: ${pythonPath}`,
+      };
+    }
+
+    // Check if file is executable (requires read + execute permissions)
+    try {
+      fs.accessSync(pythonPath, fs.constants.X_OK);
+    } catch (accessErr) {
+      return {
+        valid: false,
+        path: pythonPath,
+        error: `Python executable is not executable: ${pythonPath}`,
+      };
+    }
+
+    return {
+      valid: true,
+      path: pythonPath,
+    };
+  } catch (err) {
+    return {
+      valid: false,
+      path: pythonPath,
+      error: `Failed to validate Python executable: ${err instanceof Error ? err.message : String(err)}`,
+    };
+  }
+}

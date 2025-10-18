@@ -7,8 +7,12 @@
 import { describe, it, expect, beforeAll, afterAll } from "bun:test";
 import { readFileSync } from "fs";
 import { join } from "path";
-import { createTestStateDir, cleanup } from "./setup";
+import { createTestStateDir, cleanup, verifyEnvironmentSetup, ensurePythonAvailable } from "./setup";
 import { executeGetState, executeListWorkflows } from "../../src/tools/workflow";
+
+// Verify environment before running tests
+verifyEnvironmentSetup();
+ensurePythonAvailable();
 
 describe("adw_get_state integration tests", () => {
   let testAdwId: string;

@@ -12,8 +12,9 @@ const __dirname = dirname(__filename);
  * Get project root directory (kota-db-ts/)
  */
 export function getProjectRoot(): string {
-  // From src/utils/paths.ts, go up 4 levels to reach project root
-  return join(__dirname, '../../../..');
+  // From automation/adws/mcp_server/src/utils/paths.ts, go up 5 levels to reach project root
+  // automation/adws/mcp_server/src/utils → automation/adws/mcp_server/src → automation/adws/mcp_server → automation/adws → automation → [project root]
+  return join(__dirname, '../../../../..');
 }
 
 /**

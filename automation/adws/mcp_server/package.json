@@ -4,11 +4,11 @@
   "description": "MCP server for ADW workflow orchestration",
   "type": "module",
   "scripts": {
-    "dev": "bun run src/index.ts",
+    "dev": "bun --env-file=.env run src/index.ts",
     "build": "bunx tsc",
     "lint": "bunx eslint src/**/*.ts",
-    "test": "bun test tests/integration/*.test.ts",
-    "test:integration": "bun test tests/integration/*.test.ts"
+    "test": "bun --env-file=.env test",
+    "test:integration": "bun --env-file=.env test tests/integration/*.test.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.20.0",
