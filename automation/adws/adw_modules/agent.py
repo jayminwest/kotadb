@@ -76,6 +76,52 @@ def convert_jsonl_to_json(jsonl_file: str) -> str:
     return json_file
 
 
+def setup_mcp_config(cwd: str) -> None:
+    """Generate .mcp.json configuration file for MCP server access.
+
+    Creates a project-scoped MCP configuration in the worktree directory
+    to enable Claude Code agents to connect to the local KotaDB MCP server.
+
+    Args:
+        cwd: Working directory path where .mcp.json will be created.
+             Typically the worktree root directory.
+
+    Environment Variables:
+        MCP_SERVER_URL: URL of the MCP server (default: http://localhost:3000/mcp)
+        KOTA_MCP_API_KEY: API key for authentication (team tier recommended)
+
+    Notes:
+        - Only creates .mcp.json if KOTA_MCP_API_KEY is set
+        - Uses HTTP transport with Bearer token authentication
+        - Configuration is project-scoped (not user-scoped)
+        - File is created in .gitignore'd worktree, so won't be committed
+    """
+    api_key = os.getenv("KOTA_MCP_API_KEY")
+    if not api_key:
+        # MCP integration is optional - skip if API key not configured
+        return
+
+    server_url = os.getenv("MCP_SERVER_URL", "http://localhost:3000/mcp")
+
+    mcp_config = {
+        "mcpServers": {
+            "kotadb": {
+                "type": "http",
+                "url": server_url,
+                "headers": {
+                    "Authorization": f"Bearer {api_key}"
+                }
+            }
+        }
+    }
+
+    config_path = Path(cwd) / ".mcp.json"
+    with open(config_path, "w", encoding="utf-8") as f:
+        json.dump(mcp_config, f, indent=2)
+
+    sys.stdout.write(f"MCP configuration created: {config_path}\n")
+
+
 def get_claude_env(cwd: Optional[str] = None) -> Dict[str, str]:
     """Return the environment variables required for Claude Code execution.
 
@@ -256,6 +302,11 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     output_path = Path(request.output_file)
     output_path.parent.mkdir(parents=True, exist_ok=True)
 
+    # Set up MCP configuration if working directory is specified
+    # This enables Claude Code agents to access KotaDB's code intelligence tools
+    if request.cwd:
+        setup_mcp_config(request.cwd)
+
     cmd = [CLAUDE_PATH, "-p", request.prompt, "--model", request.model, "--output-format", "stream-json", "--verbose"]
     if request.dangerously_skip_permissions:
         cmd.append("--dangerously-skip-permissions")
@@ -348,4 +399,5 @@ __all__ = [
     "prompt_claude_code_with_retry",
     "render_slash_command_prompt",
     "save_prompt",
+    "setup_mcp_config",
 ]

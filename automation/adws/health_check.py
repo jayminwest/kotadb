@@ -4,6 +4,7 @@
 # dependencies = [
 #     "python-dotenv",
 #     "pydantic",
+#     "httpx",
 # ]
 # ///
 
@@ -20,10 +21,11 @@ import tempfile
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
+import httpx
 from pydantic import BaseModel
 
-from github import extract_repo_path, get_repo_url, make_issue_comment
-from utils import load_adw_env
+from adws.adw_modules.github import extract_repo_path, get_repo_url, make_issue_comment
+from adws.adw_modules.utils import load_adw_env
 
 load_adw_env()
 
@@ -179,6 +181,96 @@ def check_claude_code() -> CheckResult:
     return CheckResult(success=output == "4", details={"response": output})
 
 
+def check_mcp_server() -> CheckResult:
+    """Validate MCP server connectivity and tool availability.
+
+    Tests the KotaDB MCP server by making a JSON-RPC 2.0 tools/list request.
+    Requires KOTA_MCP_API_KEY and MCP_SERVER_URL environment variables.
+
+    Returns:
+        CheckResult with success=True if server is reachable and tools are available
+    """
+    api_key = os.getenv("KOTA_MCP_API_KEY")
+    if not api_key:
+        return CheckResult(
+            success=False,
+            error="KOTA_MCP_API_KEY environment variable not set",
+            details={"configured": False},
+        )
+
+    server_url = os.getenv("MCP_SERVER_URL", "http://localhost:3000/mcp")
+
+    # JSON-RPC 2.0 request for tools/list
+    jsonrpc_request = {"jsonrpc": "2.0", "method": "tools/list", "id": 1}
+
+    try:
+        with httpx.Client(timeout=5.0) as client:
+            response = client.post(
+                server_url,
+                json=jsonrpc_request,
+                headers={"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"},
+            )
+
+        if response.status_code == 401:
+            return CheckResult(
+                success=False,
+                error="MCP server authentication failed (invalid API key)",
+                details={"server_url": server_url, "status_code": 401},
+            )
+
+        if response.status_code != 200:
+            return CheckResult(
+                success=False,
+                error=f"MCP server returned status {response.status_code}",
+                details={"server_url": server_url, "status_code": response.status_code},
+            )
+
+        data = response.json()
+
+        # Check for JSON-RPC error response
+        if "error" in data:
+            return CheckResult(
+                success=False,
+                error=f"MCP server error: {data['error'].get('message', 'Unknown error')}",
+                details={"server_url": server_url, "error_code": data["error"].get("code")},
+            )
+
+        # Extract tools from result
+        result = data.get("result", {})
+        tools = result.get("tools", [])
+        tool_names = [tool.get("name") for tool in tools if "name" in tool]
+
+        return CheckResult(
+            success=bool(tool_names),
+            warning="No tools available from MCP server" if not tool_names else None,
+            details={
+                "server_url": server_url,
+                "tool_count": len(tool_names),
+                "tools": tool_names,
+                "configured": True,
+            },
+        )
+
+    except httpx.ConnectError:
+        return CheckResult(
+            success=False,
+            error=f"Cannot connect to MCP server at {server_url}",
+            details={"server_url": server_url, "error_type": "connection_refused"},
+        )
+    except httpx.TimeoutException:
+        return CheckResult(
+            success=False,
+            error=f"MCP server request timed out ({server_url})",
+            details={"server_url": server_url, "error_type": "timeout"},
+        )
+    except Exception as exc:  # noqa: BLE001
+        return CheckResult(
+            success=False,
+            error=f"MCP server check failed: {exc}",
+            details={"server_url": server_url, "error_type": type(exc).__name__},
+        )
+
+
 def run_checks(selected: List[str]) -> Dict[str, CheckResult]:
     registry = {
         "env": check_env_vars,
@@ -186,6 +278,7 @@ def run_checks(selected: List[str]) -> Dict[str, CheckResult]:
         "toolchain": check_bun_toolchain,
         "github": check_github_cli,
         "claude": check_claude_code,
+        "mcp": check_mcp_server,
     }
     results: Dict[str, CheckResult] = {}
     for name in selected:
@@ -201,14 +294,14 @@ def main(argv: List[str] | None = None) -> int:
     parser.add_argument(
         "checks",
         nargs="*",
-        choices=["env", "git", "toolchain", "github", "claude", "all"],
+        choices=["env", "git", "toolchain", "github", "claude", "mcp", "all"],
         help="Checks to execute",
     )
     parser.add_argument("--json", action="store_true", help="Emit JSON output")
     parser.add_argument("--issue", help="Optional GitHub issue number for posting results")
     args = parser.parse_args(argv)
 
-    default_checks = ["env", "git", "toolchain", "github", "claude"]
+    default_checks = ["env", "git", "toolchain", "github", "claude", "mcp"]
     targets = default_checks if not args.checks or "all" in args.checks else args.checks
     results = run_checks(targets)
 

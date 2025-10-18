@@ -306,6 +306,124 @@ cd automation && uv sync && uv run pytest adws/adw_tests/ -v --tb=short
 
 ---
 
+## MCP Integration
+
+**Feature #69: Connect Automation Agents to MCP Server**
+
+ADW automation agents can connect to the local KotaDB MCP server to access code intelligence tools during workflow execution. This enables agents to search indexed code, trigger repository indexing, and query recent file changes—enhancing context awareness during plan and build phases.
+
+### Setup
+
+1. **Generate Automation API Key** (team tier for 10,000 req/hr rate limit):
+   ```bash
+   cd app && bun scripts/generate-automation-key.ts
+   ```
+
+2. **Configure Environment Variables**:
+   Add the generated API key to `automation/adws/.env`:
+   ```bash
+   # MCP (Model Context Protocol) integration
+   MCP_SERVER_URL=http://localhost:3000/mcp
+   KOTA_MCP_API_KEY=kota_team_<key_id>_<secret>
+   ```
+
+3. **Start MCP Server** (in separate terminal):
+   ```bash
+   cd app && bun run src/index.ts
+   ```
+
+4. **Verify Connectivity**:
+   ```bash
+   uv run adws/health_check.py mcp --json
+   ```
+
+### How It Works
+
+The ADW system automatically configures Claude Code agents to connect to the MCP server when both:
+- `KOTA_MCP_API_KEY` environment variable is set
+- Agent execution uses worktree-based isolation (`cwd` parameter set)
+
+**Automatic Configuration Flow**:
+1. Before executing Claude Code CLI, `agent.py` creates a `.mcp.json` file in the worktree directory
+2. Configuration includes HTTP transport with Bearer token authentication
+3. Claude Code discovers the project-scoped MCP config and connects to the server
+4. Agents gain access to three MCP tools: `search_code`, `index_repository`, `list_recent_files`
+
+**Manual Configuration** (for interactive Claude Code sessions):
+Create `.mcp.json` in your project directory:
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Authorization": "Bearer YOUR_API_KEY_HERE"
+      }
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+When connected, agents can invoke:
+
+- `search_code` — Full-text search across indexed repositories
+- `index_repository` — Trigger indexing of a repository before building features
+- `list_recent_files` — Query recently indexed files for context discovery
+
+### Health Check
+
+The `mcp` health check validates server connectivity and tool availability:
+```bash
+# Run MCP health check only
+uv run adws/health_check.py mcp
+
+# Include MCP in full health check
+uv run adws/health_check.py all --json
+```
+
+**Health Check Validations**:
+- `KOTA_MCP_API_KEY` environment variable is set
+- MCP server is reachable at configured URL
+- Authentication succeeds (valid API key)
+- MCP tools are available (`tools/list` JSON-RPC request)
+
+**Common Errors**:
+- `KOTA_MCP_API_KEY environment variable not set` — Configure API key in `.env`
+- `Cannot connect to MCP server` — Start the MCP server (`cd app && bun run src/index.ts`)
+- `MCP server authentication failed` — Generate new API key or check for typos
+- `No tools available from MCP server` — Server started but tools not registered (restart server)
+
+### Rate Limiting
+
+Team tier API keys provide **10,000 requests per hour** (shared across all automation workflows). Monitor rate limit headers in logs:
+- `X-RateLimit-Limit`: Total requests allowed per hour
+- `X-RateLimit-Remaining`: Requests remaining in current window
+- `X-RateLimit-Reset`: Unix timestamp when limit resets
+
+If rate limits are exceeded, the health check will report 429 status codes and workflows may fail mid-execution. Consider workflow-specific rate budgets if approaching limits during heavy automation periods.
+
+### Troubleshooting
+
+**MCP tools not appearing in Claude Code sessions**:
+- Verify `.mcp.json` exists in project directory (check worktree path)
+- Confirm MCP server is running and accessible (`curl http://localhost:3000/mcp`)
+- Check health_check.py output for connectivity errors
+
+**Authentication failures**:
+- Regenerate automation API key and update `.env`
+- Verify API key format matches `kota_team_<key_id>_<secret>`
+- Check MCP server logs for authentication errors
+
+**Worktree isolation issues**:
+- MCP config is created in worktree root, not repository root
+- Verify `cwd` parameter is set when calling `prompt_claude_code()`
+- Inspect worktree directory for `.mcp.json` file after agent execution
+
+---
+
 ## Logs & State
 
 Run metadata is rooted at `logs/kota-db-ts/<env>/<adw_id>/`:
@@ -325,6 +443,7 @@ Persistent automation state lands in `agents/<adw_id>/adw_state.json` (branch, p
 | Bun/TypeScript   | Application layer: `cd ../app && bun run lint`, `bun test`, etc.     |
 | GitHub CLI       | `gh auth login` or `GITHUB_PAT`                                       |
 | Claude Code CLI  | `CLAUDE_CODE_PATH` (defaults to `claude`)                             |
+| MCP Server (optional) | KotaDB MCP server for code intelligence tools: `KOTA_MCP_API_KEY`, `MCP_SERVER_URL` |
 | Environment vars | `ANTHROPIC_API_KEY`, optional `E2B_API_KEY`, `ADW_ENV`, log overrides |
 
 Dotenv loading order: repository `.env` ➜ `ADW_ENV_FILE` (if set) ➜ `adws/.env*`.
