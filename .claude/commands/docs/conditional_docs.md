@@ -224,6 +224,16 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When troubleshooting ADW observability, metrics calculation, or report generation
     - When extending analysis to include agent state introspection from `automation/agents/`
 
+- docs/specs/feature-163-enable-adw-metrics-workflow.md
+  - Conditions:
+    - When working on issue #163 or enabling the ADW Metrics Analysis workflow
+    - When troubleshooting scheduled workflow execution (GitHub Actions cron)
+    - When workflow exists on develop but not on main (default branch requirement)
+    - When validating metrics artifact upload and GitHub Step Summary rendering
+    - When testing alert threshold logic or GitHub issue creation
+    - When documenting baseline ADW metrics or success rate targets
+    - When understanding workflow dependency on automation infrastructure
+
 - .claude/commands/docs/issue-relationships.md
   - Conditions:
     - When creating or updating spec files with relationship metadata (`## Issue Relationships` section)

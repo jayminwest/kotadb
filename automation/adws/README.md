@@ -145,6 +145,97 @@ if checkpoint_file:
 
 ---
 
+## ADW Observability
+
+The ADW Metrics Analysis workflow provides automated observability into ADW success rates and failure patterns through daily log analysis and metrics collection.
+
+### Metrics Workflow
+
+**Schedule**: Daily at 00:00 UTC (configured in `.github/workflows/adw-metrics.yml`)
+**Manual Trigger**: Available via GitHub Actions workflow dispatch
+
+The workflow analyzes execution logs and agent state to generate:
+- Success rate metrics and temporal trends
+- Phase progression funnels (plan → build → review)
+- Failure distribution by phase and root cause
+- Issue-level outcome tracking
+- Worktree staleness detection (>7 days)
+
+### Viewing Metrics
+
+```bash
+# List recent workflow runs
+gh run list --workflow="ADW Metrics Analysis" --limit 5
+
+# View latest metrics in GitHub Actions UI
+gh run view --workflow="ADW Metrics Analysis" --web
+
+# Download metrics artifact from specific run
+gh run download <run_id> -n adw-metrics-<run_number>
+
+# Parse metrics JSON
+jq '.summary' automation/metrics.json
+```
+
+### Manual Analysis
+
+Run log analysis locally without triggering the CI workflow:
+
+```bash
+# Analyze last 24 hours (default)
+uv run automation/adws/scripts/analyze_logs.py --format text
+
+# JSON output for programmatic parsing
+uv run automation/adws/scripts/analyze_logs.py --format json --hours 48
+
+# Markdown report to file
+uv run automation/adws/scripts/analyze_logs.py --format markdown --output file --output-file report.md
+
+# Analyze specific environment
+uv run automation/adws/scripts/analyze_logs.py --env staging
+```
+
+### Alert Thresholds
+
+The workflow automatically creates GitHub issues when metrics indicate problems:
+
+- **50% success rate**: Investigation recommended (automatic issue comment)
+- **20% success rate**: Critical threshold (workflow fails)
+
+Alert issues are labeled with `automation`, `alert`, and `priority:high` for easy filtering:
+
+```bash
+# Check for active alerts
+gh issue list --label automation,alert --state open
+```
+
+### Baseline Metrics
+
+**Target Success Rate**: >80% (per 3-phase architecture goals from PR #136)
+
+Expected failure modes to monitor:
+- Plan phase failures: Issue classification errors, spec generation issues
+- Build phase failures: Implementation errors, commit/push failures, PR creation issues
+- Review phase failures: Spec file not found, Claude Code review errors
+
+### Artifacts
+
+Metrics artifacts are uploaded with 90-day retention:
+- **Format**: JSON
+- **Location**: GitHub Actions artifacts (`adw-metrics-<run_number>`)
+- **Retention**: 90 days
+- **Schema**: `{summary: {success_rate, total_runs, ...}, runs: [...], phase_reaches: {...}, failure_phases: {...}}`
+
+### GitHub Step Summary
+
+Each workflow run renders a markdown summary visible in the GitHub Actions UI:
+- Success rate and run counts
+- Phase funnel visualization
+- Top failure patterns
+- Stale worktree warnings
+
+---
+
 ## Tests
 
 The beginnings of an automated regression suite lives under `adws/adw_tests/`:

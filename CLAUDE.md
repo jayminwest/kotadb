@@ -259,6 +259,16 @@ The agentic layer operates on the application layer (in `app/`) to automate deve
   - CI integration via `.github/workflows/adw-metrics.yml` (daily analysis with alerting)
   - Key metrics: success rate, phase progression, worktree staleness, failure patterns by phase
   - Usage: `uv run automation/adws/scripts/analyze_logs.py --format json --hours 24`
+- **ADW Metrics Analysis Workflow** (`.github/workflows/adw-metrics.yml`):
+  - **Schedule**: Runs daily at 00:00 UTC for automated metrics collection
+  - **Manual Trigger**: Available via `gh workflow run "ADW Metrics Analysis" --ref main`
+  - **Outputs**: JSON metrics artifact + markdown summary in GitHub Step Summary
+  - **Alerting**: Creates/updates GitHub issue when success rate < 50%
+  - **Critical Threshold**: Workflow fails if success rate < 20%
+  - **Artifacts**: 90-day retention for historical tracking
+  - **Target Success Rate**: >80% (per 3-phase architecture goals)
+  - View runs: `gh run list --workflow="ADW Metrics Analysis" --limit 5`
+  - Download metrics: `gh run download <run_id> -n adw-metrics-<run_number>`
 
 ### GitHub Issue Management and Relationship Standards
 
