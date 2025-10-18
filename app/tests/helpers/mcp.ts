@@ -116,7 +116,7 @@ export function assertToolResult(
 
 	for (const [field, type] of Object.entries(expectedFields)) {
 		expect(result).toHaveProperty(field);
-		expect(typeof result[field]).toBe(type);
+		expect(typeof result[field]).toBe(type as any);
 	}
 }
 

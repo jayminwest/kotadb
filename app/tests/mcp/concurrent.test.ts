@@ -236,10 +236,16 @@ describe("MCP Concurrency", () => {
 		);
 
 		// Wait for all to complete
-		const [_, __, searchResponse] = await Promise.all([
+		const results = await Promise.all([
 			...indexPromises,
 			searchPromise,
 		]);
+
+		// Search response is the last item
+		const searchResponse = results[results.length - 1];
+		if (!searchResponse) {
+			throw new Error("Search response not found");
+		}
 
 		// Search should succeed even with concurrent indexing
 		expect(searchResponse.status).toBe(200);
