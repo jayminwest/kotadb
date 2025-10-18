@@ -252,8 +252,8 @@ def main() -> None:
 
         make_issue_comment(
             issue_number,
-            f"{format_issue_message(adw_id, 'ops', '✅ Starting validation run')}\\n"
-            f"Commands:\\n" + "\\n".join(f"- `{entry['cmd']}`" for entry in serialized_commands),
+            f"{format_issue_message(adw_id, 'ops', '✅ Starting validation run')}\n"
+            f"Commands:\n" + "\n".join(f"- `{entry['cmd']}`" for entry in serialized_commands),
         )
 
         # Check if agent resolution is enabled (default: true)
@@ -337,7 +337,7 @@ def main() -> None:
 
                 make_issue_comment(
                     issue_number,
-                    f"{format_issue_message(adw_id, 'ops', '❌ Validation command failed')}\\n\\n{error_message}",
+                    f"{format_issue_message(adw_id, 'ops', '❌ Validation command failed')}\n\n{error_message}",
                 )
 
             logger.error("Validation run failed")
@@ -349,7 +349,7 @@ def main() -> None:
         )
         make_issue_comment(
             issue_number,
-            f"{format_issue_message(adw_id, 'ops', '📋 Test phase state')}\\n```json\\n{json.dumps(state.data, indent=2)}\\n```",
+            f"{format_issue_message(adw_id, 'ops', '📋 Test phase state')}\n```json\n{json.dumps(state.data, indent=2)}\n```",
         )
         logger.info("Validation completed successfully")
 

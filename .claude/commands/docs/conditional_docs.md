@@ -273,3 +273,20 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When issues are superseded by architectural changes or refactors
     - When generating audit reports for maintainer review before bulk closures
     - When updating spec files or epic tracking after closing related issues
+
+- .claude/commands/workflows/orchestrator.md
+  - Conditions:
+    - When needing to automate the full end-to-end issue-to-PR workflow
+    - When understanding orchestrator vs manual workflow trade-offs
+    - When working on multi-phase workflow automation
+    - When implementing slash commands that coordinate sub-agents
+    - When troubleshooting orchestrator state or checkpoint recovery
+    - When understanding how MCP Tasks API integrates with workflow orchestration
+
+- docs/specs/feature-187-orchestrator-slash-command.md
+  - Conditions:
+    - When working on issue #187 or implementing `/orchestrator` slash command
+    - When modifying orchestrator workflow logic or phase coordination
+    - When understanding orchestrator state schema and checkpoint structure
+    - When debugging orchestrator execution or sub-agent spawning issues
+    - When extending orchestrator with new phases or error handling patterns

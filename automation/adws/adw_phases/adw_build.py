@@ -168,7 +168,7 @@ def main() -> None:
         state.save()
         make_issue_comment(
             issue_number,
-            f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\\n```json\\n{json.dumps(state.data, indent=2)}\\n```",
+            f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\n```json\n{json.dumps(state.data, indent=2)}\n```",
         )
         make_issue_comment(
             issue_number,
@@ -238,7 +238,7 @@ def main() -> None:
     state.save()
     make_issue_comment(
         issue_number,
-        f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\\n```json\\n{json.dumps(state.data, indent=2)}\\n```",
+        f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\n```json\n{json.dumps(state.data, indent=2)}\n```",
     )
     make_issue_comment(
         issue_number,
