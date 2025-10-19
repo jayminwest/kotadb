@@ -172,3 +172,95 @@ export async function createTestRepository(overrides?: {
 
 	return repoId;
 }
+
+/**
+ * Reset rate limit counters for test isolation
+ *
+ * Deletes rate limit counter records from the database. Can target a specific API key
+ * or reset all counters if no keyId is provided.
+ *
+ * @param keyId - Optional API key ID to reset. If omitted, resets all counters.
+ * @returns Count of deleted counter records (0 if none existed)
+ *
+ * @example
+ * // Clean up after individual test
+ * afterEach(async () => {
+ *   await resetRateLimitCounters(testKeyId);
+ * });
+ *
+ * @example
+ * // Global cleanup in test suite
+ * afterAll(async () => {
+ *   await resetRateLimitCounters(); // Reset all counters
+ * });
+ *
+ * Note: Compatible with CI environment (respects dynamic ports from .env.test)
+ */
+export async function resetRateLimitCounters(
+	keyId?: string,
+): Promise<number> {
+	const client = getSupabaseTestClient();
+
+	let query = client.from("rate_limit_counters").delete({ count: "exact" });
+
+	if (keyId) {
+		query = query.eq("key_id", keyId);
+	}
+
+	const { error, count } = await query;
+
+	if (error) {
+		throw new Error(
+			`Failed to reset rate limit counters: ${error.message || JSON.stringify(error)}`,
+		);
+	}
+
+	return count || 0;
+}
+
+/**
+ * Get current rate limit status for an API key
+ *
+ * Retrieves the rate limit counter state for debugging and test assertions.
+ * Returns null if no counter exists (key has not been rate limited yet).
+ *
+ * @param keyId - API key ID to inspect
+ * @returns Counter state with request_count, window_start, and created_at, or null
+ *
+ * @example
+ * // Inspect counter state during test
+ * const status = await getRateLimitStatus(testKeyId);
+ * if (status) {
+ *   console.log(`Key has made ${status.request_count} requests`);
+ *   console.log(`Window started at ${status.window_start}`);
+ * }
+ *
+ * @example
+ * // Assert counter state in test
+ * const status = await getRateLimitStatus(testKeyId);
+ * expect(status).not.toBeNull();
+ * expect(status?.request_count).toBe(50);
+ *
+ * Note: Compatible with CI environment (respects dynamic ports from .env.test)
+ */
+export async function getRateLimitStatus(keyId: string): Promise<{
+	request_count: number;
+	window_start: string;
+	created_at: string;
+} | null> {
+	const client = getSupabaseTestClient();
+
+	const { data, error } = await client
+		.from("rate_limit_counters")
+		.select("request_count, window_start, created_at")
+		.eq("key_id", keyId)
+		.maybeSingle();
+
+	if (error) {
+		throw new Error(
+			`Failed to get rate limit status: ${error.message || JSON.stringify(error)}`,
+		);
+	}
+
+	return data;
+}

@@ -13,18 +13,12 @@
 
 import { beforeEach, describe, expect, it } from "bun:test";
 import { enforceRateLimit } from "@auth/rate-limit";
-import { getServiceClient } from "@db/client";
+import { resetRateLimitCounters } from "../helpers/db";
 
 describe("Rate Limiting", () => {
 	// Use unique key IDs per test to avoid interference
 	function generateTestKeyId(): string {
 		return `test_key_${crypto.randomUUID().slice(0, 16)}`;
-	}
-
-	// Helper to clean up rate limit counters for a key
-	async function cleanupRateLimitCounter(keyId: string) {
-		const supabase = getServiceClient();
-		await supabase.from("rate_limit_counters").delete().eq("key_id", keyId);
 	}
 
 	describe("enforceRateLimit", () => {
@@ -40,7 +34,7 @@ describe("Rate Limiting", () => {
 			expect(result.resetAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
 			expect(result.retryAfter).toBeUndefined();
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("increments counter correctly for subsequent requests", async () => {
@@ -59,7 +53,7 @@ describe("Rate Limiting", () => {
 			expect(result3.allowed).toBe(true);
 			expect(result3.remaining).toBe(97);
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("allows request at exact limit (100th request for free tier)", async () => {
@@ -77,7 +71,7 @@ describe("Rate Limiting", () => {
 			expect(result.remaining).toBe(0);
 			expect(result.retryAfter).toBeUndefined();
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("denies request when limit exceeded", async () => {
@@ -97,7 +91,7 @@ describe("Rate Limiting", () => {
 			expect(result.retryAfter).toBeGreaterThan(0);
 			expect(result.retryAfter).toBeLessThanOrEqual(3600);
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("handles different tier limits correctly", async () => {
@@ -117,9 +111,9 @@ describe("Rate Limiting", () => {
 			expect(teamResult.limit).toBe(10000);
 			expect(teamResult.remaining).toBe(9999);
 
-			await cleanupRateLimitCounter(freeKeyId);
-			await cleanupRateLimitCounter(soloKeyId);
-			await cleanupRateLimitCounter(teamKeyId);
+			await resetRateLimitCounters(freeKeyId);
+			await resetRateLimitCounters(soloKeyId);
+			await resetRateLimitCounters(teamKeyId);
 		});
 
 		it("maintains separate counters for different keys", async () => {
@@ -144,8 +138,8 @@ describe("Rate Limiting", () => {
 			const result2 = await enforceRateLimit(keyId2, rateLimitPerHour);
 			expect(result2.remaining).toBe(94); // 6th request
 
-			await cleanupRateLimitCounter(keyId1);
-			await cleanupRateLimitCounter(keyId2);
+			await resetRateLimitCounters(keyId1);
+			await resetRateLimitCounters(keyId2);
 		});
 
 		it("calculates reset timestamp within current hour window", async () => {
@@ -162,7 +156,7 @@ describe("Rate Limiting", () => {
 
 			expect(result.resetAt).toBe(expectedResetAt);
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("handles concurrent requests without race conditions", async () => {
@@ -185,7 +179,7 @@ describe("Rate Limiting", () => {
 			const finalResult = await enforceRateLimit(keyId, rateLimitPerHour);
 			expect(finalResult.remaining).toBe(100 - concurrentRequests - 1);
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("returns consistent resetAt across multiple requests in same window", async () => {
@@ -200,7 +194,7 @@ describe("Rate Limiting", () => {
 			expect(result1.resetAt).toBe(result2.resetAt);
 			expect(result2.resetAt).toBe(result3.resetAt);
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("calculates retryAfter correctly when limit exceeded", async () => {
@@ -222,7 +216,7 @@ describe("Rate Limiting", () => {
 			// retryAfter should be less than or equal to 1 hour (3600 seconds)
 			expect(result.retryAfter).toBeLessThanOrEqual(3600);
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 
 		it("enforces limit correctly near boundary (99, 100, 101 requests)", async () => {
@@ -250,7 +244,7 @@ describe("Rate Limiting", () => {
 			expect(result101.remaining).toBe(0);
 			expect(result101.retryAfter).toBeDefined();
 
-			await cleanupRateLimitCounter(keyId);
+			await resetRateLimitCounters(keyId);
 		});
 	});
 

@@ -8,12 +8,15 @@
  * - Eliminates need for manual `export $(grep -v '^#' .env.test | xargs)` before tests
  * - Ensures local development matches CI behavior
  * - Provides fallback to default values if .env.test doesn't exist
+ * - Provides global cleanup hooks for test isolation
  *
  * Usage: bun test --preload ./tests/setup.ts
  */
 
+import { afterEach } from "bun:test";
 import { existsSync, readFileSync } from "node:fs";
 import { resolve } from "node:path";
+import { resetRateLimitCounters } from "./helpers/db";
 
 const ENV_TEST_PATH = resolve(import.meta.dir, "../.env.test");
 
@@ -73,3 +76,27 @@ function loadEnvTest(): void {
 
 // Execute setup
 loadEnvTest();
+
+/**
+ * Global test cleanup hooks
+ *
+ * Reset rate limit counters after each test to prevent state leakage
+ * between tests. This provides an additional safety net beyond per-test
+ * cleanup in individual test files.
+ *
+ * Benefits:
+ * - Prevents 429 rate limit errors in subsequent tests
+ * - Ensures test isolation even if individual tests forget cleanup
+ * - Reduces flakiness in CI environments with concurrent test runs
+ */
+afterEach(async () => {
+	try {
+		await resetRateLimitCounters();
+	} catch (error) {
+		// Silently ignore cleanup errors - fail-safe pattern
+		// Tests that depend on rate limit state will fail explicitly
+		if (process.env.DEBUG === "1") {
+			console.warn("[Test Cleanup] Failed to reset rate limit counters:", error);
+		}
+	}
+});
