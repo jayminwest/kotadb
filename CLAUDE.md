@@ -10,7 +10,26 @@ KotaDB is a lightweight HTTP API service for indexing and searching code reposit
 
 All commands should be run from the `app/` directory.
 
-### Running the application
+### Quick Start (Recommended)
+```bash
+cd app && ./scripts/dev-start.sh            # Start Supabase + API server
+cd app && ./scripts/dev-start.sh --web      # Start Supabase + API + web app
+cd app && ./scripts/dev-start.sh --mcp-start --adws-mcp-start  # Include MCP servers
+```
+
+The `dev-start.sh` script automates:
+- Supabase container lifecycle (stop existing, start fresh)
+- `.env` file generation with correct Supabase credentials
+- Dependency installation (if `node_modules/` missing)
+- API server startup with health check validation
+- Optional web app startup (`--web` flag)
+- Optional MCP server startup (`--mcp-start` flag)
+- Optional ADW MCP server startup (`--adws-mcp-start` flag)
+- Graceful cleanup on Ctrl+C (kills all background processes)
+
+Press Ctrl+C to stop all services.
+
+### Manual Server Startup
 ```bash
 cd app && bun run src/index.ts              # Start server (default port 3000)
 cd app && PORT=4000 bun run src/index.ts    # Start with custom port

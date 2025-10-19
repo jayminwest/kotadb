@@ -38,6 +38,14 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When understanding GitHub issue relationship standards and prioritization workflow (see "GitHub Issue Management and Relationship Standards" section)
     - When working on issue dependency graphs or relationship documentation
 
+- docs/specs/chore-195-dev-start-script.md
+  - Conditions:
+    - When troubleshooting development environment setup issues
+    - When user asks about starting Supabase, configuring .env, or local development workflow
+    - When debugging port conflicts, container lifecycle, or API server health checks
+    - When needing to understand automated dev environment script behavior
+    - When explaining how to start web app or MCP servers alongside API server
+
 - docs/supabase-setup.md
   - Conditions:
     - When integrating or troubleshooting Supabase services, keys, or environment variables
