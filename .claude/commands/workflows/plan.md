@@ -97,9 +97,9 @@ Recommended sequence for executing changes:
 ## Validation Commands
 
 Commands to run after implementation:
-- Level 1: `bun run lint`, `bunx tsc --noEmit`
-- Level 2: Add `bun test --filter integration`
-- Level 3: Add full `bun test`, `bun run build`
+- Level 1: `cd app && bun run lint`, `cd app && bunx tsc --noEmit`
+- Level 2: Add `cd app && bun test:setup`, `cd app && bun test --filter integration`, `cd app && bun test:teardown || true`
+- Level 3: Add `cd app && bun test:setup`, `cd app && bun test --filter integration`, `cd app && bun test`, `cd app && bun test:teardown || true`, `cd app && bun run build`
 ```
 
 ## CRITICAL: Output Format Requirements

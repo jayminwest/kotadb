@@ -19,10 +19,27 @@ Baseline expectations for KotaDB’s anti-mock testing philosophy. Call this com
 3. Cover success + failure paths using real clients. If Supabase is unreachable, mark the test `skip` with an inline `TODO` referencing the follow-up issue.
 4. Record validation evidence that proves real integrations were exercised (command output, Supabase logs, etc.).
 
+## Test Environment Lifecycle
+
+**All tests require a running Supabase Local stack.** Slash commands that execute tests MUST follow the standard lifecycle pattern:
+
+1. **Verify Docker availability** before attempting setup
+2. **Run `bun test:setup`** to start Supabase containers (idempotent - safe to run multiple times)
+3. **Execute tests** with `bun test` or `bun test --filter integration`
+4. **Run `bun test:teardown || true`** for cleanup (required in CI, optional in local dev)
+
+**Why this matters:**
+- Tests fail with cryptic connection errors if containers aren't running
+- Pipe operators (`bun test | grep`) hang indefinitely due to Bun's multi-stream output
+- Setup scripts are idempotent and check for existing containers before recreating
+
+**Reference**: See `.claude/commands/docs/test-lifecycle.md` for complete setup patterns, Docker prerequisite checks, troubleshooting guide, and anti-patterns to avoid.
+
 ## Troubleshooting
 - **Supabase downtime**: pause implementation and escalate. Do not introduce mocks as a workaround.
 - **Slow suites**: scope with focused filters locally, but ensure full integration suites run before finishing the task.
 - **Secrets rotation**: coordinate with platform team; update `.env.example` and note recovery steps in PR description.
+- **Connection errors**: Run `cd app && bun test:setup` to start Supabase containers before running tests.
 
 ## Reporting Expectations
 - Call out which real-service suites ran in `/pull_request` and `/pr-review` outputs.

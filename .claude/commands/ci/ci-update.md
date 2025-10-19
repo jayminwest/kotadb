@@ -14,7 +14,15 @@ Implement approved CI improvements. Provide reference ID via `$ARGUMENTS` (issue
 4. Maintain git hygiene: stage intentionally (`git add --patch`) and keep commits atomic with Conventional Commit subjects referencing the issue.
 
 ## Validation
-- Run **Level 2** from `/validate-implementation` (`bun run lint`, `bun run typecheck`, `bun test`); escalate to **Level 3** if build or deployment scripts change.
+- Run **Level 2** from `/validate-implementation` (requires Docker + Supabase Local); escalate to **Level 3** if build or deployment scripts change.
+- Level 2 commands:
+  ```bash
+  cd app && bun run lint
+  cd app && bunx tsc --noEmit
+  cd app && bun test:setup
+  cd app && bun test --filter integration
+  cd app && bun test:teardown || true
+  ```
 - Execute workflow-focused validation: `gh workflow run <name> --ref <branch>` or local dry-runs where feasible.
 - Re-check `git status --short` and `git diff --stat` after edits.
 - Push the CI branch (`git push -u origin <branch>`) and invoke `/pull_request <branch> <issue_json> <plan_path> <adw_id>` so reviewers can assess the changes; PR titles must end with the issue number (e.g. `chore: harden ci cache (#210)`).

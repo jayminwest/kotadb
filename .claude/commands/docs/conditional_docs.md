@@ -101,6 +101,15 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When touching infrastructure, data access layers, or background jobs where mocks might be tempting
     - When validation requires Supabase or other third-party integrations
 
+- .claude/commands/docs/test-lifecycle.md
+  - Conditions:
+    - When writing or modifying slash commands that run tests (`bun test`, `bun test --filter integration`)
+    - When troubleshooting test failures related to Supabase connection errors
+    - When understanding Docker prerequisite checks for test environment setup
+    - When implementing validation workflows that execute test suites
+    - When debugging commands that hang (pipe operators with bun test)
+    - When adding error handling for missing Docker or stopped containers
+
 - docs/testing-setup.md
   - Conditions:
     - When setting up local testing environment with Supabase local instance
