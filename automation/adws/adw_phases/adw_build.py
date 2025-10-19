@@ -41,6 +41,32 @@ from adws.adw_modules.workflow_ops import (
 )
 
 
+def get_changed_files_count(worktree_path: Path) -> int:
+    """Count the number of changed files in the worktree.
+
+    Args:
+        worktree_path: Path to worktree directory
+
+    Returns:
+        Number of modified, added, or deleted files
+    """
+    import subprocess
+
+    result = subprocess.run(
+        ["git", "status", "--porcelain"],
+        capture_output=True,
+        text=True,
+        cwd=worktree_path,
+    )
+
+    if result.returncode != 0:
+        return 0
+
+    # Count non-empty lines (each line represents a changed file)
+    changed_files = [line for line in result.stdout.splitlines() if line.strip()]
+    return len(changed_files)
+
+
 def check_env(logger: logging.Logger) -> None:
     """Ensure required environment variables and executables are present."""
 
@@ -147,16 +173,20 @@ def main() -> None:
             )
             sys.exit(1)
 
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Solution implemented"),
-        )
+        # Don't post "Solution implemented" yet - wait to check if changes were made
+        logger.info("Implementation agent completed, checking for changes...")
 
         issue_command = state.issue_class
         if not issue_command:
             start_time = time.time()
             issue_command, error = classify_issue(issue, adw_id, logger)
             metrics.record_agent_invocation(duration=time.time() - start_time)
+
+            # Handle out-of-scope classification (graceful skip - not an error)
+            if error is None and issue_command is None:
+                logger.info("Issue classified as out-of-scope, exiting gracefully")
+                sys.exit(0)
+
             if error or not issue_command:
                 logger.warning(f"Classification unavailable, defaulting to /feature: {error}")
                 issue_command = "/feature"  # type: ignore[assignment]
@@ -171,7 +201,7 @@ def main() -> None:
             logger.info("No changes detected - implementation already complete or no modifications needed")
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, AGENT_IMPLEMENTOR, "ℹ️ No changes needed - implementation already complete"),
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, "⏭️ No implementation needed (test issue or already complete)"),
             )
             # Skip commit, push, and PR creation since there's nothing to commit
             state.save()
@@ -214,16 +244,28 @@ def main() -> None:
             )
             sys.exit(1)
 
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed"),
-        )
+        # Post outcome-specific message with file count
+        changed_count = get_changed_files_count(worktree_path)
+        if changed_count > 0:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"✅ Implementation complete ({changed_count} files changed)"),
+            )
+        else:
+            # This shouldn't happen (we already checked has_changes), but handle gracefully
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed"),
+            )
 
         # Track git operation: push_branch
         start_time = time.time()
-        pushed, push_error = git_ops.push_branch(state.worktree_name, cwd=worktree_path)
+        push_result = git_ops.push_branch(state.worktree_name, cwd=worktree_path)
         metrics.record_git_operation(duration=time.time() - start_time)
+        pushed = push_result["success"]
+
         if not pushed:
+            push_error = push_result["error_message"]
             logger.error(f"Branch push failed: {push_error}")
             make_issue_comment(
                 issue_number,
@@ -261,11 +303,21 @@ def main() -> None:
             issue_number,
             f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\n```json\n{json.dumps(state.data, indent=2)}\n```",
         )
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", "✅ Build phase completed"),
-        )
-        logger.info("Build phase completed successfully")
+
+        # Final message with outcome summary
+        if changed_count > 0:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", f"✅ Build phase completed ({changed_count} files changed)"),
+            )
+            logger.info(f"Build phase completed successfully ({changed_count} files changed)")
+        else:
+            # Fallback if count couldn't be determined (shouldn't happen in normal flow)
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", "✅ Build phase completed"),
+            )
+            logger.info("Build phase completed successfully")
 
 
 if __name__ == "__main__":

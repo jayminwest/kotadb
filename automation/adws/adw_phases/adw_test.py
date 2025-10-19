@@ -238,6 +238,12 @@ def main() -> None:
             start_time = time.time()
             issue_command, error = classify_issue(issue, adw_id, logger)
             metrics.record_agent_invocation(duration=time.time() - start_time)
+
+            # Handle out-of-scope classification (graceful skip - not an error)
+            if error is None and issue_command is None:
+                logger.info("Issue classified as out-of-scope, exiting gracefully")
+                sys.exit(0)
+
             if issue_command:
                 state.update(issue_class=issue_command)
                 state.save()

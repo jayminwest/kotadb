@@ -341,7 +341,15 @@ def _extract_slash_command(output: str, allowed: Sequence[str]) -> Optional[str]
 
 
 def classify_issue(issue: GitHubIssue, adw_id: str, logger: logging.Logger) -> Tuple[Optional[IssueClassSlashCommand], Optional[str]]:
-    """Ask the classifier agent for a slash command classification."""
+    """Ask the classifier agent for a slash command classification.
+
+    Returns:
+        Tuple of (classification, error):
+        - (None, None): Out-of-scope classification (graceful skip)
+        - (command, None): Valid classification
+        - (None, error): Classification failed
+    """
+    from .github import make_issue_comment
 
     request = AgentTemplateRequest(
         agent_name=AGENT_CLASSIFIER,
@@ -356,6 +364,19 @@ def classify_issue(issue: GitHubIssue, adw_id: str, logger: logging.Logger) -> T
 
     if not response.success:
         return None, response.output
+
+    # Check for out-of-scope classification (agent returns "0")
+    if response.output.strip() == "0":
+        logger.info("Issue classified as out-of-scope (test/analysis work)")
+        make_issue_comment(
+            str(issue.number),
+            format_issue_message(
+                adw_id,
+                "ops",
+                "⏭️ Issue classified as out-of-scope for automation (test/analysis work)"
+            )
+        )
+        return None, None  # Signal graceful skip (not an error)
 
     command = _extract_slash_command(response.output, ["/chore", "/bug", "/feature"])
     if not command:

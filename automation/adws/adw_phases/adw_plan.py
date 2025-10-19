@@ -44,6 +44,58 @@ from adws.adw_modules.workflow_ops import (
 )
 
 
+def get_push_troubleshooting_guidance(error_type: str) -> str:
+    """Return troubleshooting guidance based on push error type.
+
+    Args:
+        error_type: Error classification from push_branch
+
+    Returns:
+        Markdown-formatted troubleshooting guidance
+    """
+    guidance = {
+        "email_privacy": """
+**Email Privacy Restriction**
+GitHub is blocking this push because your git email is private.
+
+**Fix options:**
+1. Allow push with private email: Settings → Emails → Uncheck "Block command line pushes that expose my email"
+2. Configure git to use GitHub noreply email:
+   ```
+   git config user.email "USERNAME@users.noreply.github.com"
+   ```
+""",
+        "auth": """
+**Authentication Failed**
+Unable to authenticate with the remote repository.
+
+**Fix options:**
+1. Verify GitHub CLI authentication: `gh auth status`
+2. Re-authenticate: `gh auth login`
+3. Check SSH key configuration if using SSH remote
+""",
+        "network": """
+**Network Error**
+Failed to connect to remote repository (retries exhausted).
+
+**Fix options:**
+1. Check internet connectivity
+2. Verify GitHub status: https://www.githubstatus.com/
+3. Retry manually: `git push origin <branch>`
+""",
+        "unknown": """
+**Push Failed**
+Git push failed with an unrecognized error.
+
+**Fix options:**
+1. Check error details above
+2. Retry manually: `git push origin <branch>`
+3. Verify remote repository exists and is accessible
+""",
+    }
+    return guidance.get(error_type, guidance["unknown"])
+
+
 def check_env(logger: logging.Logger) -> None:
     """Ensure required environment variables and executables are present."""
 
@@ -101,6 +153,13 @@ def main() -> None:
         start_time = time.time()
         issue_command, error = classify_issue(issue, adw_id, logger)
         metrics.record_agent_invocation(duration=time.time() - start_time)
+
+        # Handle out-of-scope classification (graceful skip - not an error)
+        if error is None and issue_command is None:
+            logger.info("Issue classified as out-of-scope, exiting gracefully")
+            sys.exit(0)
+
+        # Handle classification errors
         if error or not issue_command:
             logger.error(f"Classification failed: {error}")
             make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Error classifying issue: {error}"))
@@ -309,21 +368,33 @@ def main() -> None:
 
         # Track git operation: push_branch
         start_time = time.time()
-        pushed, push_error = git_ops.push_branch(worktree_name, cwd=worktree_path)
+        push_result = git_ops.push_branch(worktree_name, cwd=worktree_path)
         metrics.record_git_operation(duration=time.time() - start_time)
-        if not pushed:
-            logger.error(f"Branch push failed: {push_error}")
+
+        if not push_result["success"]:
+            # Push failed - post error with troubleshooting guidance and exit
+            error_type = push_result["error_type"]
+            error_message = push_result["error_message"]
+            logger.error(f"Branch push failed: {error_message} (type: {error_type})")
+
+            troubleshooting = get_push_troubleshooting_guidance(error_type)
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "ops", f"❌ Error pushing branch: {push_error}"),
+                format_issue_message(
+                    adw_id,
+                    "ops",
+                    f"❌ Error pushing branch: {error_message}\n\n{troubleshooting}"
+                ),
             )
-        else:
-            logger.info("Branch pushed successfully. PR will be created after implementation.")
-            state.update(pr_created=False)
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, "ops", "✅ Branch pushed (PR pending implementation)"),
-            )
+            # Exit with failure code (do NOT post "Planning phase completed" on push failure)
+            sys.exit(1)
+
+        logger.info("Branch pushed successfully. PR will be created after implementation.")
+        state.update(pr_created=False)
+        make_issue_comment(
+            issue_number,
+            format_issue_message(adw_id, "ops", "✅ Branch pushed (PR pending implementation)"),
+        )
 
         # Worktree cleanup after plan phase
         # NOTE: Cleanup is disabled when ADW_SKIP_PLAN_CLEANUP=true (e.g., during multi-phase SDLC workflows)

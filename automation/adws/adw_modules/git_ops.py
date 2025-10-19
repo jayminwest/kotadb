@@ -177,13 +177,102 @@ def push(branch_name: str, remote: str = "origin", force: bool = False, cwd: Pat
     return _run_git(args, cwd=cwd, check=False)
 
 
-def push_branch(branch_name: str, remote: str = "origin", force: bool = False, cwd: Path | None = None) -> tuple[bool, Optional[str]]:
-    """Push the branch to the remote."""
+def classify_push_error(stderr: str) -> str:
+    """Classify push error type from stderr output.
 
-    result = push(branch_name, remote=remote, force=force, cwd=cwd)
-    if not result.ok:
-        return False, result.stderr or "git push failed"
-    return True, None
+    Args:
+        stderr: Git push error output
+
+    Returns:
+        Error type: "email_privacy", "network", "auth", or "unknown"
+    """
+    stderr_lower = stderr.lower()
+
+    # GitHub email privacy error (GH007)
+    if "gh007" in stderr_lower or "push declined due to email privacy" in stderr_lower:
+        return "email_privacy"
+
+    # Network errors
+    if any(pattern in stderr_lower for pattern in [
+        "could not resolve host",
+        "failed to connect",
+        "connection timed out",
+        "connection refused",
+        "network is unreachable",
+        "temporary failure",
+    ]):
+        return "network"
+
+    # Authentication errors
+    if any(pattern in stderr_lower for pattern in [
+        "authentication failed",
+        "permission denied",
+        "could not read from remote repository",
+        "fatal: unable to access",
+    ]):
+        return "auth"
+
+    return "unknown"
+
+
+def push_branch(branch_name: str, remote: str = "origin", force: bool = False, cwd: Path | None = None, max_retries: int = 3) -> dict:
+    """Push the branch to the remote with automatic retry for transient errors.
+
+    Args:
+        branch_name: Branch name to push
+        remote: Remote name (default: "origin")
+        force: Use --force-with-lease (default: False)
+        cwd: Working directory for git command
+        max_retries: Maximum retry attempts for network errors (default: 3)
+
+    Returns:
+        Dict with keys:
+        - success (bool): Whether push succeeded
+        - error_type (str | None): Error classification if failed
+        - error_message (str | None): Full error message if failed
+    """
+    import time
+
+    # Exponential backoff delays (seconds)
+    retry_delays = [1, 3, 5]
+
+    for attempt in range(max_retries):
+        result = push(branch_name, remote=remote, force=force, cwd=cwd)
+
+        if result.ok:
+            return {"success": True, "error_type": None, "error_message": None}
+
+        # Classify error type
+        error_type = classify_push_error(result.stderr)
+        error_message = result.stderr or "git push failed"
+
+        # Non-retryable errors: fail immediately
+        if error_type in ("email_privacy", "auth"):
+            return {
+                "success": False,
+                "error_type": error_type,
+                "error_message": error_message,
+            }
+
+        # Network errors: retry with exponential backoff
+        if error_type == "network" and attempt < max_retries - 1:
+            delay = retry_delays[attempt]
+            time.sleep(delay)
+            continue
+
+        # Unknown errors or exhausted retries: fail
+        return {
+            "success": False,
+            "error_type": error_type,
+            "error_message": error_message,
+        }
+
+    # Should never reach here, but for type safety
+    return {
+        "success": False,
+        "error_type": "unknown",
+        "error_message": "Push failed after all retry attempts",
+    }
 
 
 def finalize_git_operations(
