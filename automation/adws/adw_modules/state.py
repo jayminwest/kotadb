@@ -137,6 +137,66 @@ class ADWState:
     def data(self) -> Dict[str, Any]:
         return self.to_dict()
 
+    def get_phase_metrics(self, phase_name: str) -> Optional[Any]:
+        """Retrieve metrics for a specific phase.
+
+        Args:
+            phase_name: Phase identifier (e.g., "adw_plan", "adw_build")
+
+        Returns:
+            PhaseMetrics dict if found, None otherwise
+        """
+        metrics = self.extra.get("metrics", {})
+        phases = metrics.get("phases", [])
+        for phase in phases:
+            if phase.get("phase_name") == phase_name:
+                return phase
+        return None
+
+    def set_phase_metrics(self, phase_name: str, metrics: Any) -> None:
+        """Store metrics for a specific phase.
+
+        Args:
+            phase_name: Phase identifier (e.g., "adw_plan", "adw_build")
+            metrics: PhaseMetrics object or dict to store
+        """
+        # Convert Pydantic model to dict if needed
+        metrics_dict = metrics.model_dump(mode="json") if hasattr(metrics, "model_dump") else metrics
+
+        # Get or create metrics structure
+        all_metrics = self.extra.get("metrics", {})
+        phases = all_metrics.get("phases", [])
+
+        # Remove existing metrics for this phase
+        phases = [p for p in phases if p.get("phase_name") != phase_name]
+
+        # Add new metrics
+        phases.append(metrics_dict)
+
+        # Update extra dict
+        all_metrics["phases"] = phases
+        self.extra["metrics"] = all_metrics
+        self.save()
+
+    def get_workflow_metrics(self) -> Optional[Dict[str, Any]]:
+        """Retrieve workflow-level metrics.
+
+        Returns:
+            WorkflowMetrics dict if present, None otherwise
+        """
+        return self.extra.get("metrics")
+
+    def set_workflow_metrics(self, metrics: Any) -> None:
+        """Store workflow-level metrics.
+
+        Args:
+            metrics: WorkflowMetrics object or dict to store
+        """
+        # Convert Pydantic model to dict if needed
+        metrics_dict = metrics.model_dump(mode="json") if hasattr(metrics, "model_dump") else metrics
+        self.extra["metrics"] = metrics_dict
+        self.save()
+
 
 def ensure_adw_id(existing: str | None = None) -> str:
     """Return an existing ADW id or generate a new one."""

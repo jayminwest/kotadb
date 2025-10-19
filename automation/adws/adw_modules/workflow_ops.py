@@ -6,7 +6,9 @@ import json
 import logging
 import re
 import subprocess
+import time
 from dataclasses import dataclass
+from datetime import datetime
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple
 
@@ -19,6 +21,7 @@ from .data_types import (
     DocumentationResult,
     GitHubIssue,
     IssueClassSlashCommand,
+    PhaseMetrics,
     ReviewResult,
 )
 from .git_ops import GitError
@@ -26,6 +29,13 @@ from .github import ADW_BOT_IDENTIFIER
 from .state import ADWState, ensure_adw_id as core_ensure_adw_id
 from .ts_commands import Command, serialize_commands, validation_commands
 from .utils import parse_json, project_root, setup_logger
+
+# Optional dependency for memory tracking
+try:
+    import psutil
+    PSUTIL_AVAILABLE = True
+except ImportError:
+    PSUTIL_AVAILABLE = False
 
 AGENT_PLANNER = "sdlc_planner"
 AGENT_IMPLEMENTOR = "sdlc_implementor"
@@ -75,6 +85,139 @@ META_COMMENTARY_PATTERNS = [
     r'\bthe changes\b',
     r'\blet me\b',
 ]
+
+
+class PhaseMetricsCollector:
+    """Context manager for automatic phase metrics collection.
+
+    Captures start/end timestamps, tracks operation counts, and persists
+    metrics to ADWState on context exit.
+
+    Usage:
+        with PhaseMetricsCollector(adw_id, "adw_plan", logger) as metrics:
+            # Phase logic here
+            metrics.increment_checkpoint_count()
+            metrics.record_git_operation(duration=0.5)
+            metrics.record_agent_invocation(duration=2.3)
+        # Metrics automatically saved to state on context exit
+    """
+
+    def __init__(self, adw_id: str, phase_name: str, logger: logging.Logger):
+        """Initialize metrics collector.
+
+        Args:
+            adw_id: ADW execution ID
+            phase_name: Phase identifier (e.g., "adw_plan")
+            logger: Logger instance for tracking
+        """
+        self.adw_id = adw_id
+        self.phase_name = phase_name
+        self.logger = logger
+        self.start_time: float = 0.0
+        self.start_timestamp: datetime = datetime.now()
+        self.checkpoint_count: int = 0
+        self.git_operation_count: int = 0
+        self.git_operation_duration: float = 0.0
+        self.agent_invocation_count: int = 0
+        self.agent_invocation_duration: float = 0.0
+        self.initial_memory_mb: Optional[float] = None
+        self.peak_memory_mb: Optional[float] = None
+
+    def __enter__(self) -> "PhaseMetricsCollector":
+        """Enter context manager and capture start metrics."""
+        self.start_time = time.time()
+        self.start_timestamp = datetime.now()
+
+        # Capture initial memory if psutil available
+        if PSUTIL_AVAILABLE:
+            try:
+                process = psutil.Process()
+                memory_info = process.memory_info()
+                self.initial_memory_mb = memory_info.rss / (1024 * 1024)
+                self.peak_memory_mb = self.initial_memory_mb
+                self.logger.debug(f"Initial memory: {self.initial_memory_mb:.2f} MB")
+            except Exception as exc:
+                self.logger.debug(f"Failed to capture initial memory: {exc}")
+
+        self.logger.info(f"Phase metrics collection started for {self.phase_name}")
+        return self
+
+    def __exit__(self, exc_type, exc_val, exc_tb):
+        """Exit context manager and persist metrics to state."""
+        end_time = time.time()
+        end_timestamp = datetime.now()
+        duration_seconds = end_time - self.start_time
+
+        # Update peak memory if psutil available
+        if PSUTIL_AVAILABLE and self.peak_memory_mb is not None:
+            try:
+                process = psutil.Process()
+                memory_info = process.memory_info()
+                current_memory_mb = memory_info.rss / (1024 * 1024)
+                self.peak_memory_mb = max(self.peak_memory_mb, current_memory_mb)
+            except Exception as exc:
+                self.logger.debug(f"Failed to update peak memory: {exc}")
+
+        # Create PhaseMetrics object
+        metrics = PhaseMetrics(
+            phase_name=self.phase_name,
+            start_timestamp=self.start_timestamp,
+            end_timestamp=end_timestamp,
+            duration_seconds=duration_seconds,
+            memory_usage_mb=self.peak_memory_mb,
+            checkpoint_count=self.checkpoint_count,
+            git_operation_count=self.git_operation_count,
+            git_operation_duration_seconds=self.git_operation_duration if self.git_operation_count > 0 else None,
+            agent_invocation_count=self.agent_invocation_count,
+            agent_invocation_duration_seconds=self.agent_invocation_duration if self.agent_invocation_count > 0 else None,
+        )
+
+        # Persist to state
+        try:
+            state = ADWState.load(self.adw_id)
+            state.set_phase_metrics(self.phase_name, metrics)
+            self.logger.info(
+                f"Phase metrics saved: {self.phase_name} "
+                f"(duration={duration_seconds:.2f}s, "
+                f"git_ops={self.git_operation_count}, "
+                f"agent_calls={self.agent_invocation_count})"
+            )
+        except Exception as exc:
+            self.logger.error(f"Failed to persist phase metrics: {exc}")
+
+        # Return False to propagate exceptions
+        return False
+
+    def increment_checkpoint_count(self) -> None:
+        """Increment the checkpoint counter."""
+        self.checkpoint_count += 1
+        self.logger.debug(f"Checkpoint count: {self.checkpoint_count}")
+
+    def record_git_operation(self, duration: float) -> None:
+        """Record a git operation execution.
+
+        Args:
+            duration: Elapsed time in seconds
+        """
+        self.git_operation_count += 1
+        self.git_operation_duration += duration
+        self.logger.debug(
+            f"Git operation recorded: count={self.git_operation_count}, "
+            f"total_duration={self.git_operation_duration:.2f}s"
+        )
+
+    def record_agent_invocation(self, duration: float) -> None:
+        """Record an agent invocation.
+
+        Args:
+            duration: Elapsed time in seconds
+        """
+        self.agent_invocation_count += 1
+        self.agent_invocation_duration += duration
+        self.logger.debug(
+            f"Agent invocation recorded: count={self.agent_invocation_count}, "
+            f"total_duration={self.agent_invocation_duration:.2f}s"
+        )
 
 
 def validate_commit_message(message: str) -> Tuple[bool, Optional[str]]:
@@ -961,6 +1104,7 @@ __all__ = [
     "AVAILABLE_ADW_WORKFLOWS",
     "LOCKFILE_NAMES",
     "DEFAULT_VALIDATION_SEQUENCE",
+    "PhaseMetricsCollector",
     "ValidationCommandResult",
     "build_plan",
     "classify_issue",

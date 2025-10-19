@@ -51,6 +51,7 @@ class RunAnalysis:
     errors: List[str]
     timestamp: datetime
     agent_state: Optional[Dict[str, Any]] = None
+    phase_metrics: Optional[List[Dict[str, Any]]] = None
 
 
 @dataclass
@@ -160,6 +161,13 @@ def parse_execution_logs(
         # Try to load agent state
         agent_state = parse_agent_state(run_id)
 
+        # Extract phase metrics from agent state
+        phase_metrics = None
+        if agent_state and 'metrics' in agent_state:
+            metrics_data = agent_state.get('metrics', {})
+            if metrics_data and 'phases' in metrics_data:
+                phase_metrics = metrics_data['phases']
+
         runs.append(
             RunAnalysis(
                 run_id=run_id,
@@ -170,6 +178,7 @@ def parse_execution_logs(
                 errors=errors,
                 timestamp=mtime,
                 agent_state=agent_state,
+                phase_metrics=phase_metrics,
             )
         )
 
@@ -197,6 +206,52 @@ def parse_agent_state(adw_id: str) -> Optional[Dict[str, Any]]:
         return state.to_dict()
     except StateNotFoundError:
         return None
+
+
+def compute_metrics_statistics(runs: List[RunAnalysis]) -> Dict[str, Any]:
+    """Compute aggregated statistics from phase metrics.
+
+    Args:
+        runs: List of run analyses with phase metrics
+
+    Returns:
+        Dictionary with phase duration statistics (avg, P50, P95)
+    """
+    phase_durations = defaultdict(list)
+    phase_git_ops = defaultdict(list)
+    phase_agent_calls = defaultdict(list)
+
+    for run in runs:
+        if not run.phase_metrics:
+            continue
+        for phase_metric in run.phase_metrics:
+            phase_name = phase_metric.get('phase_name')
+            duration = phase_metric.get('duration_seconds')
+            git_ops = phase_metric.get('git_operation_count', 0)
+            agent_calls = phase_metric.get('agent_invocation_count', 0)
+
+            if phase_name and duration is not None:
+                phase_durations[phase_name].append(duration)
+                phase_git_ops[phase_name].append(git_ops)
+                phase_agent_calls[phase_name].append(agent_calls)
+
+    # Compute statistics
+    stats = {}
+    for phase, durations in phase_durations.items():
+        if not durations:
+            continue
+        sorted_durations = sorted(durations)
+        n = len(sorted_durations)
+        stats[phase] = {
+            'avg_duration': sum(durations) / n,
+            'p50_duration': sorted_durations[n // 2],
+            'p95_duration': sorted_durations[int(n * 0.95)] if n > 1 else sorted_durations[0],
+            'avg_git_ops': sum(phase_git_ops[phase]) / n if phase_git_ops[phase] else 0,
+            'avg_agent_calls': sum(phase_agent_calls[phase]) / n if phase_agent_calls[phase] else 0,
+            'sample_count': n,
+        }
+
+    return stats
 
 
 def calculate_worktree_metrics(runs: List[RunAnalysis]) -> WorktreeMetrics:

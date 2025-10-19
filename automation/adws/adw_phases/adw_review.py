@@ -12,6 +12,7 @@ import logging
 import os
 import shutil
 import sys
+import time
 from pathlib import Path
 from typing import Optional
 
@@ -25,6 +26,7 @@ from adws.adw_modules.state import ADWState, StateNotFoundError
 from adws.adw_modules.utils import load_adw_env
 from adws.adw_modules.workflow_ops import (
     AGENT_REVIEWER,
+    PhaseMetricsCollector,
     find_spec_file,
     format_issue_message,
     run_review,
@@ -79,96 +81,101 @@ def main() -> None:
 
     check_env(logger)
 
-    try:
-        repo_url = get_repo_url()
-        repo_path = extract_repo_path(repo_url)
-    except ValueError as exc:
-        logger.error(f"Unable to resolve repository: {exc}")
-        sys.exit(1)
+    # Wrap main logic in metrics collector
+    with PhaseMetricsCollector(state.adw_id, "adw_review", logger) as metrics:
+        try:
+            repo_url = get_repo_url()
+            repo_path = extract_repo_path(repo_url)
+        except ValueError as exc:
+            logger.error(f"Unable to resolve repository: {exc}")
+            sys.exit(1)
 
-    # Load worktree metadata from state
-    if not state.worktree_name or not state.worktree_path:
-        logger.error("No worktree information in state. Run plan/build phase before review.")
+        # Load worktree metadata from state
+        if not state.worktree_name or not state.worktree_path:
+            logger.error("No worktree information in state. Run plan/build phase before review.")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(state.adw_id, "ops", "❌ Review blocked: missing worktree information."),
+            )
+            sys.exit(1)
+
+        # Verify worktree exists
+        worktree_path = Path(state.worktree_path)
+        if not worktree_path.exists():
+            logger.error(f"Worktree not found at: {worktree_path}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(state.adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
+            )
+            sys.exit(1)
+
+        logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
+
+        issue = fetch_issue(str(issue_number), repo_path)
+        issue_payload = issue.model_dump(mode="json") if hasattr(issue, "model_dump") else issue.dict()
+        state.update(issue=issue_payload)
+        state.save()
+
+        spec_file = find_spec_file(state, logger)
+        if not spec_file:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    state.adw_id,
+                    "ops",
+                    "❌ Review blocked: no plan/spec file found. Run planning phase or attach a spec.",
+                ),
+            )
+            sys.exit(1)
+
         make_issue_comment(
             issue_number,
-            format_issue_message(state.adw_id, "ops", "❌ Review blocked: missing worktree information."),
+            format_issue_message(state.adw_id, "ops", f"✅ Starting review using spec `{spec_file}`"),
         )
-        sys.exit(1)
 
-    # Verify worktree exists
-    worktree_path = Path(state.worktree_path)
-    if not worktree_path.exists():
-        logger.error(f"Worktree not found at: {worktree_path}")
+        # Track agent invocation: run_review
+        start_time = time.time()
+        review_result, error = run_review(spec_file, state.adw_id, logger)
+        metrics.record_agent_invocation(duration=time.time() - start_time)
+        if error or not review_result:
+            logger.error(f"Review execution failed: {error}")
+            make_issue_comment(
+                issue_number,
+                format_issue_message(state.adw_id, AGENT_REVIEWER, f"❌ Review failed: {error}"),
+            )
+            sys.exit(1)
+
+        summary = summarize_review_result(review_result)
+        make_issue_comment(issue_number, format_issue_message(state.adw_id, AGENT_REVIEWER, summary))
+
+        state.update(
+            last_review=json.dumps(
+                review_result.model_dump() if hasattr(review_result, "model_dump") else review_result.dict()
+            )
+        )
+        state.save()
+
+        blockers = [issue for issue in review_result.review_issues if issue.issue_severity == "blocker"]
+        if blockers:
+            make_issue_comment(
+                issue_number,
+                format_issue_message(
+                    state.adw_id,
+                    "ops",
+                    "⚠️ Blockers detected during review. Please address the reported issues before approval.",
+                ),
+            )
+            sys.exit(1)
+
         make_issue_comment(
             issue_number,
-            format_issue_message(state.adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
+            format_issue_message(state.adw_id, "ops", "✅ Review phase completed"),
         )
-        sys.exit(1)
-
-    logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
-
-    issue = fetch_issue(str(issue_number), repo_path)
-    issue_payload = issue.model_dump(mode="json") if hasattr(issue, "model_dump") else issue.dict()
-    state.update(issue=issue_payload)
-    state.save()
-
-    spec_file = find_spec_file(state, logger)
-    if not spec_file:
         make_issue_comment(
             issue_number,
-            format_issue_message(
-                state.adw_id,
-                "ops",
-                "❌ Review blocked: no plan/spec file found. Run planning phase or attach a spec.",
-            ),
+            f"{format_issue_message(state.adw_id, "ops", "📋 Review state snapshot")}\n```json\n{json.dumps(state.data, indent=2)}\n```",
         )
-        sys.exit(1)
-
-    make_issue_comment(
-        issue_number,
-        format_issue_message(state.adw_id, "ops", f"✅ Starting review using spec `{spec_file}`"),
-    )
-
-    review_result, error = run_review(spec_file, state.adw_id, logger)
-    if error or not review_result:
-        logger.error(f"Review execution failed: {error}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(state.adw_id, AGENT_REVIEWER, f"❌ Review failed: {error}"),
-        )
-        sys.exit(1)
-
-    summary = summarize_review_result(review_result)
-    make_issue_comment(issue_number, format_issue_message(state.adw_id, AGENT_REVIEWER, summary))
-
-    state.update(
-        last_review=json.dumps(
-            review_result.model_dump() if hasattr(review_result, "model_dump") else review_result.dict()
-        )
-    )
-    state.save()
-
-    blockers = [issue for issue in review_result.review_issues if issue.issue_severity == "blocker"]
-    if blockers:
-        make_issue_comment(
-            issue_number,
-            format_issue_message(
-                state.adw_id,
-                "ops",
-                "⚠️ Blockers detected during review. Please address the reported issues before approval.",
-            ),
-        )
-        sys.exit(1)
-
-    make_issue_comment(
-        issue_number,
-        format_issue_message(state.adw_id, "ops", "✅ Review phase completed"),
-    )
-    make_issue_comment(
-        issue_number,
-        f"{format_issue_message(state.adw_id, "ops", "📋 Review state snapshot")}\n```json\n{json.dumps(state.data, indent=2)}\n```",
-    )
-    logger.info("Review phase completed successfully")
+        logger.info("Review phase completed successfully")
 
 
 if __name__ == "__main__":

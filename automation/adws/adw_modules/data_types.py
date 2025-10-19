@@ -305,6 +305,27 @@ class CheckpointFile(BaseModel):
     checkpoints: List[CheckpointData] = Field(default_factory=list, description="List of checkpoints in this phase")
 
 
+class PhaseMetrics(BaseModel):
+    """Execution metrics for a single ADW phase."""
+    phase_name: str = Field(..., description="Phase identifier (adw_plan, adw_build, etc.)")
+    start_timestamp: datetime = Field(..., description="Phase start time (ISO 8601)")
+    end_timestamp: Optional[datetime] = Field(None, description="Phase end time (None if incomplete)")
+    duration_seconds: Optional[float] = Field(None, description="Computed elapsed time")
+    memory_usage_mb: Optional[float] = Field(None, description="Peak memory usage snapshot")
+    checkpoint_count: int = Field(default=0, description="Number of checkpoints created")
+    git_operation_count: int = Field(default=0, description="Number of git operations executed")
+    git_operation_duration_seconds: Optional[float] = Field(None, description="Total time in git operations")
+    agent_invocation_count: int = Field(default=0, description="Number of agent calls")
+    agent_invocation_duration_seconds: Optional[float] = Field(None, description="Total time in agent calls")
+
+
+class WorkflowMetrics(BaseModel):
+    """Aggregate metrics for multi-phase workflow execution."""
+    phases: List[PhaseMetrics] = Field(default_factory=list, description="Ordered list of phase metrics")
+    total_duration_seconds: Optional[float] = Field(None, description="End-to-end workflow duration")
+    workflow_type: str = Field(..., description="Workflow identifier (adw_sdlc, adw_plan_build, etc.)")
+
+
 __all__ = [
     "AgentPromptRequest",
     "AgentPromptResponse",
@@ -327,12 +348,14 @@ __all__ = [
     "HomeServerTaskUpdate",
     "IssueClassSlashCommand",
     "ModelType",
+    "PhaseMetrics",
     "ReviewIssue",
     "ReviewResult",
     "SlashCommand",
     "TaskStatus",
     "TestResult",
     "TriggerStatsReport",
+    "WorkflowMetrics",
     "WorkflowType",
     "resolve_category",
 ]
