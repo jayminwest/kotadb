@@ -236,6 +236,108 @@ Each workflow run renders a markdown summary visible in the GitHub Actions UI:
 
 ---
 
+## Orchestrator Slash Command Integration
+
+**Feature #187: `/orchestrator` End-to-End Workflow Automation**
+
+The `/orchestrator` slash command provides a single-command interface for automating the full issue-to-PR workflow. It complements the Python ADW layer by enabling manual and interactive execution of the same multi-phase workflow.
+
+### Usage
+
+```bash
+# Basic execution
+/orchestrator <issue_number>
+
+# Dry-run validation (no execution)
+/orchestrator <issue_number> --dry-run
+
+# Skip worktree cleanup after completion
+/orchestrator <issue_number> --skip-cleanup
+
+# Force execution on closed issues
+/orchestrator <issue_number> --force
+
+# Resume from last checkpoint after failure
+/orchestrator --resume <adw_id>
+```
+
+### Workflow Phases
+
+The orchestrator coordinates the same 3-phase architecture as the Python ADW layer:
+
+1. **Plan Phase**: Issue classification → `/feat`, `/bug`, or `/chore` → spec file generation
+2. **Build Phase**: Implementation → `/implement` → validation execution
+3. **PR Creation**: Branch push → `/pull_request` → PR number extraction
+4. **Review Phase**: Code analysis → `/pr-review` → review posting
+
+### State Management
+
+Orchestrator state is persisted to `automation/agents/<adw_id>/orchestrator/state.json`:
+
+```json
+{
+  "adw_id": "orch-187-20251020140000",
+  "issue_number": "187",
+  "issue_title": "feat: implement /orchestrator slash command",
+  "issue_type": "feat",
+  "worktree_name": "feat-187-orchestrator-command",
+  "worktree_path": "trees/feat-187-orchestrator-command",
+  "branch_name": "feat-187-orchestrator-command",
+  "plan_file": "docs/specs/feature-187-orchestrator-slash-command.md",
+  "pr_number": "210",
+  "pr_url": "https://github.com/user/kota-db-ts/pull/210",
+  "phase_status": {
+    "plan": "completed",
+    "build": "completed",
+    "pr": "completed",
+    "review": "completed"
+  },
+  "checkpoints": [...]
+}
+```
+
+### Checkpoint Recovery
+
+The orchestrator implements checkpoint-based recovery for failure scenarios:
+
+- **Checkpoints**: Saved after each phase completion
+- **Resume**: Use `--resume <adw_id>` to continue from last successful phase
+- **Preservation**: Worktree preserved on failure for debugging
+- **Cleanup**: Configurable via `--skip-cleanup` flag or `ADW_CLEANUP_WORKTREES` env var
+
+### Integration with Python ADW Layer
+
+The `/orchestrator` command complements the Python automation layer:
+
+| Feature | Python ADW | Orchestrator Slash Command |
+|---------|-----------|---------------------------|
+| **Invocation** | `uv run automation/adws/adw_sdlc.py <issue>` | `/orchestrator <issue>` |
+| **Execution** | Automated (webhook/cron) | Manual (interactive) |
+| **State Location** | `agents/<adw_id>/adw_state.json` | `agents/<adw_id>/orchestrator/state.json` |
+| **Phase Agents** | Python subprocess calls | Claude Code subprocess calls |
+| **Worktree Isolation** | Yes (via `git_ops.py`) | Yes (via `git worktree add`) |
+| **Checkpoint Recovery** | Yes (automatic retry + resume) | Yes (manual `--resume`) |
+| **MCP Integration** | Yes (Tasks API for tracking) | No (deferred to #153) |
+
+### Documentation
+
+- **Slash Command Template**: `.claude/commands/workflows/orchestrator.md`
+- **Integration Tests**: `automation/adws/adw_tests/test_orchestrator_integration.py`
+- **Spec File**: `docs/specs/feature-187-orchestrator-slash-command.md`
+- **Conditional Docs Entry**: `.claude/commands/docs/conditional_docs.md`
+
+### Limitations
+
+- **Single Issue**: Orchestrates one issue at a time (no batch processing)
+- **No Parallelization**: Phases execute sequentially
+- **No MCP Integration**: Uses subprocess for phase agents (not MCP Tasks API)
+- **Manual Recovery**: Resume requires manual flag (not automatic retry)
+- **Local Only**: Executes on local machine (not CI/CD environment)
+
+Future enhancements (MCP Tasks API, automated retry, parallel execution) are tracked in follow-up issues.
+
+---
+
 ## Tests
 
 The beginnings of an automated regression suite lives under `adws/adw_tests/`:

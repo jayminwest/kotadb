@@ -300,6 +300,15 @@ All workflows execute in isolated git worktrees (`trees/`) to prevent conflicts 
 - Testing experimental changes in complete isolation
 - See `.claude/commands/worktree/spawn_interactive.md` for detailed usage
 
+**Orchestrator Slash Command** (feature #187): Use `/orchestrator` to automate the full end-to-end issue-to-PR workflow with a single command:
+- Automates all 3 phases: plan → build (with PR creation) → review
+- Validates issue metadata and dependencies before execution
+- Creates isolated worktree with conventional branch naming
+- Implements checkpoint-based recovery for failure scenarios
+- Supports dry-run validation, cleanup control, and manual resume
+- Complements Python ADW layer with manual/interactive execution mode
+- See `.claude/commands/workflows/orchestrator.md` for detailed usage
+
 The agentic layer operates on the application layer (in `app/`) to automate development workflows. See `automation/adws/README.md` for complete automation architecture and usage examples.
 
 **Recent Simplification** (PR #136): The ADW system was simplified from a 5-phase to a 3-phase flow by removing broken test/document/patch phases (519 lines deleted). PR creation was moved from plan phase to build phase to ensure PRs only open after successful implementation. Target completion rate: >80%.
