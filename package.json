@@ -6,5 +6,8 @@
     "app",
     "shared",
     "web"
-  ]
+  ],
+  "scripts": {
+    "prepare": "husky"
+  }
 }

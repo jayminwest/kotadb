@@ -1,0 +1,6 @@
+{
+  "*.{ts,tsx,js,jsx}": [
+    "bunx tsc --noEmit",
+    "bun run lint"
+  ]
+}

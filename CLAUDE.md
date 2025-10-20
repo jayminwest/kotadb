@@ -56,6 +56,31 @@ cd app && bun run test:validate-env        # Detect hardcoded environment URLs i
 
 **Testing Philosophy:** KotaDB follows an **antimocking philosophy**. All tests use real Supabase Local database connections instead of mocks for production parity. See `docs/testing-setup.md` for detailed configuration.
 
+### Pre-commit Hooks
+Pre-commit hooks automatically run type-check and lint on staged files to prevent TypeScript errors and lint issues from reaching CI.
+
+**Installation:**
+```bash
+cd app && bun install                   # Automatically installs hooks via prepare script
+```
+
+**Execution:**
+- Hooks run automatically on `git commit` for changes in `app/` or `shared/` directories
+- Type-check: Runs `bunx tsc --noEmit` in changed directories
+- Lint: Runs `bun run lint` in `app/` if app files changed
+- Skips checks if no relevant files changed (fast commits for docs, config, etc.)
+
+**Bypass (emergency only):**
+```bash
+git commit --no-verify -m "emergency: bypass hooks"    # Skip all pre-commit checks
+```
+
+**Troubleshooting:**
+- Hook fails with "command not found": Ensure `bun` is installed globally
+- Hook takes too long: Consider using `lint-staged` for incremental checks (already configured in `app/.lintstagedrc.json`)
+- Hook fails on valid code: Run `cd app && bunx tsc --noEmit` manually to debug
+- Disable hooks temporarily: `git config core.hooksPath /dev/null` (restore with `git config core.hooksPath .husky`)
+
 ### Docker
 ```bash
 docker compose up dev   # Run in development container (builds from app/ directory)
