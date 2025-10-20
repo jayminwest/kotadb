@@ -61,6 +61,8 @@ export async function updateIndexRunStatus(
 		files_indexed?: number;
 		symbols_extracted?: number;
 		references_extracted?: number;
+		dependencies_extracted?: number;
+		circular_dependencies_detected?: number;
 	},
 ): Promise<void> {
 	const updateData: {
@@ -232,6 +234,61 @@ export async function storeReferences(
 }
 
 /**
+ * Store dependency graph edges into database.
+ *
+ * Dependency edges represent file→file (imports) and symbol→symbol (calls)
+ * relationships extracted from the codebase. Stored in the `dependency_graph`
+ * table for impact analysis and circular dependency detection.
+ *
+ * Uses delete-then-insert strategy to handle re-indexing cleanly.
+ *
+ * @param client - Supabase client instance
+ * @param dependencies - Array of dependency edges
+ * @param repositoryId - Repository UUID
+ * @returns Number of dependencies stored
+ */
+export async function storeDependencies(
+	client: SupabaseClient,
+	dependencies: Array<{
+		repositoryId: string;
+		fromFileId: string | null;
+		toFileId: string | null;
+		fromSymbolId: string | null;
+		toSymbolId: string | null;
+		dependencyType: "file_import" | "symbol_usage";
+		metadata: Record<string, unknown>;
+	}>,
+	repositoryId: string,
+): Promise<number> {
+	if (dependencies.length === 0) {
+		return 0;
+	}
+
+	const records = dependencies.map((dep) => ({
+		repository_id: dep.repositoryId,
+		from_file_id: dep.fromFileId,
+		to_file_id: dep.toFileId,
+		from_symbol_id: dep.fromSymbolId,
+		to_symbol_id: dep.toSymbolId,
+		dependency_type: dep.dependencyType,
+		metadata: dep.metadata,
+	}));
+
+	// Delete existing dependency graph for this repository before inserting new ones
+	// This ensures clean re-indexing without conflict errors
+	await client.from("dependency_graph").delete().eq("repository_id", repositoryId);
+
+	// Insert new dependency edges
+	const { error, count } = await client.from("dependency_graph").insert(records);
+
+	if (error) {
+		throw new Error(`Failed to store dependencies: ${error.message}`);
+	}
+
+	return count ?? dependencies.length;
+}
+
+/**
  * Search indexed files by content term.
  *
  * @param client - Supabase client instance
@@ -383,6 +440,10 @@ export async function runIndexingWorkflow(
 	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
 	const { extractSymbols } = await import("@indexer/symbol-extractor");
 	const { extractReferences } = await import("@indexer/reference-extractor");
+	const { extractDependencies } = await import("@indexer/dependency-extractor");
+	const { detectCircularDependencies } = await import(
+		"@indexer/circular-detector"
+	);
 
 	const repo = await prepareRepository(request);
 
@@ -402,6 +463,11 @@ export async function runIndexingWorkflow(
 	await saveIndexedFiles(client, records, userId, repositoryId);
 
 	// Extract and store symbols and references for each file
+	// Collect all symbols and references for dependency graph extraction
+	const allSymbolsWithFileId: Array<any> = [];
+	const allReferencesWithFileId: Array<any> = [];
+	const filesWithId: IndexedFile[] = [];
+
 	const extractionStats = await Promise.all(
 		records.map(async (file) => {
 			if (!isSupportedForAST(file.path)) return { symbols: 0, references: 0 };
@@ -425,12 +491,47 @@ export async function runIndexingWorkflow(
 				return { symbols: 0, references: 0 };
 			}
 
+			// Store file with id for dependency extraction
+			filesWithId.push({ ...file, id: fileRecord.id, repository_id: repositoryId });
+
+			// Attach file_id to symbols and references for dependency extraction
+			const symbolsWithFileId = symbols.map((s) => ({ ...s, id: null, file_id: fileRecord.id }));
+			const referencesWithFileId = references.map((r) => ({
+				...r,
+				file_id: fileRecord.id,
+			}));
+
 			const symbolCount = await storeSymbols(client, symbols, fileRecord.id);
 			const referenceCount = await storeReferences(
 				client,
 				references,
 				fileRecord.id,
 			);
+
+			// Collect for dependency extraction (after storing to get IDs)
+			// Re-fetch stored symbols with their database IDs
+			const { data: storedSymbols } = await client
+				.from("symbols")
+				.select("id, file_id, name, kind, line_start, line_end, signature, documentation, metadata")
+				.eq("file_id", fileRecord.id);
+
+			if (storedSymbols) {
+				allSymbolsWithFileId.push(...storedSymbols.map((s) => ({
+					id: s.id,
+					file_id: s.file_id,
+					name: s.name,
+					kind: s.kind,
+					lineStart: s.line_start,
+					lineEnd: s.line_end,
+					columnStart: s.metadata?.column_start || 0,
+					columnEnd: s.metadata?.column_end || 0,
+					signature: s.signature,
+					documentation: s.documentation,
+					isExported: s.metadata?.is_exported || false,
+				})));
+			}
+
+			allReferencesWithFileId.push(...referencesWithFileId);
 
 			return { symbols: symbolCount, references: referenceCount };
 		}),
@@ -445,10 +546,49 @@ export async function runIndexingWorkflow(
 		0,
 	);
 
+	// Extract dependency graph from collected symbols and references
+	console.log(`Extracting dependency graph for ${filesWithId.length} files...`);
+	const dependencies = extractDependencies(
+		filesWithId,
+		allSymbolsWithFileId,
+		allReferencesWithFileId,
+		repositoryId,
+	);
+
+	// Store dependency edges
+	const dependencyCount = await storeDependencies(
+		client,
+		dependencies,
+		repositoryId,
+	);
+
+	// Detect circular dependencies and log warnings
+	const filePathById = new Map(filesWithId.map((f) => [f.id!, f.path]));
+	const symbolNameById = new Map(
+		allSymbolsWithFileId.map((s) => [s.id, s.name]),
+	);
+
+	const circularChains = detectCircularDependencies(
+		dependencies,
+		filePathById,
+		symbolNameById,
+	);
+
+	if (circularChains.length > 0) {
+		console.warn(
+			`Detected ${circularChains.length} circular dependency chains:`,
+		);
+		for (const chain of circularChains) {
+			console.warn(`  [${chain.type}] ${chain.description}`);
+		}
+	}
+
 	await updateIndexRunStatus(client, runId, "completed", undefined, {
 		files_indexed: records.length,
 		symbols_extracted: totalSymbols,
 		references_extracted: totalReferences,
+		dependencies_extracted: dependencyCount,
+		circular_dependencies_detected: circularChains.length,
 	});
 }
 
