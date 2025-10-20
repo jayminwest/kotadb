@@ -1,6 +1,7 @@
 import type { IndexRequest, IndexedFile } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
+import type { Reference } from "@indexer/reference-extractor";
 
 export interface SearchOptions {
 	repositoryId?: string;
@@ -49,14 +50,18 @@ export async function recordIndexRun(
  * @param id - Index job UUID
  * @param status - New status value
  * @param errorMessage - Optional error message if status is "failed"
- * @param stats - Optional statistics to store in metadata (files indexed, symbols extracted)
+ * @param stats - Optional statistics to store in metadata (files indexed, symbols extracted, references extracted)
  */
 export async function updateIndexRunStatus(
 	client: SupabaseClient,
 	id: string,
 	status: string,
 	errorMessage?: string,
-	stats?: { files_indexed?: number; symbols_extracted?: number },
+	stats?: {
+		files_indexed?: number;
+		symbols_extracted?: number;
+		references_extracted?: number;
+	},
 ): Promise<void> {
 	const updateData: {
 		status: string;
@@ -177,6 +182,53 @@ export async function storeSymbols(
 	}
 
 	return count ?? symbols.length;
+}
+
+/**
+ * Store references extracted from AST into database.
+ *
+ * References are associated with their source file via source_file_id foreign key.
+ * Upsert strategy handles re-indexing by updating existing references.
+ *
+ * @param client - Supabase client instance
+ * @param references - Array of extracted references
+ * @param fileId - UUID of the source file
+ * @returns Number of references stored
+ */
+export async function storeReferences(
+	client: SupabaseClient,
+	references: Reference[],
+	fileId: string,
+): Promise<number> {
+	if (references.length === 0) {
+		return 0;
+	}
+
+	const records = references.map((ref) => ({
+		source_file_id: fileId,
+		target_symbol_id: null, // Deferred to symbol resolution phase
+		target_file_path: null, // Deferred to symbol resolution phase
+		line_number: ref.lineNumber,
+		reference_type: ref.referenceType,
+		metadata: {
+			target_name: ref.targetName,
+			column_number: ref.columnNumber,
+			...ref.metadata,
+		},
+	}));
+
+	// Delete existing references for this file before inserting new ones
+	// This ensures clean re-indexing without conflict errors from the unique index
+	await client.from("references").delete().eq("source_file_id", fileId);
+
+	// Insert new references
+	const { error, count } = await client.from("references").insert(records);
+
+	if (error) {
+		throw new Error(`Failed to store references: ${error.message}`);
+	}
+
+	return count ?? references.length;
 }
 
 /**
@@ -330,6 +382,7 @@ export async function runIndexingWorkflow(
 	const { discoverSources, parseSourceFile } = await import("@indexer/parsers");
 	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
 	const { extractSymbols } = await import("@indexer/symbol-extractor");
+	const { extractReferences } = await import("@indexer/reference-extractor");
 
 	const repo = await prepareRepository(request);
 
@@ -348,15 +401,16 @@ export async function runIndexingWorkflow(
 
 	await saveIndexedFiles(client, records, userId, repositoryId);
 
-	// Extract and store symbols for each file
-	const symbolStats = await Promise.all(
+	// Extract and store symbols and references for each file
+	const extractionStats = await Promise.all(
 		records.map(async (file) => {
-			if (!isSupportedForAST(file.path)) return 0;
+			if (!isSupportedForAST(file.path)) return { symbols: 0, references: 0 };
 
 			const ast = parseFile(file.path, file.content);
-			if (!ast) return 0;
+			if (!ast) return { symbols: 0, references: 0 };
 
 			const symbols = extractSymbols(ast, file.path);
+			const references = extractReferences(ast, file.path);
 
 			// Get the file_id from database
 			const { data: fileRecord } = await client
@@ -368,18 +422,33 @@ export async function runIndexingWorkflow(
 
 			if (!fileRecord) {
 				console.warn(`Could not find file record for ${file.path}`);
-				return 0;
+				return { symbols: 0, references: 0 };
 			}
 
-			return await storeSymbols(client, symbols, fileRecord.id);
+			const symbolCount = await storeSymbols(client, symbols, fileRecord.id);
+			const referenceCount = await storeReferences(
+				client,
+				references,
+				fileRecord.id,
+			);
+
+			return { symbols: symbolCount, references: referenceCount };
 		}),
 	);
 
-	const totalSymbols = symbolStats.reduce((sum, count) => sum + count, 0);
+	const totalSymbols = extractionStats.reduce(
+		(sum, stat) => sum + stat.symbols,
+		0,
+	);
+	const totalReferences = extractionStats.reduce(
+		(sum, stat) => sum + stat.references,
+		0,
+	);
 
 	await updateIndexRunStatus(client, runId, "completed", undefined, {
 		files_indexed: records.length,
 		symbols_extracted: totalSymbols,
+		references_extracted: totalReferences,
 	});
 }
 
