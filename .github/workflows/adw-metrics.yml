@@ -86,13 +86,22 @@ jobs:
         id: check_threshold
         run: |
           SUCCESS_RATE="${{ steps.parse.outputs.success_rate }}"
+          TOTAL_RUNS="${{ steps.parse.outputs.total_runs }}"
           THRESHOLD="${{ github.event.inputs.alert_threshold || '50' }}"
 
-          if (( $(echo "$SUCCESS_RATE < $THRESHOLD" | bc -l) )); then
+          # Skip alert if no runs found (prevents false positives from timing issues)
+          # This happens when workflow runs at 00:00 UTC but recent ADW executions haven't completed yet
+          if [ "$TOTAL_RUNS" -eq 0 ]; then
+            echo "alert=false" >> $GITHUB_OUTPUT
+            echo "no_runs=true" >> $GITHUB_OUTPUT
+            echo "No alert: No runs found in analysis window"
+          elif (( $(echo "$SUCCESS_RATE < $THRESHOLD" | bc -l) )); then
             echo "alert=true" >> $GITHUB_OUTPUT
+            echo "no_runs=false" >> $GITHUB_OUTPUT
             echo "Alert triggered: Success rate ($SUCCESS_RATE%) is below threshold ($THRESHOLD%)"
           else
             echo "alert=false" >> $GITHUB_OUTPUT
+            echo "no_runs=false" >> $GITHUB_OUTPUT
             echo "No alert: Success rate ($SUCCESS_RATE%) is above threshold ($THRESHOLD%)"
           fi
 
