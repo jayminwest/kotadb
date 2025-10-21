@@ -26,7 +26,10 @@ export interface IndexRequest {
  */
 export interface IndexResponse {
 	/** Index job UUID for tracking status */
-	runId: string;
+	jobId: string;
+
+	/** Initial job status (always 'pending' when job is created) */
+	status: string;
 }
 
 /**

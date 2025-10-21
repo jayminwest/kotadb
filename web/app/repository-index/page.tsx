@@ -39,7 +39,7 @@ export default function IndexPage() {
       )
 
       updateRateLimitInfo(headers)
-      setSuccess(`Indexing job started successfully! Run ID: ${response.runId}`)
+      setSuccess(`Indexing job started successfully! Job ID: ${response.jobId}`)
       setRepository('')
       setRef('')
     } catch (err) {

@@ -160,10 +160,11 @@ describe("Authenticated Routes", () => {
 					localPath: ".",
 				}),
 			});
-			const data = (await response.json()) as { runId: number };
+			const data = (await response.json()) as { jobId: string; status: string };
 
 			expect(response.status).toBe(202);
-			expect(data.runId).toBeDefined();
+			expect(data.jobId).toBeDefined();
+			expect(data.status).toBe("pending");
 		});
 	});
 

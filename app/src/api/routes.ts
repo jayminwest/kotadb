@@ -16,11 +16,10 @@ import express, {
 import {
 	ensureRepository,
 	listRecentFiles,
-	recordIndexRun,
 	runIndexingWorkflow,
 	searchFiles,
-	updateIndexRunStatus,
 } from "./queries";
+import { createIndexJob, updateJobStatus, getJobStatus } from "../queue/job-tracker";
 
 /**
  * Extended Express Request with auth context attached
@@ -125,34 +124,74 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				context.userId,
 				indexRequest,
 			);
-			const runId = await recordIndexRun(
-				supabase,
-				indexRequest,
-				context.userId,
+
+			// Create index job in pending state
+			const job = await createIndexJob(
 				repositoryId,
+				indexRequest.ref || "main",
+				undefined, // commit_sha will be populated during indexing
+				context.userId,
 			);
 
+			// Queue asynchronous indexing workflow
 			queueMicrotask(() =>
 				runIndexingWorkflow(
 					supabase,
 					indexRequest,
-					runId,
+					job.id,
 					context.userId,
 					repositoryId,
-				).catch((error) => {
-					console.error("Indexing workflow failed", error);
-					updateIndexRunStatus(supabase, runId, "failed", error.message).catch(
-						console.error,
-					);
-				}),
+				)
+					.then(async () => {
+						// Update job status to completed on success
+						await updateJobStatus(
+							job.id,
+							"completed",
+							undefined,
+							context.userId,
+						);
+					})
+					.catch(async (error) => {
+						console.error("Indexing workflow failed", error);
+						// Update job status to failed with error message
+						await updateJobStatus(
+							job.id,
+							"failed",
+							{ error: error.message },
+							context.userId,
+						).catch(console.error);
+					}),
 			);
 
 			addRateLimitHeaders(res, context.rateLimit);
-			res.status(202).json({ runId });
+			res.status(202).json({ jobId: job.id, status: job.status });
 		} catch (error) {
 			addRateLimitHeaders(res, context.rateLimit);
 			res.status(500).json({
 				error: `Failed to start indexing: ${(error as Error).message}`,
+			});
+		}
+	});
+
+	// GET /jobs/:jobId - Get job status
+	app.get("/jobs/:jobId", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const jobId = req.params.jobId;
+
+		if (!jobId) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Job ID is required" });
+		}
+
+		try {
+			const job = await getJobStatus(jobId, context.userId);
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json(job);
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			// Return 404 if job not found (may be hidden by RLS)
+			res.status(404).json({
+				error: `Job not found: ${jobId}`,
 			});
 		}
 	});

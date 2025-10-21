@@ -85,11 +85,11 @@ export interface IndexJob {
 	/** Git ref being indexed (branch, tag, or commit) */
 	ref?: string;
 
-	/** Job status (pending, completed, failed, skipped) */
+	/** Job status (pending, processing, completed, failed, skipped) */
 	status: string;
 
 	/** Timestamp when job started */
-	started_at: string;
+	started_at?: string;
 
 	/** Timestamp when job completed */
 	completed_at?: string;
@@ -98,7 +98,16 @@ export interface IndexJob {
 	error_message?: string;
 
 	/** Job statistics (files indexed, symbols extracted, etc.) */
-	metadata?: Record<string, unknown>;
+	stats?: Record<string, unknown>;
+
+	/** pg-boss job UUID for queue correlation (nullable until #235 integration) */
+	queue_job_id?: string;
+
+	/** Git commit SHA for job context tracking */
+	commit_sha?: string;
+
+	/** Creation timestamp */
+	created_at?: string;
 }
 
 /**
