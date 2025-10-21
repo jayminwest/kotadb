@@ -616,3 +616,239 @@ function detectLanguage(path: string): string {
 	};
 	return languageMap[ext ?? ""] ?? "unknown";
 }
+
+/**
+ * Resolve file path to file UUID.
+ * Returns null if file not found in repository.
+ *
+ * @param client - Supabase client instance
+ * @param filePath - Relative file path to resolve
+ * @param repositoryId - Repository UUID
+ * @param userId - User UUID for RLS context
+ * @returns File UUID or null if not found
+ */
+export async function resolveFilePath(
+	client: SupabaseClient,
+	filePath: string,
+	repositoryId: string,
+	userId: string,
+): Promise<string | null> {
+	const { data, error } = await client
+		.from("indexed_files")
+		.select("id")
+		.eq("repository_id", repositoryId)
+		.eq("path", filePath)
+		.maybeSingle();
+
+	if (error) {
+		throw new Error(`Failed to resolve file path: ${error.message}`);
+	}
+
+	return data?.id ?? null;
+}
+
+export interface DependencyResult {
+	direct: string[];
+	indirect: Record<string, string[]>;
+	cycles: string[][];
+}
+
+/**
+ * Query files that depend on the given file (reverse lookup).
+ * Finds files that import or reference the target file.
+ *
+ * @param client - Supabase client instance
+ * @param fileId - Target file UUID
+ * @param depth - Recursion depth (1-5)
+ * @param includeTests - Whether to include test files
+ * @param userId - User UUID for RLS context
+ * @returns Dependency result with direct/indirect relationships and cycles
+ */
+export async function queryDependents(
+	client: SupabaseClient,
+	fileId: string,
+	depth: number,
+	includeTests: boolean,
+	userId: string,
+): Promise<DependencyResult> {
+	const visited = new Set<string>();
+	const direct: string[] = [];
+	const indirect: Record<string, string[]> = {};
+	const cycles: string[][] = [];
+
+	async function traverse(
+		currentFileId: string,
+		currentDepth: number,
+		path: string[],
+	): Promise<void> {
+		if (currentDepth > depth) return;
+
+		// Build query for files that depend on currentFileId
+		const { data, error } = await client
+			.from("dependency_graph")
+			.select(
+				"from_file_id, indexed_files!dependency_graph_from_file_id_fkey(id, path)",
+			)
+			.eq("to_file_id", currentFileId)
+			.eq("dependency_type", "file_import");
+
+		if (error) {
+			throw new Error(`Failed to query dependents: ${error.message}`);
+		}
+
+		for (const row of data ?? []) {
+			const fileRecord = row.indexed_files as
+				| { id: string; path: string }
+				| { id: string; path: string }[]
+				| null;
+			if (!fileRecord) continue;
+
+			const file = Array.isArray(fileRecord) ? fileRecord[0] : fileRecord;
+			if (!file) continue;
+
+			// Filter test files if requested
+			if (
+				!includeTests &&
+				(file.path.includes("test") || file.path.includes("spec"))
+			) {
+				continue;
+			}
+
+			// Detect cycle
+			if (path.includes(file.path)) {
+				cycles.push([...path, file.path]);
+				continue;
+			}
+
+			// Track dependencies by depth
+			if (currentDepth === 1) {
+				if (!direct.includes(file.path)) {
+					direct.push(file.path);
+				}
+			} else {
+				const parentPath = path[path.length - 1] ?? "root";
+				if (!indirect[parentPath]) {
+					indirect[parentPath] = [];
+				}
+				if (!indirect[parentPath].includes(file.path)) {
+					indirect[parentPath].push(file.path);
+				}
+			}
+
+			// Recurse if not visited and within depth limit
+			if (!visited.has(file.id) && currentDepth < depth) {
+				visited.add(file.id);
+				await traverse(file.id, currentDepth + 1, [...path, file.path]);
+			}
+		}
+	}
+
+	// Get the path of the starting file for cycle detection
+	const { data: startFile } = await client
+		.from("indexed_files")
+		.select("path")
+		.eq("id", fileId)
+		.single();
+
+	if (startFile) {
+		visited.add(fileId);
+		await traverse(fileId, 1, [startFile.path]);
+	}
+
+	return { direct, indirect, cycles };
+}
+
+/**
+ * Query files that the given file depends on (forward lookup).
+ * Finds files that are imported or referenced by the source file.
+ *
+ * @param client - Supabase client instance
+ * @param fileId - Source file UUID
+ * @param depth - Recursion depth (1-5)
+ * @param userId - User UUID for RLS context
+ * @returns Dependency result with direct/indirect relationships and cycles
+ */
+export async function queryDependencies(
+	client: SupabaseClient,
+	fileId: string,
+	depth: number,
+	userId: string,
+): Promise<DependencyResult> {
+	const visited = new Set<string>();
+	const direct: string[] = [];
+	const indirect: Record<string, string[]> = {};
+	const cycles: string[][] = [];
+
+	async function traverse(
+		currentFileId: string,
+		currentDepth: number,
+		path: string[],
+	): Promise<void> {
+		if (currentDepth > depth) return;
+
+		// Build query for files that currentFileId depends on
+		const { data, error } = await client
+			.from("dependency_graph")
+			.select(
+				"to_file_id, indexed_files!dependency_graph_to_file_id_fkey(id, path)",
+			)
+			.eq("from_file_id", currentFileId)
+			.eq("dependency_type", "file_import");
+
+		if (error) {
+			throw new Error(`Failed to query dependencies: ${error.message}`);
+		}
+
+		for (const row of data ?? []) {
+			const fileRecord = row.indexed_files as
+				| { id: string; path: string }
+				| { id: string; path: string }[]
+				| null;
+			if (!fileRecord) continue;
+
+			const file = Array.isArray(fileRecord) ? fileRecord[0] : fileRecord;
+			if (!file) continue;
+
+			// Detect cycle
+			if (path.includes(file.path)) {
+				cycles.push([...path, file.path]);
+				continue;
+			}
+
+			// Track dependencies by depth
+			if (currentDepth === 1) {
+				if (!direct.includes(file.path)) {
+					direct.push(file.path);
+				}
+			} else {
+				const parentPath = path[path.length - 1] ?? "root";
+				if (!indirect[parentPath]) {
+					indirect[parentPath] = [];
+				}
+				if (!indirect[parentPath].includes(file.path)) {
+					indirect[parentPath].push(file.path);
+				}
+			}
+
+			// Recurse if not visited and within depth limit
+			if (!visited.has(file.id) && currentDepth < depth) {
+				visited.add(file.id);
+				await traverse(file.id, currentDepth + 1, [...path, file.path]);
+			}
+		}
+	}
+
+	// Get the path of the starting file for cycle detection
+	const { data: startFile } = await client
+		.from("indexed_files")
+		.select("path")
+		.eq("id", fileId)
+		.single();
+
+	if (startFile) {
+		visited.add(fileId);
+		await traverse(fileId, 1, [startFile.path]);
+	}
+
+	return { direct, indirect, cycles };
+}

@@ -60,13 +60,14 @@ describe("MCP Protocol Lifecycle", () => {
 		const toolsList = toolsListResponse.data.result;
 		expect(toolsList.tools).toBeDefined();
 		expect(Array.isArray(toolsList.tools)).toBe(true);
-		expect(toolsList.tools.length).toBe(3);
+		expect(toolsList.tools.length).toBe(4);
 
-		// Verify all three tools are advertised
+		// Verify all four tools are advertised
 		const toolNames = toolsList.tools.map((t: any) => t.name);
 		expect(toolNames).toContain("search_code");
 		expect(toolNames).toContain("index_repository");
 		expect(toolNames).toContain("list_recent_files");
+		expect(toolNames).toContain("search_dependencies");
 
 		// Step 3: Call a tool (list_recent_files - simplest tool)
 		const toolCallResponse = await sendMcpRequest(

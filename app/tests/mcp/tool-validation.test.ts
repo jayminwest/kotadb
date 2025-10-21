@@ -14,6 +14,7 @@ import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Server } from "node:http";
 import { sendMcpRequest, assertJsonRpcError } from "../helpers/mcp";
 import { startTestServer, stopTestServer } from "../helpers/server";
+import { resetRateLimitCounters } from "../helpers/db";
 
 let server: Server;
 let baseUrl: string;
@@ -22,6 +23,8 @@ beforeAll(async () => {
 	const testServer = await startTestServer();
 	server = testServer.server;
 	baseUrl = testServer.url;
+	// Reset rate limit counters to ensure tests start with clean slate
+	await resetRateLimitCounters();
 });
 
 afterAll(async () => {

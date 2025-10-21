@@ -17,9 +17,11 @@ import {
 	INDEX_REPOSITORY_TOOL,
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_CODE_TOOL,
+	SEARCH_DEPENDENCIES_TOOL,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearchCode,
+	executeSearchDependencies,
 } from "./tools";
 
 /**
@@ -49,7 +51,12 @@ export function createMcpServer(context: McpServerContext): Server {
 	// Register tools/list handler
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
 		return {
-			tools: [SEARCH_CODE_TOOL, INDEX_REPOSITORY_TOOL, LIST_RECENT_FILES_TOOL],
+			tools: [
+				SEARCH_CODE_TOOL,
+				INDEX_REPOSITORY_TOOL,
+				LIST_RECENT_FILES_TOOL,
+				SEARCH_DEPENDENCIES_TOOL,
+			],
 		};
 	});
 
@@ -78,6 +85,14 @@ export function createMcpServer(context: McpServerContext): Server {
 				break;
 			case "list_recent_files":
 				result = await executeListRecentFiles(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "search_dependencies":
+				result = await executeSearchDependencies(
 					context.supabase,
 					toolArgs,
 					"", // requestId not used

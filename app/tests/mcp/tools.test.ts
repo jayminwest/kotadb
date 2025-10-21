@@ -58,12 +58,13 @@ describe("MCP Tools Integration", () => {
 		expect(data.jsonrpc).toBe("2.0");
 		expect(data.result).toBeDefined();
 		expect(data.result.tools).toBeArray();
-		expect(data.result.tools.length).toBe(3);
+		expect(data.result.tools.length).toBe(4);
 
 		const toolNames = data.result.tools.map((t: { name: string }) => t.name);
 		expect(toolNames).toContain("search_code");
 		expect(toolNames).toContain("index_repository");
 		expect(toolNames).toContain("list_recent_files");
+		expect(toolNames).toContain("search_dependencies");
 	});
 
 	test("search_code tool finds matching files", async () => {
@@ -397,5 +398,294 @@ describe("MCP Tools Integration", () => {
 		// Verify text is valid JSON
 		const toolResult = extractToolResult(data);
 		expect(toolResult).toBeDefined();
+	});
+
+	// Tests for search_dependencies tool
+	test("search_dependencies with missing file_path returns error", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 15,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.error).toBeDefined();
+		expect(data.error.code).toBe(-32603);
+	});
+
+	test("search_dependencies with invalid direction returns error", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 16,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/auth/context.ts",
+						direction: "invalid",
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.error).toBeDefined();
+		expect(data.error.code).toBe(-32603);
+	});
+
+	test("search_dependencies with invalid depth returns error", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 17,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/auth/context.ts",
+						depth: 10,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.error).toBeDefined();
+		expect(data.error.code).toBe(-32603);
+	});
+
+	test("search_dependencies handles missing file gracefully", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 18,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "nonexistent/file.ts",
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.result).toBeDefined();
+
+		const toolResult = extractToolResult(data);
+		expect(toolResult.file_path).toBe("nonexistent/file.ts");
+		expect(toolResult.message).toContain("File not found");
+	});
+
+	test("search_dependencies with direction=both returns both dependents and dependencies", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 19,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/api/routes.ts",
+						direction: "both",
+						depth: 1,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.result).toBeDefined();
+
+		const toolResult = extractToolResult(data);
+		expect(toolResult.file_path).toBe("src/api/routes.ts");
+		// Tool may return either dependency results OR file-not-found message
+		// depending on whether file exists in test database
+		if (toolResult.message) {
+			// File not found case
+			expect(toolResult.message).toContain("File not found");
+		} else {
+			// File found case - verify structure
+			expect(toolResult.direction).toBe("both");
+			expect(toolResult.depth).toBe(1);
+			expect(toolResult).toHaveProperty("dependents");
+			expect(toolResult).toHaveProperty("dependencies");
+		}
+	});
+
+	test("search_dependencies with direction=dependents returns only dependents", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 20,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/api/routes.ts",
+						direction: "dependents",
+						depth: 1,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.result).toBeDefined();
+
+		const toolResult = extractToolResult(data);
+		if (!toolResult.message) {
+			// File found - verify structure
+			expect(toolResult).toHaveProperty("dependents");
+			expect(toolResult.dependents).toHaveProperty("direct");
+			expect(toolResult.dependents).toHaveProperty("indirect");
+			expect(toolResult.dependents).toHaveProperty("cycles");
+			expect(toolResult.dependents).toHaveProperty("count");
+			expect(toolResult).not.toHaveProperty("dependencies");
+		}
+	});
+
+	test("search_dependencies with direction=dependencies returns only dependencies", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 21,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/api/routes.ts",
+						direction: "dependencies",
+						depth: 1,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		expect(data.result).toBeDefined();
+
+		const toolResult = extractToolResult(data);
+		if (!toolResult.message) {
+			// File found - verify structure
+			expect(toolResult).toHaveProperty("dependencies");
+			expect(toolResult.dependencies).toHaveProperty("direct");
+			expect(toolResult.dependencies).toHaveProperty("indirect");
+			expect(toolResult.dependencies).toHaveProperty("cycles");
+			expect(toolResult.dependencies).toHaveProperty("count");
+			expect(toolResult).not.toHaveProperty("dependents");
+		}
+	});
+
+	test("search_dependencies respects depth parameter", async () => {
+		const responseDepth1 = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 22,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/api/routes.ts",
+						direction: "dependencies",
+						depth: 1,
+					},
+				},
+			}),
+		});
+
+		expect(responseDepth1.status).toBe(200);
+		const dataDepth1 = (await responseDepth1.json()) as any;
+		const toolResultDepth1 = extractToolResult(dataDepth1);
+
+		const responseDepth2 = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 23,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/api/routes.ts",
+						direction: "dependencies",
+						depth: 2,
+					},
+				},
+			}),
+		});
+
+		expect(responseDepth2.status).toBe(200);
+		const dataDepth2 = (await responseDepth2.json()) as any;
+		const toolResultDepth2 = extractToolResult(dataDepth2);
+
+		// Depth 1 should have only direct dependencies
+		expect(toolResultDepth1.dependencies.direct).toBeArray();
+
+		// Depth 2 may have indirect dependencies (if the graph has depth > 1)
+		expect(toolResultDepth2.dependencies).toHaveProperty("indirect");
+	});
+
+	test("search_dependencies result structure includes counts", async () => {
+		const response = await fetch(`${baseUrl}/mcp`, {
+			method: "POST",
+			headers,
+			body: JSON.stringify({
+				jsonrpc: "2.0",
+				id: 24,
+				method: "tools/call",
+				params: {
+					name: "search_dependencies",
+					arguments: {
+						file_path: "src/api/routes.ts",
+						direction: "both",
+						depth: 1,
+					},
+				},
+			}),
+		});
+
+		expect(response.status).toBe(200);
+		const data = (await response.json()) as any;
+		const toolResult = extractToolResult(data);
+
+		if (!toolResult.message) {
+			// File found - verify count fields are numbers
+			expect(toolResult.dependents).toHaveProperty("count");
+			expect(toolResult.dependencies).toHaveProperty("count");
+			expect(typeof toolResult.dependents.count).toBe("number");
+			expect(typeof toolResult.dependencies.count).toBe("number");
+		}
 	});
 });

@@ -9,6 +9,10 @@ import {
 	runIndexingWorkflow,
 	searchFiles,
 	updateIndexRunStatus,
+	resolveFilePath,
+	queryDependents,
+	queryDependencies,
+	type DependencyResult,
 } from "@api/queries";
 import { buildSnippet } from "@indexer/extractors";
 import type { IndexRequest } from "@shared/types";
@@ -106,10 +110,56 @@ export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
 };
 
 /**
+ * Tool: search_dependencies
+ */
+export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
+	name: "search_dependencies",
+	description:
+		"Search the dependency graph to find files that depend on (dependents) or are depended on by (dependencies) a target file. Useful for impact analysis before refactoring, test scope discovery, and circular dependency detection.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			file_path: {
+				type: "string",
+				description:
+					"Relative file path within the repository (e.g., 'src/auth/context.ts')",
+			},
+			direction: {
+				type: "string",
+				enum: ["dependents", "dependencies", "both"],
+				description:
+					"Search direction: 'dependents' (files that import this file), 'dependencies' (files this file imports), or 'both' (default: 'both')",
+			},
+			depth: {
+				type: "number",
+				description:
+					"Recursion depth for traversal (1-5, default: 1). Higher values find indirect relationships.",
+			},
+			include_tests: {
+				type: "boolean",
+				description:
+					"Include test files in results (default: true). Set to false to filter out files with 'test' or 'spec' in path.",
+			},
+			repository: {
+				type: "string",
+				description:
+					"Repository ID to search within. Required for multi-repository workspaces.",
+			},
+		},
+		required: ["file_path"],
+	},
+};
+
+/**
  * Get all available tool definitions
  */
 export function getToolDefinitions(): ToolDefinition[] {
-	return [SEARCH_CODE_TOOL, INDEX_REPOSITORY_TOOL, LIST_RECENT_FILES_TOOL];
+	return [
+		SEARCH_CODE_TOOL,
+		INDEX_REPOSITORY_TOOL,
+		LIST_RECENT_FILES_TOOL,
+		SEARCH_DEPENDENCIES_TOOL,
+	];
 }
 
 /**
@@ -312,6 +362,175 @@ export async function executeListRecentFiles(
 }
 
 /**
+ * Execute search_dependencies tool
+ */
+export async function executeSearchDependencies(
+	supabase: SupabaseClient,
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: file_path
+	if (p.file_path === undefined) {
+		throw new Error("Missing required parameter: file_path");
+	}
+	if (typeof p.file_path !== "string") {
+		throw new Error("Parameter 'file_path' must be a string");
+	}
+
+	// Validate optional parameters
+	if (
+		p.direction !== undefined &&
+		typeof p.direction === "string" &&
+		!["dependents", "dependencies", "both"].includes(p.direction)
+	) {
+		throw new Error(
+			"Parameter 'direction' must be one of: dependents, dependencies, both",
+		);
+	}
+
+	if (p.depth !== undefined) {
+		if (typeof p.depth !== "number") {
+			throw new Error("Parameter 'depth' must be a number");
+		}
+		if (p.depth < 1 || p.depth > 5) {
+			throw new Error("Parameter 'depth' must be between 1 and 5");
+		}
+	}
+
+	if (p.include_tests !== undefined && typeof p.include_tests !== "boolean") {
+		throw new Error("Parameter 'include_tests' must be a boolean");
+	}
+
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const validatedParams = {
+		file_path: p.file_path as string,
+		direction: (p.direction as string | undefined) ?? "both",
+		depth: (p.depth as number | undefined) ?? 1,
+		include_tests: (p.include_tests as boolean | undefined) ?? true,
+		repository: p.repository as string | undefined,
+	};
+
+	// Resolve repository ID (use first repository if not specified)
+	let repositoryId: string;
+	if (validatedParams.repository) {
+		repositoryId = validatedParams.repository;
+	} else {
+		const { data: repos } = await supabase
+			.from("repositories")
+			.select("id")
+			.eq("user_id", userId)
+			.limit(1)
+			.single();
+
+		if (!repos) {
+			return {
+				file_path: validatedParams.file_path,
+				message:
+					"No repositories found. Please index a repository first using index_repository tool.",
+				dependents: { direct: [], indirect: {}, cycles: [] },
+				dependencies: { direct: [], indirect: {}, cycles: [] },
+			};
+		}
+
+		repositoryId = repos.id;
+	}
+
+	// Resolve file path to file ID
+	const fileId = await resolveFilePath(
+		supabase,
+		validatedParams.file_path,
+		repositoryId,
+		userId,
+	);
+
+	if (!fileId) {
+		return {
+			file_path: validatedParams.file_path,
+			message: `File not found: ${validatedParams.file_path}. Make sure the repository is indexed.`,
+			dependents: { direct: [], indirect: {}, cycles: [] },
+			dependencies: { direct: [], indirect: {}, cycles: [] },
+		};
+	}
+
+	// Query dependents and/or dependencies based on direction
+	let dependents: DependencyResult | null = null;
+	let dependencies: DependencyResult | null = null;
+
+	if (
+		validatedParams.direction === "dependents" ||
+		validatedParams.direction === "both"
+	) {
+		dependents = await queryDependents(
+			supabase,
+			fileId,
+			validatedParams.depth,
+			validatedParams.include_tests,
+			userId,
+		);
+	}
+
+	if (
+		validatedParams.direction === "dependencies" ||
+		validatedParams.direction === "both"
+	) {
+		dependencies = await queryDependencies(
+			supabase,
+			fileId,
+			validatedParams.depth,
+			userId,
+		);
+	}
+
+	// Build response
+	const result: Record<string, unknown> = {
+		file_path: validatedParams.file_path,
+		direction: validatedParams.direction,
+		depth: validatedParams.depth,
+	};
+
+	if (dependents) {
+		result.dependents = {
+			direct: dependents.direct,
+			indirect: dependents.indirect,
+			cycles: dependents.cycles,
+			count:
+				dependents.direct.length +
+				Object.values(dependents.indirect).reduce(
+					(sum, arr) => sum + arr.length,
+					0,
+				),
+		};
+	}
+
+	if (dependencies) {
+		result.dependencies = {
+			direct: dependencies.direct,
+			indirect: dependencies.indirect,
+			cycles: dependencies.cycles,
+			count:
+				dependencies.direct.length +
+				Object.values(dependencies.indirect).reduce(
+					(sum, arr) => sum + arr.length,
+					0,
+				),
+		};
+	}
+
+	return result;
+}
+
+/**
  * Main tool call dispatcher
  */
 export async function handleToolCall(
@@ -328,6 +547,13 @@ export async function handleToolCall(
 			return await executeIndexRepository(supabase, params, requestId, userId);
 		case "list_recent_files":
 			return await executeListRecentFiles(supabase, params, requestId, userId);
+		case "search_dependencies":
+			return await executeSearchDependencies(
+				supabase,
+				params,
+				requestId,
+				userId,
+			);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}

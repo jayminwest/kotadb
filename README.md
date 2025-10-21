@@ -212,6 +212,71 @@ curl -X POST http://localhost:3000/mcp \
 - `search_code`: Search indexed code files for a specific term
 - `index_repository`: Index a git repository by cloning/updating it
 - `list_recent_files`: List recently indexed files
+- `search_dependencies`: Search the dependency graph for impact analysis
+
+**Tool: `search_dependencies`**
+
+Find files that depend on (dependents) or are depended on by (dependencies) a target file. Useful for:
+- **Impact analysis before refactoring**: See what breaks if you change a file
+- **Test scope discovery**: Find relevant test files for implementation changes
+- **Circular dependency detection**: Identify dependency cycles in your codebase
+
+**Parameters:**
+- `file_path` (required): Relative file path within repository (e.g., `"src/auth/context.ts"`)
+- `direction` (optional): Search direction - `"dependents"`, `"dependencies"`, or `"both"` (default: `"both"`)
+- `depth` (optional): Recursion depth for traversal, 1-5 (default: `1`). Higher values find indirect relationships.
+- `include_tests` (optional): Include test files in results (default: `true`)
+- `repository` (optional): Repository ID to search within (auto-detected if omitted)
+
+**Example: Find what breaks if you change a file**
+
+```bash
+curl -X POST http://localhost:3000/mcp \
+  -H "Content-Type: application/json" \
+  -H "Origin: http://localhost:3000" \
+  -H "MCP-Protocol-Version: 2025-06-18" \
+  -H "Accept: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
+  -d '{
+    "jsonrpc": "2.0",
+    "id": 4,
+    "method": "tools/call",
+    "params": {
+      "name": "search_dependencies",
+      "arguments": {
+        "file_path": "src/auth/context.ts",
+        "direction": "dependents",
+        "depth": 2
+      }
+    }
+  }'
+```
+
+**Response Format:**
+
+```json
+{
+  "jsonrpc": "2.0",
+  "id": 4,
+  "result": {
+    "content": [{
+      "type": "text",
+      "text": "{
+        \"file_path\": \"src/auth/context.ts\",
+        \"direction\": \"dependents\",
+        \"depth\": 2,
+        \"dependents\": {
+          \"direct\": [\"src/auth/middleware.ts\", \"src/api/routes.ts\"],
+          \"indirect\": {
+            \"src/auth/middleware.ts\": [\"src/index.ts\"]
+          },
+          \"cycles\": [],
+          \"count\": 3
+        }
+      }"
+    }]
+  }
+}
 
 **Security & Configuration:**
 

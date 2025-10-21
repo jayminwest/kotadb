@@ -15,11 +15,13 @@ import { beforeEach, describe, expect, it } from "bun:test";
 import { clearCache } from "@auth/cache";
 import { authenticateRequest, createForbiddenResponse } from "@auth/middleware";
 import { getServiceClient } from "@db/client";
-import { getTestApiKey } from "../helpers/db";
+import { getTestApiKey, resetRateLimitCounters } from "../helpers/db";
 
 describe("Authentication Middleware", () => {
-	beforeEach(() => {
+	beforeEach(async () => {
 		clearCache();
+		// Reset rate limit counters to ensure tests start with clean slate
+		await resetRateLimitCounters();
 	});
 
 	describe("authenticateRequest", () => {

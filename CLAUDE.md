@@ -181,13 +181,18 @@ All application code is located in the `app/` directory.
 **MCP (Model Context Protocol) Integration (app/src/mcp/)**
 - `server.ts`: MCP server factory using official `@modelcontextprotocol/sdk` (v1.20+)
   - Creates per-request Server instances for user isolation (stateless mode)
-  - Registers three tools: `search_code`, `index_repository`, `list_recent_files`
+  - Registers four tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`
   - Uses `StreamableHTTPServerTransport` with `enableJsonResponse: true` for simple JSON-RPC over HTTP
   - No SSE streaming or session management (stateless design)
 - `tools.ts`: Tool execution logic and parameter validation
   - Reused by SDK server handlers
   - Type guards for parameter validation
   - Returns JSON results wrapped in SDK content blocks
+  - `search_dependencies` tool: Query dependency graph for impact analysis
+    - Supports three search directions: dependents (reverse lookup), dependencies (forward lookup), both
+    - Recursive traversal with configurable depth (1-5)
+    - Detects circular dependencies during graph traversal
+    - Optional test file filtering via `include_tests` parameter
 - Integration with Express:
   - SDK requires Node.js HTTP primitives (`IncomingMessage`, `ServerResponse`)
   - Express provides Node-compatible interfaces running on Bun runtime
