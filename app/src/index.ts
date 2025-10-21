@@ -1,5 +1,6 @@
 import { createExpressApp } from "@api/routes";
 import { getServiceClient } from "@db/client";
+import { startQueue, stopQueue } from "@queue/client";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -27,6 +28,16 @@ async function bootstrap() {
 		throw new Error(`Supabase connection failed: ${healthError.message}`);
 	}
 
+	// Start job queue
+	try {
+		await startQueue();
+	} catch (error) {
+		const errorMessage =
+			error instanceof Error ? error.message : String(error);
+		console.error(`Failed to start job queue: ${errorMessage}`);
+		throw error;
+	}
+
 	// Create Express app
 	const app = createExpressApp(supabase);
 
@@ -37,8 +48,19 @@ async function bootstrap() {
 	});
 
 	// Graceful shutdown
-	process.on("SIGTERM", () => {
+	process.on("SIGTERM", async () => {
 		console.log("SIGTERM signal received: closing HTTP server");
+
+		// Stop queue first (drains in-flight jobs)
+		try {
+			await stopQueue();
+		} catch (error) {
+			console.error(
+				`Error stopping queue: ${error instanceof Error ? error.message : String(error)}`,
+			);
+		}
+
+		// Then close HTTP server
 		server.close(() => {
 			console.log("HTTP server closed");
 			process.exit(0);

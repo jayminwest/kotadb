@@ -154,8 +154,16 @@ if [ -z "$API_URL" ] || [ -z "$ANON_KEY" ] || [ -z "$SERVICE_KEY" ]; then
     exit 1
 fi
 
+# Extract PostgreSQL port from Supabase output
+DB_URL=$(echo "$SUPABASE_OUTPUT" | grep "DB URL:" | awk '{print $3}')
+if [ -z "$DB_URL" ]; then
+    # Fallback to default port if not found in output
+    DB_URL="postgresql://postgres:postgres@localhost:5434/postgres"
+fi
+
 echo -e "${GREEN}✅ Supabase started successfully${NC}"
 echo "  API URL: $API_URL"
+echo "  DB URL: $DB_URL"
 echo ""
 
 # .env file generation
@@ -189,6 +197,9 @@ KOTA_GIT_BASE_URL=https://github.com
 SUPABASE_URL=$API_URL
 SUPABASE_ANON_KEY=$ANON_KEY
 SUPABASE_SERVICE_KEY=$SERVICE_KEY
+
+# Supabase Native Postgres Connection (for pg-boss job queue)
+SUPABASE_DB_URL=$DB_URL
 
 # Automation runtime configuration
 ADW_ENV=local

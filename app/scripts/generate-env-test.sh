@@ -82,6 +82,9 @@ DB_NAME=$DB_NAME
 DB_USER=$DB_USER
 DB_PASSWORD=$DB_PASSWORD
 DATABASE_URL=$DB_URL
+
+# Supabase Native Postgres Connection (for pg-boss job queue)
+SUPABASE_DB_URL=$DB_URL
 EOF
 
 echo "✅ Generated .env.test successfully!"

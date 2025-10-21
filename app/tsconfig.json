@@ -20,7 +20,8 @@
 			"@indexer/*": ["src/indexer/*"],
 			"@shared/*": ["../shared/*"],
 			"@mcp/*": ["src/mcp/*"],
-			"@validation/*": ["src/validation/*"]
+			"@validation/*": ["src/validation/*"],
+			"@queue/*": ["src/queue/*"]
 		},
 		"types": ["bun-types", "node"]
 	},
