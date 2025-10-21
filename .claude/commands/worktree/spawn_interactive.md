@@ -213,6 +213,73 @@ git worktree prune
 
 **Note:** The `--force` flag removes the worktree even with uncommitted changes. Commit or stash important work before cleanup.
 
+## CI Trigger Behavior
+
+GitHub Actions CI workflows are configured to run automatically on all feature branch pushes, including interactive worktree branches. This ensures CI validation happens regardless of when you create a PR.
+
+### Supported Branch Patterns
+
+All CI workflows trigger on pushes to these branch patterns:
+- `feat/**` - Feature branches
+- `bug/**` - Bug fix branches
+- `chore/**` - Chore branches
+- `fix/**` - Alternative fix branch naming
+- `refactor/**` - Refactoring branches
+- `interactive-*` - Interactive worktree branches
+
+### When CI Runs
+
+**Push-Before-PR Workflow (Default):**
+1. Create worktree with `/spawn_interactive`
+2. Make changes and commit
+3. Push branch: `git push -u origin {worktree_name}`
+4. CI runs automatically on push (before PR creation)
+5. Create PR: `gh pr create --title "..." --body "..."`
+6. PR shows CI status from step 4
+7. Subsequent pushes trigger new CI runs via `pull_request` synchronize event
+
+**PR-Before-Push Workflow (Alternative):**
+1. Create worktree with `/spawn_interactive`
+2. Create empty PR: `gh pr create --title "..." --body "..."`
+3. Make changes and commit
+4. Push branch: `git push -u origin {worktree_name}`
+5. CI runs on push via `pull_request` synchronize event
+
+### Best Practices
+
+**Ensuring CI Validation:**
+- CI runs automatically on first push to any feature branch
+- No manual workflow triggering required
+- PRs show CI status from most recent push
+- Check CI results with: `gh pr checks <pr-number>`
+
+**Monitoring CI Status:**
+```bash
+# After pushing branch
+gh run list --branch {worktree_name} --limit 5
+
+# For specific PR
+gh pr checks <pr-number>
+
+# View detailed workflow run
+gh run view <run-id>
+```
+
+**Troubleshooting:**
+- If CI doesn't trigger, verify branch name matches supported patterns
+- Check path filters: CI only runs when relevant files changed
+- View workflow configuration: `gh workflow view "Application CI"`
+- Fork PRs may have delayed CI due to GitHub security restrictions
+
+### Path Filters
+
+CI workflows use path filters to limit runs to relevant changes:
+- **Application CI**: `app/**`, `shared/**`, `.github/workflows/app-ci.yml`
+- **Automation CI**: `automation/**`, `.github/workflows/automation-ci.yml`
+- **Web CI**: `web/**`, `shared/**`, `.github/workflows/web-ci.yml`
+
+Only the workflows matching your changed files will run, reducing unnecessary CI consumption.
+
 ## Integration with ADW
 
 This command mirrors ADW patterns from `automation/adws/adw_modules/git_ops.py`:

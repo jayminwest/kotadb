@@ -2,7 +2,15 @@ name: Web CI
 
 on:
   push:
-    branches: [main, develop]
+    branches:
+      - main
+      - develop
+      - 'feat/**'
+      - 'bug/**'
+      - 'chore/**'
+      - 'fix/**'
+      - 'refactor/**'
+      - 'interactive-*'
     paths:
       - 'web/**'
       - 'shared/**'
