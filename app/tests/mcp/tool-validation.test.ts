@@ -292,6 +292,7 @@ describe("index_repository Parameter Validation", () => {
 				name: "index_repository",
 				arguments: {
 					repository: "test/repo",
+					localPath: ".",
 				},
 			},
 			"free",
