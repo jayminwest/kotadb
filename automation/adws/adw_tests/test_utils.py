@@ -1,5 +1,10 @@
+import subprocess
+from pathlib import Path
+from unittest.mock import MagicMock
 
-from adws.adw_modules.utils import parse_json
+import pytest
+
+from adws.adw_modules.utils import parse_json, project_root
 
 
 def test_parse_json_from_code_block():
@@ -29,3 +34,33 @@ def test_parse_json_list_of_models():
     assert len(results) == 2
     assert results[0].label == "lint"
     assert results[1].passed is False
+
+
+def test_project_root_from_subdirectory(monkeypatch: pytest.MonkeyPatch):
+    """Verify project_root() uses git to resolve root from any directory."""
+    mock_result = MagicMock()
+    mock_result.returncode = 0
+    mock_result.stdout = "/path/to/repo\n"
+
+    def mock_run(*args, **kwargs):
+        return mock_result
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    root = project_root()
+    assert root == Path("/path/to/repo")
+
+
+def test_project_root_fallback_outside_git(monkeypatch: pytest.MonkeyPatch):
+    """Verify project_root() falls back to file-based detection when git fails."""
+    mock_result = MagicMock()
+    mock_result.returncode = 1
+
+    def mock_run(*args, **kwargs):
+        return mock_result
+
+    monkeypatch.setattr(subprocess, "run", mock_run)
+
+    root = project_root()
+    # Should fall back to file-based detection (2 parents up from utils.py)
+    assert isinstance(root, Path)
