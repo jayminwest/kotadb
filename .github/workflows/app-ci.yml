@@ -22,7 +22,7 @@ on:
       - '.github/workflows/app-ci.yml'
 
 jobs:
-  build:
+  setup:
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -37,7 +37,109 @@ jobs:
         with:
           bun-version: 1.1.29
 
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: app/node_modules
+          key: bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            bun-
+
       - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Validate migration sync
+        run: bun run test:validate-migrations
+
+  typecheck:
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.29
+
+      - name: Restore dependencies
+        uses: actions/cache@v4
+        with:
+          path: app/node_modules
+          key: bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            bun-
+
+      - name: Install dependencies (cache miss fallback)
+        run: bun install --frozen-lockfile
+
+      - name: Type check shared types
+        working-directory: shared
+        run: bunx tsc --noEmit
+
+      - name: Type check application
+        run: bunx tsc --noEmit
+
+  lint:
+    runs-on: ubuntu-latest
+    needs: setup
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.29
+
+      - name: Restore dependencies
+        uses: actions/cache@v4
+        with:
+          path: app/node_modules
+          key: bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            bun-
+
+      - name: Install dependencies (cache miss fallback)
+        run: bun install --frozen-lockfile
+
+      - name: Lint
+        run: bun run lint
+
+  test:
+    runs-on: ubuntu-latest
+    needs: [typecheck, lint]
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.29
+
+      - name: Restore dependencies
+        uses: actions/cache@v4
+        with:
+          path: app/node_modules
+          key: bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            bun-
+
+      - name: Install dependencies (cache miss fallback)
         run: bun install --frozen-lockfile
 
       - name: Setup Docker Compose test stack and generate credentials
@@ -48,19 +150,6 @@ jobs:
           chmod +x app/scripts/run-migrations-compose.sh
           chmod +x app/scripts/cleanup-test-containers.sh
           .github/scripts/setup-supabase-ci.sh
-
-      - name: Validate migration sync
-        run: bun run test:validate-migrations
-
-      - name: Type check shared types
-        working-directory: shared
-        run: bunx tsc --noEmit
-
-      - name: Type check application
-        run: bunx tsc --noEmit
-
-      - name: Lint
-        run: bun run lint
 
       - name: Test
         run: |
