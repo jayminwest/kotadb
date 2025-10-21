@@ -95,6 +95,17 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When you need to confirm scope against strategic goals or sequencing
     - When preparing discovery or planning work that spans multiple domains
 
+- .claude/commands/docs/vision-update.md
+  - Conditions:
+    - When synchronizing docs/vision/ directory with recently closed issues and merged PRs
+    - When updating epic completion percentages in CURRENT_STATE.md or ROADMAP.md
+    - When epic reaches major milestone (25%, 50%, 75%, 100% completion)
+    - When MVP blocker is resolved and needs to be removed from documentation
+    - When technical decisions deviate from original VISION.md during implementation
+    - When conducting quarterly vision document reviews
+    - When multiple issues in same epic close and require batch documentation update
+    - When needing to maintain consistency across CURRENT_STATE.md, ROADMAP.md, and epic files
+
 - .claude/commands/docs/anti-mock.md
   - Conditions:
     - When planning or implementing changes that add or modify automated tests
