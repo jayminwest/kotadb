@@ -441,15 +441,22 @@ See issue #151 for complete documentation standards and implementation details.
 ### CI/CD Testing Infrastructure
 **GitHub Actions Workflows**:
 - **Application CI** (`.github/workflows/app-ci.yml`): Tests the TypeScript/Bun application layer
+  - **Workflow Structure** (parallelized for ~15s runtime improvement):
+    - `setup` job: Installs dependencies, validates migration sync, caches node_modules
+    - `typecheck` job: Runs type-checking for shared types and application (depends on setup)
+    - `lint` job: Runs ESLint validation (depends on setup)
+    - `test` job: Runs full test suite (depends on typecheck and lint)
+  - **Caching Strategy**: Uses `actions/cache@v4` with `bun-${{ hashFiles('app/bun.lockb') }}` key for node_modules reuse across parallel jobs
   - Uses Docker Compose with isolated project names for test environment
   - Runs `.github/scripts/setup-supabase-ci.sh` to start containerized Supabase stack
   - Auto-generates `app/.env.test` from Docker Compose container ports for dynamic credentials
   - Executes full test suite (133 tests) against real Supabase stack (PostgreSQL + PostgREST + Kong + Auth)
   - Ensures **exact parity** between local and CI testing environments (antimocking compliance)
   - **Project isolation**: unique project names prevent port conflicts across concurrent CI runs
-  - Validates migration sync between `app/src/db/migrations/` and `app/supabase/migrations/` before tests
+  - Validates migration sync between `app/src/db/migrations/` and `app/supabase/migrations/` in setup job
   - Teardown via `app/scripts/cleanup-test-containers.sh` in cleanup step (always runs)
   - Migrations applied directly to containerized Postgres via `psql` (bypasses Supabase CLI)
+  - **Parallel Execution**: typecheck and lint jobs run concurrently after setup completes, reducing total workflow runtime
 
 - **Automation CI** (`.github/workflows/automation-ci.yml`): Tests the Python automation layer
   - Runs pytest suite (63 tests) for ADW workflow validation
