@@ -310,6 +310,10 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When implementing slash commands that coordinate sub-agents
     - When troubleshooting orchestrator state or checkpoint recovery
     - When understanding how MCP Tasks API integrates with workflow orchestration
+    - When understanding orchestrator subagent delegation mechanism
+    - When implementing or debugging orchestrator coordination logic
+    - When writing slash commands that need machine-readable output for orchestrator consumption
+    - When troubleshooting orchestrator state management or checkpoint recovery
 
 - docs/specs/feature-187-orchestrator-slash-command.md
   - Conditions:

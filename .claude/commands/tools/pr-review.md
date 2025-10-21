@@ -38,3 +38,41 @@ Review another contributor’s pull request. Provide the PR number via `$ARGUMEN
 - Key findings (bugs, risks, missing tests/docs) with file/line references.
 - Follow-up actions or open questions.
 - URL to the posted GitHub review comment or confirmation that it was delivered via the PR interface.
+
+## Output Schema
+
+This command's output is validated against the following structure for orchestrator consumption:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "review_status": {
+      "type": "string",
+      "enum": ["approved", "changes_requested", "commented"],
+      "description": "Review decision submitted to GitHub"
+    },
+    "comment_count": {
+      "type": "integer",
+      "description": "Number of review comments or suggestions posted"
+    },
+    "blocking_issues": {
+      "type": "integer",
+      "description": "Number of blocking issues found (if status is changes_requested)"
+    },
+    "review_url": {
+      "type": "string",
+      "pattern": "^https://github\\.com/.*#pullrequestreview-\\d+$",
+      "description": "URL to the posted GitHub review"
+    }
+  },
+  "required": ["review_status"]
+}
+```
+
+The orchestrator parses the reporting output to extract review decision and metadata. Example parseable output:
+```
+- Review decision: Approved
+- Comments posted: 2 minor suggestions
+- Review URL: https://github.com/user/kota-db-ts/pull/123#pullrequestreview-456789
+```

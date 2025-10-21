@@ -118,3 +118,21 @@ https://github.com/user/kota-db-ts/pull/123
 - `gh pr view --web` (optional) to verify the rendered description and metadata.
 - Share the PR link with reviewers, ensure labels/reviewers are applied, and monitor `gh pr status` for CI progress.
 - Double-check the PR body captures anti-mock evidence and that labels (e.g., `methodology:anti-mock`) are applied when relevant.
+
+## Output Schema
+
+This command's output is validated against the following structure for orchestrator consumption:
+
+```json
+{
+  "type": "string",
+  "pattern": "^https://github\\.com/[^/]+/[^/]+/pull/\\d+$",
+  "description": "GitHub pull request URL"
+}
+```
+
+The orchestrator extracts two values from the URL:
+- `pr_number`: The numeric PR identifier (extracted from URL path)
+- `pr_url`: The complete GitHub URL
+
+Example valid output: `https://github.com/user/kota-db-ts/pull/123`

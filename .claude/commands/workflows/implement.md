@@ -95,3 +95,46 @@ All tests passed successfully! The validation level was Level 2.
 
 You can view the pull request at: https://github.com/user/repo/pull/123
 ```
+
+## Output Schema
+
+This command's output is validated against the following structure for orchestrator consumption:
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "files_modified": {
+      "type": "array",
+      "description": "List of files created or modified with line count"
+    },
+    "validation_level": {
+      "type": "integer",
+      "enum": [1, 2, 3],
+      "description": "Validation level selected (1=Quick, 2=Integration, 3=Release)"
+    },
+    "lint_status": {
+      "type": "string",
+      "enum": ["pass", "fail"],
+      "description": "Result of bun run lint command"
+    },
+    "typecheck_status": {
+      "type": "string",
+      "enum": ["pass", "fail"],
+      "description": "Result of bunx tsc --noEmit command"
+    },
+    "test_results": {
+      "type": "string",
+      "pattern": "^\\d+/\\d+$",
+      "description": "Test pass count in format 'passed/total' (e.g., '133/133')"
+    },
+    "real_service_evidence": {
+      "type": "string",
+      "description": "Evidence that integration tests hit real services"
+    }
+  },
+  "required": ["validation_level", "lint_status", "typecheck_status"]
+}
+```
+
+The orchestrator parses the bullet list output to extract these fields using pattern matching. While the output is plain text (not JSON), the schema defines what information must be present and parseable from the output.

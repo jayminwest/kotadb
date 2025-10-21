@@ -322,9 +322,14 @@ The `/orchestrator` command complements the Python automation layer:
 ### Documentation
 
 - **Slash Command Template**: `.claude/commands/workflows/orchestrator.md`
+  - **Subagent Delegation Pattern**: Documents how to invoke phase-specific slash commands programmatically (SlashCommand tool vs subprocess execution)
+  - **State File Integration**: Complete state file schema, lifecycle, and context passing patterns
+  - **Phase Output Extraction**: Parsing strategies with fallback mechanisms for extracting plan files, validation results, PR URLs, review decisions
+  - **Subagent Error Recovery**: Checkpoint-based recovery system with common failure scenarios and recovery steps
 - **Integration Tests**: `automation/adws/adw_tests/test_orchestrator_integration.py`
 - **Spec File**: `docs/specs/feature-187-orchestrator-slash-command.md`
 - **Conditional Docs Entry**: `.claude/commands/docs/conditional_docs.md`
+- **Output Contract Standards**: `.claude/commands/docs/prompt-code-alignment.md` - Template output format specifications for orchestrator parsing
 
 ### Limitations
 
