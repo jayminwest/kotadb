@@ -203,6 +203,73 @@ const userId = TEST_USER_IDS.free;
 const apiKey = TEST_API_KEYS.solo;
 ```
 
+### Multi-User Testing for RLS
+
+KotaDB enforces Row Level Security (RLS) to ensure users can only access their own data. Testing RLS requires creating test data for multiple users and verifying isolation.
+
+**Test User Aliases:**
+```typescript
+import { TEST_USER_IDS, createTestJob, getTestApiKey } from "../helpers/db";
+
+// Alice (free tier user)
+const aliceUserId = TEST_USER_IDS.alice;  // Same as TEST_USER_IDS.free
+const aliceApiKey = getTestApiKey("free");
+
+// Bob (solo tier user)
+const bobUserId = TEST_USER_IDS.bob;      // Same as TEST_USER_IDS.solo
+const bobApiKey = getTestApiKey("solo");
+```
+
+**Creating Jobs for Specific Users:**
+```typescript
+// Create job for Alice
+const aliceJobId = await createTestJob({
+  userId: TEST_USER_IDS.alice,
+  ref: "main",
+  status: "pending"
+});
+
+// Create job for Bob
+const bobJobId = await createTestJob({
+  userId: TEST_USER_IDS.bob,
+  ref: "feature-branch",
+  status: "completed"
+});
+```
+
+**Testing RLS Enforcement:**
+```typescript
+// Alice should see her own job
+const aliceResponse = await fetch(`${BASE_URL}/jobs/${aliceJobId}`, {
+  headers: { Authorization: `Bearer ${aliceApiKey}` }
+});
+expect(aliceResponse.status).toBe(200);
+
+// Bob should NOT see Alice's job (404, not 403 to prevent existence leakage)
+const bobResponse = await fetch(`${BASE_URL}/jobs/${aliceJobId}`, {
+  headers: { Authorization: `Bearer ${bobApiKey}` }
+});
+expect(bobResponse.status).toBe(404);
+
+// Bob should see his own job
+const bobOwnResponse = await fetch(`${BASE_URL}/jobs/${bobJobId}`, {
+  headers: { Authorization: `Bearer ${bobApiKey}` }
+});
+expect(bobOwnResponse.status).toBe(200);
+```
+
+**Best Practices:**
+- Always return 404 (not 403) for unauthorized access to prevent information leakage
+- Test both positive (user can access own data) and negative (user cannot access other's data) cases
+- Clean up test jobs in `afterEach` hooks to prevent test pollution
+- Use `createTestJob()` helper to simplify multi-user test setup
+
+**How RLS Works:**
+- `index_jobs` table has SELECT policies that filter based on `repository_id`
+- Jobs are visible only if the repository belongs to the user (user_id match) or their organization
+- `getJobStatus()` explicitly checks repository ownership to mimic RLS behavior
+- Service role client bypasses RLS, so manual filtering is required
+
 ### Test Environment Variables
 
 Tests automatically load environment variables from `.env.test` via a preload script (`app/tests/setup.ts`). This script:

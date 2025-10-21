@@ -51,6 +51,9 @@ export const TEST_USER_IDS = {
 	free: "00000000-0000-0000-0000-000000000001",
 	solo: "00000000-0000-0000-0000-000000000002",
 	team: "00000000-0000-0000-0000-000000000003",
+	// Aliases for multi-user RLS testing
+	alice: "00000000-0000-0000-0000-000000000001", // Same as free user
+	bob: "00000000-0000-0000-0000-000000000002", // Same as solo user
 };
 
 /**
@@ -263,4 +266,70 @@ export async function getRateLimitStatus(keyId: string): Promise<{
 	}
 
 	return data;
+}
+
+/**
+ * Create a test index job with specific user context for RLS testing.
+ *
+ * Simplifies multi-user RLS testing by creating jobs directly in the database
+ * with proper user context set. Useful for testing that users can only query
+ * their own jobs.
+ *
+ * @param options - Job creation options
+ * @param options.userId - User ID to create the job for (required for RLS)
+ * @param options.repositoryId - Repository ID for the job (auto-creates if not provided)
+ * @param options.ref - Git ref to index (defaults to "main")
+ * @param options.status - Job status (defaults to "pending")
+ * @returns Created job ID
+ *
+ * @example
+ * // Create job for User A
+ * const jobId = await createTestJob({ userId: TEST_USER_IDS.alice });
+ *
+ * @example
+ * // Create completed job for User B
+ * const jobId = await createTestJob({
+ *   userId: TEST_USER_IDS.bob,
+ *   status: "completed"
+ * });
+ *
+ * Note: Compatible with CI environment (respects dynamic ports from .env.test)
+ */
+export async function createTestJob(options: {
+	userId: string;
+	repositoryId?: string;
+	ref?: string;
+	status?: "pending" | "running" | "completed" | "failed" | "skipped";
+}): Promise<string> {
+	const client = getSupabaseTestClient();
+	const { userId, ref = "main", status = "pending" } = options;
+
+	// Create repository if not provided
+	let repositoryId = options.repositoryId;
+	if (!repositoryId) {
+		repositoryId = await createTestRepository({ userId });
+	}
+
+	// Set user context for RLS
+	await client.rpc("set_user_context", { user_id: userId });
+
+	// Create job
+	const jobId = crypto.randomUUID();
+	const { error } = await client.from("index_jobs").insert({
+		id: jobId,
+		repository_id: repositoryId,
+		ref,
+		status,
+	});
+
+	if (error) {
+		throw new Error(
+			`Failed to create test job: ${error.message || JSON.stringify(error)}`,
+		);
+	}
+
+	// Clear user context
+	await client.rpc("clear_user_context");
+
+	return jobId;
 }
