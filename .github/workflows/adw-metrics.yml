@@ -86,13 +86,21 @@ jobs:
         id: check_threshold
         run: |
           SUCCESS_RATE="${{ steps.parse.outputs.success_rate }}"
+          TOTAL_RUNS="${{ steps.parse.outputs.total_runs }}"
           THRESHOLD="${{ github.event.inputs.alert_threshold || '50' }}"
 
-          if (( $(echo "$SUCCESS_RATE < $THRESHOLD" | bc -l) )); then
+          # Skip alert if no runs found (prevents false positives)
+          if [ "$TOTAL_RUNS" -eq 0 ]; then
+            echo "alert=false" >> $GITHUB_OUTPUT
+            echo "no_runs=true" >> $GITHUB_OUTPUT
+            echo "No alert: No runs found in analysis window"
+          elif (( $(echo "$SUCCESS_RATE < $THRESHOLD" | bc -l) )); then
             echo "alert=true" >> $GITHUB_OUTPUT
+            echo "no_runs=false" >> $GITHUB_OUTPUT
             echo "Alert triggered: Success rate ($SUCCESS_RATE%) is below threshold ($THRESHOLD%)"
           else
             echo "alert=false" >> $GITHUB_OUTPUT
+            echo "no_runs=false" >> $GITHUB_OUTPUT
             echo "No alert: Success rate ($SUCCESS_RATE%) is above threshold ($THRESHOLD%)"
           fi
 
@@ -115,7 +123,9 @@ jobs:
             **Failed Runs**: ${failedRuns}
             **Analysis Period**: Last 24 hours
 
-            The ADW system success rate has fallen below the alert threshold. Please review the [detailed metrics](${runUrl}) and investigate failure patterns.
+            ${totalRuns === '0'
+              ? '⚠️ **Note**: This alert was triggered with 0 total runs. This may indicate a timing issue with log collection rather than actual ADW failures. Check if recent runs exist in `automation/logs/kota-db-ts/local/`.'
+              : 'The ADW system success rate has fallen below the alert threshold. Please review the [detailed metrics](${runUrl}) and investigate failure patterns.'}
 
             ### Quick Actions
             1. Review recent failure logs in \`automation/logs/kota-db-ts/local/\`

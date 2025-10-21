@@ -367,12 +367,14 @@ The agentic layer operates on the application layer (in `app/`) to automate deve
   - **Schedule**: Runs daily at 00:00 UTC for automated metrics collection
   - **Manual Trigger**: Available via `gh workflow run "ADW Metrics Analysis" --ref main`
   - **Outputs**: JSON metrics artifact + markdown summary in GitHub Step Summary
-  - **Alerting**: Creates/updates GitHub issue when success rate < 50%
+  - **Alerting**: Creates/updates GitHub issue when success rate < 50% AND total_runs > 0
+  - **False Positive Prevention**: Workflow skips alerts when no runs found (0 total_runs) to prevent timing-related false positives
   - **Critical Threshold**: Workflow fails if success rate < 20%
   - **Artifacts**: 90-day retention for historical tracking
   - **Target Success Rate**: >80% (per 3-phase architecture goals)
   - View runs: `gh run list --workflow="ADW Metrics Analysis" --limit 5`
   - Download metrics: `gh run download <run_id> -n adw-metrics-<run_number>`
+  - **Troubleshooting**: If alert triggered with 0 runs, verify recent runs exist in `automation/logs/kota-db-ts/local/` and check time window alignment (workflow runs at 00:00 UTC, logs may be created after analysis)
 
 ### GitHub Issue Management and Relationship Standards
 
