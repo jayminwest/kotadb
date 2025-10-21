@@ -15,7 +15,7 @@ STATE_FILENAME = "adw_state.json"
 def agents_root() -> Path:
     """Base directory for per-agent state and logs."""
 
-    return project_root() / "agents"
+    return project_root() / "automation" / "agents"
 
 
 def state_path(adw_id: str) -> Path:

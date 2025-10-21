@@ -6,6 +6,7 @@ import json
 import logging
 import os
 import re
+import subprocess
 import sys
 import uuid
 from pathlib import Path
@@ -31,9 +32,18 @@ RESTRICTED_ENVIRONMENTS = {"production"}
 
 
 def project_root() -> Path:
-    """Return the repository root based on this file's location."""
+    """Return the repository root by calling git rev-parse."""
 
-    return Path(__file__).resolve().parents[2]
+    result = subprocess.run(
+        ["git", "rev-parse", "--show-toplevel"],
+        capture_output=True,
+        text=True,
+        check=False,
+    )
+    if result.returncode != 0:
+        # Fallback to file-based detection
+        return Path(__file__).resolve().parents[2]
+    return Path(result.stdout.strip())
 
 
 def _resolve_env_path(path: Path) -> Path:
