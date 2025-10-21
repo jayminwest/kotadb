@@ -10,6 +10,7 @@ import type { Server } from "node:http";
 import {
 	getTestApiKey,
 	createTestRepository,
+	createTestJob,
 	TEST_USER_IDS,
 	getSupabaseTestClient,
 } from "../helpers/db";
@@ -167,11 +168,73 @@ describe("Job Status API", () => {
 			expect(data.code).toBe("AUTH_MISSING_KEY");
 		});
 
-		// NOTE: RLS enforcement test skipped for MVP
-		// getJobStatus currently uses service client which bypasses RLS
-		// See #236 follow-up for RLS enforcement implementation
-		it.skip("enforces RLS - user cannot see other users jobs", async () => {
-			// TODO: Re-enable when RLS is properly enforced in getJobStatus
+		it("enforces RLS - user cannot see other users jobs", async () => {
+			// Create job for Alice (free tier user)
+			const aliceJobId = await createTestJob({ userId: TEST_USER_IDS.alice });
+			testJobIds.push(aliceJobId);
+
+			// Attempt to query Alice's job as Bob (solo tier user)
+			const bobResponse = await fetch(`${BASE_URL}/jobs/${aliceJobId}`, {
+				headers: {
+					Authorization: `Bearer ${SOLO_API_KEY}`,
+				},
+			});
+
+			const bobData = (await bobResponse.json()) as { error: string };
+
+			// Should return 404 (not 403) to avoid leaking job existence
+			expect(bobResponse.status).toBe(404);
+			expect(bobData.error).toContain("Job not found");
+
+			// Verify Alice can query her own job
+			const aliceResponse = await fetch(`${BASE_URL}/jobs/${aliceJobId}`, {
+				headers: {
+					Authorization: `Bearer ${TEST_API_KEY}`,
+				},
+			});
+
+			const aliceData = (await aliceResponse.json()) as {
+				id: string;
+				status: string;
+			};
+
+			expect(aliceResponse.status).toBe(200);
+			expect(aliceData.id).toBe(aliceJobId);
+			expect(aliceData.status).toBe("pending");
+
+			// Create job for Bob and verify isolation
+			const bobJobId = await createTestJob({ userId: TEST_USER_IDS.bob });
+			testJobIds.push(bobJobId);
+
+			// Alice should not see Bob's job
+			const aliceQueryBobResponse = await fetch(
+				`${BASE_URL}/jobs/${bobJobId}`,
+				{
+					headers: {
+						Authorization: `Bearer ${TEST_API_KEY}`,
+					},
+				},
+			);
+
+			expect(aliceQueryBobResponse.status).toBe(404);
+
+			// Bob should see his own job
+			const bobQueryBobResponse = await fetch(
+				`${BASE_URL}/jobs/${bobJobId}`,
+				{
+					headers: {
+						Authorization: `Bearer ${SOLO_API_KEY}`,
+					},
+				},
+			);
+
+			const bobJobData = (await bobQueryBobResponse.json()) as {
+				id: string;
+				status: string;
+			};
+
+			expect(bobQueryBobResponse.status).toBe(200);
+			expect(bobJobData.id).toBe(bobJobId);
 		});
 
 		it("includes rate limit headers in response", async () => {

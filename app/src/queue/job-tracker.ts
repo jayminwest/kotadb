@@ -113,30 +113,67 @@ export async function updateJobStatus(
 /**
  * Get current job status and details.
  *
- * NOTE: Currently uses service client which bypasses RLS.
- * RLS enforcement should be added in a future iteration (#236 follow-up).
+ * Enforces user isolation by filtering jobs based on repository ownership.
+ * Returns 404 for jobs that don't exist OR belong to other users (prevents existence leakage).
+ *
+ * Security: Uses service client with explicit user_id filtering to mimic RLS policy behavior.
+ * The logic replicates the index_jobs RLS SELECT policy:
+ * 1. Fetch the job
+ * 2. Check if the repository belongs to the user or user's organization
+ * 3. Return 404 if unauthorized (prevents information leakage)
  *
  * @param jobId - UUID of job to query
- * @param userId - User UUID (for future RLS enforcement)
+ * @param userId - User UUID for filtering
  * @returns Job record with full details
- * @throws Error if job not found
+ * @throws Error if job not found or user lacks access (404, not 403)
  */
 export async function getJobStatus(
 	jobId: string,
 	userId: string,
 ): Promise<IndexJob> {
 	const client = getServiceClient();
-	await setUserContext(client, userId);
 
-	const { data, error } = await client
+	// First, fetch the job
+	const { data: job, error: jobError } = await client
 		.from("index_jobs")
 		.select("*")
 		.eq("id", jobId)
 		.single();
 
-	if (error || !data) {
+	if (jobError || !job) {
 		throw new Error(`Job not found: ${jobId}`);
 	}
 
-	return data as IndexJob;
+	// Check if user has access to the repository
+	const { data: repo, error: repoError } = await client
+		.from("repositories")
+		.select("id, user_id, org_id")
+		.eq("id", job.repository_id)
+		.single();
+
+	if (repoError || !repo) {
+		throw new Error(`Job not found: ${jobId}`);
+	}
+
+	// Check if user owns the repository directly
+	if (repo.user_id === userId) {
+		return job as IndexJob;
+	}
+
+	// Check if repository belongs to an organization that the user is a member of
+	if (repo.org_id) {
+		const { data: membership } = await client
+			.from("user_organizations")
+			.select("user_id")
+			.eq("org_id", repo.org_id)
+			.eq("user_id", userId)
+			.maybeSingle();
+
+		if (membership) {
+			return job as IndexJob;
+		}
+	}
+
+	// User has no access - return 404 (not 403) to avoid leaking job existence
+	throw new Error(`Job not found: ${jobId}`);
 }
