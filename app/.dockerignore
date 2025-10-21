@@ -1,0 +1,28 @@
+# Dependencies (will be installed fresh in container)
+node_modules/
+
+# Testing infrastructure
+tests/
+supabase/
+
+# Local development data
+data/
+
+# Development scripts
+scripts/
+
+# Documentation
+docs/
+*.md
+!README.md
+
+# Environment files
+.env
+.env.test
+.env.sample
+
+# macOS artifacts
+.DS_Store
+
+# Git directory
+.git/

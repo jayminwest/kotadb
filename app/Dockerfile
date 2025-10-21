@@ -4,7 +4,7 @@ FROM oven/bun:1.1.29 AS base
 WORKDIR /app
 
 COPY package.json bun.lock tsconfig.json ./
-RUN bun install --frozen-lockfile
+RUN bun install --frozen-lockfile --verbose
 
 COPY . .
 
