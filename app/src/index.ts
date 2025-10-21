@@ -1,6 +1,7 @@
 import { createExpressApp } from "@api/routes";
 import { getServiceClient } from "@db/client";
-import { startQueue, stopQueue } from "@queue/client";
+import { startQueue, stopQueue, getQueue } from "@queue/client";
+import { startIndexWorker } from "@queue/workers/index-repo";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -35,6 +36,17 @@ async function bootstrap() {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
 		console.error(`Failed to start job queue: ${errorMessage}`);
+		throw error;
+	}
+
+	// Start indexing worker
+	try {
+		const queue = getQueue();
+		await startIndexWorker(queue);
+	} catch (error) {
+		const errorMessage =
+			error instanceof Error ? error.message : String(error);
+		console.error(`Failed to start indexing worker: ${errorMessage}`);
 		throw error;
 	}
 
