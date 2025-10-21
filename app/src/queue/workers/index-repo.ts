@@ -2,20 +2,18 @@
  * Indexing worker for processing repository indexing jobs.
  *
  * Implements a 7-step pipeline:
- * 1. Clone/fetch repository to temporary directory
+ * 1. Clone/fetch repository (reuses data/workspace/ for efficiency)
  * 2. Discover source files in project
  * 3. Parse files and extract content
  * 4. Extract symbols via AST parsing
- * 5. Extract cross-file references
- * 6. Build dependency graph
+ * 5. Extract cross-file references (deferred - requires database IDs)
+ * 6. Build dependency graph (deferred - requires database IDs)
  * 7. Store indexed data atomically
  *
  * The worker is registered with pg-boss and processes jobs from the "index-repo" queue.
- * Includes automatic retry for transient failures, temp directory cleanup, and job status tracking.
+ * Includes automatic retry for transient failures and job status tracking.
  */
 
-import { rm } from "node:fs/promises";
-import { join } from "node:path";
 import type PgBoss from "pg-boss";
 import { getServiceClient } from "@db/client";
 import { updateJobStatus } from "@queue/job-tracker";
@@ -81,17 +79,14 @@ async function processIndexJob(
 	const supabase = getServiceClient();
 	const startTime = Date.now();
 
-	// Use unique temp directory for this job
-	const tempDir = join("/tmp", `kotadb-${indexJobId}`);
-
 	console.log(
-		`[${new Date().toISOString()}] Processing index job: job_id=${indexJobId}, repository_id=${repositoryId}, temp_dir=${tempDir}`,
+		`[${new Date().toISOString()}] Processing index job: job_id=${indexJobId}, repository_id=${repositoryId}`,
 	);
 
 	// Fetch repository metadata for context
 	const { data: repo, error: repoError } = await supabase
 		.from("repositories")
-		.select("slug, ref, user_id")
+		.select("full_name, git_url, default_branch, user_id")
 		.eq("id", repositoryId)
 		.single();
 
@@ -102,20 +97,23 @@ async function processIndexJob(
 	}
 
 	const userId = repo.user_id;
+	// Use git_url if available, otherwise use full_name (for GitHub repos or local paths)
+	const repositoryIdentifier = repo.git_url || repo.full_name;
 
 	try {
 		// Update job status to 'processing'
 		await updateJobStatus(indexJobId, "processing", undefined, userId);
 
-		// STEP 1: Clone/fetch repository to temp directory
+		// STEP 1: Clone/fetch repository
 		console.log(
 			`[${new Date().toISOString()}] [STEP 1/7] Cloning repository: repository_id=${repositoryId}`,
 		);
 
+		// Note: Don't pass localPath - let prepareRepository clone to default workspace
+		// The localPath parameter means "use existing local repo" not "clone to this directory"
 		const repoContext = await prepareRepository({
-			repository: repo.slug,
-			ref: commitSha || repo.ref,
-			localPath: tempDir,
+			repository: repositoryIdentifier,
+			ref: commitSha || repo.default_branch || "main",
 		});
 
 		// STEP 2: Discover source files
@@ -208,12 +206,22 @@ async function processIndexJob(
 			`[${new Date().toISOString()}] [STEP 5/7] Extracting references`,
 		);
 
-		// References require post-storage processing with file IDs
-		// For MVP, store empty array (deferred to future iteration)
+		// ARCHITECTURAL NOTE: Reference extraction requires post-storage processing
+		// The reference-extractor.ts module expects IndexedFile[] with database IDs
+		// already populated (see dependency-extractor.ts:148 for file_id checks).
+		// This creates a chicken-and-egg problem: we need to store files first to get IDs,
+		// but the storage function expects references as input.
+		//
+		// Solution options:
+		// 1. Two-phase storage: Store files/symbols first, then extract+store references
+		// 2. Refactor extractors to work without database IDs (use file paths as keys)
+		// 3. Post-processing job that runs after initial indexing completes
+		//
+		// For MVP, we store empty arrays and defer to follow-up issue #XXX
 		const references: ReferenceData[] = [];
 
 		console.log(
-			`[${new Date().toISOString()}] References deferred (requires post-storage processing)`,
+			`[${new Date().toISOString()}] References deferred (requires database IDs - see issue #XXX)`,
 		);
 
 		// STEP 6: Build dependency graph
@@ -221,12 +229,14 @@ async function processIndexJob(
 			`[${new Date().toISOString()}] [STEP 6/7] Building dependency graph`,
 		);
 
-		// Dependency graph requires post-storage processing with file/symbol IDs
-		// For MVP, store empty array (deferred to future iteration)
+		// ARCHITECTURAL NOTE: Dependency graph extraction has same limitation as references
+		// The dependency-extractor.ts:extractDependencies() expects files with id field populated
+		// and symbols with file_id attached (see lines 170, 238, 243).
+		// This must be solved alongside reference extraction in follow-up work.
 		const dependencyGraph: DependencyGraphEntry[] = [];
 
 		console.log(
-			`[${new Date().toISOString()}] Dependency graph deferred (requires post-storage processing)`,
+			`[${new Date().toISOString()}] Dependency graph deferred (requires database IDs - see issue #XXX)`,
 		);
 
 		// STEP 7: Store indexed data atomically
@@ -278,20 +288,9 @@ async function processIndexJob(
 
 		// Re-throw error for pg-boss retry logic
 		throw error;
-	} finally {
-		// CLEANUP: Remove temp directory (guaranteed execution)
-		try {
-			await rm(tempDir, { recursive: true, force: true });
-			console.log(
-				`[${new Date().toISOString()}] Cleaned up temp directory: ${tempDir}`,
-			);
-		} catch (cleanupError) {
-			console.error(
-				`[${new Date().toISOString()}] Failed to clean up temp directory ${tempDir}: ${cleanupError instanceof Error ? cleanupError.message : String(cleanupError)}`,
-			);
-			// Don't throw cleanup errors (non-critical)
-		}
 	}
+	// Note: Repository cleanup is not needed - prepareRepository() clones to
+	// data/workspace/{repo-name} which is reused across indexing jobs for efficiency
 }
 
 /**
