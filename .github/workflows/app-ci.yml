@@ -41,7 +41,7 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/node_modules
-          key: bun-${{ hashFiles('app/bun.lockb') }}
+          key: bun-${{ hashFiles('**/bun.lockb') }}
           restore-keys: |
             bun-
 
@@ -71,9 +71,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/node_modules
-          key: bun-${{ hashFiles('app/bun.lockb') }}
+          key: bun-${{ hashFiles('**/bun.lockb') }}
           restore-keys: |
             bun-
+
+      - name: Install dependencies (cache miss fallback)
+        run: bun install --frozen-lockfile
 
       - name: Type check shared types
         working-directory: shared
@@ -102,9 +105,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/node_modules
-          key: bun-${{ hashFiles('app/bun.lockb') }}
+          key: bun-${{ hashFiles('**/bun.lockb') }}
           restore-keys: |
             bun-
+
+      - name: Install dependencies (cache miss fallback)
+        run: bun install --frozen-lockfile
 
       - name: Lint
         run: bun run lint
@@ -129,9 +135,12 @@ jobs:
         uses: actions/cache@v4
         with:
           path: app/node_modules
-          key: bun-${{ hashFiles('app/bun.lockb') }}
+          key: bun-${{ hashFiles('**/bun.lockb') }}
           restore-keys: |
             bun-
+
+      - name: Install dependencies (cache miss fallback)
+        run: bun install --frozen-lockfile
 
       - name: Setup Docker Compose test stack and generate credentials
         working-directory: .
