@@ -89,7 +89,8 @@ jobs:
           TOTAL_RUNS="${{ steps.parse.outputs.total_runs }}"
           THRESHOLD="${{ github.event.inputs.alert_threshold || '50' }}"
 
-          # Skip alert if no runs found (prevents false positives)
+          # Skip alert if no runs found (prevents false positives from timing issues)
+          # This happens when workflow runs at 00:00 UTC but recent ADW executions haven't completed yet
           if [ "$TOTAL_RUNS" -eq 0 ]; then
             echo "alert=false" >> $GITHUB_OUTPUT
             echo "no_runs=true" >> $GITHUB_OUTPUT
@@ -123,9 +124,7 @@ jobs:
             **Failed Runs**: ${failedRuns}
             **Analysis Period**: Last 24 hours
 
-            ${totalRuns === '0'
-              ? '⚠️ **Note**: This alert was triggered with 0 total runs. This may indicate a timing issue with log collection rather than actual ADW failures. Check if recent runs exist in `automation/logs/kota-db-ts/local/`.'
-              : 'The ADW system success rate has fallen below the alert threshold. Please review the [detailed metrics](${runUrl}) and investigate failure patterns.'}
+            The ADW system success rate has fallen below the alert threshold. Please review the [detailed metrics](${runUrl}) and investigate failure patterns.
 
             ### Quick Actions
             1. Review recent failure logs in \`automation/logs/kota-db-ts/local/\`
