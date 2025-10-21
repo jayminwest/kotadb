@@ -56,6 +56,7 @@ describe("Job Status API", () => {
 				body: JSON.stringify({
 					repository: "test/repo",
 					ref: "main",
+					localPath: ".",
 				}),
 			});
 
@@ -79,6 +80,7 @@ describe("Job Status API", () => {
 				},
 				body: JSON.stringify({
 					repository: "test/repo",
+					localPath: ".",
 				}),
 			});
 
@@ -250,6 +252,7 @@ describe("Job Status API", () => {
 				body: JSON.stringify({
 					repository: "test/repo",
 					ref: "main",
+					localPath: ".",
 				}),
 			});
 
