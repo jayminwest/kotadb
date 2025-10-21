@@ -120,9 +120,51 @@ Build and run in a container:
 ```bash
 # From repository root
 docker compose up dev
+
+# Manual build (from app/ directory)
+docker build -t kotadb:test .
+
+# Run container
+docker run -p 3000:3000 -e PORT=3000 kotadb:test
 ```
 
 The Dockerfile in this directory is used for both development and production builds.
+
+### Build Context Optimization
+
+The `.dockerignore` file excludes unnecessary files from the Docker build context:
+- `node_modules/` (installed fresh in container)
+- `tests/` and `supabase/` (not needed in production)
+- `data/`, `scripts/`, `docs/` (development-only)
+- Environment files (`.env`, `.env.test`)
+
+This reduces build context from ~123MB to <3KB, significantly improving build performance.
+
+### Fly.io Deployment
+
+Deploy to Fly.io using the included `fly.toml` configuration:
+
+```bash
+# Build-only test (recommended before full deployment)
+flyctl deploy --build-only --push --buildkit -a kotadb --config fly.toml
+
+# Full deployment
+flyctl deploy --detach --buildkit -a kotadb --config fly.toml
+```
+
+**Troubleshooting deployment hangs:**
+
+If builds hang during `bun install`:
+1. Check logs: `flyctl logs -a kotadb --no-tail`
+2. Cancel stuck builds: `flyctl status -a kotadb` then `flyctl apps destroy-build`
+3. Verify build context size is small (<5MB)
+4. Try fallback builder if BuildKit fails: Add `--depot=false` flag
+
+**Configuration:**
+- App name: `kotadb` (must match Fly.io dashboard)
+- Memory: 1024MB (increased from 512MB for Bun runtime)
+- Region: `iad` (US East)
+- Auto-start/stop enabled for cost optimization
 
 ## Learn More
 

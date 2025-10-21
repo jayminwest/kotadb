@@ -1,4 +1,4 @@
-app = "kota-db-staging"
+app = "kotadb"
 
 kill_signal = "SIGINT"
 kill_timeout = 5
@@ -17,4 +17,4 @@ primary_region = "iad"
 [[vm]]
   cpu_kind = "shared"
   cpus = 1
-  memory_mb = 512
+  memory_mb = 1024

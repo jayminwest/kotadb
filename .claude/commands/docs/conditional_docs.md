@@ -38,6 +38,12 @@ Use this reference to decide which KotaDB documentation sources to consult befor
     - When understanding GitHub issue relationship standards and prioritization workflow (see "GitHub Issue Management and Relationship Standards" section)
     - When working on issue dependency graphs or relationship documentation
 
+- app/.dockerignore
+  - Conditions:
+    - When working on Docker builds, Fly.io deployments, or build optimization
+    - When troubleshooting Docker build context size or performance issues
+    - When adding new files/directories that should be excluded from production builds
+
 - docs/specs/chore-195-dev-start-script.md
   - Conditions:
     - When troubleshooting development environment setup issues
