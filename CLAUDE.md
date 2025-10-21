@@ -460,6 +460,30 @@ See issue #151 for complete documentation standards and implementation details.
   - Validates automation infrastructure without external service dependencies
   - Target runtime: < 2 minutes for full test suite execution
 
+**Push Trigger Strategy for Feature Branches**:
+All CI workflows trigger on both `push` and `pull_request` events to ensure validation regardless of PR creation timing. This prevents PRs from merging without CI validation when commits are pushed before PR creation (common in worktree workflows).
+
+**Supported Branch Patterns** (issue #193):
+- `main` - Production branch
+- `develop` - Development integration branch
+- `feat/**` - Feature branches
+- `bug/**` - Bug fix branches
+- `chore/**` - Chore branches
+- `fix/**` - Alternative fix branch naming
+- `refactor/**` - Refactoring branches
+- `interactive-*` - Interactive worktree branches (created via `/spawn_interactive`)
+
+**Trigger Behavior**:
+- Push to any supported branch triggers CI workflows (filtered by path)
+- Pull requests trigger CI workflows for code review validation
+- Fork PRs rely on `pull_request` trigger (push triggers may be restricted by GitHub security)
+- Path filters limit CI runs to relevant component changes
+
+**Monitoring**:
+- Track GitHub Actions minutes consumption via Settings → Billing
+- Alert if consumption increases >10% from baseline
+- Path filters mitigate unnecessary CI runs
+
 **Test Environment Variable Loading Strategy**:
 - **Problem**: CI uses dynamic Docker Compose ports, but tests were hardcoding `localhost:54322`
 - **Solution**: Tests automatically load `.env.test` via preload script before running

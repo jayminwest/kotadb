@@ -5,6 +5,12 @@ on:
     branches:
       - main
       - develop
+      - 'feat/**'
+      - 'bug/**'
+      - 'chore/**'
+      - 'fix/**'
+      - 'refactor/**'
+      - 'interactive-*'
     paths:
       - 'app/**'
       - 'shared/**'
