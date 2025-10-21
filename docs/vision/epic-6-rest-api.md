@@ -1,8 +1,11 @@
 # Epic 6: REST API Migration
 
-**Status**: Not Started
+> **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
+
+**Status**: 🟡 70% Complete (Partial)
 **Priority**: High (Frontend dependency)
-**Estimated Duration**: 1 week
+**Estimated Duration**: 1-2 weeks
+**Actual Progress**: Core endpoints working. Remaining: repository management, job status polling (blocked by Epic 4), organization management, pagination.
 
 ## Overview
 

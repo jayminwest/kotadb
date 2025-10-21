@@ -1,8 +1,11 @@
 # Epic 4: Job Queue & Background Processing
 
-**Status**: Not Started
-**Priority**: High (Enables async indexing)
-**Estimated Duration**: 1 week
+> **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
+
+**Status**: 🔴 0% Complete (**MVP BLOCKER**)
+**Priority**: Critical (Enables async indexing)
+**Estimated Duration**: 1-2 weeks
+**Actual Progress**: Not started. All indexing runs synchronously. **Second-highest priority gap for MVP.**
 
 ## Overview
 

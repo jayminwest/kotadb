@@ -1,8 +1,15 @@
 # Epic 7: MCP Server Implementation
 
-**Status**: Not Started
+> **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
+
+**Status**: ✅ 95% Complete (Production-Ready)
 **Priority**: Critical (Core value proposition)
 **Estimated Duration**: 2 weeks
+**Actual Duration**: ~3 weeks (completed October 2025)
+
+**Completion Summary**: HTTP JSON-RPC implementation complete (using `@modelcontextprotocol/sdk` v1.20+). Three tools working: `search_code`, `index_repository`, `list_recent_files`. 122/132 MCP tests passing (92.4% coverage). **Technical decision**: HTTP JSON-RPC instead of SSE for simpler error handling.
+
+**Remaining Work**: `search_dependencies` and `find_references` tools blocked by Epic 3 (AST parsing).
 
 ## Overview
 

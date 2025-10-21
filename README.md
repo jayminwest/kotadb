@@ -337,6 +337,17 @@ docs/                  # Documentation (schema, specs, setup guides)
 
 See `app/README.md` for application-specific quickstart and `automation/adws/README.md` for automation workflows.
 
+## Project Roadmap
+
+For strategic priorities, planned features, and development timeline, see [ROADMAP.md](ROADMAP.md).
+
+The roadmap provides:
+- Current state and shipped features
+- Immediate priorities (Phase 1)
+- Medium-term and long-term goals
+- Dependencies and blockers
+- Key architectural decisions
+
 ## Next Steps
 
 - Harden repository checkout logic with retry/backoff and temporary workspace isolation.

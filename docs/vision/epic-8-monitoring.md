@@ -1,8 +1,11 @@
 # Epic 8: Monitoring & Operations
 
-**Status**: Not Started
-**Priority**: Medium (Parallel track)
-**Estimated Duration**: 3-5 days
+> **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
+
+**Status**: 🟡 15% Complete (Minimal Progress)
+**Priority**: Medium (Launch readiness)
+**Estimated Duration**: 1 week
+**Actual Progress**: Basic `/health` endpoint exists. Remaining: structured logging, metrics, alerts.
 
 ## Overview
 

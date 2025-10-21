@@ -1,12 +1,30 @@
 # Epic 1: Database Foundation & Schema
 
-**Status**: Not Started
+> **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
+
+**Status**: ✅ 95% Complete (Production-Ready)
 **Priority**: Critical (Blocks most other work)
 **Estimated Duration**: 1-2 weeks
+**Actual Duration**: ~2 weeks (completed October 2025)
 
 ## Overview
 
 Establish the Supabase PostgreSQL database schema, migration system, and client configuration. This is the foundational epic that most other work depends on.
+
+## Completion Status
+
+**Overall**: ✅ 95% complete - Database schema implemented, migrations working, RLS policies active
+
+**Key Achievements**:
+- 10-table schema (users, api_keys, organizations, repositories, index_jobs, indexed_files, symbols, references, dependencies, rate_limit_counters)
+- Row Level Security (RLS) for multi-tenant isolation
+- Migration system with sync between `app/src/db/migrations/` and `app/supabase/migrations/`
+- `increment_rate_limit()` database function for atomic counter updates
+- Integration tests use real Supabase Local (antimocking compliance)
+
+**Remaining Work**:
+- 🟡 Index optimization for hot query paths (minor performance tuning)
+- 🟡 Migration sync validation in CI (minor automation)
 
 ## Issues
 

@@ -1,7 +1,7 @@
 # KotaDB Vision
 
-**Last Updated**: 2025-10-06
-**Status**: Architecture decisions finalized, ready for implementation
+**Last Updated**: 2025-10-20
+**Status**: ~60% complete - Foundation strong, critical gaps block MVP (see ROADMAP.md and CURRENT_STATE.md)
 
 ## Core Concept
 
@@ -14,11 +14,13 @@ KotaDB is an **intelligence layer** between Claude Code (and other MCP-compatibl
 - **kotadb (this repository)**: Backend indexing and query service
   - Bun + TypeScript runtime
   - PostgreSQL via Supabase (primary data store for all environments)
-  - SQLite for local development/testing only
-  - MCP server implementation (SSE transport)
+  - ~~SQLite for local development/testing only~~ (Removed: using Supabase Local for all testing)
+  - MCP server implementation (**HTTP JSON-RPC transport** - see Technical Decisions below)
   - REST API for frontend UX
-  - Webhook receivers for GitHub events
-  - Job queue (pg-boss) for async indexing
+  - Webhook receivers for GitHub events (**Planned** - Epic 5, not yet implemented)
+  - Job queue (pg-boss) for async indexing (**Planned** - Epic 4, not yet implemented)
+
+**Current Status**: Database, auth, MCP server, and testing infrastructure are production-ready. AST parsing, job queue, and GitHub integration are critical gaps blocking MVP (see ROADMAP.md).
 
 - **kotadb.io** (separate repository): SaaS frontend application
   - Hosted on Cloudflare
@@ -112,27 +114,32 @@ dependencies             -- File→file and symbol→symbol edges
 
 **Protocol Version**: MCP 2025-06-18 specification
 
-**Transport**: Server-Sent Events (SSE/Streamable HTTP)
-- Spec-compliant, supported by Claude Code
-- Enables real-time streaming responses for long-running queries
-- Endpoint: `/mcp/` (SSE event stream)
+**Transport**: HTTP JSON-RPC (Streamable HTTP)
+- **Implementation Decision**: HTTP JSON-RPC via `@modelcontextprotocol/sdk` (v1.20+) instead of SSE streaming
+- **Rationale**: Simpler error handling, better debugging, matches real-world MCP usage patterns
+- **Trade-off**: No real-time streaming for long-running queries, but eliminates connection management complexity
+- Endpoint: `/mcp` (POST only, JSON-RPC over HTTP)
+
+**Current Status**: MCP server is production-ready with 3 tools (95% complete, 122/132 tests passing)
 
 **MVP Tools (Phase 1)**: Three high-ROI tools for initial release
 
-1. **`search_code`** (Foundation)
+1. **`search_code`** (Foundation) ✅ **Implemented**
    - Full-text search across indexed files
    - Filters: repository, file path, language
    - Quick win, validates MCP integration end-to-end
 
-2. **`find_references`** (Killer Feature)
-   - Input: symbol name (function, class, variable)
-   - Output: All locations where symbol is imported or called
-   - Enables "what will break if I change X" use case
+2. **`index_repository`** (Core Workflow) ✅ **Implemented**
+   - Triggers repository indexing (currently synchronous, Epic 4 will make async)
+   - Returns job ID for status polling (once Epic 4 completes)
 
-3. **`get_dependencies`** (Impact Analysis)
-   - Input: file path or symbol name
-   - Output: Dependency graph (what this imports, recursively)
-   - Helps agents understand scope of changes
+3. **`list_recent_files`** (Context Discovery) ✅ **Implemented**
+   - Returns recently indexed files for a repository
+   - Useful for understanding what's available to search
+
+**Planned Tools** (blocked by Epic 3 AST parsing):
+- **`search_dependencies`** - Dependency graph traversal (requires AST parsing)
+- **`find_references`** - Symbol reference lookup (requires AST parsing)
 
 **Future Tools**: `analyze_impact`, `find_similar`, `get_type_hierarchy`
 
@@ -208,27 +215,34 @@ CREATE TABLE api_keys (
 
 **Extraction Depth (Phase 1)**: Deep indexing from day one
 
-- ✅ **Import/export statements** → dependency graphs
-- ✅ **Function/class signatures** → symbol resolution
-- ✅ **Type definitions** (TS interfaces, types) → type relationships
-- ✅ **Docstrings/comments** (JSDoc, TSDoc) → semantic context
-- ✅ **Call graphs** (function invocations) → impact analysis
+- 🔴 **Import/export statements** → dependency graphs (**Partial**: regex-based, needs AST - Epic 3)
+- 🔴 **Function/class signatures** → symbol resolution (**Not Started** - Epic 3)
+- 🔴 **Type definitions** (TS interfaces, types) → type relationships (**Not Started** - Epic 3)
+- 🔴 **Docstrings/comments** (JSDoc, TSDoc) → semantic context (**Not Started** - Epic 3)
+- 🔴 **Call graphs** (function invocations) → impact analysis (**Not Started** - Epic 3)
 
-**Parser**: Migrate from regex to `@typescript-eslint/parser` for robust AST parsing
-- Extract symbols with positions (file, line, column)
-- Store call sites, type references, property accesses
-- Index docstrings separately for future semantic search
+**Parser**: Migrate from regex to `@typescript-eslint/parser` for robust AST parsing (**In Progress** - Epic 3, 30% complete)
+- ✅ File discovery and basic content extraction (regex-based)
+- 🔴 Extract symbols with positions (file, line, column) - **Blocked on Epic 3**
+- 🔴 Store call sites, type references, property accesses - **Blocked on Epic 3**
+- 🔴 Index docstrings separately for future semantic search - **Blocked on Epic 3**
 
-**Job Queue**: pg-boss (Postgres-backed queue)
+**Current Reality**: Using regex-based parsing for basic dependency extraction. Works for simple cases but fails on complex TypeScript syntax (JSX, destructuring, generics). **Epic 3 is the highest-priority gap blocking core value proposition.**
+
+**Job Queue**: pg-boss (Postgres-backed queue) **[NOT IMPLEMENTED - Epic 4]**
 - Uses Supabase as job store—no Redis/external service needed
 - Handles retries, exponential backoff, dead letter queues
 - Simple API: `queue.send('index-repo', { repoId })`
 - Worker: `queue.work('index-repo', async (job) => { ... })`
 
-**Webhook Flow:**
+**Current Reality**: All indexing runs synchronously in API handlers, blocking requests for 30s+ on large repos. **Epic 4 is critical for scalability and webhook support.**
+
+**Webhook Flow** (Planned - Epic 5):
 ```
 GitHub push → Webhook → pg-boss queue → Worker → Index repo → Update status → Notify frontend
 ```
+
+**Current Status**: No webhook support. Users manually trigger indexing via API.
 
 ## Technical Requirements
 
@@ -418,85 +432,90 @@ feat/* → develop (staging) → main (production)
 
 ## Current Scope (Phase 1)
 
-### Infrastructure & Foundation
-- [ ] Supabase schema design and migration from SQLite
-  - [ ] Core tables: users, api_keys, organizations, user_organizations
-  - [ ] Repository management: repositories, index_jobs
-  - [ ] Code intelligence: indexed_files, symbols, references, dependencies
-  - [ ] RLS policies for multi-tenancy
-  - [ ] Up/down migration scripts
+**Progress**: ~60% complete (see ROADMAP.md for detailed status)
 
-- [ ] Fly.io deployment setup
+### Infrastructure & Foundation
+- [x] Supabase schema design and migration from SQLite **[Epic 1: 95% complete]**
+  - [x] Core tables: users, api_keys, organizations, user_organizations
+  - [x] Repository management: repositories, index_jobs
+  - [x] Code intelligence: indexed_files, symbols, references, dependencies
+  - [x] RLS policies for multi-tenancy
+  - [x] Up/down migration scripts
+
+- [ ] Fly.io deployment setup **[Epic 9: Not started]**
   - [ ] Create `kotadb-staging` and `kotadb-prod` apps
   - [ ] Environment-specific `fly.toml` configurations
-  - [ ] Health check endpoint integration
+  - [x] Health check endpoint integration
   - [ ] Secrets sync scripts (`scripts/sync-secrets-*.sh`)
 
-- [ ] CI/CD pipeline
-  - [ ] GitHub Actions workflow (lint, typecheck, test, build, deploy)
+- [x] CI/CD pipeline **[Epic 9: 40% complete]**
+  - [x] GitHub Actions workflow (lint, typecheck, test, build)
   - [ ] Automated migrations on deploy (with rollback)
-  - [ ] Branch-based deployment (feat → develop → main)
-  - [ ] Docker image build and push
+  - [x] Branch-based testing (feat → develop → main)
+  - [x] Docker image build verification
 
 ### API & Authentication
-- [ ] API key system
-  - [ ] Key generation and hashing (bcrypt)
-  - [ ] Tier-based rate limiting middleware
-  - [ ] Authentication middleware for REST and MCP
+- [x] API key system **[Epic 2: 90% complete]**
+  - [x] Key generation and hashing (bcrypt)
+  - [x] Tier-based rate limiting middleware
+  - [x] Authentication middleware for REST and MCP
 
-- [ ] REST API refinements
-  - [ ] OpenAPI spec (`docs/openapi.yaml`)
-  - [ ] Migrate existing endpoints to Supabase
+- [x] REST API refinements **[Epic 6: 70% complete]**
+  - [x] OpenAPI spec (`docs/openapi.yaml`) - skeleton exists, needs sync
+  - [x] Migrate existing endpoints to Supabase
   - [ ] Add repository management endpoints
-  - [ ] Job status polling endpoints
+  - [ ] Job status polling endpoints (blocked by Epic 4)
 
-- [ ] MCP server implementation
-  - [ ] SSE transport layer (`/mcp/`)
-  - [ ] Protocol handlers (handshake, tool discovery, execution)
-  - [ ] Three MVP tools: `search_code`, `find_references`, `get_dependencies`
-  - [ ] MCP authentication via API keys
+- [x] MCP server implementation **[Epic 7: 95% complete]**
+  - [x] HTTP JSON-RPC transport layer (`/mcp`) - **Using HTTP instead of SSE**
+  - [x] Protocol handlers (handshake, tool discovery, execution)
+  - [x] Three MVP tools: `search_code`, `index_repository`, `list_recent_files`
+  - [x] MCP authentication via API keys
+  - [ ] `search_dependencies` tool (blocked by Epic 3)
+  - [ ] `find_references` tool (blocked by Epic 3)
 
 ### Indexing & Intelligence
-- [ ] GitHub App integration
+- [ ] GitHub App integration **[Epic 5: 0% complete - MVP BLOCKER]**
   - [ ] App registration documentation
   - [ ] Installation token generation
   - [ ] Webhook receiver (`POST /webhooks/github`)
   - [ ] Signature verification
 
-- [ ] Job queue with pg-boss
+- [ ] Job queue with pg-boss **[Epic 4: 0% complete - MVP BLOCKER]**
   - [ ] Queue setup and worker configuration
   - [ ] Retry logic and dead letter handling
   - [ ] Job status updates for frontend
 
-- [ ] Deep indexing pipeline
-  - [ ] Migrate to `@typescript-eslint/parser`
+- [ ] Deep indexing pipeline **[Epic 3: 30% complete - MVP BLOCKER]**
+  - [ ] Migrate to `@typescript-eslint/parser` (currently regex-based)
   - [ ] Extract symbols (functions, classes, types, exports)
   - [ ] Extract references (imports, calls, property accesses)
   - [ ] Extract dependencies (file→file, symbol→symbol edges)
   - [ ] Extract docstrings/comments
+  - [x] File discovery and basic content extraction (regex-based)
 
 ### Testing & Quality
-- [ ] Comprehensive test suite
-  - [ ] Unit tests (70% coverage): indexer, API, parsers
-  - [ ] Integration tests: full indexing pipeline, MCP protocol
+- [x] Comprehensive test suite **[Epic 10: 85% complete]**
+  - [x] Unit tests (85% coverage): indexer, API, parsers
+  - [x] Integration tests: MCP protocol, API endpoints, auth/rate limiting
   - [ ] E2E tests: end-to-end indexing and query workflows
   - [ ] Contract tests: OpenAPI spec validation
 
-- [ ] Test infrastructure
-  - [ ] Test repository fixtures with known graphs
-  - [ ] Mock GitHub webhook payloads
-  - [ ] Supabase test database seeding
-  - [ ] MCP client simulator
+- [x] Test infrastructure **[Epic 10: 85% complete]**
+  - [x] Test repository fixtures with known graphs
+  - [x] Mock GitHub webhook payloads (fixtures created)
+  - [x] Supabase test database setup (Supabase Local, antimocking enforced)
+  - [x] MCP test helpers and utilities
 
 ### Monitoring & Operations
-- [ ] Structured logging with bun:logger
+- [ ] Structured logging with bun:logger **[Epic 8: 15% complete]**
   - [ ] JSON log format with correlation IDs
   - [ ] Request/response logging
-  - [ ] Error logging with context
+  - [x] Error logging with context (basic)
 
-- [ ] Health monitoring
-  - [ ] Enhanced `/health` endpoint (DB, queue status)
-  - [ ] Fly.io metrics dashboard setup
+- [x] Health monitoring **[Epic 8: Partially complete]**
+  - [x] `/health` endpoint (DB connection check)
+  - [ ] Fly.io metrics dashboard setup (pending deployment)
   - [ ] Alert configuration for critical failures
 
 ## Out of Scope (Future Phases)

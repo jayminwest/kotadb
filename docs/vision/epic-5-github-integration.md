@@ -1,8 +1,11 @@
 # Epic 5: GitHub Integration
 
-**Status**: Not Started
-**Priority**: High (Enables auto-indexing)
-**Estimated Duration**: 1 week
+> **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
+
+**Status**: 🔴 0% Complete (**MVP BLOCKER**)
+**Priority**: Critical (Enables auto-indexing)
+**Estimated Duration**: 2 weeks
+**Actual Progress**: Not started. No GitHub App, no webhooks. **Third-highest priority gap for MVP.** Depends on Epic 4 (job queue).
 
 ## Overview
 

@@ -1,8 +1,11 @@
 # Epic 3: Enhanced Code Parsing
 
-**Status**: Not Started
-**Priority**: High (Core functionality)
-**Estimated Duration**: 2 weeks
+> **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
+
+**Status**: 🔴 30% Complete (**MVP BLOCKER**)
+**Priority**: Critical (Core functionality)
+**Estimated Duration**: 2-3 weeks
+**Actual Progress**: File discovery works (regex-based). AST parsing NOT implemented. **Highest priority gap for MVP.**
 
 ## Overview
 
