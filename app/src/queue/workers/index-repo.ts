@@ -109,12 +109,20 @@ async function processIndexJob(
 			`[${new Date().toISOString()}] [STEP 1/7] Cloning repository: repository_id=${repositoryId}`,
 		);
 
-		// Note: Don't pass localPath - let prepareRepository clone to default workspace
-		// The localPath parameter means "use existing local repo" not "clone to this directory"
-		const repoContext = await prepareRepository({
-			repository: repositoryIdentifier,
-			ref: commitSha || repo.default_branch || "main",
-		});
+		// Check if repository identifier is a local path (for testing or local repositories)
+		const isLocalPath = repositoryIdentifier.startsWith("/") || repositoryIdentifier.startsWith(".");
+		const repoContext = await prepareRepository(
+			isLocalPath
+				? {
+						repository: repositoryIdentifier,
+						ref: commitSha || repo.default_branch || "main",
+						localPath: repositoryIdentifier,
+					}
+				: {
+						repository: repositoryIdentifier,
+						ref: commitSha || repo.default_branch || "main",
+					},
+		);
 
 		// STEP 2: Discover source files
 		console.log(

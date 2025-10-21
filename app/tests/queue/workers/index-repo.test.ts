@@ -58,11 +58,19 @@ export function capitalize(str: string): string {
 `,
 		);
 
-		// Create test repository in database with local path as slug
-		// prepareRepository will treat paths starting with '/' as local paths
+		// Initialize as git repository (required by prepareRepository)
+		const { execSync } = require("node:child_process");
+		execSync("git init", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git config user.email 'test@test.com'", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git config user.name 'Test User'", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git add .", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git commit -m 'Initial commit'", { cwd: testRepoPath, stdio: "ignore" });
+
+		// Create test repository in database with local path as full_name
+		// Worker will recognize paths starting with '/' as local paths
 		const client = getSupabaseTestClient();
 		testRepoId = await createTestRepository({
-			fullName: testRepoPath, // Use local path as slug for testing
+			fullName: testRepoPath, // Use local path for testing
 			userId: TEST_USER_IDS.free,
 		});
 
