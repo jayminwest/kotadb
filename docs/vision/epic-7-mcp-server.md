@@ -2,18 +2,46 @@
 
 > **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
 
-**Status**: ✅ 95% Complete (Production-Ready)
+**Status**: ✅ 98% Complete (Production-Ready)
 **Priority**: Critical (Core value proposition)
 **Estimated Duration**: 2 weeks
 **Actual Duration**: ~3 weeks (completed October 2025)
 
-**Completion Summary**: HTTP JSON-RPC implementation complete (using `@modelcontextprotocol/sdk` v1.20+). Three tools working: `search_code`, `index_repository`, `list_recent_files`. 122/132 MCP tests passing (92.4% coverage). **Technical decision**: HTTP JSON-RPC instead of SSE for simpler error handling.
+**Completion Summary**: HTTP JSON-RPC implementation complete (using `@modelcontextprotocol/sdk` v1.20+). **Four tools working**: `search_code`, `index_repository`, `list_recent_files`, **`search_dependencies`** (#116, added 2025-10-20). 122/132 MCP tests passing (92.4% coverage). **Technical decision**: HTTP JSON-RPC instead of SSE for simpler error handling.
 
-**Remaining Work**: `search_dependencies` and `find_references` tools blocked by Epic 3 (AST parsing).
+**Remaining Work**: `find_references` tool (requires symbol resolution from Epic 3, ~1 week).
 
 ## Overview
 
 Implement Model Context Protocol (MCP) server with SSE transport. Build three MVP tools: `search_code`, `find_references`, `get_dependencies`.
+
+## Current Status
+
+**Completion**: 98% (updated 2025-10-20)
+**Blockers**: None (production-ready)
+
+### Completed (as of 2025-10-20)
+- ✅ HTTP JSON-RPC transport (using `@modelcontextprotocol/sdk` v1.20+)
+- ✅ Per-request server isolation (stateless design)
+- ✅ Authentication integration (API keys + rate limiting)
+- ✅ Four MCP tools operational:
+  - `search_code` - Full-text search across indexed files
+  - `index_repository` - Trigger repository indexing
+  - `list_recent_files` - Query recently indexed files
+  - **`search_dependencies`** (#116, merged PR #229) - NEW
+    - Three search directions: dependents (reverse), dependencies (forward), both
+    - Recursive traversal with depth 1-5
+    - Circular dependency detection
+    - Test file filtering
+- ✅ 122/132 MCP tests passing (92.4% coverage)
+- ✅ Integration guide (`docs/guides/mcp-claude-code-integration.md`)
+
+### In Progress
+- None
+
+### Remaining Work (2%)
+- `find_references` tool - requires symbol resolution (~1 week, Epic 3 dependency)
+- Advanced tools (future): `analyze_impact`, `get_type_hierarchy`
 
 ## Issues
 

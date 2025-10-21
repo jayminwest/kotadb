@@ -2,14 +2,43 @@
 
 > **Reference Document**: This epic was from original planning. See [ROADMAP.md](./ROADMAP.md) for current priorities and [CURRENT_STATE.md](./CURRENT_STATE.md) for gap analysis.
 
-**Status**: 🔴 30% Complete (**MVP BLOCKER**)
-**Priority**: Critical (Core functionality)
-**Estimated Duration**: 2-3 weeks
-**Actual Progress**: File discovery works (regex-based). AST parsing NOT implemented. **Highest priority gap for MVP.**
+**Status**: 🟢 70% Complete (**NO LONGER BLOCKING MVP**)
+**Priority**: High (Core functionality)
+**Estimated Duration for Remaining Work**: 1 week
+**Actual Progress**: AST parsing complete, symbol extraction complete, reference extraction complete (#75), dependency graph complete (#76). Symbol resolution for `find_references` tool remains.
 
 ## Overview
 
 Migrate from regex-based parsing to proper AST parsing using `@typescript-eslint/parser`. Extract symbols, references, and dependencies with precise position information.
+
+## Current Status
+
+**Completion**: 70% (updated 2025-10-20)
+**Blockers**: None (no longer blocking MVP)
+
+### Completed (as of 2025-10-20)
+- ✅ AST parsing with `@typescript-eslint/parser` (#117) - Merged in PR #117
+- ✅ Symbol extraction (#74) - Merged in PR #126
+- ✅ **Reference extraction** (#75) - Merged in PR #225
+  - Extracts imports, function calls, property accesses, type references
+  - Stores caller location (file, line, column)
+  - Handles aliased imports
+- ✅ **Dependency graph extraction** (#76) - Merged in PR #226
+  - File→file dependencies via imports
+  - Circular dependency detection during traversal
+  - Stored in `dependency_graph` table
+- ✅ **`search_dependencies` MCP tool** (#116) - Merged in PR #229
+  - Three search directions: dependents, dependencies, both
+  - Recursive traversal with configurable depth (1-5)
+  - Optional test file filtering
+
+### In Progress
+- None
+
+### Remaining Work
+- Symbol resolution for `find_references` MCP tool (~1 week)
+- Type relationship extraction (interfaces, generics) - nice-to-have
+- Docstring/comment extraction (JSDoc, TSDoc) - nice-to-have
 
 ## Issues
 
