@@ -39,7 +39,7 @@ DECLARE
 BEGIN
     -- Delete existing indexed data for this repository (idempotent for retries)
     DELETE FROM dependency_graph WHERE repository_id = p_repository_id;
-    DELETE FROM references WHERE source_file_id IN (
+    DELETE FROM "references" WHERE source_file_id IN (
         SELECT id FROM indexed_files WHERE repository_id = p_repository_id
     );
     DELETE FROM symbols WHERE file_id IN (
@@ -111,7 +111,7 @@ BEGIN
         v_symbol_id := (v_symbol_id_map->>v_reference.target_symbol_key)::uuid;
 
         IF v_file_id IS NOT NULL THEN
-            INSERT INTO references (source_file_id, target_symbol_id, target_file_path, line_number, reference_type, metadata)
+            INSERT INTO "references" (source_file_id, target_symbol_id, target_file_path, line_number, reference_type, metadata)
             VALUES (v_file_id, v_symbol_id, v_reference.target_file_path, v_reference.line_number,
                     v_reference.reference_type, COALESCE(v_reference.metadata, '{}'::jsonb));
             v_references_found := v_references_found + 1;
