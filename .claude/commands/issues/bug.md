@@ -21,7 +21,7 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 - Reference the repo git flow: work from `bug/<issue-number>-<slug>` off `develop`, with `develop` promoted to `main` on release.
 - Integrate `/anti-mock` expectations: propose real Supabase test coverage, failure injection, and follow-ups for any temporary skips.
 - Ensure the plan's closing tasks rerun validation and push the branch so a PR can be raised (PR titles must end with the issue number, e.g. `fix: correct row filters (#210)`).
-- Consult `.claude/commands/docs/conditional_docs.md` and read only the documentation whose conditions align with the defect.
+- Consult `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and read only the documentation whose conditions align with the defect.
 - When the remediation introduces new documentation, add or update the relevant conditional entry so future agents can discover it quickly.
 
 ## ADW Agent Integration

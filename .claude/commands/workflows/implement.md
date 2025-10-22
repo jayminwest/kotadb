@@ -4,7 +4,7 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 
 ## Instructions
 - Read the entire plan before making changes; clarify assumptions in inline notes if something is ambiguous.
-- Consult `.claude/commands/docs/conditional_docs.md` for any documentation that matches the implementation scope.
+- Consult `.claude/commands/docs/conditional_docs/app.md` (for backend/API changes) or `.claude/commands/docs/conditional_docs/automation.md` (for ADW/automation changes) for any documentation that matches the implementation scope.
 - Execute tasks in the documented order, touching only the files listed unless the plan explicitly allows otherwise.
 - Keep commits incremental and logically grouped. Use Conventional Commit subjects referencing the issue.
   - **CRITICAL**: Avoid meta-commentary patterns in commit messages (e.g., "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me")
