@@ -53,7 +53,7 @@ This template is used as a fallback by automation when `/document` fails. Return
   "success": true,
   "documentation_created": true,
   "documentation_path": "CLAUDE.md",
-  "summary": "Updated CLAUDE.md to document new rate limiting middleware and response headers. Updated conditional_docs.md with new spec reference. PR created at https://github.com/user/kota-db-ts/pull/123. No translations or screenshots needed.",
+  "summary": "Updated CLAUDE.md to document new rate limiting middleware and response headers. Updated conditional_docs/app.md with new spec reference. PR created at https://github.com/user/kota-db-ts/pull/123. No translations or screenshots needed.",
   "error_message": null
 }
 ```
