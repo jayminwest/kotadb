@@ -69,7 +69,7 @@ export async function updateIndexRunStatus(
 		status: string;
 		completed_at?: string;
 		error_message?: string;
-		metadata?: Record<string, unknown>;
+		stats?: Record<string, unknown>;
 	} = {
 		status,
 	};
@@ -83,7 +83,7 @@ export async function updateIndexRunStatus(
 	}
 
 	if (stats) {
-		updateData.metadata = stats;
+		updateData.stats = stats;
 	}
 
 	const { error } = await client
@@ -219,12 +219,30 @@ export async function storeReferences(
 		},
 	}));
 
+	// Deduplicate records based on unique constraint: (source_file_id, line_number, md5(metadata), reference_type)
+	// This prevents duplicate key errors when the same reference appears multiple times
+	const uniqueRecords = Array.from(
+		new Map(
+			records.map((r) => [
+				`${r.source_file_id}-${r.line_number}-${JSON.stringify(r.metadata)}-${r.reference_type}`,
+				r,
+			]),
+		).values(),
+	);
+
 	// Delete existing references for this file before inserting new ones
 	// This ensures clean re-indexing without conflict errors from the unique index
-	await client.from("references").delete().eq("source_file_id", fileId);
+	const { error: deleteError } = await client
+		.from("references")
+		.delete()
+		.eq("source_file_id", fileId);
+
+	if (deleteError) {
+		throw new Error(`Failed to delete existing references: ${deleteError.message}`);
+	}
 
 	// Insert new references
-	const { error, count } = await client.from("references").insert(records);
+	const { error, count } = await client.from("references").insert(uniqueRecords);
 
 	if (error) {
 		throw new Error(`Failed to store references: ${error.message}`);

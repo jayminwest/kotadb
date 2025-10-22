@@ -96,18 +96,23 @@ export async function updateJobStatus(
 		.from("index_jobs")
 		.update(updates)
 		.eq("id", jobId)
-		.select()
-		.single();
+		.select();
 
 	if (error) {
 		throw new Error(`Failed to update job status: ${error.message}`);
 	}
 
-	if (!data) {
-		throw new Error(`Job not found: ${jobId}`);
+	if (!data || data.length === 0) {
+		throw new Error(`Job not found or access denied: ${jobId}`);
 	}
 
-	return data as IndexJob;
+	if (data.length > 1) {
+		console.warn(
+			`Multiple jobs found for ID ${jobId}, using first result. This should not happen.`,
+		);
+	}
+
+	return data[0] as IndexJob;
 }
 
 /**
