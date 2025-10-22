@@ -89,7 +89,11 @@ export function capitalize(str: string): string {
 			// Ignore errors
 		}
 
-		// Clean up test repository
+		// Clean up test repository from database
+		const client = getSupabaseTestClient();
+		await client.from("repositories").delete().eq("id", testRepoId);
+
+		// Clean up test repository from filesystem
 		await rm(testRepoPath, { recursive: true, force: true });
 	});
 
