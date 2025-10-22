@@ -15,7 +15,17 @@ def mock_logger():
 
 @pytest.fixture
 def sample_issue():
-    return GitHubIssue(number=123, title="Add authentication", body="Implement JWT auth")
+    from datetime import datetime, timezone
+    return GitHubIssue(
+        number=123,
+        title="Add authentication",
+        body="Implement JWT auth",
+        state="open",
+        author={"login": "testuser"},
+        createdAt=datetime.now(timezone.utc),
+        updatedAt=datetime.now(timezone.utc),
+        url="https://github.com/test/repo/issues/123"
+    )
 
 
 @patch("adws.adw_agents.agent_classify_issue.execute_template")
