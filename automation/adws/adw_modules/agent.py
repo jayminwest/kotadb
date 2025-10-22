@@ -25,8 +25,8 @@ load_adw_env()
 
 # Resolve Claude CLI path (defaults to "claude").
 CLAUDE_PATH = os.getenv("CLAUDE_CODE_PATH", "claude")
-# Commands are at repository root, one level above automation directory
-COMMANDS_ROOT = project_root().parent / ".claude" / "commands"
+# Commands are at repository root
+COMMANDS_ROOT = project_root() / ".claude" / "commands"
 
 
 class RetryCode(str, Enum):
