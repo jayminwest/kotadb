@@ -259,8 +259,10 @@ export function capitalize(str: string): string {
 			.eq("repository_id", testRepoId);
 
 		expect(indexedFiles).toBeDefined();
+		console.log("DEBUG: Indexed files:", indexedFiles?.map((f: any) => ({ path: f.path, contentPreview: f.content?.substring(0, 50) })));
 		const validFile = indexedFiles?.find((f: any) => f.path.endsWith("valid.ts"));
 		expect(validFile).toBeDefined();
+		console.log("DEBUG: Valid file found:", { path: validFile?.path, contentPreview: validFile?.content?.substring(0, 50) });
 		expect(validFile?.content).toContain("foo");
 	}, 40000);
 });
