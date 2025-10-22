@@ -256,25 +256,29 @@ describe("MCP Concurrency", () => {
 		expect(searchResult.results).toBeArray();
 	});
 
-	test("concurrent tool/list requests return consistent results", async () => {
-		// Send 10 concurrent tools/list requests
-		const promises = Array.from({ length: 10 }, () =>
-			sendMcpRequest(baseUrl, "tools/list", {}, "free"),
-		);
+	test(
+		"concurrent tool/list requests return consistent results",
+		async () => {
+			// Send 10 concurrent tools/list requests
+			const promises = Array.from({ length: 10 }, () =>
+				sendMcpRequest(baseUrl, "tools/list", {}, "free"),
+			);
 
-		const responses = await Promise.all(promises);
+			const responses = await Promise.all(promises);
 
-		// All should return the same list of tools
-		// tools/list returns result.tools directly (not wrapped in content blocks)
-		const toolsLists = responses.map((r) => r.data.result);
+			// All should return the same list of tools
+			// tools/list returns result.tools directly (not wrapped in content blocks)
+			const toolsLists = responses.map((r) => r.data.result);
 
-		for (const toolsList of toolsLists) {
-			expect(toolsList.tools.length).toBe(4);
-			const names = toolsList.tools.map((t: any) => t.name);
-			expect(names).toContain("search_code");
-			expect(names).toContain("index_repository");
-			expect(names).toContain("list_recent_files");
-			expect(names).toContain("search_dependencies");
-		}
-	});
+			for (const toolsList of toolsLists) {
+				expect(toolsList.tools.length).toBe(4);
+				const names = toolsList.tools.map((t: any) => t.name);
+				expect(names).toContain("search_code");
+				expect(names).toContain("index_repository");
+				expect(names).toContain("list_recent_files");
+				expect(names).toContain("search_dependencies");
+			}
+		},
+		10000, // Increased timeout to 10s (was hitting 5s default in slow CI environments)
+	);
 });
