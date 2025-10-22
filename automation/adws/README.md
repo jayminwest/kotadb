@@ -24,6 +24,24 @@ adws/
 │   ├── ts_commands.py    # Bun validation command catalogue
 │   ├── utils.py          # Env loading, logging, JSON helpers
 │   └── workflow_ops.py   # Agent wrappers for plan/build/test/review/etc.
+├── adw_agents/           # Atomic agent catalog (chore #216, "one agent, one task, one prompt")
+│   ├── agent_classify_issue.py      # Issue classification (feat/bug/chore)
+│   ├── agent_generate_branch.py     # Conventional branch name generation
+│   ├── agent_create_plan.py         # Plan creation via slash commands
+│   ├── agent_commit_plan.py         # Plan commit message generation
+│   ├── agent_implement_plan.py      # Implementation via /workflows:implement
+│   ├── agent_commit_implementation.py  # Implementation commit messages
+│   ├── agent_create_pr.py           # Pull request creation
+│   ├── agent_review_code.py         # Code review execution
+│   ├── agent_push_branch.py         # Git push with retry logic
+│   ├── agent_cleanup_worktree.py    # Worktree cleanup
+│   ├── orchestrator.py              # DAG-based workflow coordinator (Phase 2+)
+│   └── README.md                    # Agent catalog documentation
+├── adw_agents_tests/     # Unit tests for atomic agents
+│   ├── test_agent_classify_issue.py
+│   ├── test_agent_generate_branch.py
+│   ├── test_agent_create_plan.py
+│   └── test_agent_orchestrator.py
 ├── adw_phases/           # Single-phase execution scripts (3-phase architecture as of #136)
 │   ├── adw_plan.py       # Plan phase (classify → branch → plan)
 │   ├── adw_build.py      # Build phase (implement plan → commit → push → PR)
@@ -57,6 +75,42 @@ Each single-phase script (located in `adw_phases/`) expects `ISSUE_NUMBER [ADW_I
 **Rationale**: The 5-phase architecture achieved 0% success rate across 57 runs due to over-engineering. The simplified 3-phase flow (plan → build → review) targets >80% completion rate by focusing on core functionality and deferring PR creation until implementation is complete.
 
 The SDLC orchestrator (`adw_sdlc.py`) chains single-phase scripts using `adw_modules.orchestrators.run_sequence`.
+
+---
+
+## Atomic Agent Catalog
+
+**Chore #216: Migrate ADW to Atomic Agents** (Phase 1 Complete)
+
+The atomic agent catalog decomposes monolithic phase scripts into reusable, single-purpose agents following the "one agent, one task, one prompt" philosophy. This addresses the 0% success rate (issue #206) by improving debuggability, enabling parallel execution, and providing fine-grained error recovery.
+
+**Architecture Benefits:**
+- **Fine-grained Error Handling**: Retry individual agents instead of entire phases
+- **Parallel Execution**: Independent agents (classify + generate_branch) run concurrently
+- **Improved Debuggability**: 10-50 line agent functions vs 200-300 line phase scripts
+- **Better Testability**: Unit tests per agent with clear success/failure criteria
+
+**Migration Status:**
+- ✅ Phase 1 (Extraction): 10 atomic agents + orchestrator extracted, unit tests created
+- 🚧 Phase 2 (Orchestration): DAG-based executor with parallel execution (planned)
+- 📅 Phase 3 (Decomposition): Convert phase scripts to thin wrappers (planned)
+- 📅 Phase 4 (Validation): Side-by-side comparison, success rate measurement (planned)
+
+**Feature Flag:**
+```bash
+# Use atomic agent orchestrator (Phase 2+)
+export ADW_USE_ATOMIC_AGENTS=true
+
+# Use legacy phase scripts (default, Phase 1)
+export ADW_USE_ATOMIC_AGENTS=false
+```
+
+**Current Behavior (Phase 1):**
+- `ADW_USE_ATOMIC_AGENTS=true` → Raises `NotImplementedError` (orchestrator not yet implemented)
+- `ADW_USE_ATOMIC_AGENTS=false` → Uses legacy phase scripts (default, stable)
+
+**Agent Catalog:**
+See `adw_agents/README.md` for complete agent documentation, including inputs, outputs, failure modes, and usage examples for all 10 atomic agents.
 
 ---
 

@@ -323,6 +323,11 @@ Python-based automation pipeline for autonomous GitHub issue workflows:
   - Plan phase: Issue classification and implementation planning
   - Build phase: Implementation and PR creation
   - Review phase: Automated code review and reporting
+- **Atomic Agent Catalog** (chore #216): Decomposed agents following "one agent, one task, one prompt" philosophy
+  - `adw_agents/`: 10 atomic agents + orchestrator for fine-grained workflow execution
+  - Migration in progress: Phase 1 (extraction) complete, Phase 2 (orchestration) planned
+  - Feature flag: `ADW_USE_ATOMIC_AGENTS` (default: false, legacy phase scripts)
+  - See `automation/adws/adw_agents/README.md` for agent catalog documentation
 - `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops with worktree isolation, GitHub integration, state management)
 - `adw_tests/`: Pytest suite for workflow validation
 - `trigger_webhook.py`, `trigger_cron.py`: Webhook and polling-based trigger systems
