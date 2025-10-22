@@ -9,7 +9,7 @@ Create or update documentation to reflect implementation changes.
 ## Instructions
 - Parse issue JSON to understand the scope of changes
 - Review `git diff origin/develop...HEAD` to see what was implemented
-- Consult `.claude/commands/docs/conditional_docs.md` to identify relevant docs
+- Consult `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` to identify relevant docs
 - Determine if documentation updates are needed based on change type:
   - **Feature**: Update README, CLAUDE.md, create spec file if not exists
   - **Bug**: Update spec file with resolution notes, may need README updates
@@ -18,7 +18,7 @@ Create or update documentation to reflect implementation changes.
   - Create or update files under `docs/` or top-level markdown files
   - Use relative paths for all file operations (worktree isolation)
   - Ensure examples, commands, and architecture diagrams stay accurate
-  - Update `.claude/commands/docs/conditional_docs.md` if introducing new docs
+  - Update `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` if introducing new docs
   - Commit changes with descriptive message
 - If no documentation needed (trivial changes, internal refactors):
   - Set `documentation_created: false` and explain why in summary

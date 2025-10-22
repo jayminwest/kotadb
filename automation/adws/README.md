@@ -328,7 +328,7 @@ The `/orchestrator` command complements the Python automation layer:
   - **Subagent Error Recovery**: Checkpoint-based recovery system with common failure scenarios and recovery steps
 - **Integration Tests**: `automation/adws/adw_tests/test_orchestrator_integration.py`
 - **Spec File**: `docs/specs/feature-187-orchestrator-slash-command.md`
-- **Conditional Docs Entry**: `.claude/commands/docs/conditional_docs.md`
+- **Conditional Docs Entry**: `.claude/commands/docs/conditional_docs/automation.md`
 - **Output Contract Standards**: `.claude/commands/docs/prompt-code-alignment.md` - Template output format specifications for orchestrator parsing
 
 ### Limitations

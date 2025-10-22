@@ -59,11 +59,43 @@ When creating new slash commands, follow these guidelines:
 
 ## Documentation References
 
-- **conditional_docs.md** - Guide for determining which documentation to read based on task scope
+- **conditional_docs/** - Layer-specific documentation guides (see "Conditional Documentation Structure" below)
 - **anti-mock.md** - Testing philosophy and guidelines for writing tests without mocks
 - **prompt-code-alignment.md** - Guidelines for ensuring slash command templates align with parsing code
 - **CLAUDE.md** (root) - Complete project architecture and development workflows
 - **automation/adws/README.md** - ADW automation pipeline documentation
+
+## Conditional Documentation Structure
+
+The `conditional_docs/` directory contains layer-specific documentation guides that help agents determine which KotaDB documentation to consult based on their task scope. This structure minimizes context window usage by loading only relevant documentation for each layer.
+
+### Layer-Specific Files
+
+- **app.md** - Application layer documentation (backend/API, database, testing, CI/CD)
+  - Use when working on: `app/src/**`, database schema, Supabase integration, test infrastructure, GitHub Actions workflows
+  - Coverage: API routes, authentication, rate limiting, indexer, MCP server, validation, queue system, migrations, antimocking philosophy, CI/CD setup
+
+- **automation.md** - Automation layer documentation (ADW workflows, agent orchestration, worktree isolation)
+  - Use when working on: `automation/adws/**`, ADW phase scripts, workflow triggers, log analysis, orchestrator
+  - Coverage: ADW modules, phase architecture, worktree management, state persistence, Claude Code integration, resilience patterns, observability
+
+- **web.md** - Web layer documentation (frontend/UI, client-side logic)
+  - Use when working on: Web application features, UI components, client-side interactions
+  - Coverage: Placeholder for future frontend documentation (no entries yet)
+
+### When to Use Layer-Specific Docs
+
+- **Backend/API development**: Read `conditional_docs/app.md` before starting work
+- **Automation/ADW development**: Read `conditional_docs/automation.md` before starting work
+- **Cross-layer changes**: Read relevant sections from multiple layer files as needed
+- **New documentation**: Add entries to appropriate layer file(s) based on documentation scope
+
+### Benefits
+
+- **Reduced context window usage**: Agents load only relevant documentation for their layer
+- **Improved maintainability**: Easier to navigate and update layer-specific documentation
+- **Better separation of concerns**: Clear boundaries between application, automation, and web layers
+- **Scalable pattern**: Easy to add new layers (CLI tools, SDKs, etc.) in future
 
 ## Command Organization History
 
