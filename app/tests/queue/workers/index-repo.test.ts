@@ -207,6 +207,11 @@ export function capitalize(str: string): string {
 			"export const foo = 42;",
 		);
 
+		// Commit new files to git (required for indexer to discover them)
+		const { execSync } = require("node:child_process");
+		execSync("git add .", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git commit -m 'Add test files'", { cwd: testRepoPath, stdio: "ignore" });
+
 		// Create and enqueue job
 		const indexJob = await createIndexJob(
 			testRepoId,
