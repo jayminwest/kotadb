@@ -138,6 +138,7 @@ describe("POST /webhooks/github - Integration", () => {
 
 		const response = await sendWebhookRequest(baseUrl, payload, {
 			signature: "", // Empty signature
+			secret: testSecret,
 		});
 
 		expect(response.status).toBe(401);
