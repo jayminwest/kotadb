@@ -50,6 +50,16 @@ Use this reference to decide which KotaDB application layer documentation source
     - When running or authoring migrations that interact with Supabase
     - When preparing staging/production infrastructure that depends on Supabase
 
+- docs/github-app-setup.md
+  - Conditions:
+    - When working on GitHub App integration features (issues #257, #259, #260)
+    - When implementing webhook receivers or GitHub App authentication
+    - When configuring GitHub App credentials (GITHUB_APP_ID, GITHUB_APP_PRIVATE_KEY, GITHUB_WEBHOOK_SECRET)
+    - When troubleshooting webhook delivery or signature verification issues
+    - When setting up development vs production GitHub App environments
+    - When implementing installation token generation for private repository access
+    - When understanding GitHub App permissions and event subscriptions
+
 - docs/schema.md
   - Conditions:
     - When modifying database schema, migrations, or RLS policies
