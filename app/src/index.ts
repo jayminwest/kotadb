@@ -17,6 +17,18 @@ async function bootstrap() {
 		);
 	}
 
+	// Check for GitHub webhook secret (warn if missing, not fatal)
+	const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
+	if (!webhookSecret) {
+		console.warn(
+			"[Warning] GITHUB_WEBHOOK_SECRET not configured. Webhook endpoint will reject all requests.",
+		);
+	} else if (webhookSecret.length < 16) {
+		console.warn(
+			"[Warning] GITHUB_WEBHOOK_SECRET is too short (minimum 16 characters recommended).",
+		);
+	}
+
 	// Initialize Supabase client
 	const supabase = getServiceClient();
 

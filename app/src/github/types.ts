@@ -63,3 +63,47 @@ export class GitHubAppError extends Error {
 		this.name = "GitHubAppError";
 	}
 }
+
+/**
+ * GitHub webhook headers
+ * @see https://docs.github.com/en/webhooks/webhook-events-and-payloads#delivery-headers
+ */
+export interface WebhookHeaders {
+	/** HMAC-SHA256 signature of the webhook payload */
+	"x-hub-signature-256": string;
+	/** Event type (e.g., 'push', 'installation', 'pull_request') */
+	"x-github-event": string;
+	/** Unique delivery ID for this webhook request */
+	"x-github-delivery": string;
+}
+
+/**
+ * GitHub push event payload
+ * @see https://docs.github.com/en/webhooks/webhook-events-and-payloads#push
+ */
+export interface GitHubPushEvent {
+	/** Git ref that was pushed (e.g., 'refs/heads/main') */
+	ref: string;
+	/** Commit SHA after the push */
+	after: string;
+	/** Repository information */
+	repository: {
+		/** GitHub repository ID */
+		id: number;
+		/** Repository name */
+		name: string;
+		/** Full repository name (owner/repo) */
+		full_name: string;
+		/** Whether the repository is private */
+		private: boolean;
+		/** Default branch name */
+		default_branch: string;
+	};
+	/** User who triggered the push */
+	sender: {
+		/** GitHub username */
+		login: string;
+		/** GitHub user ID */
+		id: number;
+	};
+}
