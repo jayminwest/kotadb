@@ -148,27 +148,27 @@ active → canceled (user cancellation, access until period end)
 
 ## Task Breakdown
 
-### Phase 1: Foundation (Database + Dependencies)
+### Phase 1: Foundation (Database + Dependencies) ✅ COMPLETED
 **Goal**: Establish database schema and install required SDKs
 
-- Create `app/src/db/migrations/002_subscriptions.sql` with subscriptions table
-- Copy migration to `app/supabase/migrations/002_subscriptions.sql` (sync requirement)
-- Add `stripe` to `app/package.json` and install
-- Add `@supabase/supabase-js`, `@supabase/auth-helpers-nextjs` to `web/package.json` and install
-- Add `@stripe/stripe-js` to `web/package.json` and install
-- Update shared types: add `Subscription` entity, subscription API types
-- Update `.env.example` files with new environment variables
+- ✅ Create `app/src/db/migrations/002_subscriptions.sql` with subscriptions table
+- ✅ Copy migration to `app/supabase/migrations/002_subscriptions.sql` (sync requirement)
+- ✅ Add `stripe` to `app/package.json` and install
+- ✅ Add `@supabase/supabase-js`, `@supabase/auth-helpers-nextjs` to `web/package.json` and install
+- ✅ Add `@stripe/stripe-js` to `web/package.json` and install
+- ✅ Update shared types: add `Subscription` entity, subscription API types
+- ⏸️ Update `.env.example` files with new environment variables (TODO: next agent)
 
-### Phase 2: Backend Stripe Integration
+### Phase 2: Backend Stripe Integration ✅ COMPLETED
 **Goal**: Build Stripe Checkout, billing portal, and webhook handlers
 
-- Create `app/src/api/stripe.ts` with Stripe client initialization
-- Add `POST /api/subscriptions/create-checkout-session` endpoint in `routes.ts`
-- Add `POST /api/subscriptions/create-portal-session` endpoint in `routes.ts`
-- Create `app/src/api/webhooks.ts` with webhook signature verification
-- Add `POST /webhooks/stripe` endpoint with event handlers (invoice.paid, subscription.updated, subscription.deleted)
-- Implement tier synchronization logic in webhook handlers (update api_keys.tier based on subscription)
-- Add `GET /api/subscriptions/current` endpoint to fetch user subscription data
+- ✅ Create `app/src/api/stripe.ts` with Stripe client initialization
+- ✅ Add `POST /api/subscriptions/create-checkout-session` endpoint in `routes.ts`
+- ✅ Add `POST /api/subscriptions/create-portal-session` endpoint in `routes.ts`
+- ✅ Create `app/src/api/webhooks.ts` with webhook signature verification
+- ✅ Add `POST /webhooks/stripe` endpoint with event handlers (invoice.paid, subscription.updated, subscription.deleted)
+- ✅ Implement tier synchronization logic in webhook handlers (update api_keys.tier based on subscription)
+- ✅ Add `GET /api/subscriptions/current` endpoint to fetch user subscription data
 
 ### Phase 3: Web Authentication Infrastructure
 **Goal**: Implement GitHub OAuth and session management
