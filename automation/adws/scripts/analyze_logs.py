@@ -722,8 +722,29 @@ Examples:
         default="local",
         help="Environment to analyze (default: local)",
     )
+    parser.add_argument(
+        "--agent-metrics",
+        action="store_true",
+        help="Include agent-level success rate metrics (Phase 4)",
+    )
 
     args = parser.parse_args()
+
+    # Validate agent-metrics flag (Phase 4 feature)
+    if args.agent_metrics:
+        print(
+            "Warning: --agent-metrics flag is not yet implemented (Phase 4)",
+            file=sys.stderr,
+        )
+        print(
+            "This flag will enable agent-level metrics in future versions:",
+            file=sys.stderr,
+        )
+        print("  - Success rate by agent (which agents fail most often)", file=sys.stderr)
+        print("  - Retry count distribution per agent", file=sys.stderr)
+        print("  - Execution time per agent", file=sys.stderr)
+        print("  - Failure pattern analysis by agent", file=sys.stderr)
+        print("", file=sys.stderr)
 
     # Validate output-file requirement
     if args.output == "file" and not args.output_file:
