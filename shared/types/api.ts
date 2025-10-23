@@ -103,3 +103,75 @@ export interface HealthResponse {
 	/** ISO 8601 timestamp of health check */
 	timestamp: string;
 }
+
+/**
+ * Request payload for POST /api/subscriptions/create-checkout-session endpoint.
+ * Initiates Stripe Checkout for tier upgrade.
+ */
+export interface CreateCheckoutSessionRequest {
+	/** Subscription tier to purchase (solo, team) */
+	tier: "solo" | "team";
+
+	/** Success URL to redirect after payment */
+	successUrl: string;
+
+	/** Cancel URL to redirect if user cancels */
+	cancelUrl: string;
+}
+
+/**
+ * Response from POST /api/subscriptions/create-checkout-session endpoint.
+ * Returns Stripe Checkout session URL for redirect.
+ */
+export interface CreateCheckoutSessionResponse {
+	/** Stripe Checkout session URL */
+	url: string;
+
+	/** Stripe session ID */
+	sessionId: string;
+}
+
+/**
+ * Request payload for POST /api/subscriptions/create-portal-session endpoint.
+ * Generates Stripe billing portal link for subscription management.
+ */
+export interface CreatePortalSessionRequest {
+	/** Return URL after user completes billing portal actions */
+	returnUrl: string;
+}
+
+/**
+ * Response from POST /api/subscriptions/create-portal-session endpoint.
+ * Returns Stripe billing portal URL for redirect.
+ */
+export interface CreatePortalSessionResponse {
+	/** Stripe billing portal URL */
+	url: string;
+}
+
+/**
+ * Response from GET /api/subscriptions/current endpoint.
+ * Returns authenticated user's current subscription data.
+ */
+export interface CurrentSubscriptionResponse {
+	/** Subscription data (null if no subscription exists) */
+	subscription: {
+		/** Subscription UUID */
+		id: string;
+
+		/** Subscription tier */
+		tier: "free" | "solo" | "team";
+
+		/** Subscription status */
+		status: "trialing" | "active" | "past_due" | "canceled" | "unpaid";
+
+		/** Current period start timestamp */
+		current_period_start: string | null;
+
+		/** Current period end timestamp */
+		current_period_end: string | null;
+
+		/** Whether subscription cancels at period end */
+		cancel_at_period_end: boolean;
+	} | null;
+}

@@ -12,6 +12,9 @@
   },
   "dependencies": {
     "@kotadb/shared": "workspace:*",
+    "@stripe/stripe-js": "^8.1.0",
+    "@supabase/auth-helpers-nextjs": "^0.10.0",
+    "@supabase/supabase-js": "^2.76.1",
     "next": "^14.2.0",
     "react": "^18.3.0",
     "react-dom": "^18.3.0"
