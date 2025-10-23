@@ -46,11 +46,10 @@ ON CONFLICT (user_id, org_id) DO NOTHING;
 
 -- API key format: kota_<tier>_<key_id>_<secret>
 -- Shared secret for all test keys: 0123456789abcdef0123456789abcdef0123456789abcdef0123
--- Bcrypt hash (10 rounds): $2b$10$X8YqZ9vT2J3L5K6M.N7R8efghijklmnopqrstuvwxyzABCDEFGHIJK
+-- Bcrypt hash (10 rounds): $2b$10$qCub8ulq0BnDmxMUhfwbWOCrWmFUKVFWn2.18eOSgPWdlaHCaZ9ve
 --
--- NOTE: You must generate the actual bcrypt hash for the secret above.
--- For testing purposes, this uses a deterministic hash. In production environments,
--- regenerate these keys using the `bun run scripts/generate-automation-key.ts` script.
+-- NOTE: This hash matches the secret above for testing purposes.
+-- In production environments, regenerate keys using `bun run scripts/generate-automation-key.ts`.
 
 -- Free tier test key: kota_free_testfree123456_0123456789abcdef0123456789abcdef0123456789abcdef0123
 INSERT INTO api_keys (user_id, key_id, secret_hash, tier, rate_limit_per_hour, enabled, created_at)
