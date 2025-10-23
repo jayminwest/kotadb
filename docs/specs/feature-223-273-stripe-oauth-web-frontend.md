@@ -2,18 +2,17 @@
 
 ## Implementation Status
 
-**Current Progress**: Phases 1-2 Complete (Backend Foundation)
+**Current Progress**: Phases 1-4 Complete (Backend + Frontend Complete)
 - ✅ Database migrations and shared types
 - ✅ Stripe SDK integration with webhook handlers
-- ⏸️ Frontend OAuth and UI (Phase 3-4 pending)
+- ✅ Frontend OAuth and UI (GitHub OAuth, dashboard, pricing)
 - ⏸️ Testing and validation (Phase 5 pending)
 
 **Next Steps for Continuation**:
-1. Create Supabase client factories for web app (`web/lib/supabase.ts`, `web/lib/supabase-server.ts`)
-2. Implement GitHub OAuth flow (login page, callback route, middleware)
-3. Refactor `web/context/AuthContext.tsx` to use Supabase session
-4. Build dashboard and pricing pages
-5. Run integration tests and create PR
+1. Run type-checking and linting for web app
+2. Test OAuth login flow manually (requires Supabase Auth setup)
+3. Test Stripe Checkout flow (requires Stripe test mode setup)
+4. Create PR with validation evidence
 
 ## Overview
 
@@ -185,30 +184,31 @@ active → canceled (user cancellation, access until period end)
 - ✅ Implement tier synchronization logic in webhook handlers (update api_keys.tier based on subscription)
 - ✅ Add `GET /api/subscriptions/current` endpoint to fetch user subscription data
 
-### Phase 3: Web Authentication Infrastructure
+### Phase 3: Web Authentication Infrastructure ✅ COMPLETED
 **Goal**: Implement GitHub OAuth and session management
 
-- Create `web/lib/supabase.ts` browser client factory
-- Create `web/lib/supabase-server.ts` server-side client factory
-- Create `web/app/login/page.tsx` with "Sign in with GitHub" button
-- Create `web/app/auth/callback/route.ts` OAuth callback handler
-- Create `web/app/auth/logout/route.ts` logout handler
-- Create `web/middleware.ts` to protect routes (dashboard, search, files, repository-index)
-- Update `web/context/AuthContext.tsx` to use Supabase session instead of localStorage
-- Add subscription data fetching to AuthContext (call backend `/api/subscriptions/current`)
-- Update `web/components/Navigation.tsx` with auth UI (sign in/out button, tier badge)
+- ✅ Create `web/lib/supabase.ts` browser client factory
+- ✅ Create `web/lib/supabase-server.ts` server-side client factory
+- ✅ Create `web/app/login/page.tsx` with "Sign in with GitHub" button
+- ✅ Create `web/app/auth/callback/route.ts` OAuth callback handler
+- ✅ Create `web/app/auth/logout/route.ts` logout handler
+- ✅ Create `web/middleware.ts` to protect routes (dashboard, search, files, repository-index)
+- ✅ Update `web/context/AuthContext.tsx` to use Supabase session instead of localStorage
+- ✅ Add subscription data fetching to AuthContext (call backend `/api/subscriptions/current`)
+- ✅ Update `web/components/Navigation.tsx` with auth UI (sign in/out button, tier badge)
 
-### Phase 4: Web Dashboard & Pricing
+### Phase 4: Web Dashboard & Pricing ✅ COMPLETED
 **Goal**: Build user-facing pages for subscription management
 
-- Create `web/app/dashboard/page.tsx` with user profile section
-- Add subscription status display to dashboard (tier, status, period dates)
-- Add API keys section to dashboard (display existing keys with copy button)
-- Add "Manage Billing" link to dashboard (routes to Stripe portal)
-- Create `web/app/pricing/page.tsx` with three-tier comparison table
-- Add upgrade CTAs to pricing page (route to Stripe Checkout)
-- Display "Current Plan" badge on pricing page for authenticated users
-- Add upgrade prompts to dashboard when user is on free tier
+- ✅ Create `web/app/dashboard/page.tsx` with user profile section
+- ✅ Add subscription status display to dashboard (tier, status, period dates)
+- ✅ Add API keys section to dashboard (display existing keys with copy button)
+- ✅ Add "Manage Billing" link to dashboard (routes to Stripe portal)
+- ✅ Create `web/app/pricing/page.tsx` with three-tier comparison table
+- ✅ Add upgrade CTAs to pricing page (route to Stripe Checkout)
+- ✅ Display "Current Plan" badge on pricing page for authenticated users
+- ✅ Add upgrade prompts to dashboard when user is on free tier
+- ✅ Update `web/.env.sample` with Supabase and Stripe environment variables
 
 ### Phase 5: Testing & Validation
 **Goal**: Verify end-to-end flows with real Stripe test mode

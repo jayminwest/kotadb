@@ -1,6 +1,9 @@
 'use client'
 
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react'
+import { createClient } from '@/lib/supabase'
+import type { Session, User } from '@supabase/supabase-js'
+import type { CurrentSubscriptionResponse } from '@shared/types/api'
 
 interface RateLimitInfo {
   limit: number
@@ -8,27 +11,95 @@ interface RateLimitInfo {
   reset: number
 }
 
+interface Subscription {
+  id: string
+  tier: 'free' | 'solo' | 'team'
+  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid'
+  current_period_start: string | null
+  current_period_end: string | null
+  cancel_at_period_end: boolean
+}
+
 interface AuthContextType {
+  session: Session | null
+  user: User | null
+  subscription: Subscription | null
+  isLoading: boolean
   apiKey: string | null
   setApiKey: (key: string | null) => void
   rateLimitInfo: RateLimitInfo | null
   updateRateLimitInfo: (headers: Headers) => void
   isAuthenticated: boolean
+  signOut: () => Promise<void>
+  refreshSubscription: () => Promise<void>
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  const [session, setSession] = useState<Session | null>(null)
+  const [user, setUser] = useState<User | null>(null)
+  const [subscription, setSubscription] = useState<Subscription | null>(null)
+  const [isLoading, setIsLoading] = useState(true)
   const [apiKey, setApiKeyState] = useState<string | null>(null)
   const [rateLimitInfo, setRateLimitInfo] = useState<RateLimitInfo | null>(null)
+  const supabase = createClient()
 
-  // Load API key from localStorage on mount
+  // Fetch subscription data from backend
+  const fetchSubscription = async (userSession: Session) => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const response = await fetch(`${apiUrl}/api/subscriptions/current`, {
+        headers: {
+          Authorization: `Bearer ${userSession.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const data: CurrentSubscriptionResponse = await response.json()
+        setSubscription(data.subscription)
+      } else {
+        setSubscription(null)
+      }
+    } catch (error) {
+      console.error('Error fetching subscription:', error)
+      setSubscription(null)
+    }
+  }
+
+  // Load API key from localStorage on mount (for backwards compatibility)
   useEffect(() => {
     const stored = localStorage.getItem('kotadb_api_key')
     if (stored) {
       setApiKeyState(stored)
     }
   }, [])
+
+  // Initialize session and subscribe to auth changes
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }: { data: { session: Session | null } }) => {
+      setSession(session)
+      setUser(session?.user ?? null)
+      if (session) {
+        fetchSubscription(session)
+      }
+      setIsLoading(false)
+    })
+
+    const {
+      data: { subscription: authSubscription },
+    } = supabase.auth.onAuthStateChange((_event: string, currentSession: Session | null) => {
+      setSession(currentSession)
+      setUser(currentSession?.user ?? null)
+      if (currentSession) {
+        fetchSubscription(currentSession)
+      } else {
+        setSubscription(null)
+      }
+    })
+
+    return () => authSubscription.unsubscribe()
+  }, [supabase.auth])
 
   const setApiKey = (key: string | null) => {
     if (key) {
@@ -53,14 +124,32 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const signOut = async () => {
+    await supabase.auth.signOut()
+    setApiKey(null)
+    setRateLimitInfo(null)
+  }
+
+  const refreshSubscription = async () => {
+    if (session) {
+      await fetchSubscription(session)
+    }
+  }
+
   return (
     <AuthContext.Provider
       value={{
+        session,
+        user,
+        subscription,
+        isLoading,
         apiKey,
         setApiKey,
         rateLimitInfo,
         updateRateLimitInfo,
-        isAuthenticated: !!apiKey,
+        isAuthenticated: !!session,
+        signOut,
+        refreshSubscription,
       }}
     >
       {children}
