@@ -21,7 +21,8 @@
 			"@shared/*": ["../shared/*"],
 			"@mcp/*": ["src/mcp/*"],
 			"@validation/*": ["src/validation/*"],
-			"@queue/*": ["src/queue/*"]
+			"@queue/*": ["src/queue/*"],
+			"@github/*": ["src/github/*"]
 		},
 		"types": ["bun-types", "node"]
 	},

@@ -154,6 +154,7 @@ Git repositories owned by users or organizations.
 | full_name | text | Repository name (e.g., "owner/repo") |
 | git_url | text | Clone URL |
 | default_branch | text | Default branch (default: "main") |
+| installation_id | integer | GitHub App installation ID for private repo access (nullable) |
 | last_indexed_at | timestamptz | Last successful index |
 | created_at | timestamptz | Creation timestamp |
 | updated_at | timestamptz | Last update timestamp |
@@ -170,6 +171,7 @@ Git repositories owned by users or organizations.
 - `idx_repositories_full_name` on `full_name`
 - `idx_repositories_user_full_name` on (user_id, full_name) [partial]
 - `idx_repositories_org_full_name` on (org_id, full_name) [partial]
+- `idx_repositories_installation_id` on `installation_id`
 
 **RLS Policies**:
 - Users can SELECT repos they own or org repos they're members of

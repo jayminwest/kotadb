@@ -2,6 +2,7 @@ import { existsSync } from "node:fs";
 import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { IndexRequest } from "@shared/types";
+import { getInstallationToken } from "@github/app-auth";
 
 export interface RepositoryContext {
 	repository: string;
@@ -13,6 +14,7 @@ const WORKSPACE_ROOT = resolve("data", "workspace");
 
 export async function prepareRepository(
 	request: IndexRequest,
+	installationId?: number,
 ): Promise<RepositoryContext> {
 	const desiredRef = request.ref ?? "HEAD";
 
@@ -27,7 +29,7 @@ export async function prepareRepository(
 	const remoteUrl = resolveRemoteUrl(request.repository);
 	const repoPath = resolve(WORKSPACE_ROOT, sanitizeRepoName(remoteUrl));
 
-	await ensureRepository(remoteUrl, repoPath);
+	await ensureRepository(remoteUrl, repoPath, installationId);
 	const revision = await checkoutRef(repoPath, desiredRef);
 
 	return {
@@ -40,14 +42,19 @@ export async function prepareRepository(
 async function ensureRepository(
 	remoteUrl: string,
 	destination: string,
+	installationId?: number,
 ): Promise<void> {
 	if (!existsSync(destination) || !existsSync(join(destination, ".git"))) {
-		await cloneRepository(remoteUrl, destination);
+		await cloneRepository(remoteUrl, destination, installationId);
 		return;
 	}
 
 	// Keep remote URL in sync in case it changed.
-	await runGit(["remote", "set-url", "origin", remoteUrl], {
+	const authenticatedUrl = installationId
+		? await injectInstallationToken(remoteUrl, installationId)
+		: remoteUrl;
+
+	await runGit(["remote", "set-url", "origin", authenticatedUrl], {
 		cwd: destination,
 		allowFailure: true,
 	});
@@ -57,9 +64,15 @@ async function ensureRepository(
 async function cloneRepository(
 	remoteUrl: string,
 	destination: string,
+	installationId?: number,
 ): Promise<void> {
 	await mkdir(dirname(destination), { recursive: true });
-	await runGit(["clone", remoteUrl, destination], {
+
+	const authenticatedUrl = installationId
+		? await injectInstallationToken(remoteUrl, installationId)
+		: remoteUrl;
+
+	await runGit(["clone", authenticatedUrl, destination], {
 		cwd: dirname(destination),
 	});
 }
@@ -229,6 +242,44 @@ async function runGit(
 		stderr,
 		exitCode,
 	};
+}
+
+/**
+ * Inject GitHub App installation token into a git remote URL
+ * @param remoteUrl - Original git remote URL
+ * @param installationId - GitHub App installation ID
+ * @returns Authenticated URL with token embedded
+ *
+ * @example
+ * injectInstallationToken('https://github.com/foo/bar.git', 123)
+ * // Returns: 'https://x-access-token:ghs_TOKEN@github.com/foo/bar.git'
+ */
+async function injectInstallationToken(
+	remoteUrl: string,
+	installationId: number,
+): Promise<string> {
+	try {
+		const token = await getInstallationToken(installationId);
+
+		// Parse the URL to inject credentials
+		const url = new URL(remoteUrl);
+
+		// Use 'x-access-token' as username with token as password
+		// This is the standard format for GitHub App installation tokens
+		url.username = "x-access-token";
+		url.password = token;
+
+		return url.toString();
+	} catch (error) {
+		console.warn(
+			`[Indexer] Failed to inject installation token for installation ${installationId}:`,
+			error instanceof Error ? error.message : String(error),
+		);
+		console.warn(
+			"[Indexer] Falling back to unauthenticated cloning (public repos only)",
+		);
+		return remoteUrl;
+	}
 }
 
 function resolveRemoteUrl(repository: string): string {
