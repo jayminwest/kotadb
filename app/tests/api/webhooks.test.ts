@@ -13,6 +13,11 @@ import { getServiceClient } from "../../src/db/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Server } from "node:http";
 
+// Set up webhook secret globally before any tests run
+const WEBHOOK_TEST_SECRET = "test-webhook-secret-for-integration-tests";
+const ORIGINAL_WEBHOOK_SECRET = process.env.GITHUB_WEBHOOK_SECRET;
+process.env.GITHUB_WEBHOOK_SECRET = WEBHOOK_TEST_SECRET;
+
 /**
  * Helper: Generate valid HMAC-SHA256 signature for testing
  */
@@ -61,16 +66,13 @@ describe("POST /webhooks/github - Integration", () => {
 	let supabase: SupabaseClient;
 	let server: Server;
 	let baseUrl: string;
-	const testSecret = "test-webhook-secret-for-integration-tests";
+	const testSecret = WEBHOOK_TEST_SECRET;
 
 	beforeAll(async () => {
 		// Initialize Supabase client (real connection for consistency)
 		supabase = getServiceClient();
 
-		// Set test webhook secret
-		process.env.GITHUB_WEBHOOK_SECRET = testSecret;
-
-		// Create Express app
+		// Create Express app (webhook secret already set globally)
 		const app = createExpressApp(supabase);
 
 		// Start HTTP server on random port
@@ -89,9 +91,6 @@ describe("POST /webhooks/github - Integration", () => {
 		await new Promise<void>((resolve) => {
 			server?.close(() => resolve());
 		});
-
-		// Clean up environment
-		process.env.GITHUB_WEBHOOK_SECRET = undefined;
 	});
 
 	test("returns 200 for valid push event with correct signature", async () => {
@@ -245,5 +244,289 @@ describe("POST /webhooks/github - Integration", () => {
 		expect(response.status).toBe(200);
 		const data = await response.json();
 		expect(data).toEqual({ received: true });
+	});
+});
+
+describe("POST /webhooks/github - Job Queue Integration", () => {
+	let supabase: SupabaseClient;
+	let server: Server;
+	let baseUrl: string;
+	let testUserId: string;
+	let testRepoId: string;
+	const testSecret = WEBHOOK_TEST_SECRET;
+
+	beforeAll(async () => {
+		supabase = getServiceClient();
+
+		// Create test user
+		const { data: userData, error: userError } = await supabase.auth.admin.createUser({
+			email: "webhook-job-queue-test@example.com",
+			password: "test-password-456",
+			email_confirm: true,
+		});
+
+		if (userError) throw userError;
+		testUserId = userData.user.id;
+
+		// Create test repository
+		const { data: repoData, error: repoError } = await supabase
+			.from("repositories")
+			.insert({
+				user_id: testUserId,
+				full_name: "testuser/webhook-integration-repo",
+				git_url: "https://github.com/testuser/webhook-integration-repo.git",
+				default_branch: "main",
+			})
+			.select()
+			.single();
+
+		if (repoError) throw repoError;
+		testRepoId = repoData.id;
+
+		// Create Express app
+		const app = createExpressApp(supabase);
+
+		// Start HTTP server
+		await new Promise<void>((resolve) => {
+			server = app.listen(0, () => {
+				const address = server.address();
+				const port = typeof address === "object" ? address?.port : 0;
+				baseUrl = `http://localhost:${port}`;
+				resolve();
+			});
+		});
+	});
+
+	afterAll(async () => {
+		// Clean up
+		await supabase.from("index_jobs").delete().eq("repository_id", testRepoId);
+		await supabase.from("repositories").delete().eq("id", testRepoId);
+		await supabase.auth.admin.deleteUser(testUserId);
+
+		await new Promise<void>((resolve) => {
+			server?.close(() => resolve());
+		});
+
+		// Restore original webhook secret after all tests complete
+		if (ORIGINAL_WEBHOOK_SECRET !== undefined) {
+			process.env.GITHUB_WEBHOOK_SECRET = ORIGINAL_WEBHOOK_SECRET;
+		} else {
+			process.env.GITHUB_WEBHOOK_SECRET = undefined;
+		}
+	});
+
+	test("creates index job for push to tracked repository", async () => {
+		const commitSha = "integration-test-123";
+		const payload = {
+			ref: "refs/heads/main",
+			after: commitSha,
+			repository: {
+				id: 123456,
+				name: "webhook-integration-repo",
+				full_name: "testuser/webhook-integration-repo",
+				private: false,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+		};
+
+		const response = await sendWebhookRequest(baseUrl, payload, {
+			secret: testSecret,
+		});
+
+		expect(response.status).toBe(200);
+
+		// Wait for async processing
+		await new Promise(resolve => setTimeout(resolve, 200));
+
+		// Verify job was created
+		const { data: jobs, error } = await supabase
+			.from("index_jobs")
+			.select("*")
+			.eq("repository_id", testRepoId)
+			.eq("commit_sha", commitSha);
+
+		expect(error).toBeNull();
+		expect(jobs).toHaveLength(1);
+		expect(jobs![0].status).toBe("pending");
+		expect(jobs![0].ref).toBe("refs/heads/main");
+	});
+
+	test("returns 200 but creates no job for untracked repository", async () => {
+		const commitSha = "untracked-test-456";
+		const payload = {
+			ref: "refs/heads/main",
+			after: commitSha,
+			repository: {
+				id: 999999,
+				name: "untracked-repo",
+				full_name: "testuser/untracked-repo",
+				private: false,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+		};
+
+		const response = await sendWebhookRequest(baseUrl, payload, {
+			secret: testSecret,
+		});
+
+		expect(response.status).toBe(200);
+
+		// Wait for async processing
+		await new Promise(resolve => setTimeout(resolve, 200));
+
+		// Verify no job was created
+		const { data: jobs, error } = await supabase
+			.from("index_jobs")
+			.select("*")
+			.eq("commit_sha", commitSha);
+
+		expect(error).toBeNull();
+		expect(jobs).toHaveLength(0);
+	});
+
+	test("creates no job for push to non-default branch", async () => {
+		const commitSha = "feature-branch-789";
+		const payload = {
+			ref: "refs/heads/feature/test",
+			after: commitSha,
+			repository: {
+				id: 123456,
+				name: "webhook-integration-repo",
+				full_name: "testuser/webhook-integration-repo",
+				private: false,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+		};
+
+		const response = await sendWebhookRequest(baseUrl, payload, {
+			secret: testSecret,
+		});
+
+		expect(response.status).toBe(200);
+
+		// Wait for async processing
+		await new Promise(resolve => setTimeout(resolve, 200));
+
+		// Verify no job was created
+		const { data: jobs, error } = await supabase
+			.from("index_jobs")
+			.select("*")
+			.eq("commit_sha", commitSha);
+
+		expect(error).toBeNull();
+		expect(jobs).toHaveLength(0);
+	});
+
+	test("deduplicates jobs for duplicate push events", async () => {
+		const commitSha = "duplicate-test-abc";
+
+		// First push
+		const payload = {
+			ref: "refs/heads/main",
+			after: commitSha,
+			repository: {
+				id: 123456,
+				name: "webhook-integration-repo",
+				full_name: "testuser/webhook-integration-repo",
+				private: false,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+		};
+
+		const response1 = await sendWebhookRequest(baseUrl, payload, {
+			secret: testSecret,
+			delivery: "first-delivery",
+		});
+		expect(response1.status).toBe(200);
+
+		// Wait for first job to be created
+		await new Promise(resolve => setTimeout(resolve, 200));
+
+		// Second push (duplicate)
+		const response2 = await sendWebhookRequest(baseUrl, payload, {
+			secret: testSecret,
+			delivery: "second-delivery",
+		});
+		expect(response2.status).toBe(200);
+
+		// Wait for potential second job
+		await new Promise(resolve => setTimeout(resolve, 200));
+
+		// Verify only one job exists
+		const { data: jobs, error } = await supabase
+			.from("index_jobs")
+			.select("*")
+			.eq("repository_id", testRepoId)
+			.eq("commit_sha", commitSha);
+
+		expect(error).toBeNull();
+		expect(jobs).toHaveLength(1);
+	});
+
+	test("updates repository last_push_at timestamp", async () => {
+		const commitSha = "timestamp-test-def";
+
+		// Get current timestamp
+		const { data: repoBefore } = await supabase
+			.from("repositories")
+			.select("last_push_at")
+			.eq("id", testRepoId)
+			.single();
+
+		const payload = {
+			ref: "refs/heads/main",
+			after: commitSha,
+			repository: {
+				id: 123456,
+				name: "webhook-integration-repo",
+				full_name: "testuser/webhook-integration-repo",
+				private: false,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+		};
+
+		const response = await sendWebhookRequest(baseUrl, payload, {
+			secret: testSecret,
+		});
+
+		expect(response.status).toBe(200);
+
+		// Wait for processing
+		await new Promise(resolve => setTimeout(resolve, 200));
+
+		// Get updated timestamp
+		const { data: repoAfter } = await supabase
+			.from("repositories")
+			.select("last_push_at")
+			.eq("id", testRepoId)
+			.single();
+
+		// Verify timestamp was updated
+		if (repoBefore?.last_push_at) {
+			expect(new Date(repoAfter!.last_push_at!).getTime())
+				.toBeGreaterThan(new Date(repoBefore.last_push_at).getTime());
+		} else {
+			expect(repoAfter!.last_push_at).not.toBeNull();
+		}
 	});
 });
