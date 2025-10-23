@@ -1,5 +1,20 @@
 # Feature Plan: Stripe Subscription Payment Infrastructure with GitHub OAuth Web Frontend
 
+## Implementation Status
+
+**Current Progress**: Phases 1-2 Complete (Backend Foundation)
+- ✅ Database migrations and shared types
+- ✅ Stripe SDK integration with webhook handlers
+- ⏸️ Frontend OAuth and UI (Phase 3-4 pending)
+- ⏸️ Testing and validation (Phase 5 pending)
+
+**Next Steps for Continuation**:
+1. Create Supabase client factories for web app (`web/lib/supabase.ts`, `web/lib/supabase-server.ts`)
+2. Implement GitHub OAuth flow (login page, callback route, middleware)
+3. Refactor `web/context/AuthContext.tsx` to use Supabase session
+4. Build dashboard and pricing pages
+5. Run integration tests and create PR
+
 ## Overview
 
 ### Problem
