@@ -357,7 +357,7 @@ After completing GitHub App setup:
 - [GitHub Webhooks Guide](https://docs.github.com/en/webhooks)
 - [Authenticating with GitHub Apps](https://docs.github.com/en/apps/creating-github-apps/authenticating-with-a-github-app)
 - [Webhook Event Payloads](https://docs.github.com/en/webhooks/webhook-events-and-payloads)
-- [KotaDB Epic 5: GitHub Integration](./vision/epic-5-github-integration.md)
+- [GitHub Integration Epic (#257)](https://github.com/kotadb/kotadb/issues/257)
 
 ---
 
