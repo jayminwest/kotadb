@@ -105,8 +105,8 @@ flyctl secrets set \
 # Set custom git base URL (defaults to https://github.com)
 flyctl secrets set KOTA_GIT_BASE_URL="https://your-git-server.com" --app kota-db-staging
 
-# Set allowed MCP origins (comma-separated, defaults to localhost)
-flyctl secrets set KOTA_ALLOWED_ORIGINS="https://app.example.com,https://staging.example.com" --app kota-db-staging
+# Set allowed origins for CORS (comma-separated, for web app and MCP clients)
+flyctl secrets set KOTA_ALLOWED_ORIGINS="https://kota-db-web-staging.vercel.app,https://app.example.com" --app kota-db-staging
 ```
 
 **Verify secrets:**
@@ -294,6 +294,504 @@ app = "kota-db-production"
 [[vm]]
   memory_mb = 1024  # Increase for production load
 ```
+
+## Web Application Deployment (Next.js Frontend)
+
+The KotaDB monorepo includes a Next.js web application (`web/`) that provides a user interface for the API. This section covers deployment strategies for the frontend, with Vercel as the recommended platform and Fly.io as an alternative.
+
+**Prerequisites:**
+- Backend API deployed and accessible (see sections above)
+- Backend API URL available (e.g., `https://kota-db-staging.fly.dev`)
+- API key generated for frontend authentication (see Authentication section)
+- CORS configured on backend to allow frontend origin (see CORS Configuration below)
+
+**Important:** Avoid deploying to Cloudflare Pages. Use Vercel (recommended) or Fly.io instead.
+
+### Option A: Deploy to Vercel (Recommended)
+
+Vercel provides zero-configuration deployment for Next.js applications with automatic optimizations, edge network distribution, and built-in PR previews.
+
+**Benefits:**
+- Zero-config Next.js deployment with automatic optimizations
+- Automatic preview deployments for every pull request
+- Global edge network for low-latency content delivery
+- Free tier suitable for development and small production workloads
+- Built-in analytics and monitoring
+
+**1. Install Vercel CLI**
+
+```bash
+npm install -g vercel
+vercel login
+```
+
+**2. Deploy Staging Environment**
+
+From the `web/` directory:
+
+```bash
+cd web
+vercel
+```
+
+Follow the prompts:
+- Link to existing project or create new one
+- Set project name: `kota-db-web-staging`
+- Configure build settings (auto-detected for Next.js)
+
+**3. Configure Environment Variables**
+
+Set environment variables via Vercel CLI:
+
+```bash
+# API endpoint (staging backend)
+vercel env add NEXT_PUBLIC_API_URL
+# Enter: https://kota-db-staging.fly.dev
+
+# API key for server-side requests (optional, for Next.js API routes)
+vercel env add API_KEY
+# Enter: your-api-key-here
+```
+
+Or configure via Vercel Dashboard:
+1. Navigate to Project Settings → Environment Variables
+2. Add variables for Production, Preview, and Development environments
+3. Use `NEXT_PUBLIC_` prefix for browser-accessible variables
+
+**Required Environment Variables:**
+
+| Variable | Example Value | Scope | Description |
+|----------|---------------|-------|-------------|
+| `NEXT_PUBLIC_API_URL` | `https://kota-db-staging.fly.dev` | Browser | Backend API endpoint |
+| `API_KEY` | `kota_sk_abc123...` | Server | API key for server-side calls (optional) |
+
+**4. Deploy to Production**
+
+```bash
+cd web
+vercel --prod
+```
+
+This deploys to the production domain (e.g., `kota-db-web.vercel.app`).
+
+**5. Custom Domain Setup**
+
+Configure custom domain via Vercel Dashboard:
+1. Navigate to Project Settings → Domains
+2. Add custom domain (e.g., `app.kotadb.com`)
+3. Update DNS records as instructed by Vercel
+4. SSL certificates are automatically provisioned
+
+**6. Update Backend CORS Configuration**
+
+After deploying, add the Vercel URL to backend's allowed origins:
+
+```bash
+# For staging backend
+flyctl secrets set KOTA_ALLOWED_ORIGINS="https://kota-db-web-staging.vercel.app" --app kota-db-staging
+
+# For production backend (multiple origins)
+flyctl secrets set KOTA_ALLOWED_ORIGINS="https://kota-db-web.vercel.app,https://app.kotadb.com" --app kota-db-production
+```
+
+### Option B: Deploy to Fly.io (Alternative)
+
+Fly.io can host both backend and frontend on the same platform with internal networking benefits, but requires manual Next.js optimization.
+
+**Trade-offs:**
+- Requires manual configuration for Next.js production optimizations
+- Separate machines for frontend (higher cost vs Vercel free tier)
+- Manual CDN setup needed for edge distribution
+- Internal networking allows direct backend communication (bypasses public internet)
+
+**1. Create Fly.io App for Frontend**
+
+```bash
+cd web
+flyctl apps create kota-db-web-staging
+```
+
+**2. Create `web/fly.toml` Configuration**
+
+```toml
+app = "kota-db-web-staging"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "3000"
+  NODE_ENV = "production"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  memory_mb = 512
+  cpu_kind = "shared"
+  cpus = 1
+```
+
+**3. Create `web/Dockerfile`**
+
+```dockerfile
+FROM node:20-alpine AS base
+
+# Install dependencies
+FROM base AS deps
+WORKDIR /app
+COPY package.json bun.lockb ./
+RUN npm install -g bun && bun install --frozen-lockfile
+
+# Build application
+FROM base AS builder
+WORKDIR /app
+COPY --from=deps /app/node_modules ./node_modules
+COPY . .
+RUN npm install -g bun && bun run build
+
+# Production image
+FROM base AS runner
+WORKDIR /app
+ENV NODE_ENV=production
+RUN addgroup --system --gid 1001 nodejs
+RUN adduser --system --uid 1001 nextjs
+COPY --from=builder /app/public ./public
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+USER nextjs
+EXPOSE 3000
+ENV PORT=3000
+CMD ["node", "server.js"]
+```
+
+**4. Configure Secrets**
+
+```bash
+# Set backend API URL (can use internal .internal address for same-region apps)
+flyctl secrets set NEXT_PUBLIC_API_URL="https://kota-db-staging.fly.dev" --app kota-db-web-staging
+
+# Optional: Use internal networking for backend communication
+flyctl secrets set NEXT_PUBLIC_API_URL="http://kota-db-staging.internal:3000" --app kota-db-web-staging
+```
+
+**5. Deploy**
+
+```bash
+cd web
+flyctl deploy
+```
+
+**6. Verify Deployment**
+
+```bash
+flyctl status --app kota-db-web-staging
+curl https://kota-db-web-staging.fly.dev
+```
+
+### CORS Configuration
+
+The backend API must allow cross-origin requests from the frontend domain to enable browser-based API calls.
+
+**1. Add CORS Middleware to Backend**
+
+In `app/src/api/routes.ts`, add CORS middleware before route handlers:
+
+```typescript
+import type { Request, Response, NextFunction } from "express";
+
+// CORS middleware
+app.use((req: Request, res: Response, next: NextFunction) => {
+  const allowedOrigins = process.env.KOTA_ALLOWED_ORIGINS?.split(",") || [];
+  const origin = req.headers.origin;
+
+  if (origin && allowedOrigins.includes(origin)) {
+    res.setHeader("Access-Control-Allow-Origin", origin);
+    res.setHeader("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS");
+    res.setHeader("Access-Control-Allow-Headers", "Content-Type, Authorization");
+    res.setHeader("Access-Control-Allow-Credentials", "true");
+  }
+
+  // Handle preflight requests
+  if (req.method === "OPTIONS") {
+    return res.status(204).send();
+  }
+
+  next();
+});
+```
+
+**2. Set Allowed Origins on Backend**
+
+Configure `KOTA_ALLOWED_ORIGINS` environment variable on the backend API:
+
+```bash
+# Local development
+export KOTA_ALLOWED_ORIGINS="http://localhost:3001"
+
+# Staging (Vercel)
+flyctl secrets set KOTA_ALLOWED_ORIGINS="https://kota-db-web-staging.vercel.app" --app kota-db-staging
+
+# Production (multiple origins)
+flyctl secrets set KOTA_ALLOWED_ORIGINS="https://kota-db-web.vercel.app,https://app.kotadb.com" --app kota-db-production
+```
+
+**Security Considerations:**
+
+- **Origin Validation**: Always validate `Origin` header against allowlist to prevent unauthorized domains
+- **Credentials**: Only set `Access-Control-Allow-Credentials: true` if using cookies or HTTP auth
+- **Preflight Caching**: Add `Access-Control-Max-Age` header to reduce preflight request overhead
+- **Sensitive Data**: Never expose API keys in `NEXT_PUBLIC_*` variables (use Next.js API routes for server-side calls)
+
+**3. Test CORS Configuration**
+
+Use curl to verify CORS headers:
+
+```bash
+# Test preflight request
+curl -X OPTIONS \
+  -H "Origin: https://kota-db-web-staging.vercel.app" \
+  -H "Access-Control-Request-Method: POST" \
+  -H "Access-Control-Request-Headers: Content-Type,Authorization" \
+  https://kota-db-staging.fly.dev/api/search \
+  -v
+
+# Expected response headers:
+# Access-Control-Allow-Origin: https://kota-db-web-staging.vercel.app
+# Access-Control-Allow-Methods: GET, POST, PUT, DELETE, OPTIONS
+# Access-Control-Allow-Headers: Content-Type, Authorization
+```
+
+### Multi-Environment Deployment Strategy
+
+**Environment Matrix:**
+
+| Environment | Backend URL | Frontend URL | Supabase URL | Use Case |
+|-------------|-------------|--------------|--------------|----------|
+| Local | `http://localhost:3000` | `http://localhost:3001` | `http://localhost:54322` | Local development |
+| Staging | `https://kota-db-staging.fly.dev` | `https://kota-db-web-staging.vercel.app` | `https://[project].supabase.co` | QA testing, PR previews |
+| Production | `https://kota-db-production.fly.dev` | `https://kota-db-web.vercel.app` | `https://[project].supabase.co` | Live production workloads |
+
+**Environment Variable Matrix:**
+
+| Variable | Local | Staging | Production |
+|----------|-------|---------|------------|
+| `NEXT_PUBLIC_API_URL` | `http://localhost:3000` | `https://kota-db-staging.fly.dev` | `https://kota-db-production.fly.dev` |
+| `SUPABASE_URL` | `http://localhost:54322` | `https://[staging-project].supabase.co` | `https://[prod-project].supabase.co` |
+| `KOTA_ALLOWED_ORIGINS` (backend) | `http://localhost:3001` | `https://kota-db-web-staging.vercel.app` | `https://kota-db-web.vercel.app,https://app.kotadb.com` |
+| `API_KEY` | Generated via CLI | Generated via staging API | Generated via production API |
+
+**Best Practices:**
+
+- Use `.env.local` for local development environment variables (not committed to git)
+- Use Vercel Dashboard or `vercel env` CLI for remote environment configuration
+- Use Fly.io secrets (`flyctl secrets set`) for backend environment variables
+- Prefix browser-accessible variables with `NEXT_PUBLIC_` in Next.js
+- Never commit API keys or secrets to version control
+- Test environment-specific configurations in staging before deploying to production
+
+### Web Application Health Check
+
+After deploying the frontend, verify the deployment and API integration:
+
+**1. Frontend Availability**
+
+```bash
+# Test frontend loads
+curl -I https://kota-db-web-staging.vercel.app
+
+# Expected: HTTP/2 200 OK
+```
+
+**2. API Integration Test**
+
+From browser console or curl:
+
+```bash
+# Test API call from frontend origin
+curl -X POST \
+  -H "Origin: https://kota-db-web-staging.vercel.app" \
+  -H "Content-Type: application/json" \
+  -H "Authorization: Bearer kota_sk_your_api_key_here" \
+  -d '{"query": "test", "limit": 5}' \
+  https://kota-db-staging.fly.dev/api/search
+
+# Expected: JSON response with search results and rate limit headers
+```
+
+**3. Verify Rate Limit Headers**
+
+Check that rate limit headers are present in API responses:
+
+```bash
+curl -X GET \
+  -H "Authorization: Bearer kota_sk_your_api_key_here" \
+  https://kota-db-staging.fly.dev/api/health \
+  -v
+
+# Expected headers:
+# X-RateLimit-Limit: 1000
+# X-RateLimit-Remaining: 999
+# X-RateLimit-Reset: 1672531200
+```
+
+**4. End-to-End Integration Test**
+
+1. Navigate to frontend URL in browser
+2. Trigger API call via UI (search, index, etc.)
+3. Open browser DevTools → Network tab
+4. Verify API request succeeds with rate limit headers
+5. Check for CORS errors in console (should be none)
+
+### Deployment Flow Diagram
+
+```
+┌─────────────────────────────────────────────────────────────┐
+│                     KotaDB Architecture                      │
+├─────────────────────────────────────────────────────────────┤
+│                                                               │
+│  ┌─────────────────┐           ┌─────────────────┐          │
+│  │  Next.js Web    │           │   Backend API   │          │
+│  │  (Vercel/Fly)   │──HTTPS───▶│   (Fly.io)      │          │
+│  │                 │           │                 │          │
+│  │  Port: 3000     │◀──CORS────│  Port: 3000     │          │
+│  └─────────────────┘           └─────────────────┘          │
+│         │                              │                     │
+│         │                              │                     │
+│         ▼                              ▼                     │
+│  ┌─────────────────┐           ┌─────────────────┐          │
+│  │  User Browser   │           │  Supabase PG    │          │
+│  │  (API calls)    │           │  (Database)     │          │
+│  └─────────────────┘           └─────────────────┘          │
+│                                                               │
+│  Environment Variables:                                      │
+│  - NEXT_PUBLIC_API_URL: Backend URL for browser calls       │
+│  - KOTA_ALLOWED_ORIGINS: Frontend origin for CORS           │
+│  - API_KEY: Authentication for server-side calls            │
+│                                                               │
+└─────────────────────────────────────────────────────────────┘
+```
+
+### Troubleshooting Web Deployment
+
+**Issue: CORS errors in browser console**
+
+Error: `Access to fetch at 'https://kota-db-staging.fly.dev/api/search' from origin 'https://kota-db-web-staging.vercel.app' has been blocked by CORS policy`
+
+**Solution:**
+1. Verify `KOTA_ALLOWED_ORIGINS` is set correctly on backend:
+   ```bash
+   flyctl secrets list --app kota-db-staging
+   ```
+2. Ensure origin matches exactly (no trailing slash):
+   ```bash
+   # Wrong: https://kota-db-web-staging.vercel.app/
+   # Right: https://kota-db-web-staging.vercel.app
+   ```
+3. Check CORS middleware is registered before route handlers in `app/src/api/routes.ts`
+4. Test preflight request manually (see CORS Configuration section)
+
+**Issue: Environment variables not loaded in browser**
+
+Error: `NEXT_PUBLIC_API_URL is undefined`
+
+**Solution:**
+1. Verify variable is prefixed with `NEXT_PUBLIC_` for browser access:
+   ```bash
+   # Wrong: API_URL
+   # Right: NEXT_PUBLIC_API_URL
+   ```
+2. Check Vercel environment variable configuration:
+   ```bash
+   vercel env ls
+   ```
+3. Rebuild and redeploy after adding environment variables:
+   ```bash
+   vercel --prod
+   ```
+
+**Issue: API key exposed in browser**
+
+Security risk: API key visible in browser DevTools Network tab
+
+**Solution:**
+- Never use `NEXT_PUBLIC_` prefix for sensitive secrets
+- Move API calls to Next.js API routes (`pages/api/`) for server-side execution:
+  ```typescript
+  // pages/api/search.ts
+  export default async function handler(req, res) {
+    const response = await fetch(`${process.env.API_URL}/search`, {
+      headers: { Authorization: `Bearer ${process.env.API_KEY}` }
+    });
+    const data = await response.json();
+    res.json(data);
+  }
+  ```
+- Use API routes as proxy to hide backend URL and credentials
+
+**Issue: 429 Too Many Requests errors from frontend**
+
+Error: Rate limit exceeded for tier
+
+**Solution:**
+1. Check rate limit headers in API responses:
+   ```bash
+   curl -I -H "Authorization: Bearer kota_sk_your_api_key_here" \
+     https://kota-db-staging.fly.dev/api/health
+   ```
+2. Verify correct API key is used (staging vs production):
+   ```bash
+   vercel env ls
+   ```
+3. Implement client-side rate limit handling:
+   ```typescript
+   const rateLimitRemaining = response.headers.get("X-RateLimit-Remaining");
+   const rateLimitReset = response.headers.get("X-RateLimit-Reset");
+   // Show user warning when remaining < 10
+   ```
+4. Consider upgrading tier if legitimate usage exceeds limits
+
+**Issue: Vercel deployment fails with build errors**
+
+Error: `Build failed: Command "next build" exited with 1`
+
+**Solution:**
+1. Check build logs in Vercel Dashboard → Deployments → Build Logs
+2. Verify dependencies are installed:
+   ```bash
+   cd web && bun install
+   ```
+3. Test build locally:
+   ```bash
+   cd web && bun run build
+   ```
+4. Ensure `next.config.js` has correct output configuration:
+   ```javascript
+   module.exports = {
+     output: 'standalone', // For Docker/Fly.io deployments
+   }
+   ```
+
+**Issue: Fly.io deployment timeout**
+
+Error: `Error: failed to fetch an image or build from source: error building: context deadline exceeded`
+
+**Solution:**
+1. Increase Fly.io build timeout:
+   ```bash
+   flyctl deploy --remote-only --app kota-db-web-staging
+   ```
+2. Use remote builder instead of local Docker:
+   ```bash
+   flyctl deploy --remote-only
+   ```
+3. Check Dockerfile uses multi-stage builds to reduce image size
+4. Verify network connectivity to Fly.io registry
 
 ## Troubleshooting
 

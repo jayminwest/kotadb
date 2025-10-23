@@ -326,6 +326,17 @@ app/                   # Application layer (TypeScript/Bun API service)
   supabase/            # Database migrations and configuration
   scripts/             # Application-specific bash scripts
 
+web/                   # Next.js web application (frontend)
+  src/
+    components/        # React components
+    pages/             # Next.js pages and API routes
+    lib/               # Client utilities and API integration
+  package.json         # Frontend dependencies
+  next.config.js       # Next.js configuration
+
+shared/                # Shared TypeScript types (monorepo)
+  types/               # API contracts, entities, authentication types
+
 automation/            # Agentic layer (Python AI developer workflows)
   adws/                # ADW automation scripts and modules
   docker/              # ADW-specific Docker images
@@ -335,7 +346,7 @@ automation/            # Agentic layer (Python AI developer workflows)
 docs/                  # Documentation (schema, specs, setup guides)
 ```
 
-See `app/README.md` for application-specific quickstart and `automation/adws/README.md` for automation workflows.
+See `app/README.md` for application-specific quickstart, `web/README.md` for frontend development, and `automation/adws/README.md` for automation workflows.
 
 ## Project Roadmap
 
