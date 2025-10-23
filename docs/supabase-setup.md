@@ -308,6 +308,205 @@ Before deploying to production:
 - [ ] Enable Supabase Realtime (optional, for live updates)
 - [ ] Set up log drain for application monitoring (Settings → Integrations)
 
+## Resetting Supabase Instances (CLI-Based)
+
+For production and staging environments, you may need to reset the database to match the current migration schema. This is useful when:
+
+- Migrating from an older schema version
+- Fixing RLS policy issues
+- Starting fresh after significant schema changes
+- Cleaning up stale test data
+
+### Prerequisites
+
+1. Install Supabase CLI:
+```bash
+# macOS
+brew install supabase/tap/supabase
+
+# Other platforms
+npm install -g supabase
+```
+
+2. Authenticate with Supabase:
+```bash
+supabase login
+```
+
+This will open a browser window for authentication.
+
+3. Verify access to your projects:
+```bash
+supabase projects list
+```
+
+### Reset Procedure
+
+**Warning**: This will delete all data in the target database. Ensure you have backups if needed.
+
+#### Step 1: Link to Target Project
+
+```bash
+cd app
+
+# For staging instance
+supabase link --project-ref szuaoiiwrwpuhdbruydr
+
+# For production instance
+supabase link --project-ref mnppfnyhvgohhblhcgbq
+```
+
+#### Step 2: Reset Database
+
+```bash
+# This command:
+# - Drops all tables and functions
+# - Applies all migrations from app/supabase/migrations/
+# - Recreates schema from scratch
+supabase db reset --linked
+```
+
+Expected output:
+```
+Resetting database...
+Running migrations...
+  20241001000001_initial_schema.sql
+  20241011000000_fulltext_search_index.sql
+  [... all 11 migrations ...]
+Database reset complete.
+```
+
+#### Step 3: Verify Schema
+
+```bash
+# Check for any schema drift
+supabase db diff --linked
+```
+
+Expected output:
+```
+No schema differences detected.
+```
+
+If differences are detected, it means the migrations don't match the actual schema. Review and fix migrations before proceeding.
+
+#### Step 4: Inspect Database
+
+```bash
+# Verify all tables exist
+supabase db inspect tables --linked
+
+# Verify RLS policies applied
+supabase db inspect policies --linked
+```
+
+Expected output should show all 10+ tables and RLS policies for multi-tenant isolation.
+
+#### Step 5: Apply Seed Data
+
+```bash
+# Apply minimal test data for validation
+supabase db execute -f scripts/seed-test-data.sql --linked
+```
+
+This creates:
+- 3 test users (free, solo, team tiers)
+- 1 test organization
+- 3 test API keys with known credentials
+
+#### Step 6: Test Connection
+
+```bash
+# Start local API server
+cd app && bun run src/index.ts
+```
+
+In another terminal:
+
+```bash
+# Test health endpoint
+curl http://localhost:3000/health
+
+# Test authentication with seed API key
+curl -X POST http://localhost:3000/index \
+  -H "Authorization: Bearer kota_free_testfree123456_0123456789abcdef0123456789abcdef0123456789abcdef0123" \
+  -H "Content-Type: application/json" \
+  -d '{"repo_path": "test/repo", "ref": "main"}'
+
+# Test MCP endpoint
+curl -X POST http://localhost:3000/mcp \
+  -H "Authorization: Bearer kota_free_testfree123456_0123456789abcdef0123456789abcdef0123456789abcdef0123" \
+  -H "Content-Type: application/json" \
+  -d '{"jsonrpc": "2.0", "method": "tools/list", "id": 1}'
+```
+
+### Updating Deployment Secrets
+
+If the reset regenerated Supabase API keys, you must update deployment secrets:
+
+#### GitHub Actions Secrets
+
+1. Navigate to repository Settings → Secrets and variables → Actions
+2. Update the following secrets:
+   - `SUPABASE_URL` (if project URL changed)
+   - `SUPABASE_SERVICE_KEY` (from Settings → API → service_role)
+   - `SUPABASE_ANON_KEY` (from Settings → API → anon public)
+
+#### Fly.io Secrets (Production)
+
+```bash
+fly secrets set \
+  SUPABASE_URL=https://<project-ref>.supabase.co \
+  SUPABASE_SERVICE_KEY=<service-key> \
+  SUPABASE_ANON_KEY=<anon-key> \
+  SUPABASE_DB_URL=postgresql://postgres:<password>@db.<project-ref>.supabase.co:5432/postgres
+```
+
+### Validation After Reset
+
+Run the CI workflow to verify updated credentials:
+
+```bash
+# Trigger GitHub Actions workflow manually
+gh workflow run "Application CI"
+
+# Monitor workflow status
+gh run list --limit 1
+```
+
+Expected: All CI checks pass (typecheck, lint, tests).
+
+### Troubleshooting
+
+#### Error: "relation does not exist"
+
+**Cause**: Migration didn't apply correctly.
+
+**Solution**: Check migration sync:
+```bash
+cd app && bun run test:validate-migrations
+```
+
+If migrations are out of sync, copy updated migrations from `app/src/db/migrations/` to `app/supabase/migrations/`.
+
+#### Error: "permission denied"
+
+**Cause**: Missing RLS policies or incorrect user context.
+
+**Solution**: Verify RLS policies applied:
+```bash
+supabase db inspect policies --linked
+```
+
+#### Error: "database reset failed"
+
+**Cause**: Existing connections or locks on database objects.
+
+**Solution**: Force disconnect all clients via Supabase dashboard:
+1. Navigate to Settings → Database
+2. Click "Terminate all connections"
+3. Retry `supabase db reset --linked`
+
 ## Useful Commands
 
 ```bash
@@ -331,6 +530,16 @@ bun test
 
 # Start server in watch mode
 bun --watch src/index.ts
+
+# Supabase CLI commands
+supabase login                          # Authenticate with Supabase
+supabase projects list                  # List all accessible projects
+supabase link --project-ref <ref>       # Link CLI to remote project
+supabase db reset --linked              # Reset database and apply migrations
+supabase db diff --linked               # Check for schema drift
+supabase db inspect tables --linked     # List all tables
+supabase db inspect policies --linked   # List all RLS policies
+supabase db execute -f <file> --linked  # Execute SQL file on remote database
 ```
 
 ## Additional Resources
