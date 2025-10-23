@@ -20,6 +20,11 @@ import {
 	searchFiles,
 } from "./queries";
 import { createIndexJob, updateJobStatus, getJobStatus } from "../queue/job-tracker";
+import {
+	verifyWebhookSignature,
+	parseWebhookPayload,
+	logWebhookRequest,
+} from "../github/webhook-handler";
 
 /**
  * Extended Express Request with auth context attached
@@ -37,7 +42,72 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		credentials: true,
 	}));
 
-	// Body parser middleware
+	// Health check endpoint (public, no auth)
+	app.get("/health", (req: Request, res: Response) => {
+		res.json({ status: "ok", timestamp: new Date().toISOString() });
+	});
+
+	// GitHub webhook endpoint (public, signature-verified)
+	// IMPORTANT: Registered BEFORE express.json() middleware to preserve raw body for HMAC verification
+	app.post(
+		"/webhooks/github",
+		express.raw({ type: "application/json" }),
+		async (req: Request, res: Response) => {
+			try {
+				// Extract webhook headers
+				const signature = req.get("x-hub-signature-256");
+				const event = req.get("x-github-event");
+				const delivery = req.get("x-github-delivery") || "unknown";
+
+				// Validate required headers
+				if (!signature) {
+					return res.status(401).json({ error: "Missing signature header" });
+				}
+				if (!event) {
+					return res.status(400).json({ error: "Missing event type header" });
+				}
+
+				// Get webhook secret from environment
+				const secret = process.env.GITHUB_WEBHOOK_SECRET;
+				if (!secret) {
+					console.error("[Webhook] GITHUB_WEBHOOK_SECRET not configured");
+					return res.status(500).json({ error: "Webhook secret not configured" });
+				}
+
+				// Convert raw body to string for signature verification
+				const rawBody = req.body.toString("utf-8");
+
+				// Verify signature
+				const isValid = verifyWebhookSignature(rawBody, signature, secret);
+				if (!isValid) {
+					console.warn(`[Webhook] Invalid signature for delivery ${delivery}`);
+					return res.status(401).json({ error: "Invalid signature" });
+				}
+
+				// Parse JSON body after signature verification
+				let parsedBody: unknown;
+				try {
+					parsedBody = JSON.parse(rawBody);
+				} catch (error) {
+					return res.status(400).json({ error: "Invalid JSON payload" });
+				}
+
+				// Parse webhook payload (type-specific)
+				const payload = parseWebhookPayload(parsedBody, event);
+
+				// Log webhook request
+				logWebhookRequest(event, delivery, payload);
+
+				// Return success (payload processing will be handled in #261)
+				res.status(200).json({ received: true });
+			} catch (error) {
+				console.error("[Webhook] Handler error:", error);
+				res.status(500).json({ error: "Internal server error" });
+			}
+		},
+	);
+
+	// Body parser middleware for other routes (after webhook)
 	app.use(express.json());
 
 	// JSON parse error handler
@@ -53,11 +123,6 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			});
 		}
 		next(err);
-	});
-
-	// Health check endpoint (public, no auth)
-	app.get("/health", (req: Request, res: Response) => {
-		res.json({ status: "ok", timestamp: new Date().toISOString() });
 	});
 
 	// Authentication middleware for all other routes
