@@ -10,6 +10,7 @@ import { describe, expect, test, beforeAll, afterAll } from "bun:test";
 import { createHmac } from "node:crypto";
 import { createExpressApp } from "../../src/api/routes";
 import { getServiceClient } from "../../src/db/client";
+import { waitForCondition } from "../helpers/async-assertions";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Server } from "node:http";
 
@@ -339,10 +340,22 @@ describe("POST /webhooks/github - Job Queue Integration", () => {
 
 		expect(response.status).toBe(200);
 
-		// Wait for async processing
-		await new Promise(resolve => setTimeout(resolve, 200));
+		// Wait for async job creation to be visible in database
+		// Webhook processing happens asynchronously via processPushEvent().catch()
+		// In CI environments, slower I/O may delay database visibility of the job
+		await waitForCondition(
+			async () => {
+				const { data: jobs } = await supabase
+					.from("index_jobs")
+					.select("*")
+					.eq("repository_id", testRepoId)
+					.eq("commit_sha", commitSha);
+				return jobs !== null && jobs.length > 0;
+			},
+			{ timeout: 3000, interval: 50, message: "Index job not created" }
+		);
 
-		// Verify job was created
+		// Verify job was created with expected fields
 		const { data: jobs, error } = await supabase
 			.from("index_jobs")
 			.select("*")
@@ -456,7 +469,17 @@ describe("POST /webhooks/github - Job Queue Integration", () => {
 		expect(response1.status).toBe(200);
 
 		// Wait for first job to be created
-		await new Promise(resolve => setTimeout(resolve, 200));
+		await waitForCondition(
+			async () => {
+				const { data: jobs } = await supabase
+					.from("index_jobs")
+					.select("*")
+					.eq("repository_id", testRepoId)
+					.eq("commit_sha", commitSha);
+				return jobs !== null && jobs.length > 0;
+			},
+			{ timeout: 3000, interval: 50 }
+		);
 
 		// Second push (duplicate)
 		const response2 = await sendWebhookRequest(baseUrl, payload, {
@@ -465,8 +488,8 @@ describe("POST /webhooks/github - Job Queue Integration", () => {
 		});
 		expect(response2.status).toBe(200);
 
-		// Wait for potential second job
-		await new Promise(resolve => setTimeout(resolve, 200));
+		// Wait a bit to ensure second processing completes (should not create job)
+		await new Promise(resolve => setTimeout(resolve, 100));
 
 		// Verify only one job exists
 		const { data: jobs, error } = await supabase
@@ -511,8 +534,23 @@ describe("POST /webhooks/github - Job Queue Integration", () => {
 
 		expect(response.status).toBe(200);
 
-		// Wait for processing
-		await new Promise(resolve => setTimeout(resolve, 200));
+		// Wait for timestamp update to be visible
+		await waitForCondition(
+			async () => {
+				const { data: repo } = await supabase
+					.from("repositories")
+					.select("last_push_at")
+					.eq("id", testRepoId)
+					.single();
+
+				// Check if timestamp was updated (either set for first time or changed)
+				if (!repoBefore?.last_push_at) {
+					return repo?.last_push_at !== null;
+				}
+				return repo?.last_push_at !== repoBefore.last_push_at;
+			},
+			{ timeout: 3000, interval: 50, message: "Repository last_push_at not updated" }
+		);
 
 		// Get updated timestamp
 		const { data: repoAfter } = await supabase
