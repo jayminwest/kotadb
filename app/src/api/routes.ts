@@ -25,6 +25,7 @@ import {
 	parseWebhookPayload,
 	logWebhookRequest,
 } from "../github/webhook-handler";
+import { processPushEvent } from "../github/webhook-processor";
 
 /**
  * Extended Express Request with auth context attached
@@ -98,7 +99,14 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Log webhook request
 				logWebhookRequest(event, delivery, payload);
 
-				// Return success (payload processing will be handled in #261)
+				// Process push event asynchronously (don't block webhook response)
+				if (payload) {
+					processPushEvent(payload).catch((error) => {
+						console.error("[Webhook] Processing error:", error);
+					});
+				}
+
+				// Always return success for valid webhooks (GitHub expects 200 OK)
 				res.status(200).json({ received: true });
 			} catch (error) {
 				console.error("[Webhook] Handler error:", error);
