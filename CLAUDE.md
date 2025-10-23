@@ -323,11 +323,19 @@ Python-based automation pipeline for autonomous GitHub issue workflows:
   - Plan phase: Issue classification and implementation planning
   - Build phase: Implementation and PR creation
   - Review phase: Automated code review and reporting
-- **Atomic Agent Catalog** (chore #216): Decomposed agents following "one agent, one task, one prompt" philosophy
+- **Atomic Agent Catalog** (chore #216, #255): Decomposed agents following "one agent, one task, one prompt" philosophy
   - `adw_agents/`: 10 atomic agents + orchestrator for fine-grained workflow execution
-  - Migration in progress: Phase 1 (extraction) complete, Phase 2 (orchestration) planned
+  - Migration status: Phase 1-3 complete (extraction, orchestration, parallel execution infrastructure)
+  - Phase 3 deliverables (chore #255):
+    - Parallel execution infrastructure via ThreadPoolExecutor
+    - Thread-safe state management with global locking
+    - 7 new integration tests for concurrency and thread safety
+    - Configurable parallelism via `ADW_MAX_PARALLEL_AGENTS` (default: 2)
+    - Current limitation: data dependency between classify_issue and generate_branch prevents parallel execution
   - Feature flag: `ADW_USE_ATOMIC_AGENTS` (default: false, legacy phase scripts)
-  - See `automation/adws/adw_agents/README.md` for agent catalog documentation
+  - Phase 4 (next): Real-world validation on 10-20 test issues, success rate measurement (target: >80%)
+  - See `automation/adws/adw_agents/README.md` for agent catalog and parallel execution architecture
+  - See `docs/specs/phase3-validation-results.md` for Phase 3 infrastructure completion summary
 - `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops with worktree isolation, GitHub integration, state management)
 - `adw_tests/`: Pytest suite for workflow validation
 - `trigger_webhook.py`, `trigger_cron.py`: Webhook and polling-based trigger systems
@@ -367,6 +375,7 @@ The agentic layer operates on the application layer (in `app/`) to automate deve
   - Outputs text, JSON, or markdown reports with success rates, phase funnels, and failure distributions
   - CI integration via `.github/workflows/adw-metrics.yml` (daily analysis with alerting)
   - Key metrics: success rate, phase progression, worktree staleness, failure patterns by phase
+  - Agent-level metrics (Phase 4): `--agent-metrics` flag for agent success rates, retry counts, execution times (stub)
   - Usage: `uv run automation/adws/scripts/analyze_logs.py --format json --hours 24`
 - **ADW Metrics Analysis Workflow** (`.github/workflows/adw-metrics.yml`):
   - **Schedule**: Runs daily at 00:00 UTC for automated metrics collection

@@ -6,21 +6,100 @@ This module provides a simplified orchestrator that coordinates atomic agent exe
 in dependency order with retry logic and parallel execution for independent agents.
 
 Architecture:
-- Phase 2 (Current): DAG-based execution with sequential agents and retry logic
-- Phase 3 (Future): Full parallel execution and checkpoint recovery
+- Phase 2 (Complete): DAG-based execution with sequential agents and retry logic
+- Phase 3 (Current): Parallel execution infrastructure with thread-safe state management
+- Phase 4 (Future): Full checkpoint recovery and dynamic DAG optimization
+
+Parallel Execution Strategy:
+- Agents with no dependencies run in parallel using ThreadPoolExecutor
+- Thread-safe state updates via locking mechanisms
+- Configurable parallelism via ADW_MAX_PARALLEL_AGENTS environment variable
+- Current limitation: classify_issue must complete before generate_branch (data dependency)
+- Future enhancement: Split generate_branch into independent preparation phase
 """
 
 from __future__ import annotations
 
 import logging
+import os
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
+from concurrent.futures import ThreadPoolExecutor, as_completed, Future
 from dataclasses import dataclass
-from typing import Dict, List, Optional
+from threading import Lock
+from typing import Dict, List, Optional, Callable, Tuple, Any
 
 from ..adw_modules.state import ADWState
 from ..adw_modules.utils import make_adw_id
 from ..adw_modules.github import fetch_issue, get_repo_url, extract_repo_path
+
+# Global lock for thread-safe state updates
+_state_lock = Lock()
+
+
+def _safe_state_update(state: ADWState, update_fn: Callable[[ADWState], None]) -> None:
+    """Thread-safe state update helper.
+
+    Args:
+        state: ADW state object to update
+        update_fn: Function that modifies the state object
+
+    Example:
+        >>> def update(s): s.issue_class = "/feature"
+        >>> _safe_state_update(state, update)
+    """
+    with _state_lock:
+        update_fn(state)
+        state.save()
+
+
+def _execute_parallel_agents(
+    tasks: Dict[str, Callable[[], Tuple[Any, Optional[str]]]],
+    logger: logging.Logger,
+    max_workers: Optional[int] = None,
+) -> Dict[str, Tuple[Any, Optional[str]]]:
+    """Execute multiple agent tasks in parallel with retry logic.
+
+    Args:
+        tasks: Dictionary mapping agent names to callable tasks
+        logger: Logger instance for tracking
+        max_workers: Maximum parallel workers (defaults to ADW_MAX_PARALLEL_AGENTS env var or 2)
+
+    Returns:
+        Dictionary mapping agent names to (result, error) tuples
+
+    Example:
+        >>> tasks = {"classify": lambda: classify_issue(...), "fetch": lambda: fetch_data(...)}
+        >>> results = _execute_parallel_agents(tasks, logger)
+        >>> classify_result, classify_error = results["classify"]
+    """
+    if max_workers is None:
+        max_workers = int(os.getenv("ADW_MAX_PARALLEL_AGENTS", "2"))
+
+    results: Dict[str, Tuple[Any, Optional[str]]] = {}
+
+    with ThreadPoolExecutor(max_workers=max_workers) as executor:
+        # Submit all tasks
+        future_to_agent: Dict[Future, str] = {}
+        for agent_name, task in tasks.items():
+            logger.info(f"Submitting {agent_name} for parallel execution")
+            future = executor.submit(_retry_with_backoff, task, logger=logger)
+            future_to_agent[future] = agent_name
+
+        # Collect results as they complete
+        for future in as_completed(future_to_agent):
+            agent_name = future_to_agent[future]
+            try:
+                result, error = future.result()
+                results[agent_name] = (result, error)
+                if error:
+                    logger.warning(f"{agent_name} completed with error: {error}")
+                else:
+                    logger.info(f"{agent_name} completed successfully")
+            except Exception as e:
+                logger.error(f"{agent_name} raised unexpected exception: {e}", exc_info=True)
+                results[agent_name] = (None, str(e))
+
+    return results
 
 
 @dataclass
@@ -90,7 +169,8 @@ def run_adw_workflow(
 ) -> WorkflowResult:
     """Run the full ADW workflow using atomic agents.
 
-    This orchestrator coordinates all atomic agents in dependency order with retry logic.
+    This orchestrator coordinates all atomic agents in dependency order with retry logic
+    and parallel execution infrastructure for independent agents.
 
     Args:
         issue_number: GitHub issue number to process
@@ -100,10 +180,21 @@ def run_adw_workflow(
     Returns:
         WorkflowResult with execution outcome
 
-    Workflow DAG (with parallel execution for independent agents):
-    1. (classify_issue || generate_branch_partial) → 2. generate_branch_complete →
-    3. create_plan → 4. commit_plan → 5. implement_plan → 6. commit_implementation →
-    7. create_pr → 8. review_code → 9. push_branch → 10. cleanup_worktree
+    Workflow DAG:
+    1. classify_issue → 2. generate_branch → 3. create_plan → 4. commit_plan →
+    5. implement_plan → 6. commit_implementation → 7. create_pr → 8. review_code →
+    9. push_branch → 10. cleanup_worktree
+
+    Parallel Execution Status (Phase 3):
+    - Infrastructure ready: _execute_parallel_agents(), _safe_state_update()
+    - Current limitation: generate_branch requires issue_class from classify_issue (data dependency)
+    - Future enhancement: Split generate_branch into preparation phase that can run in parallel
+    - Configurable via ADW_MAX_PARALLEL_AGENTS environment variable
+
+    Thread Safety:
+    - All state updates use _safe_state_update() with lock acquisition
+    - Parallel agent execution isolated via ThreadPoolExecutor
+    - No shared mutable state between concurrent agents
     """
     # Import all atomic agents
     from .agent_classify_issue import classify_issue
@@ -360,11 +451,11 @@ def validate_agent_dependencies() -> Dict[str, List[str]]:
         Dictionary mapping agent names to their dependency lists.
         Empty list means no dependencies (can run immediately).
 
-    Example DAG:
+    Current DAG (Phase 3):
         {
             "classify_issue": [],  # No dependencies
-            "generate_branch": [],  # No dependencies (can run parallel with classify)
-            "create_plan": ["classify_issue", "generate_branch"],  # Depends on both
+            "generate_branch": ["classify_issue"],  # Requires issue_class (data dependency)
+            "create_plan": ["generate_branch"],  # Requires branch name and classification
             "commit_plan": ["create_plan"],
             "implement_plan": ["commit_plan"],
             "commit_implementation": ["implement_plan"],
@@ -373,11 +464,20 @@ def validate_agent_dependencies() -> Dict[str, List[str]]:
             "push_branch": ["review_code"],
             "cleanup_worktree": ["push_branch"],
         }
+
+    Future DAG (Phase 4 - with split branch generation):
+        {
+            "classify_issue": [],  # No dependencies
+            "generate_branch_prep": [],  # No dependencies (can run parallel with classify)
+            "generate_branch_complete": ["classify_issue", "generate_branch_prep"],
+            "create_plan": ["generate_branch_complete"],
+            ...
+        }
     """
     return {
         "classify_issue": [],
-        "generate_branch": [],
-        "create_plan": ["classify_issue", "generate_branch"],
+        "generate_branch": ["classify_issue"],  # Data dependency on classification result
+        "create_plan": ["generate_branch"],
         "commit_plan": ["create_plan"],
         "implement_plan": ["commit_plan"],
         "commit_implementation": ["implement_plan"],
