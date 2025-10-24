@@ -1,13 +1,41 @@
 'use client'
 
 import { useAuth } from '@/context/AuthContext'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
 import type { CreatePortalSessionResponse } from '@shared/types/api'
 
 export default function DashboardPage() {
   const { user, subscription, apiKey, isLoading } = useAuth()
   const [loadingPortal, setLoadingPortal] = useState(false)
+  const [loadingKeyGen, setLoadingKeyGen] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)
+  const [keyGenError, setKeyGenError] = useState<string | null>(null)
+  const [keyGenSuccess, setKeyGenSuccess] = useState<string | null>(null)
+  const router = useRouter()
+  const searchParams = useSearchParams()
+
+  // Handle OAuth callback query parameters
+  useEffect(() => {
+    const apiKeyParam = searchParams.get('api_key')
+    const keyGenerated = searchParams.get('key_generated')
+    const existingKey = searchParams.get('existing_key')
+    const keyError = searchParams.get('key_error')
+
+    if (apiKeyParam && keyGenerated) {
+      // New API key generated during OAuth flow
+      localStorage.setItem('kotadb_api_key', apiKeyParam)
+      setKeyGenSuccess('API key successfully generated!')
+      // Clear query params after storing key
+      router.replace('/dashboard')
+    } else if (existingKey) {
+      setKeyGenSuccess('Welcome back! Your existing API key is still active.')
+      router.replace('/dashboard')
+    } else if (keyError) {
+      setKeyGenError('Failed to generate API key. Please try again using the button below.')
+      router.replace('/dashboard')
+    }
+  }, [searchParams, router])
 
   const handleManageBilling = async () => {
     setLoadingPortal(true)
@@ -33,6 +61,60 @@ export default function DashboardPage() {
       console.error('Error creating portal session:', error)
     } finally {
       setLoadingPortal(false)
+    }
+  }
+
+  const handleGenerateApiKey = async () => {
+    setLoadingKeyGen(true)
+    setKeyGenError(null)
+    setKeyGenSuccess(null)
+
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+
+      // Get the current session
+      const { createClient } = await import('@/lib/supabase')
+      const supabase = createClient()
+      const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+      if (sessionError || !session) {
+        setKeyGenError('You must be logged in to generate an API key')
+        return
+      }
+
+      const response = await fetch(`${apiUrl}/api/keys/generate`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (response.ok) {
+        const keyData = await response.json() as {
+          apiKey?: string
+          keyId: string
+          message?: string
+        }
+
+        if (keyData.apiKey) {
+          // New key generated
+          localStorage.setItem('kotadb_api_key', keyData.apiKey)
+          setKeyGenSuccess('API key successfully generated!')
+          // Reload the page to update the auth context
+          window.location.reload()
+        } else if (keyData.message?.includes('already exists')) {
+          setKeyGenError('You already have an API key. Please contact support if you need a new one.')
+        }
+      } else {
+        const errorData = await response.json() as { error?: string }
+        setKeyGenError(errorData.error || 'Failed to generate API key')
+      }
+    } catch (error) {
+      console.error('Error generating API key:', error)
+      setKeyGenError('An unexpected error occurred. Please try again.')
+    } finally {
+      setLoadingKeyGen(false)
     }
   }
 
@@ -158,6 +240,25 @@ export default function DashboardPage() {
           {/* API Keys Section */}
           <div className="glass-light dark:glass-dark rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">API Keys</h2>
+
+            {/* Success Message */}
+            {keyGenSuccess && (
+              <div className="mb-4 p-3 bg-green-50 dark:bg-green-900/20 rounded-md">
+                <p className="text-sm text-green-800 dark:text-green-200">
+                  {keyGenSuccess}
+                </p>
+              </div>
+            )}
+
+            {/* Error Message */}
+            {keyGenError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
+                <p className="text-sm text-red-800 dark:text-red-200">
+                  {keyGenError}
+                </p>
+              </div>
+            )}
+
             {apiKey ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-4 glass-light dark:glass-dark rounded-md">
@@ -177,9 +278,16 @@ export default function DashboardPage() {
               </div>
             ) : (
               <div className="text-center py-8">
-                <p className="text-gray-600 dark:text-gray-400 mb-4">No API keys configured</p>
-                <p className="text-sm text-gray-500 dark:text-gray-500">
-                  You can configure your API key in the navigation bar or contact support to generate one
+                <p className="text-gray-600 dark:text-gray-400 mb-4">No API key configured</p>
+                <button
+                  onClick={handleGenerateApiKey}
+                  disabled={loadingKeyGen}
+                  className="px-6 py-3 text-sm font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                >
+                  {loadingKeyGen ? 'Generating...' : 'Generate API Key'}
+                </button>
+                <p className="text-sm text-gray-500 dark:text-gray-500 mt-2">
+                  Click the button above to generate your first API key
                 </p>
               </div>
             )}
