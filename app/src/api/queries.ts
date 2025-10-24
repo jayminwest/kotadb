@@ -221,31 +221,38 @@ export async function storeReferences(
 
 	// Deduplicate records based on unique constraint: (source_file_id, line_number, md5(metadata), reference_type)
 	// This prevents duplicate key errors when the same reference appears multiple times
-	// Sort metadata keys to ensure consistent stringification
+	// Use MD5 to match the database constraint exactly
+	const { createHash } = await import("node:crypto");
 	const uniqueRecords = Array.from(
 		new Map(
 			records.map((r) => {
-				// Sort metadata keys for consistent deduplication
+				// Sort metadata keys for consistent stringification (matches Postgres JSONB behavior)
 				const sortedMetadata = r.metadata
 					? JSON.stringify(r.metadata, Object.keys(r.metadata).sort())
 					: "{}";
+				// Calculate MD5 to match database constraint: md5(metadata::text)
+				const metadataHash = createHash("md5").update(sortedMetadata).digest("hex");
 				return [
-					`${r.source_file_id}-${r.line_number}-${sortedMetadata}-${r.reference_type}`,
+					`${r.source_file_id}-${r.line_number}-${metadataHash}-${r.reference_type}`,
 					r,
 				];
 			}),
 		).values(),
 	);
 
-	// Use upsert to handle re-indexing gracefully
-	// The unique constraint on (source_file_id, line_number, md5(metadata::text), reference_type)
-	// ensures we don't create duplicates, and upsert updates existing records
-	const { error, count } = await client
+	// Delete existing references for this file before inserting new ones
+	// This ensures clean re-indexing without conflict errors from the unique index
+	const { error: deleteError } = await client
 		.from("references")
-		.upsert(uniqueRecords, {
-			onConflict: "source_file_id,line_number,md5(metadata::text),reference_type",
-			ignoreDuplicates: false, // Update existing records instead of ignoring
-		});
+		.delete()
+		.eq("source_file_id", fileId);
+
+	if (deleteError) {
+		throw new Error(`Failed to delete existing references: ${deleteError.message}`);
+	}
+
+	// Insert new references
+	const { error, count } = await client.from("references").insert(uniqueRecords);
 
 	if (error) {
 		throw new Error(`Failed to store references: ${error.message}`);
