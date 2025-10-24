@@ -219,23 +219,17 @@ export async function storeReferences(
 		},
 	}));
 
-	// Deduplicate records based on unique constraint: (source_file_id, line_number, md5(metadata), reference_type)
-	// This prevents duplicate key errors when the same reference appears multiple times
-	// Use MD5 to match the database constraint exactly
-	const { createHash } = await import("node:crypto");
+	// Deduplicate records within this batch to prevent duplicate key errors
+	// Use all fields that should uniquely identify a reference
+	// Note: We use delete-then-insert, so exact MD5 match isn't needed
 	const uniqueRecords = Array.from(
 		new Map(
 			records.map((r) => {
-				// Sort metadata keys for consistent stringification (matches Postgres JSONB behavior)
-				const sortedMetadata = r.metadata
-					? JSON.stringify(r.metadata, Object.keys(r.metadata).sort())
-					: "{}";
-				// Calculate MD5 to match database constraint: md5(metadata::text)
-				const metadataHash = createHash("md5").update(sortedMetadata).digest("hex");
-				return [
-					`${r.source_file_id}-${r.line_number}-${metadataHash}-${r.reference_type}`,
-					r,
-				];
+				// Create deduplication key using all identifying fields
+				// Include metadata values to distinguish between similar references
+				const metadataStr = r.metadata ? JSON.stringify(r.metadata) : "{}";
+				const dedupKey = `${r.source_file_id}|${r.line_number}|${r.reference_type}|${r.target_file_path || ""}|${r.target_symbol_id || ""}|${metadataStr}`;
+				return [dedupKey, r];
 			}),
 		).values(),
 	);
