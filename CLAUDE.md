@@ -50,6 +50,15 @@ cd app && bun run test:validate-env        # Detect hardcoded environment URLs i
 - When adding or modifying migrations in `app/src/db/migrations/`, you **must** also update `app/supabase/migrations/`
 - Run `cd app && bun run test:validate-migrations` to check for drift between directories
 - Keep both directories synchronized to prevent test environment divergence from production schema
+
+**Migration Naming Convention:**
+- All migration files must use timestamped format: `YYYYMMDDHHMMSS_description.sql`
+- Example: `20241024143000_add_rate_limiting.sql`
+- Rationale:
+  - Prevents merge conflicts when multiple developers create migrations concurrently
+  - Aligns with Supabase CLI expectations and industry standards
+  - Ensures deterministic ordering regardless of file system
+- Use current UTC timestamp when creating new migrations: `date -u +%Y%m%d%H%M%S`
 ./scripts/setup-test-db.sh       # Start Supabase Local test database
 ./scripts/reset-test-db.sh       # Reset test database to clean state
 ```
