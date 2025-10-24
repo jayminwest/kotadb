@@ -11,21 +11,27 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
-import { createExpressApp } from "@api/routes";
+import { startTestServer, stopTestServer } from "../../helpers/server";
 import { getSupabaseTestClient } from "../../helpers/db";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import type { Server } from "node:http";
 
 describe("POST /api/keys/generate", () => {
 	let supabase: SupabaseClient;
-	let app: any;
+	let server: Server;
+	let baseUrl: string;
 	let testUserId: string;
 	let testUserEmail: string;
 	let testUserToken: string;
 
 	beforeEach(async () => {
+		// Start test server
+		const testServer = await startTestServer();
+		server = testServer.server;
+		baseUrl = testServer.url;
+
 		// Get test Supabase client
 		supabase = getSupabaseTestClient();
-		app = createExpressApp(supabase);
 
 		// Create a test user via Supabase Auth
 		const testEmail = `test-${Date.now()}@example.com`;
@@ -60,10 +66,15 @@ describe("POST /api/keys/generate", () => {
 			// Delete user from auth.users (requires service role)
 			await supabase.auth.admin.deleteUser(testUserId);
 		}
+
+		// Stop test server
+		if (server) {
+			await stopTestServer(server);
+		}
 	});
 
 	it("returns 401 for missing Authorization header", async () => {
-		const response = await fetch("http://localhost:3000/api/keys/generate", {
+		const response = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -76,7 +87,7 @@ describe("POST /api/keys/generate", () => {
 	});
 
 	it("returns 401 for invalid Authorization header format", async () => {
-		const response = await fetch("http://localhost:3000/api/keys/generate", {
+		const response = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -90,7 +101,7 @@ describe("POST /api/keys/generate", () => {
 	});
 
 	it("returns 401 for invalid JWT token", async () => {
-		const response = await fetch("http://localhost:3000/api/keys/generate", {
+		const response = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -104,7 +115,7 @@ describe("POST /api/keys/generate", () => {
 	});
 
 	it("generates new API key for authenticated user", async () => {
-		const response = await fetch("http://localhost:3000/api/keys/generate", {
+		const response = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -143,7 +154,7 @@ describe("POST /api/keys/generate", () => {
 	});
 
 	it("creates default organization for new user", async () => {
-		const response = await fetch("http://localhost:3000/api/keys/generate", {
+		const response = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -180,7 +191,7 @@ describe("POST /api/keys/generate", () => {
 
 	it("returns existing key for duplicate request (idempotency)", async () => {
 		// First request - generates new key
-		const response1 = await fetch("http://localhost:3000/api/keys/generate", {
+		const response1 = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -193,7 +204,7 @@ describe("POST /api/keys/generate", () => {
 		const firstKeyId = body1.keyId;
 
 		// Second request - should return existing key info (without secret)
-		const response2 = await fetch("http://localhost:3000/api/keys/generate", {
+		const response2 = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",
@@ -242,7 +253,7 @@ describe("POST /api/keys/generate", () => {
 		});
 
 		// Generate API key - should use existing org
-		const response = await fetch("http://localhost:3000/api/keys/generate", {
+		const response = await fetch(`${baseUrl}/api/keys/generate`, {
 			method: "POST",
 			headers: {
 				"Content-Type": "application/json",

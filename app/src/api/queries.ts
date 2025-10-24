@@ -221,12 +221,19 @@ export async function storeReferences(
 
 	// Deduplicate records based on unique constraint: (source_file_id, line_number, md5(metadata), reference_type)
 	// This prevents duplicate key errors when the same reference appears multiple times
+	// Sort metadata keys to ensure consistent stringification
 	const uniqueRecords = Array.from(
 		new Map(
-			records.map((r) => [
-				`${r.source_file_id}-${r.line_number}-${JSON.stringify(r.metadata)}-${r.reference_type}`,
-				r,
-			]),
+			records.map((r) => {
+				// Sort metadata keys for consistent deduplication
+				const sortedMetadata = r.metadata
+					? JSON.stringify(r.metadata, Object.keys(r.metadata).sort())
+					: "{}";
+				return [
+					`${r.source_file_id}-${r.line_number}-${sortedMetadata}-${r.reference_type}`,
+					r,
+				];
+			}),
 		).values(),
 	);
 
