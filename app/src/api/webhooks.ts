@@ -86,9 +86,10 @@ export async function handleInvoicePaid(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		throw new Error(
-			`No user_id found in subscription or customer metadata for subscription ${subscriptionId}`,
+		console.warn(
+			`Invoice ${invoice.id} has no user_id in subscription or customer metadata, skipping (subscription: ${subscriptionId})`,
 		);
+		return; // Return success to avoid Stripe webhook retries
 	}
 
 	// Determine tier from price ID
@@ -162,9 +163,10 @@ export async function handleSubscriptionUpdated(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		throw new Error(
-			`No user_id found in subscription metadata for subscription ${subscription.id}`,
+		console.warn(
+			`Subscription update event has no user_id in metadata, skipping (subscription: ${subscription.id})`,
 		);
+		return; // Return success to avoid Stripe webhook retries
 	}
 
 	const priceId = subscription.items.data[0]?.price.id;
@@ -239,9 +241,10 @@ export async function handleSubscriptionDeleted(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		throw new Error(
-			`No user_id found in subscription metadata for subscription ${subscription.id}`,
+		console.warn(
+			`Subscription deleted event has no user_id in metadata, skipping (subscription: ${subscription.id})`,
 		);
+		return; // Return success to avoid Stripe webhook retries
 	}
 
 	const supabase = getServiceClient();

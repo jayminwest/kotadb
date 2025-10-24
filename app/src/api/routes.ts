@@ -411,11 +411,18 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				return res.status(400).json({ error: "successUrl and cancelUrl are required" });
 			}
 
-			const { getStripeClient, STRIPE_PRICE_IDS, validateStripePriceIds } = await import("./stripe");
-			validateStripePriceIds();
-
-			const stripe = getStripeClient();
-			const priceId = STRIPE_PRICE_IDS[tier as "solo" | "team"];
+			// Initialize Stripe with configuration validation
+			let stripe;
+			let priceId;
+			try {
+				const { getStripeClient, STRIPE_PRICE_IDS, validateStripePriceIds } = await import("./stripe");
+				validateStripePriceIds();
+				stripe = getStripeClient();
+				priceId = STRIPE_PRICE_IDS[tier as "solo" | "team"];
+			} catch (configError) {
+				console.error("[Stripe] Configuration error:", configError);
+				return res.status(500).json({ error: "Stripe is not configured on this server" });
+			}
 
 			// Get or create Stripe customer
 			const { data: existingSub } = await supabase
@@ -477,8 +484,15 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				return res.status(404).json({ error: "No subscription found" });
 			}
 
-			const { getStripeClient } = await import("./stripe");
-			const stripe = getStripeClient();
+			// Initialize Stripe with configuration validation
+			let stripe;
+			try {
+				const { getStripeClient } = await import("./stripe");
+				stripe = getStripeClient();
+			} catch (configError) {
+				console.error("[Stripe] Configuration error:", configError);
+				return res.status(500).json({ error: "Stripe is not configured on this server" });
+			}
 
 			const session = await stripe.billingPortal.sessions.create({
 				customer: subscription.stripe_customer_id,
