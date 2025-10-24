@@ -59,6 +59,8 @@ cd app && bun run test:validate-env        # Detect hardcoded environment URLs i
   - Aligns with Supabase CLI expectations and industry standards
   - Ensures deterministic ordering regardless of file system
 - Use current UTC timestamp when creating new migrations: `date -u +%Y%m%d%H%M%S`
+
+```bash
 ./scripts/setup-test-db.sh       # Start Supabase Local test database
 ./scripts/reset-test-db.sh       # Reset test database to clean state
 ```
