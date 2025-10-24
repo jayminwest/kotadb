@@ -2,6 +2,7 @@ import { createExpressApp } from "@api/routes";
 import { getServiceClient } from "@db/client";
 import { startQueue, stopQueue, getQueue } from "@queue/client";
 import { startIndexWorker } from "@queue/workers/index-repo";
+import { QUEUE_NAMES } from "@queue/config";
 
 const PORT = Number(process.env.PORT ?? 3000);
 
@@ -74,6 +75,12 @@ async function bootstrap() {
 	// Start job queue
 	try {
 		await startQueue();
+
+		// Create queues before registering workers
+		// pg-boss requires queues to exist before workers can be registered
+		const queue = getQueue();
+		await queue.createQueue(QUEUE_NAMES.INDEX_REPO);
+		console.log(`[${new Date().toISOString()}] Created queue: ${QUEUE_NAMES.INDEX_REPO}`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
