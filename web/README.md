@@ -132,7 +132,28 @@ cd web && bun run build
 
 ## Deployment
 
-See `docs/deployment.md` for deployment instructions (Fly.io, Vercel, etc.).
+### Vercel
+
+When deploying to Vercel, configure the following environment variables in Project Settings → Environment Variables:
+
+**Required Variables:**
+- `NEXT_PUBLIC_SUPABASE_URL`: Production Supabase project URL (from Supabase dashboard → Settings → API)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Production Supabase anon key (from Supabase dashboard → Settings → API)
+- `NEXT_PUBLIC_API_URL`: Production KotaDB API URL (e.g., `https://api.kotadb.com`)
+
+**Scope:** Apply to Production, Preview, and Development environments
+
+**Security Notes:**
+- Never commit credentials to git repository
+- Use `.env.local` for local development (excluded by `.gitignore`)
+- Production credentials should only exist in Vercel dashboard
+
+**Build Configuration:**
+- Build Command: `cd web && bun run build`
+- Output Directory: `web/.next`
+- Install Command: `bun install`
+
+See `docs/deployment.md` for additional deployment instructions (Fly.io, etc.).
 
 ## Contributing
 
