@@ -5,7 +5,7 @@
  * Bridges pg-boss queue operations (once #235 lands) with user-facing API.
  */
 
-import { getServiceClient, setUserContext } from "@db/client";
+import { getServiceClient } from "@db/client";
 import type { IndexJob } from "@shared/types/entities";
 import type { JobMetadata, JobStatus } from "./types";
 
@@ -26,7 +26,8 @@ export async function createIndexJob(
 	userId: string,
 ): Promise<IndexJob> {
 	const client = getServiceClient();
-	await setUserContext(client, userId);
+	// Service role client bypasses RLS - no need to set user context
+	// Job tracking is internal infrastructure that requires reliable access
 
 	const { data, error } = await client
 		.from("index_jobs")
@@ -67,7 +68,8 @@ export async function updateJobStatus(
 	userId: string,
 ): Promise<IndexJob> {
 	const client = getServiceClient();
-	await setUserContext(client, userId);
+	// Service role client bypasses RLS - no need to set user context
+	// Job tracking is internal infrastructure that requires reliable access
 
 	// Build update payload with conditional timestamp logic
 	const updates: Record<string, unknown> = { status };

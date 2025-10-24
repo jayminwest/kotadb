@@ -237,19 +237,15 @@ export async function storeReferences(
 		).values(),
 	);
 
-	// Delete existing references for this file before inserting new ones
-	// This ensures clean re-indexing without conflict errors from the unique index
-	const { error: deleteError } = await client
+	// Use upsert to handle re-indexing gracefully
+	// The unique constraint on (source_file_id, line_number, md5(metadata::text), reference_type)
+	// ensures we don't create duplicates, and upsert updates existing records
+	const { error, count } = await client
 		.from("references")
-		.delete()
-		.eq("source_file_id", fileId);
-
-	if (deleteError) {
-		throw new Error(`Failed to delete existing references: ${deleteError.message}`);
-	}
-
-	// Insert new references
-	const { error, count } = await client.from("references").insert(uniqueRecords);
+		.upsert(uniqueRecords, {
+			onConflict: "source_file_id,line_number,md5(metadata::text),reference_type",
+			ignoreDuplicates: false, // Update existing records instead of ignoring
+		});
 
 	if (error) {
 		throw new Error(`Failed to store references: ${error.message}`);
