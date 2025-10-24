@@ -81,6 +81,15 @@ Use this reference to decide which KotaDB application layer documentation source
     - When working on issue #27 or related database standardization tasks
     - When updating type definitions from SQLite to Supabase schemas
 
+- docs/specs/chore-270-standardize-migration-naming.md
+  - Conditions:
+    - When creating new database migrations and need to determine correct filename format
+    - When working on issue #270 or migration naming standardization
+    - When troubleshooting migration sync validation failures (`bun run test:validate-migrations`)
+    - When onboarding developers who need to understand migration file naming conventions
+    - When experiencing merge conflicts in migration directories during concurrent development
+    - When Supabase CLI fails to recognize or apply migrations due to naming issues
+
 - docs/migration-sqlite-to-supabase.md
   - Conditions:
     - When helping developers upgrade from pre-PR#29 SQLite-based code

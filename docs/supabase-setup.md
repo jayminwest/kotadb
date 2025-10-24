@@ -68,7 +68,7 @@ bun add -d supabase
 ### Option A: Via Supabase Studio (Manual)
 
 1. Open Supabase Studio: **Database** → **SQL Editor**
-2. Copy contents of `src/db/migrations/001_initial_schema.sql`
+2. Copy contents of `src/db/migrations/20241001000001_initial_schema.sql`
 3. Paste into SQL Editor
 4. Click "Run" button
 5. Verify success (should see "Success. No rows returned")
@@ -83,7 +83,7 @@ bun run src/db/migrate.ts
 
 Expected output:
 ```
-Applying migration: 001_initial_schema.sql
+Applying migration: 20241001000001_initial_schema.sql
 Migration applied successfully (2.3s)
 Migrations completed: 1 applied, 0 skipped
 ```
