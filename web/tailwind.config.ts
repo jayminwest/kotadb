@@ -12,6 +12,16 @@ const config: Config = {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
       },
+      backdropBlur: {
+        xs: '2px',
+        sm: '4px',
+        md: '10px',
+        lg: '16px',
+        xl: '24px',
+      },
+      backdropSaturate: {
+        180: '180%',
+      },
     },
   },
   plugins: [],

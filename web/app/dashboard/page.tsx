@@ -83,7 +83,7 @@ export default function DashboardPage() {
           <h1 className="text-3xl font-bold text-gray-900 dark:text-gray-100 mb-8">Dashboard</h1>
 
           {/* User Profile Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <div className="glass-light dark:glass-dark rounded-lg shadow-md p-6 mb-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">Profile</h2>
             <div className="space-y-3">
               <div>
@@ -100,7 +100,7 @@ export default function DashboardPage() {
           </div>
 
           {/* Subscription Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6 mb-6">
+          <div className="glass-light dark:glass-dark rounded-lg shadow-md p-6 mb-6">
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100">Subscription</h2>
               {subscription && subscription.tier !== 'free' && (
@@ -118,7 +118,7 @@ export default function DashboardPage() {
               <div className="space-y-3">
                 <div className="flex items-center space-x-3">
                   <span className="text-sm text-gray-600 dark:text-gray-400">Tier:</span>
-                  <span className="px-3 py-1 rounded-full text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200">
+                  <span className="px-3 py-1 rounded-full text-xs font-medium glass-light dark:glass-dark bg-blue-100/50 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200">
                     {subscription.tier.toUpperCase()}
                   </span>
                 </div>
@@ -156,11 +156,11 @@ export default function DashboardPage() {
           </div>
 
           {/* API Keys Section */}
-          <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md p-6">
+          <div className="glass-light dark:glass-dark rounded-lg shadow-md p-6">
             <h2 className="text-xl font-semibold text-gray-900 dark:text-gray-100 mb-4">API Keys</h2>
             {apiKey ? (
               <div className="space-y-3">
-                <div className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-700 rounded-md">
+                <div className="flex items-center justify-between p-4 glass-light dark:glass-dark rounded-md">
                   <div className="flex-1 font-mono text-sm text-gray-900 dark:text-gray-100">
                     {apiKey.substring(0, 20)}...{apiKey.substring(apiKey.length - 10)}
                   </div>
