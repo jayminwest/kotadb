@@ -560,6 +560,78 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		}
 	});
 
+	// POST /api/keys/generate - Generate API key for authenticated user
+	app.post("/api/keys/generate", async (req: Request, res: Response) => {
+		try {
+			// Extract JWT token from Authorization header
+			const authHeader = req.get("Authorization");
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).json({ error: "Missing or invalid Authorization header" });
+			}
+
+			const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+			// Verify JWT with Supabase Auth
+			const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+			if (authError || !user) {
+				return res.status(401).json({ error: "Invalid or expired token" });
+			}
+
+			// Check if user already has an API key
+			const { data: existingKey } = await supabase
+				.from("api_keys")
+				.select("key_id, tier, rate_limit_per_hour, created_at")
+				.eq("user_id", user.id)
+				.eq("enabled", true)
+				.maybeSingle();
+
+			if (existingKey) {
+				// Return existing key info (without secret, which is never stored)
+				return res.json({
+					keyId: existingKey.key_id,
+					tier: existingKey.tier,
+					rateLimitPerHour: existingKey.rate_limit_per_hour,
+					createdAt: existingKey.created_at,
+					message: "API key already exists for this user",
+				});
+			}
+
+			// Check if user has an organization, create if not
+			const { data: userOrg } = await supabase
+				.from("user_organizations")
+				.select("organization_id")
+				.eq("user_id", user.id)
+				.maybeSingle();
+
+			let orgId: string;
+			if (!userOrg) {
+				const { createDefaultOrganization } = await import("./queries");
+				orgId = await createDefaultOrganization(supabase, user.id, user.email);
+			} else {
+				orgId = userOrg.organization_id;
+			}
+
+			// Generate new API key (default to free tier)
+			const { generateApiKey } = await import("@auth/keys");
+			const result = await generateApiKey({
+				userId: user.id,
+				tier: "free",
+				orgId,
+			});
+
+			res.json({
+				apiKey: result.apiKey,
+				keyId: result.keyId,
+				tier: result.tier,
+				rateLimitPerHour: result.rateLimitPerHour,
+				createdAt: result.createdAt,
+			});
+		} catch (error) {
+			console.error("[API Keys] Generation error:", error);
+			res.status(500).json({ error: "Failed to generate API key" });
+		}
+	});
+
 	// 404 handler
 	app.use((req: Request, res: Response) => {
 		res.status(404).json({ error: "Not found" });

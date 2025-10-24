@@ -611,6 +611,58 @@ export async function runIndexingWorkflow(
 }
 
 /**
+ * Create default organization for a new user.
+ *
+ * Organizations are required for RLS policies and multi-tenant data isolation.
+ * This creates a single-member organization owned by the user.
+ *
+ * @param client - Supabase client instance
+ * @param userId - User UUID from auth.users table
+ * @param userEmail - User email for slug generation (optional)
+ * @returns Organization UUID
+ */
+export async function createDefaultOrganization(
+	client: SupabaseClient,
+	userId: string,
+	userEmail?: string,
+): Promise<string> {
+	// Generate org slug from user email or use generic slug
+	const slug = userEmail
+		? `${userEmail.split('@')[0]}-org`
+		: `user-${userId.substring(0, 8)}-org`;
+
+	// Insert organization record
+	const { data: org, error: orgError } = await client
+		.from("organizations")
+		.insert({
+			owner_id: userId,
+			name: slug,
+			slug,
+		})
+		.select("id")
+		.single();
+
+	if (orgError) {
+		throw new Error(`Failed to create organization: ${orgError.message}`);
+	}
+
+	// Insert user_organizations record to link user to org
+	const { error: userOrgError } = await client
+		.from("user_organizations")
+		.insert({
+			user_id: userId,
+			organization_id: org.id,
+			role: "owner",
+		});
+
+	if (userOrgError) {
+		throw new Error(`Failed to link user to organization: ${userOrgError.message}`);
+	}
+
+	return org.id;
+}
+
+/**
  * Detect programming language from file path.
  * Helper function for metadata enrichment.
  */
