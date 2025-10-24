@@ -990,6 +990,154 @@ flyctl releases --app kota-db-staging
 flyctl releases rollback v123 --app kota-db-staging
 ```
 
+## Web Application Deployment
+
+The KotaDB web application is a Next.js frontend that provides GitHub OAuth authentication, API key management, and subscription billing. This section covers deploying the web app to Fly.io.
+
+### Prerequisites
+
+- Backend API deployed and accessible (e.g., `https://kotadb.fly.dev`)
+- Supabase project configured with GitHub OAuth provider
+- GitHub OAuth App created for authentication
+
+### 1. Configure GitHub OAuth
+
+**Create GitHub OAuth App:**
+
+1. Navigate to https://github.com/settings/developers
+2. Click "New OAuth App"
+3. Fill in application details:
+   - **Application name**: KotaDB (Staging/Production)
+   - **Homepage URL**: `https://kotadb-web-production.fly.dev` (or your staging URL)
+   - **Authorization callback URL**: `https://YOUR_SUPABASE_PROJECT.supabase.co/auth/v1/callback`
+4. Click "Register application"
+5. Copy the **Client ID** and generate a **Client Secret**
+
+**Enable GitHub Provider in Supabase:**
+
+1. Navigate to your Supabase project dashboard
+2. Go to Authentication > Providers > GitHub
+3. Enable the GitHub provider
+4. Paste your GitHub OAuth App **Client ID** and **Client Secret**
+5. Save configuration
+
+### 2. Create Fly.io Web App
+
+The web app is pre-configured in `web/fly.toml` with the name `kotadb-web-production`.
+
+**Create the app:**
+```bash
+cd web
+flyctl apps create kotadb-web-production
+```
+
+**Verify app creation:**
+```bash
+flyctl apps list | grep kotadb-web-production
+```
+
+### 3. Configure Web App Secrets
+
+Set environment variables for the web app:
+
+```bash
+cd web
+flyctl secrets set \
+  NEXT_PUBLIC_SUPABASE_URL="https://your-project.supabase.co" \
+  NEXT_PUBLIC_SUPABASE_ANON_KEY="your-supabase-anon-key" \
+  NEXT_PUBLIC_API_URL="https://kotadb.fly.dev" \
+  NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY="pk_live_your_stripe_key" \
+  --app kotadb-web-production
+```
+
+**Environment Variable Reference:**
+
+- `NEXT_PUBLIC_SUPABASE_URL` - Your Supabase project URL (safe to expose)
+- `NEXT_PUBLIC_SUPABASE_ANON_KEY` - Supabase anonymous key (safe to expose, RLS enforces security)
+- `NEXT_PUBLIC_API_URL` - Backend API URL for key generation and subscriptions
+- `NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY` - Stripe publishable key for checkout (optional, for paid tiers)
+
+**Verify secrets:**
+```bash
+flyctl secrets list --app kotadb-web-production
+```
+
+### 4. Deploy Web App
+
+```bash
+cd web
+flyctl deploy --app kotadb-web-production
+```
+
+**Monitor deployment progress:**
+```bash
+flyctl logs --app kotadb-web-production
+```
+
+### 5. Verify Web App Deployment
+
+**Test health check:**
+```bash
+curl https://kotadb-web-production.fly.dev
+```
+
+**Test OAuth flow:**
+
+1. Visit `https://kotadb-web-production.fly.dev/login`
+2. Click "Sign in with GitHub"
+3. Authorize the application
+4. Verify redirect to dashboard
+5. Verify API key is generated and displayed
+
+**Check logs for errors:**
+```bash
+flyctl logs --app kotadb-web-production
+```
+
+### 6. Web App Updates and Rollbacks
+
+**Deploy new version:**
+```bash
+cd web
+git pull origin main
+flyctl deploy --app kotadb-web-production
+```
+
+**Rollback to previous version:**
+```bash
+# List releases
+flyctl releases --app kotadb-web-production
+
+# Rollback to specific version
+flyctl releases rollback v123 --app kotadb-web-production
+```
+
+### Troubleshooting Web App
+
+**OAuth callback fails:**
+
+- Verify GitHub OAuth App callback URL matches Supabase URL exactly
+- Check Supabase logs for authentication errors
+- Ensure GitHub provider is enabled in Supabase dashboard
+
+**API key generation fails:**
+
+- Verify `NEXT_PUBLIC_API_URL` points to deployed backend
+- Check backend logs for API key generation errors
+- Ensure user has valid Supabase session token
+
+**Web app won't start:**
+
+- Check for build errors in deployment logs
+- Verify all `NEXT_PUBLIC_*` environment variables are set
+- Ensure `web/fly.toml` has correct internal port (3000 for Next.js)
+
+**MCP integration fails:**
+
+- Verify generated API key is valid (test with curl)
+- Check rate limits haven't been exceeded
+- Ensure backend API is accessible from MCP client
+
 ## Security Considerations
 
 ### Secrets Management
