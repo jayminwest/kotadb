@@ -199,3 +199,51 @@ export interface Dependency {
 	/** Creation timestamp */
 	created_at: string;
 }
+
+/**
+ * Subscription entity from subscriptions table.
+ * Represents a user's Stripe subscription for paid tiers.
+ */
+export interface Subscription {
+	/** Subscription UUID (primary key) */
+	id: string;
+
+	/** User UUID (foreign key to auth.users table) */
+	user_id: string;
+
+	/** Stripe customer ID */
+	stripe_customer_id: string;
+
+	/** Stripe subscription ID (null for free tier) */
+	stripe_subscription_id: string | null;
+
+	/** Subscription tier (free, solo, team) */
+	tier: "free" | "solo" | "team";
+
+	/** Subscription status (trialing, active, past_due, canceled, unpaid) */
+	status: "trialing" | "active" | "past_due" | "canceled" | "unpaid";
+
+	/** Current billing period start timestamp */
+	current_period_start: string | null;
+
+	/** Current billing period end timestamp */
+	current_period_end: string | null;
+
+	/** Whether subscription cancels at period end */
+	cancel_at_period_end: boolean;
+
+	/** Timestamp when subscription was canceled */
+	canceled_at: string | null;
+
+	/** Trial end timestamp */
+	trial_end: string | null;
+
+	/** Creation timestamp */
+	created_at: string;
+
+	/** Last update timestamp */
+	updated_at: string;
+
+	/** Additional metadata (stored as JSONB in database) */
+	metadata?: Record<string, unknown>;
+}

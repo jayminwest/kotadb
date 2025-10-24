@@ -395,6 +395,171 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		});
 	});
 
+	// POST /api/subscriptions/create-checkout-session - Create Stripe Checkout session
+	app.post("/api/subscriptions/create-checkout-session", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		addRateLimitHeaders(res, context.rateLimit);
+
+		try {
+			const { tier, successUrl, cancelUrl } = req.body;
+
+			if (!tier || (tier !== "solo" && tier !== "team")) {
+				return res.status(400).json({ error: "Invalid tier. Must be 'solo' or 'team'" });
+			}
+
+			if (!successUrl || !cancelUrl) {
+				return res.status(400).json({ error: "successUrl and cancelUrl are required" });
+			}
+
+			// Initialize Stripe with configuration validation
+			let stripe;
+			let priceId;
+			try {
+				const { getStripeClient, STRIPE_PRICE_IDS, validateStripePriceIds } = await import("./stripe");
+				validateStripePriceIds();
+				stripe = getStripeClient();
+				priceId = STRIPE_PRICE_IDS[tier as "solo" | "team"];
+			} catch (configError) {
+				console.error("[Stripe] Configuration error:", configError);
+				return res.status(500).json({ error: "Stripe is not configured on this server" });
+			}
+
+			// Get or create Stripe customer
+			const { data: existingSub } = await supabase
+				.from("subscriptions")
+				.select("stripe_customer_id")
+				.eq("user_id", context.userId)
+				.single();
+
+			let customerId: string;
+
+			if (existingSub?.stripe_customer_id) {
+				customerId = existingSub.stripe_customer_id;
+			} else {
+				const customer = await stripe.customers.create({
+					metadata: { user_id: context.userId },
+				});
+				customerId = customer.id;
+			}
+
+			// Create Checkout session
+			const session = await stripe.checkout.sessions.create({
+				customer: customerId,
+				mode: "subscription",
+				line_items: [{ price: priceId, quantity: 1 }],
+				success_url: successUrl,
+				cancel_url: cancelUrl,
+				subscription_data: {
+					metadata: { user_id: context.userId },
+				},
+			});
+
+			res.json({ url: session.url, sessionId: session.id });
+		} catch (error) {
+			console.error("[Stripe] Checkout session error:", error);
+			res.status(500).json({ error: "Failed to create checkout session" });
+		}
+	});
+
+	// POST /api/subscriptions/create-portal-session - Create Stripe billing portal session
+	app.post("/api/subscriptions/create-portal-session", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		addRateLimitHeaders(res, context.rateLimit);
+
+		try {
+			const { returnUrl } = req.body;
+
+			if (!returnUrl) {
+				return res.status(400).json({ error: "returnUrl is required" });
+			}
+
+			// Get Stripe customer ID from subscription
+			const { data: subscription } = await supabase
+				.from("subscriptions")
+				.select("stripe_customer_id")
+				.eq("user_id", context.userId)
+				.single();
+
+			if (!subscription?.stripe_customer_id) {
+				return res.status(404).json({ error: "No subscription found" });
+			}
+
+			// Initialize Stripe with configuration validation
+			let stripe;
+			try {
+				const { getStripeClient } = await import("./stripe");
+				stripe = getStripeClient();
+			} catch (configError) {
+				console.error("[Stripe] Configuration error:", configError);
+				return res.status(500).json({ error: "Stripe is not configured on this server" });
+			}
+
+			const session = await stripe.billingPortal.sessions.create({
+				customer: subscription.stripe_customer_id,
+				return_url: returnUrl,
+			});
+
+			res.json({ url: session.url });
+		} catch (error) {
+			console.error("[Stripe] Portal session error:", error);
+			res.status(500).json({ error: "Failed to create portal session" });
+		}
+	});
+
+	// GET /api/subscriptions/current - Get current user's subscription
+	app.get("/api/subscriptions/current", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		addRateLimitHeaders(res, context.rateLimit);
+
+		try {
+			const { data: subscription } = await supabase
+				.from("subscriptions")
+				.select("id, tier, status, current_period_start, current_period_end, cancel_at_period_end")
+				.eq("user_id", context.userId)
+				.single();
+
+			res.json({ subscription: subscription || null });
+		} catch (error) {
+			console.error("[Stripe] Get subscription error:", error);
+			res.status(500).json({ error: "Failed to fetch subscription" });
+		}
+	});
+
+	// POST /webhooks/stripe - Handle Stripe webhook events (no auth, signature-verified)
+	app.post("/webhooks/stripe", express.raw({ type: "application/json" }), async (req: Request, res: Response) => {
+		try {
+			const signature = req.get("stripe-signature");
+			if (!signature) {
+				return res.status(400).json({ error: "Missing stripe-signature header" });
+			}
+
+			const rawBody = req.body.toString("utf-8");
+
+			const { verifyWebhookSignature, handleInvoicePaid, handleSubscriptionUpdated, handleSubscriptionDeleted } = await import("./webhooks");
+			const event = verifyWebhookSignature(rawBody, signature);
+
+			// Handle event types
+			switch (event.type) {
+				case "invoice.paid":
+					await handleInvoicePaid(event as any);
+					break;
+				case "customer.subscription.updated":
+					await handleSubscriptionUpdated(event as any);
+					break;
+				case "customer.subscription.deleted":
+					await handleSubscriptionDeleted(event as any);
+					break;
+				default:
+					console.log(`[Stripe] Unhandled event type: ${event.type}`);
+			}
+
+			res.json({ received: true });
+		} catch (error) {
+			console.error("[Stripe] Webhook error:", error);
+			res.status(400).json({ error: "Webhook processing failed" });
+		}
+	});
+
 	// 404 handler
 	app.use((req: Request, res: Response) => {
 		res.status(404).json({ error: "Not found" });

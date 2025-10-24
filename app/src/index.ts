@@ -29,6 +29,36 @@ async function bootstrap() {
 		);
 	}
 
+	// Validate Stripe configuration (optional - warn if incomplete)
+	const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+	const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+	const stripeSoloPriceId = process.env.STRIPE_SOLO_PRICE_ID;
+	const stripeTeamPriceId = process.env.STRIPE_TEAM_PRICE_ID;
+
+	const stripeConfigPresent =
+		stripeSecretKey || stripeWebhookSecret || stripeSoloPriceId || stripeTeamPriceId;
+
+	if (stripeConfigPresent) {
+		const missingVars: string[] = [];
+		if (!stripeSecretKey) missingVars.push("STRIPE_SECRET_KEY");
+		if (!stripeWebhookSecret) missingVars.push("STRIPE_WEBHOOK_SECRET");
+		if (!stripeSoloPriceId) missingVars.push("STRIPE_SOLO_PRICE_ID");
+		if (!stripeTeamPriceId) missingVars.push("STRIPE_TEAM_PRICE_ID");
+
+		if (missingVars.length > 0) {
+			console.warn(
+				`[Warning] Partial Stripe configuration detected. Missing: ${missingVars.join(", ")}. ` +
+					"Subscription endpoints will fail until all Stripe variables are configured.",
+			);
+		} else {
+			console.log("✓ Stripe configuration validated");
+		}
+	} else {
+		console.log(
+			"[Info] Stripe not configured. Subscription features disabled.",
+		);
+	}
+
 	// Initialize Supabase client
 	const supabase = getServiceClient();
 

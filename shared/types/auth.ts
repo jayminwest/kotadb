@@ -34,6 +34,16 @@ export interface AuthContext {
 
 	/** Rate limit status for current request (added after enforcement check) */
 	rateLimit?: RateLimitResult;
+
+	/** Subscription data (for web app authenticated users) */
+	subscription?: {
+		id: string;
+		tier: Tier;
+		status: "trialing" | "active" | "past_due" | "canceled" | "unpaid";
+		current_period_start: string | null;
+		current_period_end: string | null;
+		cancel_at_period_end: boolean;
+	};
 }
 
 /**
