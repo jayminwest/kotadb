@@ -5,12 +5,42 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+
+  /* Glass design tokens */
+  --glass-blur-sm: 4px;
+  --glass-blur-md: 10px;
+  --glass-blur-lg: 16px;
+  --glass-opacity-light: 0.7;
+  --glass-opacity-dark: 0.5;
+  --glass-border-light: rgba(255, 255, 255, 0.18);
+  --glass-border-dark: rgba(255, 255, 255, 0.12);
+  --glass-bg-light: rgba(255, 255, 255, 0.7);
+  --glass-bg-dark: rgba(255, 255, 255, 0.05);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
+    --glass-bg-light: rgba(10, 10, 10, 0.7);
+    --glass-bg-dark: rgba(0, 0, 0, 0.5);
+  }
+}
+
+/* Fallback for reduced transparency preference */
+@media (prefers-reduced-transparency: reduce) {
+  :root {
+    --glass-opacity-light: 0.95;
+    --glass-opacity-dark: 0.95;
+    --glass-bg-light: rgba(255, 255, 255, 0.95);
+    --glass-bg-dark: rgba(255, 255, 255, 0.95);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --glass-bg-light: rgba(10, 10, 10, 0.95);
+      --glass-bg-dark: rgba(0, 0, 0, 0.95);
+    }
   }
 }
 
@@ -23,5 +53,54 @@ body {
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+
+  /* Glass utility classes */
+  .glass-light {
+    background: var(--glass-bg-light);
+    backdrop-filter: blur(var(--glass-blur-md)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-md)) saturate(180%);
+    border: 1px solid var(--glass-border-light);
+  }
+
+  .glass-dark {
+    background: var(--glass-bg-dark);
+    backdrop-filter: blur(var(--glass-blur-md)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-md)) saturate(180%);
+    border: 1px solid var(--glass-border-dark);
+  }
+
+  .glass-modal {
+    background: var(--glass-bg-light);
+    backdrop-filter: blur(var(--glass-blur-lg)) saturate(180%);
+    -webkit-backdrop-filter: blur(var(--glass-blur-lg)) saturate(180%);
+    border: 1px solid var(--glass-border-light);
+  }
+
+  /* Fallback for browsers without backdrop-filter support */
+  @supports not (backdrop-filter: blur(10px)) {
+    .glass-light,
+    .glass-dark,
+    .glass-modal {
+      background: rgba(255, 255, 255, 0.95);
+    }
+
+    @media (prefers-color-scheme: dark) {
+      .glass-light,
+      .glass-dark,
+      .glass-modal {
+        background: rgba(10, 10, 10, 0.95);
+      }
+    }
+  }
+
+  /* Fallback for reduced transparency */
+  @media (prefers-reduced-transparency: reduce) {
+    .glass-light,
+    .glass-dark,
+    .glass-modal {
+      backdrop-filter: none;
+      -webkit-backdrop-filter: none;
+    }
   }
 }

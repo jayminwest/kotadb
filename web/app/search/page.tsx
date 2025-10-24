@@ -56,7 +56,7 @@ export default function SearchPage() {
       </div>
 
       {!isAuthenticated && (
-        <div className="bg-yellow-50 dark:bg-yellow-900/20 border border-yellow-200 dark:border-yellow-800 rounded-lg p-4">
+        <div className="glass-light dark:glass-dark bg-yellow-50/50 dark:bg-yellow-900/20 rounded-lg p-4">
           <p className="text-yellow-800 dark:text-yellow-200">
             Please set your API key in the navigation bar to search code.
           </p>
@@ -66,7 +66,7 @@ export default function SearchPage() {
       <SearchBar onSearch={handleSearch} isLoading={isLoading} />
 
       {error && (
-        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-4">
+        <div className="glass-light dark:glass-dark bg-red-50/50 dark:bg-red-900/20 rounded-lg p-4">
           <p className="text-red-800 dark:text-red-200">{error}</p>
         </div>
       )}

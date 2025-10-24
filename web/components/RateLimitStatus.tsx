@@ -44,7 +44,7 @@ export default function RateLimitStatus() {
   const isCritical = percentage < 10
 
   return (
-    <div className="hidden md:flex items-center space-x-3">
+    <div className="hidden md:flex items-center space-x-3 glass-light dark:glass-dark px-3 py-2 rounded-lg">
       <div className="flex flex-col text-right">
         <div className="text-xs text-gray-600 dark:text-gray-400">
           Rate Limit
@@ -61,7 +61,7 @@ export default function RateLimitStatus() {
       </div>
 
       <div className="w-24">
-        <div className="h-2 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden">
+        <div className="h-2 glass-light dark:glass-dark rounded-full overflow-hidden">
           <div
             className={`h-full transition-all ${
               isCritical
