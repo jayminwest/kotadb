@@ -1,4 +1,4 @@
--- Migration: 002_subscriptions
+-- Migration: 012_subscriptions
 -- Description: Add subscriptions table for Stripe payment integration
 -- Author: Claude Code
 -- Date: 2025-10-23
@@ -30,27 +30,18 @@ CREATE INDEX idx_subscriptions_stripe_subscription_id ON subscriptions(stripe_su
 CREATE INDEX idx_subscriptions_status ON subscriptions(status);
 CREATE UNIQUE INDEX idx_subscriptions_user_id_unique ON subscriptions(user_id);
 
--- Enable RLS on subscriptions
-ALTER TABLE subscriptions ENABLE ROW LEVEL SECURITY;
-
-CREATE POLICY subscriptions_select ON subscriptions
-    FOR SELECT
-    USING (user_id = (current_setting('app.user_id', true))::uuid);
-
-CREATE POLICY subscriptions_insert ON subscriptions
-    FOR INSERT
-    WITH CHECK (user_id = (current_setting('app.user_id', true))::uuid);
-
-CREATE POLICY subscriptions_update ON subscriptions
-    FOR UPDATE
-    USING (user_id = (current_setting('app.user_id', true))::uuid);
-
-CREATE POLICY subscriptions_delete ON subscriptions
-    FOR DELETE
-    USING (user_id = (current_setting('app.user_id', true))::uuid);
+-- Authorization Note:
+-- RLS is NOT enabled on this table because:
+-- 1. Backend uses service role client which bypasses RLS
+-- 2. All subscription endpoints (routes.ts) enforce authorization via explicit
+--    WHERE user_id = context.userId filters (lines 424, 473, 504)
+-- 3. Webhook handlers use service role for Stripe event processing
+--
+-- This design is consistent with other backend-only tables (api_keys, index_jobs)
+-- where application-layer authorization is preferred over database-layer RLS.
 
 -- ============================================================================
 -- Migration Tracking
 -- ============================================================================
 
-INSERT INTO migrations (name) VALUES ('002_subscriptions');
+INSERT INTO migrations (name) VALUES ('012_subscriptions');

@@ -11,6 +11,18 @@ import { getServiceClient } from "@db/client";
 import type { Tier } from "@shared/types/auth";
 
 /**
+ * Helper type for Stripe Subscription with full property access.
+ * Stripe SDK types are sometimes overly strict or incomplete.
+ */
+type StripeSubscriptionFull = Stripe.Subscription & {
+	current_period_start: number;
+	current_period_end: number;
+	cancel_at_period_end: boolean;
+	canceled_at?: number;
+	trial_end?: number;
+};
+
+/**
  * Verify Stripe webhook signature.
  * Returns the constructed event if signature is valid.
  *
@@ -49,11 +61,11 @@ export function verifyWebhookSignature(
 export async function handleInvoicePaid(
 	event: Stripe.InvoicePaidEvent,
 ): Promise<void> {
-	const invoice = event.data.object as any;
+	const invoice = event.data.object as Stripe.Invoice;
+	// Access subscription field which Stripe SDK types don't fully expose
+	const subscriptionRef = (invoice as unknown as { subscription?: string | Stripe.Subscription | null }).subscription;
 	const subscriptionId =
-		typeof invoice.subscription === "string"
-			? invoice.subscription
-			: invoice.subscription?.id;
+		typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
 	const customerId =
 		typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
 
@@ -65,13 +77,13 @@ export async function handleInvoicePaid(
 	const stripe = getStripeClient();
 	const subscription = (await stripe.subscriptions.retrieve(
 		subscriptionId,
-	)) as any;
+	)) as unknown as StripeSubscriptionFull;
 
 	// Get user_id from subscription metadata or customer metadata
+	const customer = await stripe.customers.retrieve(customerId);
 	const userId =
-		subscription.metadata.user_id ||
-		((await stripe.customers.retrieve(customerId)) as Stripe.Customer).metadata
-			?.user_id;
+		subscription.metadata?.user_id ||
+		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
 		throw new Error(
@@ -96,14 +108,14 @@ export async function handleInvoicePaid(
 				tier,
 				status: "active" as const,
 				current_period_start: new Date(
-					(subscription.current_period_start as number) * 1000,
+					subscription.current_period_start * 1000,
 				).toISOString(),
 				current_period_end: new Date(
-					(subscription.current_period_end as number) * 1000,
+					subscription.current_period_end * 1000,
 				).toISOString(),
 				cancel_at_period_end: subscription.cancel_at_period_end,
 				trial_end: subscription.trial_end
-					? new Date((subscription.trial_end as number) * 1000).toISOString()
+					? new Date(subscription.trial_end * 1000).toISOString()
 					: null,
 				updated_at: new Date().toISOString(),
 			},
@@ -138,16 +150,16 @@ export async function handleInvoicePaid(
 export async function handleSubscriptionUpdated(
 	event: Stripe.CustomerSubscriptionUpdatedEvent,
 ): Promise<void> {
-	const subscription = event.data.object as any;
+	const subscription = event.data.object as StripeSubscriptionFull;
 	const customerId =
 		typeof subscription.customer === "string"
 			? subscription.customer
 			: subscription.customer?.id;
+
+	const customer = await getStripeClient().customers.retrieve(customerId);
 	const userId =
 		subscription.metadata.user_id ||
-		((await getStripeClient().customers.retrieve(
-			customerId,
-		)) as Stripe.Customer).metadata?.user_id;
+		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
 		throw new Error(
@@ -172,14 +184,14 @@ export async function handleSubscriptionUpdated(
 				| "canceled"
 				| "unpaid",
 			current_period_start: new Date(
-				(subscription.current_period_start as number) * 1000,
+				subscription.current_period_start * 1000,
 			).toISOString(),
 			current_period_end: new Date(
-				(subscription.current_period_end as number) * 1000,
+				subscription.current_period_end * 1000,
 			).toISOString(),
 			cancel_at_period_end: subscription.cancel_at_period_end,
 			canceled_at: subscription.canceled_at
-				? new Date((subscription.canceled_at as number) * 1000).toISOString()
+				? new Date(subscription.canceled_at * 1000).toISOString()
 				: null,
 			updated_at: new Date().toISOString(),
 		})
@@ -215,16 +227,16 @@ export async function handleSubscriptionUpdated(
 export async function handleSubscriptionDeleted(
 	event: Stripe.CustomerSubscriptionDeletedEvent,
 ): Promise<void> {
-	const subscription = event.data.object as any;
+	const subscription = event.data.object;
 	const customerId =
 		typeof subscription.customer === "string"
 			? subscription.customer
 			: subscription.customer?.id;
+
+	const customer = await getStripeClient().customers.retrieve(customerId);
 	const userId =
 		subscription.metadata.user_id ||
-		((await getStripeClient().customers.retrieve(
-			customerId,
-		)) as Stripe.Customer).metadata?.user_id;
+		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
 		throw new Error(
