@@ -13,11 +13,13 @@
 import { afterEach, beforeEach, describe, expect, it } from "bun:test";
 import { startTestServer, stopTestServer } from "../../helpers/server";
 import { getSupabaseTestClient } from "../../helpers/db";
+import { getServiceClient } from "@db/client";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Server } from "node:http";
 
 describe("POST /api/keys/generate", () => {
 	let supabase: SupabaseClient;
+	let serviceClient: SupabaseClient;
 	let server: Server;
 	let baseUrl: string;
 	let testUserId: string;
@@ -30,8 +32,11 @@ describe("POST /api/keys/generate", () => {
 		server = testServer.server;
 		baseUrl = testServer.url;
 
-		// Get test Supabase client
+		// Get test Supabase client (for auth operations)
 		supabase = getSupabaseTestClient();
+
+		// Get service client (for database queries that bypass RLS)
+		serviceClient = getServiceClient();
 
 		// Create a test user via Supabase Auth
 		const testEmail = `test-${Date.now()}@example.com`;
@@ -52,16 +57,16 @@ describe("POST /api/keys/generate", () => {
 	});
 
 	afterEach(async () => {
-		// Clean up test user data
+		// Clean up test user data (use service client to bypass RLS)
 		if (testUserId) {
 			// Delete API keys
-			await supabase.from("api_keys").delete().eq("user_id", testUserId);
+			await serviceClient.from("api_keys").delete().eq("user_id", testUserId);
 
 			// Delete user_organizations
-			await supabase.from("user_organizations").delete().eq("user_id", testUserId);
+			await serviceClient.from("user_organizations").delete().eq("user_id", testUserId);
 
 			// Delete organizations owned by user
-			await supabase.from("organizations").delete().eq("owner_id", testUserId);
+			await serviceClient.from("organizations").delete().eq("owner_id", testUserId);
 
 			// Delete user from auth.users (requires service role)
 			await supabase.auth.admin.deleteUser(testUserId);
@@ -139,8 +144,8 @@ describe("POST /api/keys/generate", () => {
 		expect(body.rateLimitPerHour).toBe(100);
 		expect(body.createdAt).toBeTruthy();
 
-		// Verify API key was stored in database
-		const { data: apiKey } = await supabase
+		// Verify API key was stored in database (use service client to bypass RLS)
+		const { data: apiKey } = await serviceClient
 			.from("api_keys")
 			.select("key_id, tier, enabled, user_id")
 			.eq("user_id", testUserId)
@@ -164,8 +169,8 @@ describe("POST /api/keys/generate", () => {
 
 		expect(response.status).toBe(200);
 
-		// Verify organization was created
-		const { data: org } = await supabase
+		// Verify organization was created (use service client to bypass RLS)
+		const { data: org } = await serviceClient
 			.from("organizations")
 			.select("id, name, slug, owner_id")
 			.eq("owner_id", testUserId)
@@ -176,16 +181,16 @@ describe("POST /api/keys/generate", () => {
 		expect(org?.slug).toContain("-org");
 		expect(org?.owner_id).toBe(testUserId);
 
-		// Verify user_organizations link
-		const { data: userOrg } = await supabase
+		// Verify user_organizations link (use service client to bypass RLS)
+		const { data: userOrg } = await serviceClient
 			.from("user_organizations")
-			.select("user_id, organization_id, role")
+			.select("user_id, org_id, role")
 			.eq("user_id", testUserId)
 			.single();
 
 		expect(userOrg).not.toBeNull();
 		expect(userOrg?.user_id).toBe(testUserId);
-		expect(userOrg?.organization_id).toBe(org?.id);
+		expect(userOrg?.org_id).toBe(org?.id);
 		expect(userOrg?.role).toBe("owner");
 	});
 
@@ -219,8 +224,8 @@ describe("POST /api/keys/generate", () => {
 		expect(body2.keyId).toBe(firstKeyId);
 		expect(body2.message).toContain("already exists");
 
-		// Verify only one API key exists in database
-		const { count } = await supabase
+		// Verify only one API key exists in database (use service client to bypass RLS)
+		const { count } = await serviceClient
 			.from("api_keys")
 			.select("*", { count: "exact", head: true })
 			.eq("user_id", testUserId);
@@ -229,9 +234,9 @@ describe("POST /api/keys/generate", () => {
 	});
 
 	it("uses existing organization if available", async () => {
-		// Pre-create organization for user
+		// Pre-create organization for user (use service client to bypass RLS)
 		const orgSlug = `pre-existing-org-${Date.now()}`;
-		const { data: preOrg, error: orgError } = await supabase
+		const { data: preOrg, error: orgError } = await serviceClient
 			.from("organizations")
 			.insert({
 				name: orgSlug,
@@ -245,8 +250,8 @@ describe("POST /api/keys/generate", () => {
 			throw new Error(`Failed to create pre-existing org: ${orgError?.message}`);
 		}
 
-		// Link user to organization
-		await supabase.from("user_organizations").insert({
+		// Link user to organization (use service client to bypass RLS)
+		await serviceClient.from("user_organizations").insert({
 			user_id: testUserId,
 			org_id: preOrg.id,
 			role: "owner",
@@ -263,16 +268,16 @@ describe("POST /api/keys/generate", () => {
 
 		expect(response.status).toBe(200);
 
-		// Verify no new organization was created (should still have exactly 1)
-		const { count } = await supabase
+		// Verify no new organization was created (should still have exactly 1) (use service client to bypass RLS)
+		const { count } = await serviceClient
 			.from("organizations")
 			.select("*", { count: "exact", head: true })
 			.eq("owner_id", testUserId);
 
 		expect(count).toBe(1);
 
-		// Verify API key metadata references the existing org
-		const { data: apiKey } = await supabase
+		// Verify API key metadata references the existing org (use service client to bypass RLS)
+		const { data: apiKey } = await serviceClient
 			.from("api_keys")
 			.select("metadata")
 			.eq("user_id", testUserId)
