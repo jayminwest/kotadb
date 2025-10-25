@@ -136,8 +136,8 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	// Authentication middleware for all other routes
 	app.use(
 		async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
-			// Skip auth for health check
-			if (req.path === "/health") {
+			// Skip auth for health check and JWT-authenticated endpoints
+			if (req.path === "/health" || req.path === "/api/keys/generate") {
 				return next();
 			}
 
