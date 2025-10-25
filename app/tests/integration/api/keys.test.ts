@@ -248,7 +248,7 @@ describe("POST /api/keys/generate", () => {
 		// Link user to organization
 		await supabase.from("user_organizations").insert({
 			user_id: testUserId,
-			organization_id: preOrg.id,
+			org_id: preOrg.id,
 			role: "owner",
 		});
 
