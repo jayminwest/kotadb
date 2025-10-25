@@ -655,7 +655,7 @@ export async function createDefaultOrganization(
 		.from("user_organizations")
 		.insert({
 			user_id: userId,
-			organization_id: org.id,
+			org_id: org.id,
 			role: "owner",
 		});
 

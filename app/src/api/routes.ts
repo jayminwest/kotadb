@@ -599,7 +599,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			// Check if user has an organization, create if not
 			const { data: userOrg } = await supabase
 				.from("user_organizations")
-				.select("organization_id")
+				.select("org_id")
 				.eq("user_id", user.id)
 				.maybeSingle();
 
@@ -608,7 +608,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				const { createDefaultOrganization } = await import("./queries");
 				orgId = await createDefaultOrganization(supabase, user.id, user.email);
 			} else {
-				orgId = userOrg.organization_id;
+				orgId = userOrg.org_id;
 			}
 
 			// Generate new API key (default to free tier)
