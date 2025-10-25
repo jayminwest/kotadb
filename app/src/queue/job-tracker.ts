@@ -26,6 +26,8 @@ export async function createIndexJob(
 	userId: string,
 ): Promise<IndexJob> {
 	const client = getServiceClient();
+	// Set user context for RLS policy evaluation
+	// Service role can bypass RLS, but setting context ensures policies match correctly
 	await setUserContext(client, userId);
 
 	const { data, error } = await client
@@ -67,6 +69,8 @@ export async function updateJobStatus(
 	userId: string,
 ): Promise<IndexJob> {
 	const client = getServiceClient();
+	// Set user context for RLS policy evaluation
+	// Service role can bypass RLS, but setting context ensures policies match correctly
 	await setUserContext(client, userId);
 
 	// Build update payload with conditional timestamp logic
