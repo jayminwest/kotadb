@@ -38,6 +38,8 @@ automation/adws/.env
 automation/adws/.env.local
 .env.adws
 .env.adws.local
+*.env.backup
+*.env.vercel.preview
 
 # trees
 automation/trees/
@@ -63,6 +65,12 @@ __pycache__/
 
 # .mcp.json for Claude Code MCP integration
 .mcp.json
+
+# Playwright MCP screenshots
+.playwright-mcp/
+
+# Migration backups
+migrations-backup.tar.gz
 
 # Supabase CLI metadata
 supabase/
