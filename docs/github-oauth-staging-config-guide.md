@@ -129,6 +129,54 @@ If 404 error: API key generation endpoint not yet implemented
 
 ## Troubleshooting
 
+### 403 Error: "Resource not accessible by integration"
+
+**Symptom**: GitHub OAuth flow redirects back to Supabase with error 403, message "Resource not accessible by integration"
+
+**Root Cause Investigation Checklist**:
+
+1. **Verify Scope Parameter Transmission**:
+   - Open browser DevTools → Network tab
+   - Navigate to `https://develop.kotadb.io/login`
+   - Click "Sign in with GitHub"
+   - Find the GitHub authorization redirect in Network tab
+   - Check if `scope=user:email` or `scope=read:user%20user:email` parameter is present
+   - If missing, the scope parameter is not being transmitted to GitHub
+
+2. **Check GitHub OAuth App vs GitHub App Type**:
+   - Navigate to https://github.com/settings/developers
+   - Locate "KotaDB Preview" OAuth App
+   - Verify app type: GitHub OAuth Apps have different permission models than GitHub Apps
+   - GitHub OAuth Apps may require application-level email permissions beyond scope parameter
+   - Consider migrating to GitHub App for more granular permission control
+
+3. **Verify GitHub OAuth App Permissions**:
+   - In GitHub OAuth App settings, check Permissions tab
+   - Verify email access is enabled at application level (not just via scope)
+   - Some OAuth Apps require explicit permission grants in app configuration
+
+4. **Test Alternative Scope Formats**:
+   - Try scope as array: `scopes: ['user:email']` in `web/app/login/page.tsx`
+   - Try multiple scopes: `scopes: 'read:user user:email'`
+   - Try comma-separated: `scopes: 'read:user,user:email'`
+   - Consult Supabase SDK documentation for correct scope syntax
+
+5. **Regenerate OAuth App Credentials**:
+   - If Client ID/Secret are stale or corrupted, regenerate in GitHub OAuth App settings
+   - Update Supabase GitHub provider with new credentials
+   - Test OAuth flow immediately after credential rotation
+
+6. **Migrate to GitHub App** (if OAuth App type is blocker):
+   - Create new GitHub App at https://github.com/settings/apps
+   - Configure with explicit email read permissions (User permissions → Email addresses → Read-only)
+   - Replace OAuth App credentials in Supabase with GitHub App Client ID and Secret
+   - GitHub Apps have more granular permission models designed for API integrations
+
+**Resolution Steps** (documented 2025-10-26):
+- Root cause identified: GitHub App credentials used instead of OAuth App credentials. Supabase GitHub authentication provider requires OAuth App (not GitHub App) for user sign-in flows.
+- Fix applied: Created new GitHub OAuth App "KotaDB Preview" at https://github.com/settings/developers and updated Supabase provider credentials with OAuth App Client ID and Secret.
+- Validation results: OAuth flow successful, user authenticated and redirected to dashboard without 403 error. GitHub OAuth App resolves the "Resource not accessible by integration" error.
+
 ### Redirect Loop
 
 If users experience redirect loops after OAuth:
