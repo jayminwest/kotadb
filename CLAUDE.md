@@ -465,6 +465,121 @@ When working with GitHub issues, both human developers and AI agents follow rela
 
 See issue #151 for complete documentation standards and implementation details.
 
+### Beads Workflow
+
+**Overview**:
+KotaDB uses Beads, a lightweight SQLite-based issue tracker with git-synchronized state, for dependency-aware work tracking. Beads operates via MCP tools and provides programmatic access to issue CRUD operations, dependency management, and work selection queries. This complements GitHub Issues for internal development workflows while maintaining GitHub as the primary collaboration interface for external contributors.
+
+**Database Discovery**:
+Beads searches for the database in the following order:
+1. Project root `.beads/` directory (preferred for KotaDB)
+2. Ancestor directories (searches up the tree)
+3. `~/.beads/default.db` (global fallback)
+
+For KotaDB, the database is located at `.beads/beads.db` (gitignored). The source of truth for team synchronization is `.beads/issues.jsonl` (version controlled).
+
+**Issue ID Conventions**:
+- **Prefix**: `kota-` (matches repository naming)
+- **Format**: `kota-{number}` (e.g., `kota-1`, `kota-123`)
+- **Auto-increment**: Beads automatically assigns sequential numbers
+- **GitHub linking**: Use `external_ref` field to link GitHub issues
+
+**Dependency Relationship Types**:
+- **blocks**: Hard blocker - issue cannot start until dependency completes (default)
+  - Example: `kota-123` (rate limiting) blocks on `kota-25` (API key generation)
+  - Blocked issues won't appear in `/beads:ready` queries until blockers are closed
+- **related**: Soft link - issues share technical context but no strict ordering
+  - Example: Multiple issues touching the authentication layer
+  - Useful for discovering design patterns and architectural decisions
+- **parent-child**: Epic/subtask hierarchy - child is part of larger parent epic
+  - Example: Symbol extraction (`kota-74`) is child of AST parsing epic (`kota-70`)
+  - Enables epic progress tracking and scope management
+- **discovered-from**: Issue was found while working on another issue
+  - Example: Bug found during rate limiting implementation
+  - Tracks discovery path and follow-up work context
+
+**Git Workflow for JSONL Sync**:
+1. **Auto-export**: Beads auto-exports to `.beads/issues.jsonl` with 5-second debounce after any write operation
+2. **Commit strategy**: Commit JSONL changes alongside code changes in the same PR
+   - Wait 5 seconds after creating/updating issues before committing
+   - Recommended: Create issues → verify JSONL updated → commit
+3. **Merge conflicts**: JSONL format is line-based (one issue per line) for merge-friendly diffs
+   - If conflicts occur, resolve manually in JSONL file
+   - Worst case: `bd import issues.jsonl` re-imports from git after resolution
+4. **Team sync**: Teammates pull JSONL changes and beads auto-imports if JSONL is newer than database
+5. **Worktree isolation**: ADW workflows execute in isolated worktrees, sharing the same `.beads/` database via SQLite locking
+
+**Slash Commands for Manual Workflow**:
+- `/beads:ready [assignee] [priority] [limit]`: Query ready-to-work tasks (no unresolved blockers)
+  - Returns markdown table with priority, labels, links to spec files
+  - Recommends highest-priority issue based on priority + effort labels
+- `/beads:create <title> [type] [priority] [description] [deps]`: Create issue with dependencies
+  - Types: bug, feature, task, epic, chore
+  - Priority: 0 (low), 1 (medium), 2 (high)
+  - Returns created issue ID for immediate use
+- `/beads:show <issue_id>`: Show detailed issue information and dependency tree
+  - Displays metadata, dependencies (with status), dependents, spec file links
+  - Highlights unresolved blockers
+- `/beads:update <issue_id> [status] [priority] [assignee] [description]`: Update issue fields
+  - Status: open, in_progress, blocked, closed
+  - Use to claim work: `/beads:update kota-123 in_progress "" claude`
+  - Use to mark complete: `/beads:update kota-123 closed`
+- `/beads:dep <issue_id> <depends_on_id> [relationship_type]`: Add dependency relationship
+  - Creates links between issues for dependency tracking
+  - Supports all relationship types (blocks, related, parent-child, discovered-from)
+
+**Common Beads Operations**:
+
+```bash
+# Find next ready-to-work task
+/beads:ready
+
+# Create a new feature issue
+/beads:create "Add rate limiting" feature 2 "Implement tier-based limits"
+
+# Add dependency (feature depends on prerequisite)
+/beads:dep kota-123 kota-25 blocks
+
+# Claim work on an issue
+/beads:update kota-123 in_progress "" claude
+
+# Check dependency status
+/beads:show kota-123
+
+# Mark issue complete
+/beads:update kota-123 closed
+
+# Find newly unblocked work
+/beads:ready
+```
+
+**When to Use Beads vs GitHub Issues**:
+- **Use Beads for**:
+  - Internal work tracking with explicit dependency management
+  - ADW workflow automation (programmatic work selection)
+  - Blocking relationships that require strict ordering
+  - Quick work queries without GitHub API rate limits
+  - Worktree-isolated development with shared state
+- **Use GitHub Issues for**:
+  - External contributor collaboration and discussions
+  - Public issue tracking and visibility
+  - Integration with GitHub Projects and milestones
+  - Cross-repository issue references
+
+**Migration from GitHub Issues**:
+- **Selective migration**: Start fresh with beads for new work, selectively migrate active GitHub issues
+- **No forced migration**: Phase 1 is opt-in for manual testing; GitHub Issues remain primary
+- **GitHub linking**: Use `external_ref` field to link beads issues to GitHub issues for traceability
+- **Future sync** (Phase 4): Bidirectional GitHub sync for seamless integration
+
+**CI Validation**:
+- JSONL syntax validation runs in CI setup job via `bun run test:validate-beads`
+- Checks `.beads/issues.jsonl` for valid JSON structure using `jq`
+- Skips validation if `.beads/` directory doesn't exist (no false failures on fresh clones)
+- Future: Add timestamp staleness checks in Phase 2
+
+See `.claude/commands/beads/` for slash command documentation and issue #300 (epic) for complete Beads integration roadmap.
+
 ### CI/CD Testing Infrastructure
 **GitHub Actions Workflows**:
 - **Application CI** (`.github/workflows/app-ci.yml`): Tests the TypeScript/Bun application layer

@@ -29,6 +29,7 @@ Use this reference to decide which KotaDB application layer documentation source
     - When clarifying validation commands or development workflows
     - When understanding GitHub issue relationship standards and prioritization workflow (see "GitHub Issue Management and Relationship Standards" section)
     - When working on issue dependency graphs or relationship documentation
+    - When working with Beads issue tracker integration, slash commands, or dependency-aware work selection (see "Beads Workflow" section)
 
 - app/.dockerignore
   - Conditions:
