@@ -19,6 +19,7 @@
 		"test:env": "./scripts/generate-env-test-compose.sh",
 		"test:validate-migrations": "diff -r src/db/migrations supabase/migrations || echo 'WARNING: Migration directories are out of sync!'",
 		"test:validate-env": "! grep -rn 'process\\.env\\.\\(SUPABASE_URL\\|DATABASE_URL\\)\\s*=\\s*[\"\\x27]' tests/ || (echo 'ERROR: Found hardcoded environment variable string assignments in tests/' && exit 1)",
+		"test:validate-beads": "bash scripts/validate-beads-sync.sh",
 		"prepare": "husky || true"
 	},
 	"dependencies": {

@@ -74,3 +74,9 @@ migrations-backup.tar.gz
 
 # Supabase CLI metadata
 supabase/
+
+# Beads SQLite databases (keep JSONL exports only)
+.beads/*.db
+.beads/*.db-journal
+.beads/*.db-wal
+.beads/*.db-shm
