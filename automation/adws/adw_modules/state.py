@@ -35,6 +35,8 @@ class ADWState:
     Resolution tracking fields (stored in extra):
         - last_resolution_attempts: JSON string of resolution history for debugging
         - validation_retry_count: Number of validation retry attempts performed
+        - beads_issue_id: Beads issue ID for tracking (e.g., kota-db-ts-303)
+        - beads_sync: Sync metadata (last_sync, source, beads_available)
     """
 
     adw_id: str
@@ -47,6 +49,8 @@ class ADWState:
     worktree_created_at: Optional[str] = None
     test_project_name: Optional[str] = None
     pr_created: Optional[bool] = None
+    beads_issue_id: Optional[str] = None
+    beads_sync: Optional[Dict[str, Any]] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -69,6 +73,8 @@ class ADWState:
             "worktree_created_at": self.worktree_created_at,
             "test_project_name": self.test_project_name,
             "pr_created": self.pr_created,
+            "beads_issue_id": self.beads_issue_id,
+            "beads_sync": self.beads_sync,
         }
         payload.update(self.extra)
         return {key: value for key, value in payload.items() if value is not None}
@@ -91,7 +97,7 @@ class ADWState:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
 
-        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at", "test_project_name", "pr_created"}}
+        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at", "test_project_name", "pr_created", "beads_issue_id", "beads_sync"}}
 
         return cls(
             adw_id=data.get("adw_id", adw_id),
@@ -104,6 +110,8 @@ class ADWState:
             worktree_created_at=data.get("worktree_created_at"),
             test_project_name=data.get("test_project_name"),
             pr_created=data.get("pr_created"),
+            beads_issue_id=data.get("beads_issue_id"),
+            beads_sync=data.get("beads_sync"),
             extra=extra,
         )
 
