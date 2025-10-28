@@ -35,15 +35,21 @@ def test_workspace(tmp_path):
     workspace.mkdir()
 
     # Initialize beads with test prefix
-    result = subprocess.run(
-        ["bd", "init", "--prefix", "test"],
-        cwd=workspace,
-        capture_output=True,
-        text=True,
-    )
+    try:
+        result = subprocess.run(
+            ["bd", "init", "--prefix", "test"],
+            cwd=workspace,
+            capture_output=True,
+            text=True,
+        )
 
-    if result.returncode != 0:
-        pytest.skip(f"Beads CLI not available: {result.stderr}")
+        if result.returncode != 0:
+            pytest.skip(f"Beads CLI initialization failed: {result.stderr}")
+
+    except FileNotFoundError:
+        pytest.skip("Beads CLI not available in PATH")
+    except Exception as e:
+        pytest.skip(f"Beads CLI initialization error: {e}")
 
     return workspace
 
