@@ -112,7 +112,9 @@ describe("Python Bridge CLI", () => {
 
 		// Should find our test workflow
 		expect(workflows.length).toBeGreaterThan(0);
-		expect(workflows[0].adw_id).toBe(TEST_ADW_ID);
+		if (workflows[0]) {
+			expect(workflows[0].adw_id).toBe(TEST_ADW_ID);
+		}
 	});
 
 	it("should handle missing state file", async () => {
