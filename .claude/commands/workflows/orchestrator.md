@@ -448,24 +448,69 @@ Before execution:
 ## Phase 1: Issue Validation
 
 ### Extract Issue Metadata
+
+**Primary Source: Beads** (local SQLite database, sub-50ms queries)
+```typescript
+// Try beads MCP tools first (Phase 2 integration)
+const beadsIssue = mcp__plugin_beads_beads__show({
+  issue_id: `kota-db-ts-${issueNumber}`,  // Map GitHub issue to beads ID
+  workspace_root: "."
+});
+
+if (beadsIssue) {
+  // Beads provides full metadata including dependencies
+  issueMetadata = {
+    number: beadsIssue.external_ref,  // GitHub issue number
+    title: beadsIssue.title,
+    status: beadsIssue.status,  // open, in_progress, blocked, closed
+    priority: beadsIssue.priority,  // 1-5
+    type: beadsIssue.issue_type,  // bug, feature, task, chore, epic
+    dependencies: beadsIssue.dependencies,  // Array of beads issue IDs
+    dependents: beadsIssue.dependents,  // Array of beads issue IDs blocking on this
+    labels: beadsIssue.labels,
+    assignee: beadsIssue.assignee,
+  };
+}
+```
+
+**Fallback Source: GitHub API** (if beads unavailable or issue not synced)
 ```bash
 gh issue view $1 --json number,title,labels,body,state
 ```
 
 ### Validate Issue State
-- **Open Status**: Issue must be in "OPEN" state (warn and require `--force` if closed)
-- **Label Requirements**: Must have labels from all categories:
+- **Open Status**: Issue must be in "open" state (warn and require `--force` if closed)
+- **Beads-Aware Validation**:
+  - If beads available: Check `beadsIssue.status === "open"` or `"in_progress"`
+  - If GitHub API: Check `issueMetadata.state === "OPEN"`
+- **Label Requirements** (GitHub API fallback only):
   - Component: `component:api`, `component:auth`, `component:db`, `component:ci`, etc.
   - Priority: `priority:critical`, `priority:high`, `priority:medium`, `priority:low`
   - Effort: `effort:small`, `effort:medium`, `effort:large`
   - Status: `status:ready`, `status:in-progress`, `status:blocked`, etc.
-- **Type Extraction**: Determine issue type from labels or title prefix:
-  - Look for labels: `type:feature`, `type:bug`, `type:chore`
-  - Fallback: extract from title (e.g., "feat:", "bug:", "chore:")
+- **Type Extraction**:
+  - Beads: Use `beadsIssue.issue_type` directly
+  - GitHub API: Look for labels (`type:feature`, `type:bug`, `type:chore`) or extract from title prefix
   - Map to slash command: `feat` → `/feat`, `bug` → `/bug`, `chore` → `/chore`
 
 ### Check Dependencies
-Parse issue body for "Depends On" relationships:
+
+**Primary: Beads Dependency Graph** (local, instant queries)
+```typescript
+if (beadsIssue && beadsIssue.dependencies.length > 0) {
+  // Beads provides dependency status directly
+  for (const depId of beadsIssue.dependencies) {
+    const dep = mcp__plugin_beads_beads__show({ issue_id: depId, workspace_root: "." });
+    if (dep && dep.status !== "closed") {
+      // Error: dependency unresolved
+      console.error(`Issue depends on unresolved ${depId} (${dep.title})`);
+      requireForceFlag = true;
+    }
+  }
+}
+```
+
+**Fallback: Parse Issue Body** (GitHub API)
 ```markdown
 ## Issue Relationships
 - Depends On: #123, #456
@@ -479,6 +524,24 @@ gh issue view <dep_number> --json state
 If any dependency is still open:
 - Error: "Issue #<issue> depends on unresolved issue #<dep> (<title>)"
 - Require `--force` flag to continue
+
+### Atomic Work Claim (Beads Only)
+After dependency validation passes, atomically claim the work to prevent concurrent agent conflicts:
+```typescript
+if (beadsIssue) {
+  // Update status to in_progress (prevents other agents from claiming)
+  const claimed = mcp__plugin_beads_beads__update({
+    issue_id: beadsIssue.id,
+    status: "in_progress",
+    assignee: "claude",  // Or dynamic assignee
+    workspace_root: "."
+  });
+
+  if (!claimed) {
+    console.error("Failed to claim work atomically - another agent may be working on this");
+    process.exit(1);
+  }
+}
 
 ### Dry-Run Exit
 If `--dry-run` flag is set:
@@ -526,6 +589,12 @@ Write initial state to `state.json`:
   "worktree_name": "feat-187-orchestrator-command",
   "worktree_path": "trees/feat-187-orchestrator-command",
   "branch_name": "feat-187-orchestrator-command",
+  "beads_issue_id": "kota-db-ts-187",
+  "beads_sync": {
+    "last_sync": "2025-10-20T14:00:00Z",
+    "source": "beads",
+    "beads_available": true
+  },
   "created_at": "2025-10-20T14:00:00Z",
   "updated_at": "2025-10-20T14:00:00Z",
   "phase_status": {
