@@ -143,36 +143,69 @@ export async function executeBridgeCommand(
 	args: string[] = [],
 	options: SubprocessOptions = {},
 ): Promise<unknown> {
-	// Resolve path to mcp_bridge.py relative to project root
+	// Resolve project root and automation directory
 	const projectRoot = resolve(__dirname, "../../../..");
-	const bridgeScript = resolve(
-		projectRoot,
-		"automation/adws/adw_modules/mcp_bridge.py",
-	);
+	const automationAdwsDir = resolve(projectRoot, "automation/adws");
 
-	const result = await spawnPythonProcess(
-		bridgeScript,
-		[command, ...args],
-		{
-			...options,
-			cwd: options.cwd || projectRoot,
-		},
-	);
-
-	// Check for subprocess errors
-	if (result.error) {
-		throw new Error(
-			`Python bridge subprocess failed: ${result.error.message}`,
+	// Execute as Python module using -m flag for proper import resolution
+	// Run from automation/adws directory for module resolution
+	return new Promise((resolve, reject) => {
+		const child = spawn(
+			"uv",
+			["run", "python", "-m", "adw_modules.mcp_bridge", command, ...args],
+			{
+				cwd: options.cwd || automationAdwsDir,
+				env: { ...process.env, ...options.env },
+				stdio: ["ignore", "pipe", "pipe"],
+			},
 		);
-	}
 
-	// Check for non-zero exit code
-	if (result.exitCode !== 0) {
-		throw new Error(
-			`Python bridge exited with code ${result.exitCode}: ${result.stderr}`,
-		);
-	}
+		let stdout = "";
+		let stderr = "";
+		let timedOut = false;
 
-	// Parse JSON output
-	return parsePythonOutput(result.stdout);
+		const timeout = options.timeout || 30000;
+		const timeoutId = setTimeout(() => {
+			timedOut = true;
+			child.kill("SIGTERM");
+		}, timeout);
+
+		child.stdout?.on("data", (data) => {
+			stdout += data.toString();
+		});
+
+		child.stderr?.on("data", (data) => {
+			stderr += data.toString();
+		});
+
+		child.on("close", (exitCode) => {
+			clearTimeout(timeoutId);
+
+			if (timedOut) {
+				reject(new Error(`Process timed out after ${timeout}ms`));
+				return;
+			}
+
+			if (exitCode !== 0) {
+				reject(
+					new Error(
+						`Python bridge exited with code ${exitCode}: ${stderr}`,
+					),
+				);
+				return;
+			}
+
+			try {
+				const result = parsePythonOutput(stdout);
+				resolve(result);
+			} catch (error) {
+				reject(error);
+			}
+		});
+
+		child.on("error", (error) => {
+			clearTimeout(timeoutId);
+			reject(new Error(`Python bridge subprocess failed: ${error.message}`));
+		});
+	});
 }

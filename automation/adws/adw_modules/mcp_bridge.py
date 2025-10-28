@@ -12,10 +12,20 @@ import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
 
-from .state import ADWState, StateNotFoundError, agents_root
-from .utils import project_root
-from .git_ops import create_worktree as git_create_worktree_impl
-from .git_ops import cleanup_worktree as git_cleanup_worktree_impl
+# Support both direct execution and module import
+try:
+    from .state import ADWState, StateNotFoundError, agents_root
+    from .utils import project_root
+    from .git_ops import create_worktree as git_create_worktree_impl
+    from .git_ops import cleanup_worktree as git_cleanup_worktree_impl
+except ImportError:
+    # Direct execution - add parent directory to path
+    _module_dir = Path(__file__).parent
+    sys.path.insert(0, str(_module_dir))
+    from state import ADWState, StateNotFoundError, agents_root
+    from utils import project_root
+    from git_ops import create_worktree as git_create_worktree_impl
+    from git_ops import cleanup_worktree as git_cleanup_worktree_impl
 
 
 def get_adw_state(adw_id: str) -> Dict[str, Any]:
