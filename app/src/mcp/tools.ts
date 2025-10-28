@@ -18,6 +18,7 @@ import { buildSnippet } from "@indexer/extractors";
 import type { IndexRequest } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invalidParams } from "./jsonrpc";
+import { executeBridgeCommand } from "./utils/python";
 
 /**
  * MCP Tool Definition
@@ -151,6 +152,55 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
 };
 
 /**
+ * Tool: get_adw_state
+ */
+export const GET_ADW_STATE_TOOL: ToolDefinition = {
+	name: "get_adw_state",
+	description:
+		"Query the state of a specific ADW (AI Developer Workflow) execution. Returns workflow metadata including issue number, branch name, worktree path, PR status, and phase completion status.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			adw_id: {
+				type: "string",
+				description:
+					"ADW workflow identifier (e.g., 'abc-123-def456')",
+			},
+		},
+		required: ["adw_id"],
+	},
+};
+
+/**
+ * Tool: list_adw_workflows
+ */
+export const LIST_ADW_WORKFLOWS_TOOL: ToolDefinition = {
+	name: "list_adw_workflows",
+	description:
+		"List all ADW workflow executions with optional filtering by ADW ID prefix, status, or result limit. Useful for discovering active workflows, monitoring completion status, and troubleshooting failed executions.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			adw_id_filter: {
+				type: "string",
+				description:
+					"Optional: Filter results by ADW ID prefix (e.g., 'abc-' to find all workflows starting with 'abc-')",
+			},
+			status_filter: {
+				type: "string",
+				description:
+					"Optional: Filter results by workflow status (e.g., 'completed', 'failed', 'in_progress')",
+			},
+			limit: {
+				type: "number",
+				description:
+					"Optional: Maximum number of results to return (default: 50, max: 100)",
+			},
+		},
+	},
+};
+
+/**
  * Get all available tool definitions
  */
 export function getToolDefinitions(): ToolDefinition[] {
@@ -159,6 +209,8 @@ export function getToolDefinitions(): ToolDefinition[] {
 		INDEX_REPOSITORY_TOOL,
 		LIST_RECENT_FILES_TOOL,
 		SEARCH_DEPENDENCIES_TOOL,
+		GET_ADW_STATE_TOOL,
+		LIST_ADW_WORKFLOWS_TOOL,
 	];
 }
 
@@ -531,6 +583,93 @@ export async function executeSearchDependencies(
 }
 
 /**
+ * Execute get_adw_state tool
+ */
+export async function executeGetAdwState(
+	supabase: SupabaseClient,
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: adw_id
+	if (p.adw_id === undefined) {
+		throw new Error("Missing required parameter: adw_id");
+	}
+	if (typeof p.adw_id !== "string") {
+		throw new Error("Parameter 'adw_id' must be a string");
+	}
+
+	const adwId = p.adw_id as string;
+
+	// Execute Python bridge command to get state
+	const result = await executeBridgeCommand("get_state", [adwId], {
+		timeout: 30000, // 30s timeout for state queries
+	});
+
+	return result;
+}
+
+/**
+ * Execute list_adw_workflows tool
+ */
+export async function executeListAdwWorkflows(
+	supabase: SupabaseClient,
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (params !== undefined && typeof params !== "object") {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = (params as Record<string, unknown> | undefined) || {};
+
+	// Validate optional parameters
+	if (p.adw_id_filter !== undefined && typeof p.adw_id_filter !== "string") {
+		throw new Error("Parameter 'adw_id_filter' must be a string");
+	}
+	if (p.status_filter !== undefined && typeof p.status_filter !== "string") {
+		throw new Error("Parameter 'status_filter' must be a string");
+	}
+	if (p.limit !== undefined) {
+		if (typeof p.limit !== "number") {
+			throw new Error("Parameter 'limit' must be a number");
+		}
+		if (p.limit < 1 || p.limit > 100) {
+			throw new Error("Parameter 'limit' must be between 1 and 100");
+		}
+	}
+
+	// Build bridge command arguments
+	const args: string[] = [];
+
+	if (p.adw_id_filter) {
+		args.push("--adw-id", p.adw_id_filter as string);
+	}
+	if (p.status_filter) {
+		args.push("--status", p.status_filter as string);
+	}
+	if (p.limit) {
+		args.push("--limit", (p.limit as number).toString());
+	}
+
+	// Execute Python bridge command to list workflows
+	const result = await executeBridgeCommand("list_workflows", args, {
+		timeout: 30000, // 30s timeout for list queries
+	});
+
+	return result;
+}
+
+/**
  * Main tool call dispatcher
  */
 export async function handleToolCall(
@@ -554,6 +693,10 @@ export async function handleToolCall(
 				requestId,
 				userId,
 			);
+		case "get_adw_state":
+			return await executeGetAdwState(supabase, params, requestId, userId);
+		case "list_adw_workflows":
+			return await executeListAdwWorkflows(supabase, params, requestId, userId);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}

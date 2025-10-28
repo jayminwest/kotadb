@@ -147,6 +147,11 @@ jobs:
         with:
           enable-cache: true
 
+      - name: Verify uv installation
+        run: |
+          which uv
+          uv --version
+
       - name: Setup Docker Compose test stack and generate credentials
         working-directory: .
         run: |
