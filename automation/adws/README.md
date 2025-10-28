@@ -585,6 +585,167 @@ If rate limits are exceeded, the health check will report 429 status codes and w
 
 ---
 
+## Beads Integration (Phase 2)
+
+**Feature #303: Beads ADW Workflow Integration**
+
+Beads (local issue tracking via SQLite) replaces GitHub API queries in ADW workflows, providing sub-50ms work selection, atomic claim operations, and dependency graph queries. This eliminates GitHub API latency (150ms+), reduces rate limit pressure, and enables offline-friendly workflows.
+
+### Benefits
+
+- **30x faster queries**: Beads SQLite queries are 5-20ms vs 150ms+ GitHub API latency
+- **Atomic work claims**: `bd update --status in_progress` prevents concurrent agent conflicts
+- **Dependency graphs**: `dependencies` and `dependents` fields eliminate spec file parsing
+- **Offline-friendly**: Local-first data access, sync via git commits
+- **Reduced rate limits**: 5000 GitHub API requests/hour → minimal usage
+
+### Architecture
+
+```
+GitHub Issues → bd sync → beads SQLite → MCP Tools → ADW Workflows
+                              ↓
+                         JSONL export → git commit → sync across machines
+```
+
+### Setup
+
+1. **Install Beads CLI**:
+   ```bash
+   uv tool install beads
+   bd --version
+   ```
+
+2. **Initialize Beads** (if not already initialized):
+   ```bash
+   bd init --prefix kota-db-ts
+   ```
+
+3. **Sync Issues** (import from GitHub):
+   ```bash
+   bd sync
+   ```
+
+### Using Beads in Workflows
+
+**Orchestrator Work Selection**:
+```typescript
+// Primary: Beads (sub-50ms)
+const issue = mcp__plugin_beads_beads__show({
+  issue_id: `kota-db-ts-${issueNumber}`,
+  workspace_root: "."
+});
+
+// Fallback: GitHub API (150ms+)
+if (!issue) {
+  const ghIssue = await gh.issue.view(issueNumber);
+}
+```
+
+**Atomic Work Claim**:
+```typescript
+// Prevent concurrent agents from claiming same work
+const claimed = mcp__plugin_beads_beads__update({
+  issue_id: issue.id,
+  status: "in_progress",
+  assignee: "claude",
+  workspace_root: "."
+});
+```
+
+**Dependency Validation**:
+```typescript
+// Check if dependencies resolved before starting
+for (const depId of issue.dependencies) {
+  const dep = mcp__plugin_beads_beads__show({
+    issue_id: depId,
+    workspace_root: "."
+  });
+  if (dep.status !== "closed") {
+    console.error(`Blocked by ${depId}: ${dep.title}`);
+  }
+}
+```
+
+### Python Automation Layer
+
+For Python scripts that need beads data, use CLI-based helpers from `adw_modules/beads_ops.py`:
+
+```python
+from adw_modules.beads_ops import (
+    query_ready_issues_cli,
+    get_issue_details_cli,
+    update_issue_status_cli,
+)
+
+# Query ready issues (no blockers)
+issues = query_ready_issues_cli(priority=1, limit=10)
+
+# Get issue details with dependencies
+details = get_issue_details_cli("kota-db-ts-303")
+
+# Update status atomically
+success = update_issue_status_cli(
+    "kota-db-ts-303",
+    "in_progress",
+    assignee="claude",
+)
+```
+
+### State Schema Extension
+
+ADW state now includes beads tracking fields:
+
+```json
+{
+  "adw_id": "orch-303-20251028120000",
+  "issue_number": "303",
+  "beads_issue_id": "kota-db-ts-303",
+  "beads_sync": {
+    "last_sync": "2025-10-28T12:00:00Z",
+    "source": "beads",
+    "beads_available": true
+  }
+}
+```
+
+### Sync Strategy
+
+Beads uses JSONL for git-based sync (`.beads/issues.jsonl`):
+
+1. **Manual sync**: `bd sync` (exports SQLite → JSONL, commits changes)
+2. **Auto-import**: Beads detects newer JSONL on `git pull` and imports automatically
+3. **Conflict resolution**: Last-write-wins (SQLite timestamp-based)
+
+### Troubleshooting
+
+**"Beads CLI not found"**:
+- Install beads: `uv tool install beads`
+- Verify: `bd --version`
+
+**"Issue not found in beads"**:
+- Sync beads: `bd sync`
+- Check JSONL: `cat .beads/issues.jsonl`
+- Verify external_ref: `bd show <issue_id>`
+
+**"Atomic claim failed"**:
+- Check if issue already claimed: `bd show <issue_id>`
+- Verify status: Should be `open`, not `in_progress`
+- Check worktree isolation: Ensure agents in separate worktrees
+
+**"Dependency sync delay"**:
+- Beads auto-imports JSONL if newer than database
+- Force import: `bd import .beads/issues.jsonl`
+- Check freshness: Compare JSONL timestamp with database
+
+### Related Documentation
+
+- Beads Integration Guide (`.claude/commands/docs/beads-adw-integration.md`): Complete developer guide
+- Orchestrator (`.claude/commands/workflows/orchestrator.md`): Beads work selection in Phase 1
+- Prioritize (`.claude/commands/issues/prioritize.md`): Beads dependency graph queries
+- Issue Relationships (`.claude/commands/docs/issue-relationships.md`): Dependency types
+
+---
+
 ## Logs & State
 
 Run metadata is rooted at `logs/kota-db-ts/<env>/<adw_id>/`:
