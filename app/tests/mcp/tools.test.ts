@@ -58,13 +58,15 @@ describe("MCP Tools Integration", () => {
 		expect(data.jsonrpc).toBe("2.0");
 		expect(data.result).toBeDefined();
 		expect(data.result.tools).toBeArray();
-		expect(data.result.tools.length).toBe(4);
+		expect(data.result.tools.length).toBe(6);
 
 		const toolNames = data.result.tools.map((t: { name: string }) => t.name);
 		expect(toolNames).toContain("search_code");
 		expect(toolNames).toContain("index_repository");
 		expect(toolNames).toContain("list_recent_files");
 		expect(toolNames).toContain("search_dependencies");
+		expect(toolNames).toContain("get_adw_state");
+		expect(toolNames).toContain("list_adw_workflows");
 	});
 
 	test("search_code tool finds matching files", async () => {

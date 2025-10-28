@@ -142,6 +142,11 @@ jobs:
       - name: Install dependencies (cache miss fallback)
         run: bun install --frozen-lockfile
 
+      - name: Install uv (required for ADW MCP tools)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
       - name: Setup Docker Compose test stack and generate credentials
         working-directory: .
         run: |
