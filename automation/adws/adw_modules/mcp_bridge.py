@@ -37,25 +37,34 @@ def get_adw_state(adw_id: str) -> Dict[str, Any]:
         return {"error": str(e), "success": False}
 
 
-def list_adw_workflows(adw_id_filter: Optional[str] = None) -> Dict[str, Any]:
-    """List all ADW workflows or filter by adw_id.
+def list_adw_workflows(
+    adw_id_filter: Optional[str] = None,
+    status_filter: Optional[str] = None,
+    limit: int = 50,
+) -> Dict[str, Any]:
+    """List all ADW workflows with optional filtering.
 
     Args:
-        adw_id_filter: Optional ADW ID to filter results
+        adw_id_filter: Optional ADW ID prefix filter
+        status_filter: Optional status filter (e.g., completed, failed)
+        limit: Maximum number of results to return
 
     Returns:
-        Dictionary with workflows list and total count
+        Dictionary with workflows list, total count, and filtered count
     """
     agents_dir = agents_root()
     if not agents_dir.exists():
-        return {"workflows": [], "total": 0}
+        return {"workflows": [], "total": 0, "filtered": 0, "limit": limit}
 
+    all_dirs = list(agents_dir.iterdir())
     workflows = []
-    for agent_dir in agents_dir.iterdir():
+
+    for agent_dir in sorted(all_dirs, reverse=True):
         if not agent_dir.is_dir():
             continue
 
-        if adw_id_filter and agent_dir.name != adw_id_filter:
+        # Apply ADW ID prefix filter
+        if adw_id_filter and not agent_dir.name.startswith(adw_id_filter):
             continue
 
         state_file = agent_dir / "adw_state.json"
@@ -64,11 +73,42 @@ def list_adw_workflows(adw_id_filter: Optional[str] = None) -> Dict[str, Any]:
 
         try:
             state = ADWState.load(agent_dir.name)
-            workflows.append(state.to_dict())
+            state_dict = state.to_dict()
+
+            # Apply status filter
+            if status_filter:
+                workflow_status = state_dict.get("extra", {}).get("status", "unknown")
+                if workflow_status != status_filter:
+                    continue
+
+            # Extract key fields for listing
+            workflow_summary = {
+                "adw_id": agent_dir.name,
+                "issue_number": state_dict.get("issue_number"),
+                "issue_class": state_dict.get("issue_class"),
+                "branch_name": state_dict.get("branch_name"),
+                "worktree_path": state_dict.get("worktree_path"),
+                "worktree_created_at": state_dict.get("worktree_created_at"),
+                "pr_created": state_dict.get("pr_created"),
+                "status": state_dict.get("extra", {}).get("status"),
+                "triggered_by": state_dict.get("extra", {}).get("triggered_by"),
+            }
+
+            workflows.append(workflow_summary)
+
+            # Stop if we've reached the limit
+            if len(workflows) >= limit:
+                break
+
         except Exception:
             continue
 
-    return {"workflows": workflows, "total": len(workflows)}
+    return {
+        "workflows": workflows,
+        "total": len(all_dirs),
+        "filtered": len(workflows),
+        "limit": limit,
+    }
 
 
 def execute_git_commit(
@@ -370,8 +410,24 @@ def main() -> None:
         print(json.dumps(result, indent=2))
 
     elif command == "list_workflows":
-        adw_id_filter = sys.argv[2] if len(sys.argv) > 2 else None
-        result = list_adw_workflows(adw_id_filter)
+        # Parse arguments: --adw-id, --status, --limit
+        adw_id_filter = None
+        status_filter = None
+        limit = 50
+        i = 2
+        while i < len(sys.argv):
+            if sys.argv[i] == "--adw-id" and i + 1 < len(sys.argv):
+                adw_id_filter = sys.argv[i + 1]
+                i += 2
+            elif sys.argv[i] == "--status" and i + 1 < len(sys.argv):
+                status_filter = sys.argv[i + 1]
+                i += 2
+            elif sys.argv[i] == "--limit" and i + 1 < len(sys.argv):
+                limit = int(sys.argv[i + 1])
+                i += 2
+            else:
+                i += 1
+        result = list_adw_workflows(adw_id_filter, status_filter, limit)
         print(json.dumps(result, indent=2))
 
     elif command == "git_commit":
