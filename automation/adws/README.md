@@ -24,6 +24,9 @@ adws/
 │   ├── ts_commands.py    # Bun validation command catalogue
 │   ├── utils.py          # Env loading, logging, JSON helpers
 │   └── workflow_ops.py   # Agent wrappers for plan/build/test/review/etc.
+├── playwright_helpers/   # Playwright authentication for frontend testing (issue #318)
+│   ├── auth.py           # PlaywrightAuthHelper class + authenticate_playwright_session()
+│   └── __init__.py       # Public API exports
 ├── adw_agents/           # Atomic agent catalog (chore #216, "one agent, one task, one prompt")
 │   ├── agent_classify_issue.py      # Issue classification (feat/bug/chore)
 │   ├── agent_generate_branch.py     # Conventional branch name generation
