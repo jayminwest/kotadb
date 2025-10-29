@@ -7,7 +7,7 @@
 
 import type { AuthContext } from "@shared/types/auth";
 import { enforceRateLimit } from "@auth/rate-limit";
-import { updateLastUsed, validateApiKey } from "@auth/validator";
+import { updateLastUsed, validateApiKey, validateJwtToken } from "@auth/validator";
 
 // Conditional logging for test environment
 const isTestEnv = process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
@@ -77,13 +77,24 @@ export async function authenticateRequest(
 	// Extract token
 	const token = authHeader.slice(7); // Remove "Bearer " prefix
 
-	// Validate API key
-	const validation = await validateApiKey(token);
+	// Route to appropriate validator based on token format
+	let validation: Awaited<ReturnType<typeof validateApiKey>> | null;
+	let authMethod: string;
+
+	if (token.startsWith("kota_")) {
+		// API key authentication
+		authMethod = "api_key";
+		validation = await validateApiKey(token);
+	} else {
+		// JWT token authentication
+		authMethod = "jwt";
+		validation = await validateJwtToken(token);
+	}
 
 	if (!validation) {
-		// Log failed authentication attempt (keyId if parseable)
+		// Log failed authentication attempt
 		if (shouldLog) {
-			process.stderr.write("[Auth] Invalid API key attempt");
+			process.stderr.write(`[Auth] Invalid ${authMethod} attempt\n`);
 		}
 
 		return {
@@ -115,7 +126,7 @@ export async function authenticateRequest(
 	// Log successful authentication
 	if (shouldLog) {
 		process.stdout.write(
-			`[Auth] Success - userId: ${context.userId}, keyId: ${context.keyId}, tier: ${context.tier}`,
+			`[Auth] ${authMethod === "jwt" ? "JWT" : "API key"} auth success - userId: ${context.userId}, keyId: ${context.keyId}, tier: ${context.tier}\n`,
 		);
 	}
 
@@ -155,12 +166,14 @@ export async function authenticateRequest(
 	// Attach rate limit result to context for response headers
 	context.rateLimit = rateLimit;
 
-	// Update last_used_at asynchronously (non-blocking)
-	queueMicrotask(() => {
-		updateLastUsed(validation.keyId).catch((err: unknown) => {
-			process.stderr.write(`[Auth] Failed to update last_used_at: ${JSON.stringify(err)}\n`);
+	// Update last_used_at asynchronously (non-blocking) - only for API keys
+	if (authMethod === "api_key") {
+		queueMicrotask(() => {
+			updateLastUsed(validation.keyId).catch((err: unknown) => {
+				process.stderr.write(`[Auth] Failed to update last_used_at: ${JSON.stringify(err)}\n`);
+			});
 		});
-	});
+	}
 
 	return { context };
 }
