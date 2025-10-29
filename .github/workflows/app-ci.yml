@@ -222,7 +222,7 @@ jobs:
       - name: Run tests with coverage
         run: |
           export $(grep -v '^#' ../.env.test | xargs) || true
-          bun test --coverage
+          bun run test --coverage
 
       - name: Check coverage threshold
         run: |
