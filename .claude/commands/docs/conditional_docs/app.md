@@ -45,6 +45,17 @@ Use this reference to decide which KotaDB application layer documentation source
     - When needing to understand automated dev environment script behavior
     - When explaining how to start web app or MCP servers alongside API server
 
+- .claude/commands/workflows/dogfood-prime.md
+  - Conditions:
+    - When priming KotaDB development environment for local dogfooding and testing
+    - When setting up complete workflow: Supabase → API server → test credentials → validation
+    - When needing step-by-step guide for first-time environment configuration
+    - When preparing testing session for manual API or MCP integration validation
+    - When troubleshooting environment setup with detailed diagnostics and expected outputs
+    - When generating test API keys and validating core functionality (REST, MCP, rate limiting)
+    - When reproducing production-like environment locally for issue investigation
+    - When onboarding new developers or agents to local development setup
+
 - docs/supabase-setup.md
   - Conditions:
     - When integrating or troubleshooting Supabase services, keys, or environment variables
