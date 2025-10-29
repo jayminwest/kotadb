@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase-server'
+import { createClient } from '@supabase/supabase-js'
 import { z } from 'zod'
 
 /**
@@ -115,8 +115,17 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { email, tier } = DevSessionRequestSchema.parse(body)
 
-    // Create Supabase admin client
-    const supabase = createClient()
+    // Create Supabase admin client with service role key
+    const supabase = createClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      {
+        auth: {
+          autoRefreshToken: false,
+          persistSession: false
+        }
+      }
+    )
 
     // Step 1: Create test user (idempotent via email uniqueness)
     const { data: createData, error: createError } = await supabase.auth.admin.createUser({

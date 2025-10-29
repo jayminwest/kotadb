@@ -64,6 +64,8 @@ For **testing and development only**: `/auth/dev-session` generates authenticate
 - **Security**: Strict production guard (requires both `NODE_ENV !== 'production'` AND `VERCEL_ENV !== 'production'`)
 - **Location**: `web/app/auth/dev-session/route.ts`
 - **Helper Utilities**: `web/lib/playwright-helpers.ts` (cookie injection, session management)
+- **Requirements**: `SUPABASE_SERVICE_ROLE_KEY` env var (admin API access)
+- **Middleware**: Exempted from auth checks via middleware matcher
 - **Spec**: `docs/specs/feature-317-dev-session-endpoint.md`
 
 ```bash
