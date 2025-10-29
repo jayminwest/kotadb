@@ -199,6 +199,83 @@ if checkpoint_file:
 
 ---
 
+## Auto-Merge Workflow
+
+**Feature #305: Auto-Merge for ADW PRs**
+
+ADW-generated PRs can automatically merge after successful CI validation, reducing median merge time from 15 minutes to ~3 minutes (CI runtime only).
+
+### Enabling Auto-Merge
+
+Set the `ADW_AUTO_MERGE` environment variable to enable:
+
+```bash
+export ADW_AUTO_MERGE=true
+uv run adws/adw_sdlc.py <issue_number> <adw_id>
+```
+
+**Default Behavior**: Auto-merge is **disabled by default** (`false`) for safety during initial rollout.
+
+### Safety Mechanisms
+
+- Auto-merge only enabled for ADW-generated PRs (build phase checks feature flag)
+- Requires all CI checks to pass: setup, typecheck, lint, test, coverage, build
+- PRs with merge conflicts blocked by GitHub (require manual resolution)
+- Failure to enable auto-merge logs warning but continues workflow (graceful degradation)
+
+### How It Works
+
+1. Build phase creates PR after successful implementation
+2. If `ADW_AUTO_MERGE=true`, runs `gh pr merge --auto --squash --delete-branch`
+3. GitHub queues auto-merge (waits for required status checks)
+4. CI workflow completes (all jobs pass)
+5. GitHub automatically merges PR and deletes branch
+6. ADW state tracks merge status: `pending`, `success`, `failed`, `conflict`
+
+### Monitoring
+
+Track auto-merge success rates via `analyze_logs.py`:
+
+```bash
+uv run automation/adws/scripts/analyze_logs.py --format json --hours 24
+```
+
+**Metrics Include**:
+- Auto-merge enabled count
+- Success rate (target: >90%)
+- Failure distribution (CI failures, conflicts, timeouts)
+- Alert threshold: Warning if success rate <90% AND enabled count ≥5
+
+**Example Output**:
+```
+Auto-Merge Metrics:
+  • Auto-merge enabled: 12
+  • Success: 11
+  • Failed: 0
+  • Conflicts: 0
+  • Pending: 1
+  • Success rate: 100.0%
+```
+
+### Troubleshooting
+
+**Auto-merge not enabled**:
+- Check `ADW_AUTO_MERGE` environment variable is set to `true`
+- Verify build phase logs show `"Enabling auto-merge for PR #<number>"`
+- Check state file: `cat automation/agents/<adw_id>/adw_state.json | jq '.auto_merge_enabled'`
+
+**Auto-merge failed**:
+- Check CI status: `gh pr checks <pr_number>` (all checks must pass)
+- Check for merge conflicts: `gh pr view <pr_number> --json mergeable`
+- Check PR auto-merge status: `gh pr view <pr_number> --json autoMergeRequest`
+
+**Auto-merge pending (not completing)**:
+- Verify all required status checks are configured: `gh repo view --json branchProtectionRules`
+- Check CI workflow logs for failures
+- Manually merge if needed: `gh pr merge <pr_number> --squash --delete-branch`
+
+---
+
 ## ADW Observability
 
 The ADW Metrics Analysis workflow provides automated observability into ADW success rates and failure patterns through daily log analysis and metrics collection.
@@ -864,6 +941,7 @@ sudo systemctl enable --now adw-webhook.service
 - `ADW_REPO_URL` – Optional explicit Git URL override (falls back to the image's embedded remote).
 - `ADW_RUNNER_AUTO_PULL` – Set to `false` to skip `docker pull` checks before each run.
 - `ADW_LOG_VOLUME` – Optional Docker volume name shared with runner containers (defaults to `kotadb_adw_logs`).
+- `ADW_AUTO_MERGE` – Enable auto-merge for ADW-generated PRs after CI validation (default: `false`). Set to `true` to enable automatic PR merging.
 
 Secrets such as `ANTHROPIC_API_KEY` and `GITHUB_PAT` must still be available in the webhook container environment (e.g. via `.env` + `adws/.env`, Docker secrets, or a secrets manager). The runner receives them per invocation through `docker run -e`.
 
