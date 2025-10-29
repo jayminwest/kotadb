@@ -14,6 +14,7 @@ import json
 import logging
 import os
 import shutil
+import subprocess
 import sys
 import time
 from pathlib import Path
@@ -295,6 +296,39 @@ def main() -> None:
                     issue_number,
                     format_issue_message(adw_id, "ops", f"✅ Pull request created: {pr_url}"),
                 )
+
+                # Enable auto-merge if feature flag is set
+                auto_merge_enabled = os.getenv("ADW_AUTO_MERGE", "false").lower() == "true"
+                if auto_merge_enabled:
+                    # Extract PR number from URL
+                    pr_number = pr_url.split('/')[-1]
+                    logger.info(f"Enabling auto-merge for PR #{pr_number}")
+
+                    # Enable auto-merge with squash and branch deletion
+                    merge_result = subprocess.run(
+                        ["gh", "pr", "merge", pr_number, "--auto", "--squash", "--delete-branch"],
+                        capture_output=True,
+                        text=True,
+                        cwd=worktree_path,
+                    )
+
+                    if merge_result.returncode == 0:
+                        logger.info(f"Auto-merge enabled for PR #{pr_number}")
+                        state.update(auto_merge_enabled=True)
+                        state.update_merge_status("pending")
+                        make_issue_comment(
+                            issue_number,
+                            format_issue_message(adw_id, "ops", "✅ Auto-merge enabled - PR will merge after CI validation passes"),
+                        )
+                    else:
+                        logger.warning(f"Failed to enable auto-merge: {merge_result.stderr}")
+                        state.update(auto_merge_enabled=False)
+                        make_issue_comment(
+                            issue_number,
+                            format_issue_message(adw_id, "ops", f"⚠️ Auto-merge failed to enable: {merge_result.stderr}"),
+                        )
+                else:
+                    logger.info("Auto-merge feature flag disabled, skipping auto-merge enablement")
         elif state.pr_created:
             logger.info("Pull request already exists, skipping creation")
 

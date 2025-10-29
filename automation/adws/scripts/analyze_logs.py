@@ -57,6 +57,16 @@ class WorktreeMetrics:
     stale_threshold_days: int = 7
 
 @dataclass
+class AutoMergeMetrics:
+    """Metrics about auto-merge usage and success rates."""
+    enabled_count: int = 0
+    success_count: int = 0
+    failed_count: int = 0
+    pending_count: int = 0
+    conflict_count: int = 0
+    success_rate: float = 0.0
+
+@dataclass
 class AnalysisMetrics:
     """Aggregated metrics from log analysis."""
     total_runs: int
@@ -70,6 +80,7 @@ class AnalysisMetrics:
     analysis_time: datetime
     environment: str
     worktree_metrics: WorktreeMetrics = field(default_factory=WorktreeMetrics)
+    auto_merge_metrics: AutoMergeMetrics = field(default_factory=AutoMergeMetrics)
 
 def parse_execution_logs(time_window: timedelta, env: str='local') -> List[RunAnalysis]:
     """Parse execution logs from automation/logs/ within the time window.
@@ -216,6 +227,38 @@ def calculate_worktree_metrics(runs: List[RunAnalysis]) -> WorktreeMetrics:
             metrics.active += 1
     return metrics
 
+def calculate_auto_merge_metrics(runs: List[RunAnalysis]) -> AutoMergeMetrics:
+    """Calculate metrics about auto-merge usage and success rates.
+
+    Args:
+        runs: List of run analyses with agent state
+
+    Returns:
+        AutoMergeMetrics with counts and success rate
+    """
+    metrics = AutoMergeMetrics()
+    for run in runs:
+        if not run.agent_state:
+            continue
+        if run.agent_state.get('auto_merge_enabled'):
+            metrics.enabled_count += 1
+            merge_status = run.agent_state.get('merge_status')
+            if merge_status == 'success':
+                metrics.success_count += 1
+            elif merge_status == 'failed':
+                metrics.failed_count += 1
+            elif merge_status == 'conflict':
+                metrics.conflict_count += 1
+            elif merge_status == 'pending':
+                metrics.pending_count += 1
+
+    # Calculate success rate (excluding pending)
+    completed_merges = metrics.success_count + metrics.failed_count + metrics.conflict_count
+    if completed_merges > 0:
+        metrics.success_rate = (metrics.success_count / completed_merges) * 100
+
+    return metrics
+
 def calculate_metrics(runs: List[RunAnalysis], time_window_hours: int, env: str) -> AnalysisMetrics:
     """Calculate aggregated metrics from run analyses.
 
@@ -243,7 +286,8 @@ def calculate_metrics(runs: List[RunAnalysis], time_window_hours: int, env: str)
     completed_count = len([r for r in runs if r.outcome == 'completed'])
     success_rate = completed_count / len(runs) * 100 if runs else 0.0
     worktree_metrics = calculate_worktree_metrics(runs)
-    return AnalysisMetrics(total_runs=len(runs), success_rate=success_rate, outcomes=dict(outcomes), issues=dict(issues), phase_reaches=dict(phase_reaches), failure_phases=dict(failure_phases), runs=runs, time_window_hours=time_window_hours, analysis_time=datetime.now(), environment=env, worktree_metrics=worktree_metrics)
+    auto_merge_metrics = calculate_auto_merge_metrics(runs)
+    return AnalysisMetrics(total_runs=len(runs), success_rate=success_rate, outcomes=dict(outcomes), issues=dict(issues), phase_reaches=dict(phase_reaches), failure_phases=dict(failure_phases), runs=runs, time_window_hours=time_window_hours, analysis_time=datetime.now(), environment=env, worktree_metrics=worktree_metrics, auto_merge_metrics=auto_merge_metrics)
 
 def format_text(metrics: AnalysisMetrics) -> str:
     """Format metrics as human-readable text for stdout.
@@ -293,6 +337,17 @@ def format_text(metrics: AnalysisMetrics) -> str:
         lines.append(f'  • Completed: {metrics.worktree_metrics.completed}')
         lines.append(f'  • Stale (>{metrics.worktree_metrics.stale_threshold_days}d): {metrics.worktree_metrics.stale}')
         lines.append('')
+    if metrics.auto_merge_metrics.enabled_count > 0:
+        lines.append('Auto-Merge Metrics:')
+        lines.append(f'  • Auto-merge enabled: {metrics.auto_merge_metrics.enabled_count}')
+        lines.append(f'  • Success: {metrics.auto_merge_metrics.success_count}')
+        lines.append(f'  • Failed: {metrics.auto_merge_metrics.failed_count}')
+        lines.append(f'  • Conflicts: {metrics.auto_merge_metrics.conflict_count}')
+        lines.append(f'  • Pending: {metrics.auto_merge_metrics.pending_count}')
+        lines.append(f'  • Success rate: {metrics.auto_merge_metrics.success_rate:.1f}%')
+        if metrics.auto_merge_metrics.success_rate < 90 and metrics.auto_merge_metrics.enabled_count >= 5:
+            lines.append(f'  ⚠️  Warning: Auto-merge success rate below 90% ({metrics.auto_merge_metrics.enabled_count} runs)')
+        lines.append('')
     lines.append('🔍 FAILURE PATTERNS')
     lines.append('─' * 80)
     if metrics.failure_phases:
@@ -335,7 +390,7 @@ def format_json(metrics: AnalysisMetrics) -> str:
     Returns:
         JSON string
     """
-    data = {'analysis_time': metrics.analysis_time.isoformat(), 'time_window_hours': metrics.time_window_hours, 'environment': metrics.environment, 'summary': {'total_runs': metrics.total_runs, 'success_rate': round(metrics.success_rate, 2)}, 'outcomes': metrics.outcomes, 'issues': metrics.issues, 'phase_reaches': metrics.phase_reaches, 'failure_phases': metrics.failure_phases, 'worktree_metrics': {'total': metrics.worktree_metrics.total, 'active': metrics.worktree_metrics.active, 'completed': metrics.worktree_metrics.completed, 'stale': metrics.worktree_metrics.stale, 'stale_threshold_days': metrics.worktree_metrics.stale_threshold_days}, 'runs': [{'run_id': r.run_id, 'issue': r.issue, 'phases': r.phases, 'failures': [{'phase': f[0], 'exit_code': f[1]} for f in r.failures], 'outcome': r.outcome, 'timestamp': r.timestamp.isoformat(), 'agent_state': r.agent_state} for r in metrics.runs]}
+    data = {'analysis_time': metrics.analysis_time.isoformat(), 'time_window_hours': metrics.time_window_hours, 'environment': metrics.environment, 'summary': {'total_runs': metrics.total_runs, 'success_rate': round(metrics.success_rate, 2)}, 'outcomes': metrics.outcomes, 'issues': metrics.issues, 'phase_reaches': metrics.phase_reaches, 'failure_phases': metrics.failure_phases, 'worktree_metrics': {'total': metrics.worktree_metrics.total, 'active': metrics.worktree_metrics.active, 'completed': metrics.worktree_metrics.completed, 'stale': metrics.worktree_metrics.stale, 'stale_threshold_days': metrics.worktree_metrics.stale_threshold_days}, 'auto_merge_metrics': {'enabled_count': metrics.auto_merge_metrics.enabled_count, 'success_count': metrics.auto_merge_metrics.success_count, 'failed_count': metrics.auto_merge_metrics.failed_count, 'pending_count': metrics.auto_merge_metrics.pending_count, 'conflict_count': metrics.auto_merge_metrics.conflict_count, 'success_rate': round(metrics.auto_merge_metrics.success_rate, 2)}, 'runs': [{'run_id': r.run_id, 'issue': r.issue, 'phases': r.phases, 'failures': [{'phase': f[0], 'exit_code': f[1]} for f in r.failures], 'outcome': r.outcome, 'timestamp': r.timestamp.isoformat(), 'agent_state': r.agent_state} for r in metrics.runs]}
     return json.dumps(data, indent=2)
 
 def format_markdown(metrics: AnalysisMetrics) -> str:
@@ -407,6 +462,21 @@ def format_markdown(metrics: AnalysisMetrics) -> str:
         lines.append(f'| Active | {metrics.worktree_metrics.active} |')
         lines.append(f'| Completed | {metrics.worktree_metrics.completed} |')
         lines.append(f'| Stale (>{metrics.worktree_metrics.stale_threshold_days}d) | {metrics.worktree_metrics.stale} |')
+        lines.append('')
+    if metrics.auto_merge_metrics.enabled_count > 0:
+        lines.append('### Auto-Merge Metrics')
+        lines.append('')
+        lines.append('| Metric | Count |')
+        lines.append('|--------|-------|')
+        lines.append(f'| Auto-merge enabled | {metrics.auto_merge_metrics.enabled_count} |')
+        lines.append(f'| Success | {metrics.auto_merge_metrics.success_count} |')
+        lines.append(f'| Failed | {metrics.auto_merge_metrics.failed_count} |')
+        lines.append(f'| Conflicts | {metrics.auto_merge_metrics.conflict_count} |')
+        lines.append(f'| Pending | {metrics.auto_merge_metrics.pending_count} |')
+        lines.append(f'| Success rate | {metrics.auto_merge_metrics.success_rate:.1f}% |')
+        if metrics.auto_merge_metrics.success_rate < 90 and metrics.auto_merge_metrics.enabled_count >= 5:
+            lines.append('')
+            lines.append(f'⚠️  **Warning**: Auto-merge success rate below 90% ({metrics.auto_merge_metrics.enabled_count} runs)')
         lines.append('')
     if metrics.failure_phases:
         lines.append('## Failure Pattern Analysis')

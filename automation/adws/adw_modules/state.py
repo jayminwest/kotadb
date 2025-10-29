@@ -43,6 +43,9 @@ class ADWState:
         - validation_retry_count: Number of validation retry attempts performed
         - beads_issue_id: Beads issue ID for tracking (e.g., kota-db-ts-303)
         - beads_sync: Sync metadata (last_sync, source, beads_available)
+        - auto_merge_enabled: Auto-merge enabled for PR (default: False)
+        - merge_status: Merge status (pending, success, failed, conflict)
+        - merge_timestamp: Timestamp when merge status was updated
     """
 
     adw_id: str
@@ -57,6 +60,9 @@ class ADWState:
     pr_created: Optional[bool] = None
     beads_issue_id: Optional[str] = None
     beads_sync: Optional[Dict[str, Any]] = None
+    auto_merge_enabled: Optional[bool] = None
+    merge_status: Optional[str] = None
+    merge_timestamp: Optional[float] = None
     extra: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -81,6 +87,9 @@ class ADWState:
             "pr_created": self.pr_created,
             "beads_issue_id": self.beads_issue_id,
             "beads_sync": self.beads_sync,
+            "auto_merge_enabled": self.auto_merge_enabled,
+            "merge_status": self.merge_status,
+            "merge_timestamp": self.merge_timestamp,
         }
         payload.update(self.extra)
         return {key: value for key, value in payload.items() if value is not None}
@@ -103,7 +112,7 @@ class ADWState:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
 
-        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at", "test_project_name", "pr_created", "beads_issue_id", "beads_sync"}}
+        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at", "test_project_name", "pr_created", "beads_issue_id", "beads_sync", "auto_merge_enabled", "merge_status", "merge_timestamp"}}
 
         return cls(
             adw_id=data.get("adw_id", adw_id),
@@ -118,6 +127,9 @@ class ADWState:
             pr_created=data.get("pr_created"),
             beads_issue_id=data.get("beads_issue_id"),
             beads_sync=data.get("beads_sync"),
+            auto_merge_enabled=data.get("auto_merge_enabled"),
+            merge_status=data.get("merge_status"),
+            merge_timestamp=data.get("merge_timestamp"),
             extra=extra,
         )
 
@@ -210,6 +222,22 @@ class ADWState:
         metrics_dict = metrics.model_dump(mode="json") if hasattr(metrics, "model_dump") else metrics
         self.extra["metrics"] = metrics_dict
         self.save()
+
+    def update_merge_status(self, status: str) -> None:
+        """Update merge status and timestamp.
+
+        Args:
+            status: Merge status (pending, success, failed, conflict)
+        """
+        self.update(merge_status=status, merge_timestamp=time.time())
+
+    def is_auto_merge_enabled(self) -> bool:
+        """Check if auto-merge is enabled for this workflow.
+
+        Returns:
+            True if auto-merge is enabled, False otherwise
+        """
+        return self.auto_merge_enabled is True
 
 
 def ensure_adw_id(existing: str | None = None) -> str:
