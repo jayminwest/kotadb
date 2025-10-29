@@ -29,6 +29,13 @@ import { processPushEvent } from "../github/webhook-processor";
 import { getQueue, getDefaultSendOptions } from "@queue/client";
 import { QUEUE_NAMES } from "@queue/config";
 import type { IndexRepoJobPayload } from "@queue/types";
+import {
+	verifyWebhookSignature as verifyStripeSignature,
+	handleInvoicePaid,
+	handleSubscriptionUpdated,
+	handleSubscriptionDeleted,
+} from "@api/webhooks";
+import type Stripe from "stripe";
 
 /**
  * Extended Express Request with auth context attached
@@ -113,6 +120,79 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				res.status(200).json({ received: true });
 			} catch (error) {
 				process.stderr.write(`[Webhook] Handler error: ${JSON.stringify(error)}\n`);
+				res.status(500).json({ error: "Internal server error" });
+			}
+		},
+	);
+
+	// Stripe webhook endpoint (must be before express.json() to preserve raw body)
+	app.post(
+		"/webhooks/stripe",
+		express.raw({ type: "application/json" }),
+		async (req: Request, res: Response) => {
+			try {
+				// Extract Stripe webhook signature
+				const signature = req.get("stripe-signature");
+
+				// Validate signature header
+				if (!signature) {
+					return res.status(401).json({ error: "Missing signature header" });
+				}
+
+				// Get webhook secret from environment
+				const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+				if (!webhookSecret) {
+					process.stderr.write("[Stripe Webhook] STRIPE_WEBHOOK_SECRET not configured\n");
+					return res.status(500).json({ error: "Webhook secret not configured" });
+				}
+
+				// Convert raw body to string for signature verification
+				const rawBody = req.body.toString("utf-8");
+
+				// Verify signature and construct event
+				let event: Stripe.Event;
+				try {
+					event = await verifyStripeSignature(rawBody, signature);
+				} catch (error) {
+					const err = error as Error;
+					process.stderr.write(`[Stripe Webhook] Signature verification failed: ${err.message}\n`);
+					return res.status(401).json({ error: "Invalid signature" });
+				}
+
+				// Log webhook event
+				process.stdout.write(
+					`[Stripe Webhook] Received event: type=${event.type}, id=${event.id}\n`,
+				);
+
+				// Route events to handlers asynchronously (don't block webhook response)
+				if (event.type === "invoice.paid") {
+					handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
+						process.stderr.write(
+							`[Stripe Webhook] invoice.paid handler error: ${JSON.stringify(error)}\n`,
+						);
+					});
+				} else if (event.type === "customer.subscription.updated") {
+					handleSubscriptionUpdated(event as Stripe.CustomerSubscriptionUpdatedEvent).catch(
+						(error) => {
+							process.stderr.write(
+								`[Stripe Webhook] customer.subscription.updated handler error: ${JSON.stringify(error)}\n`,
+							);
+						},
+					);
+				} else if (event.type === "customer.subscription.deleted") {
+					handleSubscriptionDeleted(event as Stripe.CustomerSubscriptionDeletedEvent).catch(
+						(error) => {
+							process.stderr.write(
+								`[Stripe Webhook] customer.subscription.deleted handler error: ${JSON.stringify(error)}\n`,
+							);
+						},
+					);
+				}
+
+				// Always return success for valid webhooks (Stripe expects 200 OK)
+				res.status(200).json({ received: true });
+			} catch (error) {
+				process.stderr.write(`[Stripe Webhook] Handler error: ${JSON.stringify(error)}\n`);
 				res.status(500).json({ error: "Internal server error" });
 			}
 		},
@@ -526,41 +606,6 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		} catch (error) {
 			process.stderr.write(`[Stripe] Get subscription error: ${JSON.stringify(error)}\n`);
 			res.status(500).json({ error: "Failed to fetch subscription" });
-		}
-	});
-
-	// POST /webhooks/stripe - Handle Stripe webhook events (no auth, signature-verified)
-	app.post("/webhooks/stripe", express.raw({ type: "application/json" }), async (req: Request, res: Response) => {
-		try {
-			const signature = req.get("stripe-signature");
-			if (!signature) {
-				return res.status(400).json({ error: "Missing stripe-signature header" });
-			}
-
-			const rawBody = req.body.toString("utf-8");
-
-			const { verifyWebhookSignature, handleInvoicePaid, handleSubscriptionUpdated, handleSubscriptionDeleted } = await import("./webhooks");
-			const event = verifyWebhookSignature(rawBody, signature);
-
-			// Handle event types
-			switch (event.type) {
-				case "invoice.paid":
-					await handleInvoicePaid(event as any);
-					break;
-				case "customer.subscription.updated":
-					await handleSubscriptionUpdated(event as any);
-					break;
-				case "customer.subscription.deleted":
-					await handleSubscriptionDeleted(event as any);
-					break;
-				default:
-					process.stdout.write(`[Stripe] Unhandled event type: ${event.type}\n`);
-			}
-
-			res.json({ received: true });
-		} catch (error) {
-			process.stderr.write(`[Stripe] Webhook error: ${JSON.stringify(error)}\n`);
-			res.status(400).json({ error: "Webhook processing failed" });
 		}
 	});
 

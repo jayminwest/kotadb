@@ -31,10 +31,10 @@ type StripeSubscriptionFull = Stripe.Subscription & {
  * @returns Constructed Stripe event
  * @throws Error if signature verification fails
  */
-export function verifyWebhookSignature(
+export async function verifyWebhookSignature(
 	rawBody: string,
 	signature: string,
-): Stripe.Event {
+): Promise<Stripe.Event> {
 	const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 	if (!webhookSecret) {
 		throw new Error(
@@ -45,7 +45,7 @@ export function verifyWebhookSignature(
 	const stripe = getStripeClient();
 
 	try {
-		return stripe.webhooks.constructEvent(rawBody, signature, webhookSecret);
+		return await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
 	} catch (err) {
 		const error = err as Error;
 		throw new Error(`Webhook signature verification failed: ${error.message}`);

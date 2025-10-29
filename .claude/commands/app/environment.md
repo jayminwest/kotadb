@@ -40,6 +40,42 @@ Environment variables used by KotaDB. These are typically configured in `app/.en
   - Used for repository indexing when a repository is specified without full URL
   - Example: `KOTA_GIT_BASE_URL=https://gitlab.com`
 
+### Stripe Configuration
+
+- **`STRIPE_SECRET_KEY`**: Stripe secret API key
+  - Test mode: `sk_test_...` (from https://dashboard.stripe.com/test/apikeys)
+  - Live mode: `sk_live_...` (from https://dashboard.stripe.com/apikeys)
+  - **Required** for subscription billing and checkout operations
+
+- **`STRIPE_WEBHOOK_SECRET`**: Stripe webhook signing secret
+  - Configure webhook endpoint in Stripe Dashboard → Webhooks
+  - Endpoint URL: `https://your-domain.com/webhooks/stripe`
+  - Subscribe to events: `invoice.paid`, `customer.subscription.updated`, `customer.subscription.deleted`
+  - **Required** for webhook signature verification
+
+- **`STRIPE_SOLO_PRICE_ID`**: Price ID for Solo tier subscription
+  - Format: `price_...` (from Stripe Dashboard → Products)
+  - **Required** for checkout and subscription tier mapping
+
+- **`STRIPE_TEAM_PRICE_ID`**: Price ID for Team tier subscription
+  - Format: `price_...` (from Stripe Dashboard → Products)
+  - **Required** for checkout and subscription tier mapping
+
+### GitHub App Configuration
+
+- **`GITHUB_APP_ID`**: GitHub App ID for private repository access
+  - Found in GitHub Settings → Apps → Your App → General
+  - **Required** for GitHub App installation token generation
+
+- **`GITHUB_APP_PRIVATE_KEY`**: GitHub App private key (PEM format)
+  - Generate and download from GitHub App settings
+  - **Required** for authenticating as GitHub App
+
+- **`GITHUB_WEBHOOK_SECRET`**: GitHub webhook signing secret
+  - Generate with: `openssl rand -hex 32`
+  - Configure in GitHub App settings → Webhooks
+  - **Required** for webhook signature verification
+
 ## Auto-Generated Files
 
 ### `app/.env`

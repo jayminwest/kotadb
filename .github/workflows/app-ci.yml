@@ -121,6 +121,7 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: [typecheck, lint]
+    environment: Preview
     defaults:
       run:
         working-directory: app
