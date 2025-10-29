@@ -80,3 +80,6 @@ supabase/
 .beads/*.db-journal
 .beads/*.db-wal
 .beads/*.db-shm
+.beads/daemon.lock
+.beads/daemon.log
+.beads/daemon.pid

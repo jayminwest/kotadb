@@ -173,10 +173,40 @@ if [ -f "app/supabase/seed.sql" ]; then
     echo "✅ Test data seeded successfully!"
 fi
 
+# Start Stripe CLI listener if credentials configured
+if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
+    echo "🔧 Starting Stripe CLI listener..."
+
+    # Check if Stripe CLI is available
+    if ! command -v stripe >/dev/null 2>&1; then
+        echo "⚠️  Stripe CLI not installed, skipping Stripe webhook tests"
+    else
+        # Start listener in background
+        stripe listen --forward-to "${SUPABASE_URL}/webhooks/stripe" --skip-verify > .stripe-listen.log 2>&1 &
+        STRIPE_CLI_PID=$!
+        echo "$STRIPE_CLI_PID" > .stripe-test.pid
+
+        # Wait for listener to be ready
+        sleep 2
+
+        # Extract webhook secret
+        STRIPE_WEBHOOK_SECRET=$(stripe listen --print-secret 2>/dev/null || echo "")
+        export STRIPE_WEBHOOK_SECRET
+
+        # Regenerate .env.test with Stripe webhook secret
+        app/scripts/generate-env-test-compose.sh "$PROJECT_NAME"
+
+        echo "✅ Stripe CLI listener started (webhook secret: ${STRIPE_WEBHOOK_SECRET:0:20}...)"
+    fi
+fi
+
 echo ""
 echo "Configuration:"
 echo "  API URL (Kong):  $SUPABASE_URL"
 echo "  Database:        $DATABASE_URL"
 echo "  Project Name:    $PROJECT_NAME"
+if [ -n "${STRIPE_SECRET_KEY:-}" ] && [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
+    echo "  Stripe webhook:  ${SUPABASE_URL}/webhooks/stripe"
+fi
 echo ""
 echo "🎉 Docker Compose test setup complete for CI!"

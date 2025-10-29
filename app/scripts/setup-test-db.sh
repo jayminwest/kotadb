@@ -166,6 +166,33 @@ fi
 echo "🌱 Seeding test data..."
 PGPASSWORD=$DB_PASSWORD psql -h $DB_HOST -p $DB_PORT -U $DB_USER -d $DB_NAME < supabase/seed.sql > /dev/null 2>&1
 
+# Start Stripe CLI listener if credentials configured
+if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
+    echo "🔧 Starting Stripe CLI listener..."
+
+    # Check if Stripe CLI is available
+    if ! command -v stripe >/dev/null 2>&1; then
+        echo "⚠️  Stripe CLI not installed, skipping Stripe webhook tests"
+    else
+        # Start listener in background
+        stripe listen --forward-to "${SUPABASE_URL}/webhooks/stripe" --skip-verify > .stripe-listen.log 2>&1 &
+        STRIPE_CLI_PID=$!
+        echo "$STRIPE_CLI_PID" > .stripe-test.pid
+
+        # Wait for listener to be ready
+        sleep 2
+
+        # Extract webhook secret
+        STRIPE_WEBHOOK_SECRET=$(stripe listen --print-secret 2>/dev/null || echo "")
+        export STRIPE_WEBHOOK_SECRET
+
+        # Regenerate .env.test with Stripe webhook secret
+        ./scripts/generate-env-test-compose.sh "$PROJECT_NAME"
+
+        echo "✅ Stripe CLI listener started (webhook secret: ${STRIPE_WEBHOOK_SECRET:0:20}...)"
+    fi
+fi
+
 # Save project name for final output (before unsetting)
 SAVED_PROJECT_NAME="$PROJECT_NAME"
 

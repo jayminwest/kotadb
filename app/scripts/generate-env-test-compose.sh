@@ -90,6 +90,12 @@ DATABASE_URL=$DB_URL
 
 # Supabase Native Postgres Connection (for pg-boss job queue)
 SUPABASE_DB_URL=$DB_URL
+
+# Stripe Configuration (optional - auto-populated if configured in environment)
+STRIPE_SECRET_KEY=${STRIPE_SECRET_KEY:-}
+STRIPE_WEBHOOK_SECRET=${STRIPE_WEBHOOK_SECRET:-}
+STRIPE_SOLO_PRICE_ID=${STRIPE_SOLO_PRICE_ID:-}
+STRIPE_TEAM_PRICE_ID=${STRIPE_TEAM_PRICE_ID:-}
 EOF
 
 echo "✅ Generated .env.test successfully!"
@@ -98,4 +104,7 @@ echo "Configuration:"
 echo "  API URL (Kong):  $API_URL"
 echo "  Database:        $DB_URL"
 echo "  Project Name:    $PROJECT_NAME"
+if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
+    echo "  Stripe webhook:  $API_URL/webhooks/stripe"
+fi
 echo ""

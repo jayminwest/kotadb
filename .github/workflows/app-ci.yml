@@ -146,6 +146,14 @@ jobs:
       - name: Install dependencies (cache miss fallback)
         run: bun install --frozen-lockfile
 
+      - name: Install Stripe CLI
+        run: |
+          curl -s https://packages.stripe.dev/api/security/keypair/stripe-cli-gpg/public | gpg --dearmor | sudo tee /usr/share/keyrings/stripe.gpg
+          echo "deb [signed-by=/usr/share/keyrings/stripe.gpg] https://packages.stripe.dev/stripe-cli-debian-local stable main" | sudo tee /etc/apt/sources.list.d/stripe.list
+          sudo apt update
+          sudo apt install stripe
+          stripe --version
+
       - name: Install uv (required for ADW MCP tools)
         uses: astral-sh/setup-uv@v5
         with:
@@ -158,6 +166,10 @@ jobs:
 
       - name: Setup Docker Compose test stack and generate credentials
         working-directory: .
+        env:
+          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
+          STRIPE_SOLO_PRICE_ID: ${{ secrets.STRIPE_SOLO_PRICE_ID }}
+          STRIPE_TEAM_PRICE_ID: ${{ secrets.STRIPE_TEAM_PRICE_ID }}
         run: |
           chmod +x .github/scripts/setup-supabase-ci.sh
           chmod +x app/scripts/generate-env-test-compose.sh

@@ -84,6 +84,95 @@ Violations look like:
 process.env.SUPABASE_URL = "http://localhost:54322"
 ```
 
+## Stripe CLI Setup
+
+**Stripe webhook tests require Stripe CLI** for real webhook testing following KotaDB's antimocking philosophy.
+
+### Installation
+
+**macOS:**
+```bash
+brew install stripe/stripe-cli/stripe
+```
+
+**Linux (Ubuntu/Debian):**
+```bash
+curl -s https://packages.stripe.dev/api/security/keypair/stripe-cli-gpg/public | gpg --dearmor | sudo tee /usr/share/keyrings/stripe.gpg
+echo "deb [signed-by=/usr/share/keyrings/stripe.gpg] https://packages.stripe.dev/stripe-cli-debian-local stable main" | sudo tee /etc/apt/sources.list.d/stripe.list
+sudo apt update
+sudo apt install stripe
+```
+
+### Required Environment Variables
+
+Configure these in your local environment or CI secrets:
+
+```bash
+# Required: Stripe test mode secret key
+export STRIPE_SECRET_KEY=sk_test_...
+
+# Required: Test price IDs from Stripe dashboard
+export STRIPE_SOLO_PRICE_ID=price_...
+export STRIPE_TEAM_PRICE_ID=price_...
+
+# Auto-generated: Webhook secret (set by test setup script)
+# STRIPE_WEBHOOK_SECRET=whsec_...  # Do not set manually
+```
+
+### How It Works
+
+1. **Test Setup** (`bun test:setup`):
+   - Starts Stripe CLI listener in background
+   - Forwards webhooks to `http://localhost:<port>/webhooks/stripe`
+   - Extracts webhook secret and adds to `.env.test`
+
+2. **Test Execution**:
+   - Tests create real Stripe resources (customers, subscriptions)
+   - Stripe API operations trigger real webhooks
+   - Webhooks delivered via Stripe CLI to local server
+   - Tests verify async webhook handler updates database
+
+3. **Test Teardown** (`bun test:teardown`):
+   - Stops Stripe CLI listener process
+   - Cleans up Stripe resources and local database
+
+### Graceful Degradation
+
+Stripe webhook tests skip gracefully when credentials not configured:
+```bash
+[SKIP] Stripe webhook tests require STRIPE_SECRET_KEY environment variable
+```
+
+This allows CI and local development to work without Stripe credentials (tests simply skip).
+
+### Troubleshooting
+
+**Stripe CLI not found:**
+```bash
+# Verify installation
+stripe --version
+
+# Check PATH
+which stripe
+```
+
+**Webhook secret not auto-populated:**
+```bash
+# Check Stripe CLI is running
+ps aux | grep stripe
+
+# Check listener log
+cat .stripe-listen.log
+
+# Manually verify listener works
+stripe listen --print-secret
+```
+
+**Tests timeout waiting for webhooks:**
+- Ensure Stripe CLI listener is running (check `.stripe-test.pid`)
+- Verify test server port matches Stripe CLI forward URL
+- Check `.stripe-listen.log` for delivery errors
+
 ## MCP Testing
 
 MCP integration has comprehensive test coverage (issue #68, 9 test files, 100+ test cases):

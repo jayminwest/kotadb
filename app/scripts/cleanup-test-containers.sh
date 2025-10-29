@@ -22,6 +22,13 @@ fi
 
 echo "🧹 Cleaning up Docker Compose stack: $PROJECT_NAME"
 
+# Stop Stripe CLI if running
+if [ -f .stripe-test.pid ]; then
+    echo "  ✓ Stopping Stripe CLI..."
+    kill $(cat .stripe-test.pid) 2>/dev/null || true
+    rm -f .stripe-test.pid .stripe-listen.log
+fi
+
 # Stop and remove containers, networks, and volumes
 docker compose -p "$PROJECT_NAME" -f ../docker-compose.test.yml down -v 2>/dev/null || true
 
