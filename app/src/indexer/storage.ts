@@ -70,7 +70,7 @@ export interface StorageResult {
  * Store indexed data atomically using Postgres function
  *
  * Calls the store_indexed_data() RPC function which performs:
- * 1. Delete existing data for repository (idempotent retry safety)
+ * 1. Delete existing data for repository (idempotent retry safety) - skipped if skipDelete=true
  * 2. Insert files and build file_id mapping
  * 3. Insert symbols and build symbol_id mapping
  * 4. Insert references using file/symbol mappings
@@ -85,6 +85,7 @@ export interface StorageResult {
  * @param symbols - Array of symbol data to store
  * @param references - Array of reference data to store
  * @param dependencyGraph - Array of dependency graph entries to store
+ * @param skipDelete - Skip DELETE phase for batch processing (default: false)
  * @returns Summary stats (files_indexed, symbols_extracted, etc.)
  * @throws Error if RPC call fails or database transaction fails
  */
@@ -95,6 +96,7 @@ export async function storeIndexedData(
 	symbols: SymbolData[],
 	references: ReferenceData[],
 	dependencyGraph: DependencyGraphEntry[],
+	skipDelete = false,
 ): Promise<StorageResult> {
 	const { data, error } = await supabase.rpc("store_indexed_data", {
 		p_repository_id: repositoryId,
@@ -102,6 +104,7 @@ export async function storeIndexedData(
 		p_symbols: symbols,
 		p_references: references,
 		p_dependency_graph: dependencyGraph,
+		p_skip_delete: skipDelete,
 	});
 
 	if (error) {

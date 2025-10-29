@@ -18,7 +18,7 @@ import type PgBoss from "pg-boss";
 import { getServiceClient } from "@db/client";
 import { updateJobStatus } from "@queue/job-tracker";
 import type { IndexRepoJobPayload } from "@queue/types";
-import { WORKER_TEAM_SIZE, QUEUE_NAMES } from "@queue/config";
+import { WORKER_TEAM_SIZE, QUEUE_NAMES, BATCH_SIZE } from "@queue/config";
 import { prepareRepository } from "@indexer/repos";
 import { discoverSources, parseSourceFile } from "@indexer/parsers";
 import { parseFile, isSupportedForAST } from "@indexer/ast-parser";
@@ -247,37 +247,117 @@ async function processIndexJob(
 			`[${new Date().toISOString()}] Dependency graph deferred (requires database IDs - see issue #XXX)\n`,
 		);
 
-		// STEP 7: Store indexed data atomically
+		// STEP 7: Store indexed data in batches
 		process.stdout.write(
-			`[${new Date().toISOString()}] [STEP 7/7] Storing indexed data\n`,
+			`[${new Date().toISOString()}] [STEP 7/7] Storing indexed data (batch_size=${BATCH_SIZE})\n`,
 		);
 
-		const stats = await storeIndexedData(
-			supabase,
-			repositoryId,
-			files,
-			symbols,
-			references,
-			dependencyGraph,
+		// Chunk files for batch processing
+		const chunks: FileData[][] = [];
+		for (let i = 0; i < files.length; i += BATCH_SIZE) {
+			chunks.push(files.slice(i, i + BATCH_SIZE));
+		}
+
+		process.stdout.write(
+			`[${new Date().toISOString()}] Processing ${files.length} files in ${chunks.length} chunks\n`,
 		);
+
+		// Accumulate stats across all chunks
+		let totalFilesIndexed = 0;
+		let totalSymbolsExtracted = 0;
+		let totalReferencesFound = 0;
+		let totalDependenciesExtracted = 0;
+
+		// Process each chunk sequentially
+		for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+			const chunk = chunks[chunkIndex];
+			if (!chunk) continue; // Skip if chunk is undefined
+
+			const skipDelete = chunkIndex > 0; // Skip DELETE phase for chunks after first
+
+			// Extract file paths in this chunk for filtering
+			const chunkFilePaths = new Set(chunk.map((f) => f.path));
+
+			// Filter symbols for this chunk (symbols reference file_path)
+			const chunkSymbols = symbols.filter((s) =>
+				chunkFilePaths.has(s.file_path),
+			);
+
+			// Filter references for this chunk (references have source_file_path)
+			const chunkReferences = references.filter((r) =>
+				chunkFilePaths.has(r.source_file_path),
+			);
+
+			// Filter dependencies for this chunk (dependencies have from_file_path)
+			const chunkDependencies = dependencyGraph.filter((d) =>
+				d.from_file_path && chunkFilePaths.has(d.from_file_path),
+			);
+
+			process.stdout.write(
+				`[${new Date().toISOString()}] [STEP 7/${chunks.length}] Processing chunk ${chunkIndex + 1}: ` +
+					`files=${chunk.length}, symbols=${chunkSymbols.length}, ` +
+					`references=${chunkReferences.length}, dependencies=${chunkDependencies.length}, ` +
+					`skip_delete=${skipDelete}\n`,
+			);
+
+			// Store chunk atomically
+			const chunkStats = await storeIndexedData(
+				supabase,
+				repositoryId,
+				chunk,
+				chunkSymbols,
+				chunkReferences,
+				chunkDependencies,
+				skipDelete,
+			);
+
+			// Accumulate stats
+			totalFilesIndexed += chunkStats.files_indexed;
+			totalSymbolsExtracted += chunkStats.symbols_extracted;
+			totalReferencesFound += chunkStats.references_found;
+			totalDependenciesExtracted += chunkStats.dependencies_extracted;
+
+			// Update job progress after each chunk
+			await updateJobStatus(
+				indexJobId,
+				"processing",
+				{
+					stats: {
+						files_indexed: totalFilesIndexed,
+						symbols_extracted: totalSymbolsExtracted,
+						references_found: totalReferencesFound,
+						dependencies_extracted: totalDependenciesExtracted,
+						chunks_completed: chunkIndex + 1,
+						current_chunk: chunkIndex + 1,
+					},
+				},
+				userId,
+			);
+
+			process.stdout.write(
+				`[${new Date().toISOString()}] Chunk ${chunkIndex + 1}/${chunks.length} completed: ` +
+					`files=${chunkStats.files_indexed}, symbols=${chunkStats.symbols_extracted}\n`,
+			);
+		}
 
 		const duration = Date.now() - startTime;
 
 		process.stdout.write(
 			`[${new Date().toISOString()}] Successfully indexed repository: ` +
 				`job_id=${indexJobId}, repository_id=${repositoryId}, ` +
-				`duration=${duration}ms, files=${stats.files_indexed}, ` +
-				`symbols=${stats.symbols_extracted}, references=${stats.references_found}, ` +
-				`dependencies=${stats.dependencies_extracted}\n`,
+				`duration=${duration}ms, files=${totalFilesIndexed}, ` +
+				`symbols=${totalSymbolsExtracted}, references=${totalReferencesFound}, ` +
+				`dependencies=${totalDependenciesExtracted}, chunks=${chunks.length}\n`,
 		);
 
-		// Update job status to 'completed' with stats
+		// Update job status to 'completed' with final stats
 		await updateJobStatus(indexJobId, "completed", {
 			stats: {
-				files_indexed: stats.files_indexed,
-				symbols_extracted: stats.symbols_extracted,
-				references_found: stats.references_found,
-				dependencies_extracted: stats.dependencies_extracted,
+				files_indexed: totalFilesIndexed,
+				symbols_extracted: totalSymbolsExtracted,
+				references_found: totalReferencesFound,
+				dependencies_extracted: totalDependenciesExtracted,
+				chunks_completed: chunks.length,
 			},
 		}, userId);
 	} catch (error) {
