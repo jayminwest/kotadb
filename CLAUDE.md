@@ -115,6 +115,8 @@ curl -X POST http://localhost:3001/auth/dev-session \
 ### Issue Management
 - [Issue Relationships](./.claude/commands/docs/issue-relationships.md) - Dependency types, prioritization
 - [Beads Workflow](./.claude/commands/beads/) - SQLite-based issue tracker with git sync
+- [Beads ADW Integration](./.claude/commands/docs/beads-adw-integration.md) - Workflow integration, atomic operations
+- [GitHub-Beads Sync](./.claude/commands/beads/sync-github.md) - Maintain GitHub and Beads alignment
 
 ## MCP Server Availability
 
