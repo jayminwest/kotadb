@@ -23,6 +23,7 @@ import { afterAll, beforeAll, describe, expect, it } from "bun:test";
 import type { Server } from "node:http";
 import { getTestApiKey } from "../helpers/db";
 import { startTestServer, stopTestServer } from "../helpers/server";
+import { getServiceClient } from "@db/client";
 
 let server: Server;
 let BASE_URL: string;
@@ -111,6 +112,129 @@ describe("POST /api/subscriptions/create-checkout-session", () => {
 			expect(response.status).toBe(401);
 			expect(data.error).toBeDefined();
 			expect(data.code).toBe("AUTH_INVALID_KEY");
+		});
+
+		it("accepts valid JWT token for authentication", async () => {
+			// Create test user and get JWT token
+			const supabase = getServiceClient();
+			const testEmail = `test-checkout-${Date.now()}@test.local`;
+			const testPassword = "test-password-123456";
+
+			const { data: userData, error: createError } = await supabase.auth.admin.createUser({
+				email: testEmail,
+				password: testPassword,
+				email_confirm: true,
+			});
+
+			if (createError || !userData.user) {
+				throw new Error(`Failed to create test user: ${JSON.stringify(createError)}`);
+			}
+
+			const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
+				email: testEmail,
+				password: testPassword,
+			});
+
+			if (signInError || !sessionData.session) {
+				throw new Error(`Failed to sign in test user: ${JSON.stringify(signInError)}`);
+			}
+
+			const jwtToken = sessionData.session.access_token;
+
+			// Make authenticated request with JWT
+			const response = await fetch(
+				`${BASE_URL}/api/subscriptions/create-checkout-session`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${jwtToken}`,
+					},
+					body: JSON.stringify({
+						tier: "solo",
+						successUrl: "http://localhost:3000/dashboard?upgrade=success",
+						cancelUrl: "http://localhost:3000/pricing?upgrade=canceled",
+					}),
+				},
+			);
+
+			// Should not be 401 (authenticated)
+			expect(response.status).not.toBe(401);
+		});
+
+		it("returns 401 with invalid JWT token", async () => {
+			const invalidJwt = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.invalid.signature";
+
+			const response = await fetch(
+				`${BASE_URL}/api/subscriptions/create-checkout-session`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${invalidJwt}`,
+					},
+					body: JSON.stringify({
+						tier: "solo",
+						successUrl: "http://localhost:3000/dashboard?upgrade=success",
+						cancelUrl: "http://localhost:3000/pricing?upgrade=canceled",
+					}),
+				},
+			);
+
+			const data = (await response.json()) as { error: string; code: string };
+
+			expect(response.status).toBe(401);
+			expect(data.error).toBeDefined();
+			expect(data.code).toBe("AUTH_INVALID_KEY");
+		});
+
+		it("includes rate limit headers for JWT authentication", async () => {
+			// Create test user and get JWT token
+			const supabase = getServiceClient();
+			const testEmail = `test-rate-limit-${Date.now()}@test.local`;
+			const testPassword = "test-password-123456";
+
+			const { data: userData, error: createError } = await supabase.auth.admin.createUser({
+				email: testEmail,
+				password: testPassword,
+				email_confirm: true,
+			});
+
+			if (createError || !userData.user) {
+				throw new Error(`Failed to create test user: ${JSON.stringify(createError)}`);
+			}
+
+			const { data: sessionData, error: signInError } = await supabase.auth.signInWithPassword({
+				email: testEmail,
+				password: testPassword,
+			});
+
+			if (signInError || !sessionData.session) {
+				throw new Error(`Failed to sign in test user: ${JSON.stringify(signInError)}`);
+			}
+
+			const jwtToken = sessionData.session.access_token;
+
+			const response = await fetch(
+				`${BASE_URL}/api/subscriptions/create-checkout-session`,
+				{
+					method: "POST",
+					headers: {
+						"Content-Type": "application/json",
+						Authorization: `Bearer ${jwtToken}`,
+					},
+					body: JSON.stringify({
+						tier: "solo",
+						successUrl: "http://localhost:3000/dashboard?upgrade=success",
+						cancelUrl: "http://localhost:3000/pricing?upgrade=canceled",
+					}),
+				},
+			);
+
+			// Verify rate limit headers are present
+			expect(response.headers.get("X-RateLimit-Limit")).toBeDefined();
+			expect(response.headers.get("X-RateLimit-Remaining")).toBeDefined();
+			expect(response.headers.get("X-RateLimit-Reset")).toBeDefined();
 		});
 	});
 

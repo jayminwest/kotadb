@@ -235,6 +235,17 @@ Use this reference to decide which KotaDB application layer documentation source
     - When multiple issues in same epic close and require batch documentation update
     - When needing to maintain consistency across CURRENT_STATE.md, ROADMAP.md, and epic files
 
+- .claude/commands/workflows/roadmap-update.md
+  - Conditions:
+    - When performing comprehensive ROADMAP.md synchronization (weekly/bi-weekly)
+    - When preparing for release and need to validate progress claims
+    - When onboarding new developers and roadmap is outdated
+    - When multiple epics have significant progress not reflected in roadmap
+    - When needing automated validation of epic completion across app/, automation/, web/
+    - When investigation report with detailed findings is required
+    - When coordinating multiple subagents to check different project areas
+    - When updating epic status tables, immediate priorities, and success metrics
+
 - .claude/commands/docs/anti-mock.md
   - Conditions:
     - When planning or implementing changes that add or modify automated tests

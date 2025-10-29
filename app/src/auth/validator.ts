@@ -154,6 +154,93 @@ export async function validateApiKey(
 }
 
 /**
+ * Validate JWT token from Supabase Auth.
+ *
+ * Process:
+ * 1. Verify JWT with Supabase Auth service
+ * 2. Query subscriptions table for user's tier
+ * 3. Generate synthetic keyId for rate limiting
+ * 4. Return ValidateApiKeyResult structure
+ *
+ * @param token - JWT token from Supabase session
+ * @returns Validation result or null if invalid
+ */
+export async function validateJwtToken(
+	token: string,
+): Promise<ValidateApiKeyResult | null> {
+	try {
+		const supabase = getServiceClient();
+
+		// Verify JWT with Supabase Auth
+		const { data: userData, error: authError } = await supabase.auth.getUser(
+			token,
+		);
+
+		if (authError || !userData?.user) {
+			// Invalid or expired JWT - use timing attack mitigation
+			await bcrypt.compare("dummy-secret", "$2a$10$dummyhash");
+			return null;
+		}
+
+		const userId = userData.user.id;
+
+		// Generate synthetic keyId for rate limiting consistency
+		const syntheticKeyId = `jwt_${userId}`;
+
+		// Check cache first using synthetic keyId
+		const cached = getCachedValidation(syntheticKeyId);
+		if (cached) {
+			return {
+				userId: cached.userId,
+				tier: cached.tier,
+				orgId: cached.orgId,
+				keyId: cached.keyId,
+				rateLimitPerHour: cached.rateLimitPerHour,
+			};
+		}
+
+		// Query subscriptions table for user's tier
+		const { data: subData, error: subError } = await supabase
+			.from("subscriptions")
+			.select("tier, status")
+			.eq("user_id", userId)
+			.maybeSingle();
+
+		// Default to 'free' tier if no subscription found or query fails
+		let tier: Tier = "free";
+		if (subData && !subError && (subData.status === "active" || subData.status === "trialing")) {
+			tier = subData.tier as Tier;
+		}
+
+		// Determine rate limit based on tier
+		const rateLimitMap: Record<Tier, number> = {
+			free: 100,
+			solo: 1000,
+			team: 10000,
+		};
+		const rateLimitPerHour = rateLimitMap[tier];
+
+		// Build validation result
+		const result: ValidateApiKeyResult = {
+			userId,
+			tier,
+			keyId: syntheticKeyId,
+			rateLimitPerHour,
+		};
+
+		// Cache successful validation
+		setCachedValidation(syntheticKeyId, result);
+
+		return result;
+	} catch (error) {
+		process.stderr.write(
+			`[Auth] JWT validation error: ${JSON.stringify(error)}\n`,
+		);
+		return null;
+	}
+}
+
+/**
  * Update last_used_at timestamp for API key.
  * Called asynchronously after successful authentication.
  *
