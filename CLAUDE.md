@@ -20,6 +20,10 @@ cd app && bunx tsc --noEmit
 
 # Validate migration sync
 cd app && bun run test:validate-migrations
+
+# Configure indexer batch size (optional - defaults to 50)
+# Set INDEXER_BATCH_SIZE=<value> in app/.env to tune for repository size
+# Larger batches = fewer database calls, smaller batches = better progress tracking
 ```
 
 ## Critical Conventions
