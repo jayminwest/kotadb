@@ -13,6 +13,7 @@ import {
 	createTestJob,
 	TEST_USER_IDS,
 	getSupabaseTestClient,
+	resetRateLimitCounters,
 } from "../helpers/db";
 import { startTestServer, stopTestServer } from "../helpers/server";
 
@@ -41,6 +42,9 @@ describe("Job Status API", () => {
 			await client.from("index_jobs").delete().eq("id", jobId);
 		}
 		testJobIds.length = 0;
+
+		// Reset rate limit counters to avoid test interference
+		await resetRateLimitCounters();
 	});
 
 	describe("POST /index", () => {

@@ -26,6 +26,9 @@ import {
 	logWebhookRequest,
 } from "../github/webhook-handler";
 import { processPushEvent } from "../github/webhook-processor";
+import { getQueue, getDefaultSendOptions } from "@queue/client";
+import { QUEUE_NAMES } from "@queue/config";
+import type { IndexRepoJobPayload } from "@queue/types";
 
 /**
  * Extended Express Request with auth context attached
@@ -206,43 +209,36 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				context.userId,
 			);
 
-			// Queue asynchronous indexing workflow
-			queueMicrotask(() =>
-				runIndexingWorkflow(
-					supabase,
-					indexRequest,
-					job.id,
-					context.userId,
+			// Enqueue job to pg-boss for asynchronous processing
+			try {
+				const queue = getQueue();
+				const payload: IndexRepoJobPayload = {
+					indexJobId: job.id,
 					repositoryId,
-				)
-					.then(async () => {
-						// Update job status to completed on success
-						await updateJobStatus(
-							job.id,
-							"completed",
-							undefined,
-							context.userId,
-						);
-					})
-					.catch(async (error) => {
-						const errorMsg = error instanceof Error ? error.message : String(error);
-						const errorStack = error instanceof Error ? error.stack : undefined;
-						process.stderr.write(`Indexing workflow failed: ${errorMsg}\n`);
-						if (errorStack) {
-							process.stderr.write(`Stack trace: ${errorStack}\n`);
-						}
-						// Update job status to failed with error message
-						await updateJobStatus(
-							job.id,
-							"failed",
-							{ error: errorMsg },
-							context.userId,
-						).catch((err) => {
-							const updateErrorMsg = err instanceof Error ? err.message : String(err);
-							process.stderr.write(`Failed to update job status: ${updateErrorMsg}\n`);
-						});
-					}),
-			);
+					commitSha: indexRequest.ref || "main",
+				};
+
+				await queue.send(
+					QUEUE_NAMES.INDEX_REPO,
+					payload,
+					getDefaultSendOptions(),
+				);
+
+				process.stdout.write(
+					`[${new Date().toISOString()}] Enqueued index job ${job.id} for repository ${repositoryId}\n`,
+				);
+			} catch (error) {
+				const errorMsg = error instanceof Error ? error.message : String(error);
+				process.stderr.write(`Failed to enqueue job: ${errorMsg}\n`);
+				// Update job status to failed since we couldn't enqueue it
+				await updateJobStatus(
+					job.id,
+					"failed",
+					{ error: `Queue error: ${errorMsg}` },
+					context.userId,
+				);
+				throw error;
+			}
 
 			addRateLimitHeaders(res, context.rateLimit);
 			res.status(202).json({ jobId: job.id, status: job.status });
