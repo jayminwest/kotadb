@@ -169,7 +169,7 @@ jobs:
           # Tests automatically load .env.test via preload script (tests/setup.ts)
           # No manual export needed - keeping for backwards compatibility
           export $(grep -v '^#' ../.env.test | xargs) || true
-          bun test
+          bun run test
 
       - name: Teardown Docker Compose test stack
         if: always()
