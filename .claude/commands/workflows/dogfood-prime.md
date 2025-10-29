@@ -154,7 +154,7 @@ Create a test user and API key for authentication:
 
 ```bash
 cd app
-bun run scripts/generate-test-key.ts team
+bun run scripts/generate-test-account.ts team
 ```
 
 **Expected Output**:
@@ -452,7 +452,7 @@ psql "postgresql://postgres:postgres@localhost:5434/postgres" -c \
 **Solution**:
 ```bash
 # Generate new test key
-cd app && bun run scripts/generate-test-key.ts team
+cd app && bun run scripts/generate-test-account.ts team
 export KOTA_API_KEY="<new key from output>"
 
 # Verify key works
