@@ -5,22 +5,25 @@ import { useState } from 'react'
 import type { CreateCheckoutSessionResponse } from '@shared/types/api'
 
 export default function PricingPage() {
-  const { isAuthenticated, subscription } = useAuth()
+  const { isAuthenticated, subscription, session } = useAuth()
   const [loadingTier, setLoadingTier] = useState<string | null>(null)
+  const [error, setError] = useState<string | null>(null)
 
   const handleUpgrade = async (tier: 'solo' | 'team') => {
-    if (!isAuthenticated) {
+    if (!isAuthenticated || !session) {
       window.location.href = '/login'
       return
     }
 
     setLoadingTier(tier)
+    setError(null)
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const response = await fetch(`${apiUrl}/api/subscriptions/create-checkout-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           tier,
@@ -33,10 +36,13 @@ export default function PricingPage() {
         const data: CreateCheckoutSessionResponse = await response.json()
         window.location.href = data.url
       } else {
-        console.error('Failed to create checkout session')
+        const errorData = await response.json().catch(() => ({ error: 'Failed to create checkout session' }))
+        const errorMessage = errorData.error || 'Failed to create checkout session'
+        setError(errorMessage)
       }
     } catch (error) {
-      console.error('Error creating checkout session:', error)
+      const message = error instanceof Error ? error.message : 'Network error. Please try again.'
+      setError(message)
     } finally {
       setLoadingTier(null)
     }
@@ -65,7 +71,7 @@ export default function PricingPage() {
     {
       name: 'Solo',
       tier: 'solo',
-      price: '$20',
+      price: '$29.99',
       period: 'per month',
       description: 'For individual developers',
       features: [
@@ -81,7 +87,7 @@ export default function PricingPage() {
     {
       name: 'Team',
       tier: 'team',
-      price: '$100',
+      price: '$49.99',
       period: 'per month',
       description: 'For development teams',
       features: [
@@ -108,6 +114,32 @@ export default function PricingPage() {
           <p className="text-lg text-gray-600 dark:text-gray-400">
             Select the perfect plan for your needs
           </p>
+          {error && (
+            <div className="mt-4 mx-auto max-w-2xl p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+              <div className="flex items-start">
+                <svg
+                  className="w-5 h-5 text-red-600 dark:text-red-400 mr-3 flex-shrink-0 mt-0.5"
+                  fill="currentColor"
+                  viewBox="0 0 20 20"
+                >
+                  <path
+                    fillRule="evenodd"
+                    d="M10 18a8 8 0 100-16 8 8 0 000 16zM8.707 7.293a1 1 0 00-1.414 1.414L8.586 10l-1.293 1.293a1 1 0 101.414 1.414L10 11.414l1.293 1.293a1 1 0 001.414-1.414L11.414 10l1.293-1.293a1 1 0 00-1.414-1.414L10 8.586 8.707 7.293z"
+                    clipRule="evenodd"
+                  />
+                </svg>
+                <div className="flex-1">
+                  <p className="text-sm font-medium text-red-800 dark:text-red-300">{error}</p>
+                  <button
+                    onClick={() => setError(null)}
+                    className="mt-2 text-sm text-red-600 dark:text-red-400 underline hover:text-red-700 dark:hover:text-red-300"
+                  >
+                    Dismiss
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
