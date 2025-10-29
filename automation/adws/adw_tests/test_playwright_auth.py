@@ -190,6 +190,20 @@ class TestPlaywrightAuthIntegration:
     Run with: pytest -m integration
     """
 
+    @pytest.fixture(autouse=True)
+    def check_dev_server_available(self) -> None:
+        """Skip integration tests if dev server is not reachable."""
+        import httpx
+
+        dev_url = os.getenv("WEB_URL", "http://localhost:3001")
+        try:
+            # Quick health check with short timeout
+            response = httpx.get(f"{dev_url}/api/health", timeout=2.0)
+            if response.status_code >= 500:
+                pytest.skip(f"Dev server at {dev_url} returned error status")
+        except (httpx.ConnectError, httpx.TimeoutException, httpx.RequestError):
+            pytest.skip(f"Dev server not available at {dev_url}")
+
     @pytest.fixture
     def dev_server_url(self) -> str:
         """Provide dev server URL for tests."""
