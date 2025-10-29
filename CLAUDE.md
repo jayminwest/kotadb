@@ -6,6 +6,16 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 KotaDB is a lightweight HTTP API service for indexing and searching code repositories. Built with Bun + TypeScript and Supabase (PostgreSQL) for multi-tenant data isolation via RLS. Designed to power AI developer workflows through automated code intelligence.
 
+## Branching Strategy
+
+**Default Branch**: `develop` (all PRs merge here for continuous integration)
+
+**Git Flow**:
+- Feature branches (`feat/*`, `bug/*`, `chore/*`) merge into `develop`
+- `develop` accumulates tested changes and merges into `main` for production releases
+- Direct commits to `develop` or `main` are discouraged; use feature branches + PRs
+- GitHub auto-close for issues works when PRs merge into `develop` (the default branch)
+
 ## Quick Reference
 
 ```bash
