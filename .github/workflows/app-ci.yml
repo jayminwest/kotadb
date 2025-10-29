@@ -169,66 +169,7 @@ jobs:
           # Tests automatically load .env.test via preload script (tests/setup.ts)
           # No manual export needed - keeping for backwards compatibility
           export $(grep -v '^#' ../.env.test | xargs) || true
-          bun run test
-
-      - name: Teardown Docker Compose test stack
-        if: always()
-        working-directory: .
-        run: |
-          chmod +x app/scripts/cleanup-test-containers.sh
-          app/scripts/cleanup-test-containers.sh || true
-
-  coverage:
-    runs-on: ubuntu-latest
-    needs: test
-    defaults:
-      run:
-        working-directory: app
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Install Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: 1.1.29
-
-      - name: Restore dependencies
-        uses: actions/cache@v4
-        with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
-          restore-keys: |
-            bun-
-
-      - name: Install dependencies (cache miss fallback)
-        run: bun install --frozen-lockfile
-
-      - name: Install uv (required for ADW MCP tools)
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Setup test environment
-        working-directory: .
-        run: |
-          chmod +x .github/scripts/setup-supabase-ci.sh
-          chmod +x app/scripts/generate-env-test-compose.sh
-          chmod +x app/scripts/run-migrations-compose.sh
-          chmod +x app/scripts/cleanup-test-containers.sh
-          .github/scripts/setup-supabase-ci.sh
-
-      - name: Run tests with coverage
-        run: |
-          export $(grep -v '^#' ../.env.test | xargs) || true
           bun run test --coverage
-
-      - name: Check coverage threshold
-        run: |
-          # TODO: Implement coverage threshold check when Bun supports programmatic coverage parsing
-          # Extract coverage percentage from output and fail if <70%
-          echo "Coverage threshold check placeholder - manual review required"
 
       - name: Upload coverage report
         uses: actions/upload-artifact@v4
@@ -237,10 +178,12 @@ jobs:
           path: app/coverage/
           retention-days: 30
 
-      - name: Teardown test environment
+      - name: Teardown Docker Compose test stack
         if: always()
         working-directory: .
-        run: app/scripts/cleanup-test-containers.sh || true
+        run: |
+          chmod +x app/scripts/cleanup-test-containers.sh
+          app/scripts/cleanup-test-containers.sh || true
 
   build:
     runs-on: ubuntu-latest
