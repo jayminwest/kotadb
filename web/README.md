@@ -153,7 +153,7 @@ When deploying to Vercel, configure the following environment variables in Proje
 - Output Directory: `web/.next`
 - Install Command: `bun install`
 
-See `docs/deployment.md` for additional deployment instructions (Fly.io, etc.).
+See `docs/deployment.md` for backend API deployment instructions.
 
 ## Contributing
 

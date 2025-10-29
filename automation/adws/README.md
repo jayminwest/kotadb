@@ -26,6 +26,7 @@ adws/
 │   └── workflow_ops.py   # Agent wrappers for plan/build/test/review/etc.
 ├── playwright_helpers/   # Playwright authentication for frontend testing (issue #318)
 │   ├── auth.py           # PlaywrightAuthHelper class + authenticate_playwright_session()
+│   ├── README.md         # Authentication patterns guide with examples
 │   └── __init__.py       # Public API exports
 ├── adw_agents/           # Atomic agent catalog (chore #216, "one agent, one task, one prompt")
 │   ├── agent_classify_issue.py      # Issue classification (feat/bug/chore)
@@ -48,7 +49,10 @@ adws/
 ├── adw_phases/           # Single-phase execution scripts (3-phase architecture as of #136)
 │   ├── adw_plan.py       # Plan phase (classify → branch → plan)
 │   ├── adw_build.py      # Build phase (implement plan → commit → push → PR)
-│   └── adw_review.py     # Review phase (Claude review + reporting)
+│   ├── adw_review.py     # Review phase (Claude review + reporting)
+│   ├── test_frontend_dashboard.py   # Example: Dashboard access authentication
+│   ├── test_frontend_search.py      # Example: Search flow with form interaction
+│   └── test_frontend_indexing.py    # Example: Async indexing operation
 ├── adw_sdlc.py           # Full SDLC orchestrator (plan → build → review)
 ├── adw_tests/            # Pytest suite covering utilities and workflows
 ├── adw_triggers/         # Automation trigger systems
@@ -662,6 +666,81 @@ If rate limits are exceeded, the health check will report 429 status codes and w
 - MCP config is created in worktree root, not repository root
 - Verify `cwd` parameter is set when calling `prompt_claude_code()`
 - Inspect worktree directory for `.mcp.json` file after agent execution
+
+---
+
+## Frontend Testing Examples
+
+**Feature #319: ADW Integration Examples for Agent Authentication**
+
+The ADW system includes three example scripts demonstrating progressively complex authentication patterns for Playwright agents testing frontend user flows. These examples show how to use the `playwright_helpers` authentication system to enable automated testing of the KotaDB web application.
+
+### Example Scripts
+
+Located in `adw_phases/`, these standalone scripts demonstrate authentication patterns without requiring actual browser automation:
+
+1. **Dashboard Access** (`test_frontend_dashboard.py`)
+   - Basic authenticated page access
+   - Cookie injection pattern
+   - Verification of dashboard content loading
+   - Example usage:
+     ```bash
+     cd automation && python -m adws.adw_phases.test_frontend_dashboard
+     ```
+
+2. **Search Flow** (`test_frontend_search.py`)
+   - Form field interaction pattern
+   - Search query submission
+   - Result verification workflow
+   - Example usage:
+     ```bash
+     cd automation && python -m adws.adw_phases.test_frontend_search
+     ```
+
+3. **Indexing Flow** (`test_frontend_indexing.py`)
+   - Higher tier authentication (solo vs free)
+   - Async operation monitoring
+   - Status polling pattern
+   - Example usage:
+     ```bash
+     cd automation && python -m adws.adw_phases.test_frontend_indexing
+     ```
+
+### Integration Script
+
+Run all examples sequentially to validate authentication system:
+
+```bash
+cd automation && ./scripts/test-frontend-examples.sh
+```
+
+**Expected Output**:
+- All three examples authenticate successfully
+- MCP instruction sequences output for each workflow
+- Exit code 0 indicates all tests passed
+
+### Documentation
+
+Complete authentication pattern guide available in `playwright_helpers/README.md`:
+- Quickstart with code examples
+- Environment configuration (local, staging, production)
+- Troubleshooting common authentication issues
+- Cookie injection and API key usage patterns
+- Links to related issues (#315, #317, #318)
+
+### Prerequisites
+
+- Dev server running at `http://localhost:3001`
+- Python 3.9+ with httpx and asyncio
+- Playwright helpers module (included in ADW installation)
+
+### Future Work
+
+These examples document MCP call sequences as comments for future implementation. When Playwright MCP integration is implemented:
+- Replace comment blocks with actual MCP tool calls
+- Add real browser automation and verification
+- Integrate into CI pipeline for E2E testing
+- See [#190](https://github.com/kotadb/kotadb/issues/190) for Playwright E2E infrastructure roadmap
 
 ---
 

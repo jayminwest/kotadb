@@ -147,32 +147,54 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    // Step 2: Generate session tokens via magic link
+    // Step 2: Generate magic link with hashed token (PKCE flow)
     const { data: linkData, error: linkError } = await supabase.auth.admin.generateLink({
       type: 'magiclink',
       email
     })
 
     if (linkError || !linkData) {
-      process.stderr.write(`[dev-session] Session token generation failed: ${linkError?.message}\n`)
+      process.stderr.write(`[dev-session] Magic link generation failed: ${linkError?.message}\n`)
       return NextResponse.json(
-        { error: 'Failed to generate session tokens', details: linkError?.message },
+        { error: 'Failed to generate magic link', details: linkError?.message },
         { status: 500 }
       )
     }
 
-    // Extract session tokens
-    // Note: TypeScript types may not include all properties, but they exist at runtime
+    // Extract hashed token for OTP verification
     const properties = linkData.properties as any
-    const access_token = properties.access_token as string
-    const refresh_token = properties.refresh_token as string
+    const hashed_token = properties.hashed_token as string
     const userId = linkData.user.id
 
-    // Calculate expiration (default 1 hour for access token)
-    const expires_in = 3600
-    const expires_at = Math.floor(Date.now() / 1000) + expires_in
+    if (!hashed_token) {
+      process.stderr.write('[dev-session] No hashed_token in generateLink response\n')
+      return NextResponse.json(
+        { error: 'Failed to generate session tokens', details: 'No hashed_token returned' },
+        { status: 500 }
+      )
+    }
 
-    // Step 3: Generate API key via backend endpoint (non-blocking)
+    // Step 3: Exchange hashed token for actual session tokens via verifyOtp
+    const { data: otpData, error: otpError } = await supabase.auth.verifyOtp({
+      token_hash: hashed_token,
+      type: 'magiclink'
+    })
+
+    if (otpError || !otpData?.session) {
+      process.stderr.write(`[dev-session] Token verification failed: ${otpError?.message}\n`)
+      return NextResponse.json(
+        { error: 'Failed to verify session tokens', details: otpError?.message },
+        { status: 500 }
+      )
+    }
+
+    // Extract session tokens from verified OTP
+    const access_token = otpData.session.access_token
+    const refresh_token = otpData.session.refresh_token
+    const expires_in = otpData.session.expires_in || 3600
+    const expires_at = otpData.session.expires_at || Math.floor(Date.now() / 1000) + expires_in
+
+    // Step 4: Generate API key via backend endpoint (non-blocking)
     let apiKey: string | undefined
 
     try {
@@ -198,7 +220,7 @@ export async function POST(request: NextRequest) {
       // Continue without API key - partial response still useful
     }
 
-    // Step 4: Return complete session data
+    // Step 5: Return complete session data
     const response: DevSessionResponse = {
       userId,
       email,
