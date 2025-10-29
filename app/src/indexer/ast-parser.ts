@@ -72,7 +72,7 @@ export function isSupportedForAST(filePath: string): boolean {
  * ```typescript
  * const ast = parseFile('example.ts', 'function foo() {}');
  * if (ast) {
- *   console.log('Function count:', ast.body.length);
+ *   process.stdout.write('Function count:', ast.body.length);
  * }
  * ```
  */
@@ -112,7 +112,7 @@ export function parseFile(
 		// Log parse error for observability
 		const message = error instanceof Error ? error.message : String(error);
 		const location = line !== undefined ? ` at line ${line}` : "";
-		console.error(`Failed to parse ${filePath}${location}: ${message}`);
+		process.stderr.write(`Failed to parse ${filePath}${location}: ${message}`);
 
 		return null;
 	}

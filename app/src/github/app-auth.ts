@@ -93,8 +93,8 @@ function evictStaleTokens(): void {
 	for (const installationId of staleInstallationIds) {
 		tokenCache.delete(installationId);
 		lastAccessTime.delete(installationId);
-		console.log(
-			`[GitHub App] Evicted stale token for installation ${installationId}`,
+		process.stdout.write(
+			`[GitHub App] Evicted stale token for installation ${installationId}\n`,
 		);
 	}
 }
@@ -116,8 +116,8 @@ function enforceCacheSizeLimit(): void {
 	for (const [installationId] of toRemove) {
 		tokenCache.delete(installationId);
 		lastAccessTime.delete(installationId);
-		console.log(
-			`[GitHub App] Evicted token for installation ${installationId} (cache size limit)`,
+		process.stdout.write(
+			`[GitHub App] Evicted token for installation ${installationId} (cache size limit)\n`,
 		);
 	}
 }
@@ -136,8 +136,8 @@ async function generateInstallationToken(
 	const app = createAppClient();
 
 	try {
-		console.log(
-			`[GitHub App] Generating token for installation ${installationId}`,
+		process.stdout.write(
+			`[GitHub App] Generating token for installation ${installationId}\n`,
 		);
 
 		// Create installation access token using Octokit App SDK
@@ -158,8 +158,8 @@ async function generateInstallationToken(
 				| "selected",
 		};
 
-		console.log(
-			`[GitHub App] Token generated for installation ${installationId}, expires at ${token.expires_at}`,
+		process.stdout.write(
+			`[GitHub App] Token generated for installation ${installationId}, expires at ${token.expires_at}\n`,
 		);
 
 		return token;
@@ -218,14 +218,14 @@ export async function getInstallationToken(
 	if (cached) {
 		// Return cached token if it's still valid (more than 5 minutes remaining)
 		if (cached.expiresAt - now > REFRESH_THRESHOLD_MS) {
-			console.log(
-				`[GitHub App] Using cached token for installation ${installationId}`,
+			process.stdout.write(
+				`[GitHub App] Using cached token for installation ${installationId}\n`,
 			);
 			return cached.token;
 		}
 
-		console.log(
-			`[GitHub App] Token for installation ${installationId} is expiring soon, refreshing`,
+		process.stdout.write(
+			`[GitHub App] Token for installation ${installationId} is expiring soon, refreshing\n`,
 		);
 	}
 
@@ -253,13 +253,13 @@ export function clearTokenCache(installationId?: number): void {
 	if (installationId !== undefined) {
 		tokenCache.delete(installationId);
 		lastAccessTime.delete(installationId);
-		console.log(
-			`[GitHub App] Cleared token cache for installation ${installationId}`,
+		process.stdout.write(
+			`[GitHub App] Cleared token cache for installation ${installationId}\n`,
 		);
 	} else {
 		tokenCache.clear();
 		lastAccessTime.clear();
-		console.log("[GitHub App] Cleared all token cache");
+		process.stdout.write("[GitHub App] Cleared all token cache\n");
 	}
 }
 

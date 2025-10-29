@@ -234,7 +234,7 @@ def main():
         logger.info(f"Results saved to {output_path}")
     else:
         # Print results to stdout
-        print(json.dumps(results, indent=2))
+        sys.stdout.write(json.dumps(results, indent=2) + "\n")
 
     # Exit with failure if any workflow failed
     if args.mode == "both":

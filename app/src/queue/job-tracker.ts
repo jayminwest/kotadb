@@ -111,8 +111,8 @@ export async function updateJobStatus(
 	}
 
 	if (data.length > 1) {
-		console.warn(
-			`Multiple jobs found for ID ${jobId}, using first result. This should not happen.`,
+		process.stderr.write(
+			`Multiple jobs found for ID ${jobId}, using first result. This should not happen.\n`,
 		);
 	}
 

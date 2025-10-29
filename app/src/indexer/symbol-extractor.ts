@@ -100,7 +100,7 @@ interface VisitorContext {
  * const ast = parseFile('example.ts', content);
  * if (ast) {
  *   const symbols = extractSymbols(ast, 'example.ts');
- *   console.log(`Found ${symbols.length} symbols`);
+ *   process.stdout.write(`Found ${symbols.length} symbols`);
  * }
  * ```
  */

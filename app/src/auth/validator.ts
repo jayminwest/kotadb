@@ -168,9 +168,8 @@ export async function updateLastUsed(keyId: string): Promise<void> {
 			.eq("key_id", keyId);
 	} catch (error) {
 		// Non-critical operation - log error but don't throw
-		console.error(
-			`[Auth] Failed to update last_used_at for key ${keyId}:`,
-			error,
+		process.stderr.write(
+			`[Auth] Failed to update last_used_at for key ${keyId}: ${JSON.stringify(error)}\n`,
 		);
 	}
 }

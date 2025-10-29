@@ -21,12 +21,12 @@ async function bootstrap() {
 	// Check for GitHub webhook secret (warn if missing, not fatal)
 	const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
 	if (!webhookSecret) {
-		console.warn(
-			"[Warning] GITHUB_WEBHOOK_SECRET not configured. Webhook endpoint will reject all requests.",
+		process.stderr.write(
+			"[Warning] GITHUB_WEBHOOK_SECRET not configured. Webhook endpoint will reject all requests.\n",
 		);
 	} else if (webhookSecret.length < 16) {
-		console.warn(
-			"[Warning] GITHUB_WEBHOOK_SECRET is too short (minimum 16 characters recommended).",
+		process.stderr.write(
+			"[Warning] GITHUB_WEBHOOK_SECRET is too short (minimum 16 characters recommended).\n",
 		);
 	}
 
@@ -47,16 +47,16 @@ async function bootstrap() {
 		if (!stripeTeamPriceId) missingVars.push("STRIPE_TEAM_PRICE_ID");
 
 		if (missingVars.length > 0) {
-			console.warn(
+			process.stderr.write(
 				`[Warning] Partial Stripe configuration detected. Missing: ${missingVars.join(", ")}. ` +
-					"Subscription endpoints will fail until all Stripe variables are configured.",
+					"Subscription endpoints will fail until all Stripe variables are configured.\n",
 			);
 		} else {
-			console.log("✓ Stripe configuration validated");
+			process.stdout.write("✓ Stripe configuration validated\n");
 		}
 	} else {
-		console.log(
-			"[Info] Stripe not configured. Subscription features disabled.",
+		process.stdout.write(
+			"[Info] Stripe not configured. Subscription features disabled.\n",
 		);
 	}
 
@@ -80,11 +80,11 @@ async function bootstrap() {
 		// pg-boss requires queues to exist before workers can be registered
 		const queue = getQueue();
 		await queue.createQueue(QUEUE_NAMES.INDEX_REPO);
-		console.log(`[${new Date().toISOString()}] Created queue: ${QUEUE_NAMES.INDEX_REPO}`);
+		process.stdout.write(`[${new Date().toISOString()}] Created queue: ${QUEUE_NAMES.INDEX_REPO}\n`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
-		console.error(`Failed to start job queue: ${errorMessage}`);
+		process.stderr.write(`Failed to start job queue: ${errorMessage}\n`);
 		throw error;
 	}
 
@@ -95,7 +95,7 @@ async function bootstrap() {
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
-		console.error(`Failed to start indexing worker: ${errorMessage}`);
+		process.stderr.write(`Failed to start indexing worker: ${errorMessage}\n`);
 		throw error;
 	}
 
@@ -104,32 +104,32 @@ async function bootstrap() {
 
 	// Start server
 	const server = app.listen(PORT, () => {
-		console.log(`KotaDB server listening on http://localhost:${PORT}`);
-		console.log(`Connected to Supabase at ${supabaseUrl}`);
+		process.stdout.write(`KotaDB server listening on http://localhost:${PORT}\n`);
+		process.stdout.write(`Connected to Supabase at ${supabaseUrl}\n`);
 	});
 
 	// Graceful shutdown
 	process.on("SIGTERM", async () => {
-		console.log("SIGTERM signal received: closing HTTP server");
+		process.stdout.write("SIGTERM signal received: closing HTTP server\n");
 
 		// Stop queue first (drains in-flight jobs)
 		try {
 			await stopQueue();
 		} catch (error) {
-			console.error(
-				`Error stopping queue: ${error instanceof Error ? error.message : String(error)}`,
+			process.stderr.write(
+				`Error stopping queue: ${error instanceof Error ? error.message : String(error)}\n`,
 			);
 		}
 
 		// Then close HTTP server
 		server.close(() => {
-			console.log("HTTP server closed");
+			process.stdout.write("HTTP server closed\n");
 			process.exit(0);
 		});
 	});
 }
 
 bootstrap().catch((error) => {
-	console.error("Failed to start server", error);
+	process.stderr.write(`Failed to start server: ${JSON.stringify(error)}\n`);
 	process.exit(1);
 });

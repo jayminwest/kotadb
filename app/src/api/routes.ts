@@ -71,7 +71,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Get webhook secret from environment
 				const secret = process.env.GITHUB_WEBHOOK_SECRET;
 				if (!secret) {
-					console.error("[Webhook] GITHUB_WEBHOOK_SECRET not configured");
+					process.stderr.write("[Webhook] GITHUB_WEBHOOK_SECRET not configured\n");
 					return res.status(500).json({ error: "Webhook secret not configured" });
 				}
 
@@ -81,7 +81,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Verify signature
 				const isValid = verifyWebhookSignature(rawBody, signature, secret);
 				if (!isValid) {
-					console.warn(`[Webhook] Invalid signature for delivery ${delivery}`);
+					process.stderr.write(`[Webhook] Invalid signature for delivery ${delivery}\n`);
 					return res.status(401).json({ error: "Invalid signature" });
 				}
 
@@ -102,14 +102,14 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Process push event asynchronously (don't block webhook response)
 				if (payload) {
 					processPushEvent(payload).catch((error) => {
-						console.error("[Webhook] Processing error:", error);
+						process.stderr.write(`[Webhook] Processing error: ${JSON.stringify(error)}\n`);
 					});
 				}
 
 				// Always return success for valid webhooks (GitHub expects 200 OK)
 				res.status(200).json({ received: true });
 			} catch (error) {
-				console.error("[Webhook] Handler error:", error);
+				process.stderr.write(`[Webhook] Handler error: ${JSON.stringify(error)}\n`);
 				res.status(500).json({ error: "Internal server error" });
 			}
 		},
@@ -225,14 +225,22 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 						);
 					})
 					.catch(async (error) => {
-						console.error("Indexing workflow failed", error);
+						const errorMsg = error instanceof Error ? error.message : String(error);
+						const errorStack = error instanceof Error ? error.stack : undefined;
+						process.stderr.write(`Indexing workflow failed: ${errorMsg}\n`);
+						if (errorStack) {
+							process.stderr.write(`Stack trace: ${errorStack}\n`);
+						}
 						// Update job status to failed with error message
 						await updateJobStatus(
 							job.id,
 							"failed",
-							{ error: error.message },
+							{ error: errorMsg },
 							context.userId,
-						).catch(console.error);
+						).catch((err) => {
+							const updateErrorMsg = err instanceof Error ? err.message : String(err);
+							process.stderr.write(`Failed to update job status: ${updateErrorMsg}\n`);
+						});
 					}),
 			);
 
@@ -376,7 +384,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		} catch (error) {
 			// Only send error if headers haven't been sent yet
 			if (!res.headersSent) {
-				console.error("MCP handler error:", error);
+				process.stderr.write(`MCP handler error: ${JSON.stringify(error)}\n`);
 				res.status(500).json({ error: "Internal server error" });
 			}
 		}
@@ -420,7 +428,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				stripe = getStripeClient();
 				priceId = STRIPE_PRICE_IDS[tier as "solo" | "team"];
 			} catch (configError) {
-				console.error("[Stripe] Configuration error:", configError);
+				process.stderr.write(`[Stripe] Configuration error: ${JSON.stringify(configError)}\n`);
 				return res.status(500).json({ error: "Stripe is not configured on this server" });
 			}
 
@@ -456,7 +464,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			res.json({ url: session.url, sessionId: session.id });
 		} catch (error) {
-			console.error("[Stripe] Checkout session error:", error);
+			process.stderr.write(`[Stripe] Checkout session error: ${JSON.stringify(error)}\n`);
 			res.status(500).json({ error: "Failed to create checkout session" });
 		}
 	});
@@ -490,7 +498,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				const { getStripeClient } = await import("./stripe");
 				stripe = getStripeClient();
 			} catch (configError) {
-				console.error("[Stripe] Configuration error:", configError);
+				process.stderr.write(`[Stripe] Configuration error: ${JSON.stringify(configError)}\n`);
 				return res.status(500).json({ error: "Stripe is not configured on this server" });
 			}
 
@@ -501,7 +509,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			res.json({ url: session.url });
 		} catch (error) {
-			console.error("[Stripe] Portal session error:", error);
+			process.stderr.write(`[Stripe] Portal session error: ${JSON.stringify(error)}\n`);
 			res.status(500).json({ error: "Failed to create portal session" });
 		}
 	});
@@ -520,7 +528,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			res.json({ subscription: subscription || null });
 		} catch (error) {
-			console.error("[Stripe] Get subscription error:", error);
+			process.stderr.write(`[Stripe] Get subscription error: ${JSON.stringify(error)}\n`);
 			res.status(500).json({ error: "Failed to fetch subscription" });
 		}
 	});
@@ -550,12 +558,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 					await handleSubscriptionDeleted(event as any);
 					break;
 				default:
-					console.log(`[Stripe] Unhandled event type: ${event.type}`);
+					process.stdout.write(`[Stripe] Unhandled event type: ${event.type}\n`);
 			}
 
 			res.json({ received: true });
 		} catch (error) {
-			console.error("[Stripe] Webhook error:", error);
+			process.stderr.write(`[Stripe] Webhook error: ${JSON.stringify(error)}\n`);
 			res.status(400).json({ error: "Webhook processing failed" });
 		}
 	});
@@ -627,7 +635,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				createdAt: result.createdAt,
 			});
 		} catch (error) {
-			console.error("[API Keys] Generation error:", error);
+			process.stderr.write(`[API Keys] Generation error: ${JSON.stringify(error)}\n`);
 			res.status(500).json({ error: "Failed to generate API key" });
 		}
 	});

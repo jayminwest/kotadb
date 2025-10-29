@@ -111,7 +111,7 @@ interface VisitorContext {
  * const ast = parseFile('example.ts', content);
  * if (ast) {
  *   const references = extractReferences(ast, 'example.ts');
- *   console.log(`Found ${references.length} references`);
+ *   process.stdout.write(`Found ${references.length} references`);
  * }
  * ```
  */

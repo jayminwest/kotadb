@@ -271,12 +271,11 @@ async function injectInstallationToken(
 
 		return url.toString();
 	} catch (error) {
-		console.warn(
-			`[Indexer] Failed to inject installation token for installation ${installationId}:`,
-			error instanceof Error ? error.message : String(error),
+		process.stderr.write(
+			`[Indexer] Failed to inject installation token for installation ${installationId}: ${error instanceof Error ? error.message : String(error)}\n`,
 		);
-		console.warn(
-			"[Indexer] Falling back to unauthenticated cloning (public repos only)",
+		process.stderr.write(
+			"[Indexer] Falling back to unauthenticated cloning (public repos only)\n",
 		);
 		return remoteUrl;
 	}

@@ -32,7 +32,7 @@ export async function enforceRateLimit(
 		});
 
 		if (error) {
-			console.error("[RateLimit] Database error:", error);
+			process.stderr.write(`[RateLimit] Database error: ${JSON.stringify(error)}\n`);
 			// Fail closed: deny request on database errors
 			return {
 				allowed: false,
@@ -44,7 +44,7 @@ export async function enforceRateLimit(
 		}
 
 		if (!data) {
-			console.error("[RateLimit] No data returned from increment_rate_limit");
+			process.stderr.write("[RateLimit] No data returned from increment_rate_limit");
 			// Fail closed: deny request if no data
 			return {
 				allowed: false,
@@ -79,7 +79,7 @@ export async function enforceRateLimit(
 			limit: rateLimitPerHour,
 		};
 	} catch (error) {
-		console.error("[RateLimit] Unexpected error:", error);
+		process.stderr.write(`[RateLimit] Unexpected error: ${JSON.stringify(error)}\n`);
 		// Fail closed: deny request on unexpected errors
 		return {
 			allowed: false,

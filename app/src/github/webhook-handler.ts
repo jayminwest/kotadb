@@ -174,5 +174,5 @@ export function logWebhookRequest(
 		sender: payload?.sender?.login ?? "unknown",
 	};
 
-	console.log(`[Webhook] ${JSON.stringify(logEntry)}`);
+	process.stdout.write(`[Webhook] ${JSON.stringify(logEntry)}\n`);
 }
