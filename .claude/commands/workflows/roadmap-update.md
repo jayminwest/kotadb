@@ -53,13 +53,14 @@ The roadmap-update workflow automates synchronization between code implementatio
 2. **Validation**: Using subagents to verify implementation status across project areas
 3. **Analysis**: Cross-referencing epic definitions with actual codebase state
 4. **Update**: Modifying ROADMAP.md with corrected percentages and new epics
-5. **Documentation**: Creating investigation report with detailed findings
+
+**IMPORTANT**: This command should **ONLY** modify ROADMAP.md. DO NOT create additional files like investigation reports or separate documentation. All findings should be incorporated directly into ROADMAP.md.
 
 **Target Use Cases:**
 - Post-sprint roadmap refresh (weekly/bi-weekly)
 - Pre-release status validation
 - Onboarding documentation updates
-- Audit trail for progress tracking
+- Progress tracking
 
 ## Workflow Steps
 
@@ -289,26 +290,9 @@ For each new epic (11-14):
 - Mark completed external dependencies
 - Update success metrics with achieved targets
 
-### Phase 5: Investigation Report (1-2 minutes)
+### Phase 5: Validation & Git Operations (2-3 minutes)
 
-**Step 5.1: Generate Detailed Report**
-
-Create `ROADMAP_INVESTIGATION_FINDINGS.md` with:
-1. Executive summary
-2. Detailed epic analysis (what's implemented, what's missing)
-3. Completion assessment with evidence
-4. File paths for all implementations
-5. Code snippets showing key features
-6. Test coverage statistics
-7. Recommended action plan
-
-**Step 5.2: Reference Report in ROADMAP.md**
-
-Add link to investigation report in Navigation section and footer.
-
-### Phase 6: Validation & Git Operations (2-3 minutes)
-
-**Step 6.1: Validate Markdown**
+**Step 5.1: Validate Markdown**
 
 ```bash
 # Check for markdown syntax errors
@@ -318,24 +302,24 @@ bunx markdownlint-cli2 ROADMAP.md
 grep -o '\[.*\](.*\.md)' ROADMAP.md
 ```
 
-**Step 6.2: Git Operations**
+**Step 5.2: Git Operations**
 
 ```bash
-# Stage changes
-git add ROADMAP.md ROADMAP_INVESTIGATION_FINDINGS.md
+# Stage changes (ONLY ROADMAP.md should be modified)
+git add ROADMAP.md
 
 # Check diff
 git diff --stat
 git diff --cached ROADMAP.md | head -100
 
 # Commit with conventional format
-git commit -m "docs: comprehensive roadmap update based on investigation
+git commit -m "docs: roadmap update based on validation
 
 - Updated overall progress from X% to Y%
-- Epic 4 (Job Queue): 0% → 65-70%
-- Epic 5 → Epic 12 (GitHub Integration): 0% → 85%
-- Added 4 new epics (11-14)
-- Created detailed investigation report
+- Epic 4 (Job Queue): A% → B%
+- Epic 12 (GitHub Integration): C% → D%
+- Updated epic status tables and gaps
+- Validated with subagent explorations
 
 Refs: <issue numbers or PR numbers if applicable>"
 
@@ -343,7 +327,7 @@ Refs: <issue numbers or PR numbers if applicable>"
 git push -u origin <branch>
 ```
 
-**Step 6.3: Create PR (if on feature branch)**
+**Step 5.3: Create PR (if on feature branch)**
 
 If not on develop/main, use `/pull_request` command to create PR.
 
