@@ -57,6 +57,24 @@ Enforced by pre-commit hooks and CI validation.
 
 See `.claude/commands/docs/anti-mock.md` for complete guidelines.
 
+### Dev-Mode Session Endpoint
+
+For **testing and development only**: `/auth/dev-session` generates authenticated Supabase sessions for Playwright agents that cannot complete GitHub OAuth headlessly.
+
+- **Security**: Strict production guard (requires both `NODE_ENV !== 'production'` AND `VERCEL_ENV !== 'production'`)
+- **Location**: `web/app/auth/dev-session/route.ts`
+- **Helper Utilities**: `web/lib/playwright-helpers.ts` (cookie injection, session management)
+- **Requirements**: `SUPABASE_SERVICE_ROLE_KEY` env var (admin API access)
+- **Middleware**: Exempted from auth checks via middleware matcher
+- **Spec**: `docs/specs/feature-317-dev-session-endpoint.md`
+
+```bash
+# Create test session
+curl -X POST http://localhost:3001/auth/dev-session \
+  -H "Content-Type: application/json" \
+  -d '{"email":"test@local.dev","tier":"free"}'
+```
+
 ## Documentation Directory
 
 ### Development
