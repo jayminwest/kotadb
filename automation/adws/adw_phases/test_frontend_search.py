@@ -11,7 +11,7 @@ This example shows how to test user workflows that involve form input.
 import asyncio
 import sys
 
-from playwright_helpers.auth import authenticate_playwright_session
+from adws.playwright_helpers.auth import authenticate_playwright_session
 
 
 async def test_search_flow() -> bool:

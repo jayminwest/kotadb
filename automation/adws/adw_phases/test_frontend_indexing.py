@@ -11,7 +11,7 @@ This example shows how to test workflows with asynchronous processing.
 import asyncio
 import sys
 
-from playwright_helpers.auth import authenticate_playwright_session
+from adws.playwright_helpers.auth import authenticate_playwright_session
 
 
 async def test_indexing_flow() -> bool:

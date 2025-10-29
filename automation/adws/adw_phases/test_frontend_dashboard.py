@@ -11,7 +11,7 @@ This example shows the foundational pattern for authenticated frontend testing.
 import asyncio
 import sys
 
-from playwright_helpers.auth import authenticate_playwright_session
+from adws.playwright_helpers.auth import authenticate_playwright_session
 
 
 async def test_dashboard_access() -> bool:

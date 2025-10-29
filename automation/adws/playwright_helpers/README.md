@@ -5,7 +5,7 @@ Authentication utilities for Playwright browser automation in ADW (AI Developer 
 ## Quickstart
 
 ```python
-from playwright_helpers.auth import authenticate_playwright_session
+from adws.playwright_helpers.auth import authenticate_playwright_session
 import asyncio
 
 async def main():
