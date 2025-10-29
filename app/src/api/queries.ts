@@ -470,7 +470,7 @@ export async function runIndexingWorkflow(
 	const repo = await prepareRepository(request);
 
 	if (!existsSync(repo.localPath)) {
-		console.warn(`Indexing skipped: path ${repo.localPath} does not exist.`);
+		process.stderr.write(`Indexing skipped: path ${repo.localPath} does not exist.\n`);
 		await updateIndexRunStatus(client, runId, "skipped");
 		return;
 	}
@@ -509,7 +509,7 @@ export async function runIndexingWorkflow(
 				.single();
 
 			if (!fileRecord) {
-				console.warn(`Could not find file record for ${file.path}`);
+				process.stderr.write(`Could not find file record for ${file.path}\n`);
 				return { symbols: 0, references: 0 };
 			}
 
@@ -569,7 +569,7 @@ export async function runIndexingWorkflow(
 	);
 
 	// Extract dependency graph from collected symbols and references
-	console.log(`Extracting dependency graph for ${filesWithId.length} files...`);
+	process.stdout.write(`Extracting dependency graph for ${filesWithId.length} files...\n`);
 	const dependencies = extractDependencies(
 		filesWithId,
 		allSymbolsWithFileId,
@@ -597,11 +597,11 @@ export async function runIndexingWorkflow(
 	);
 
 	if (circularChains.length > 0) {
-		console.warn(
-			`Detected ${circularChains.length} circular dependency chains:`,
+		process.stderr.write(
+			`Detected ${circularChains.length} circular dependency chains:\n`,
 		);
 		for (const chain of circularChains) {
-			console.warn(`  [${chain.type}] ${chain.description}`);
+			process.stderr.write(`  [${chain.type}] ${chain.description}\n`);
 		}
 	}
 

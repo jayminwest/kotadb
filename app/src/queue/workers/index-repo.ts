@@ -40,8 +40,8 @@ import {
  * @param queue - pg-boss instance
  */
 export async function startIndexWorker(queue: PgBoss): Promise<void> {
-	console.log(
-		`[${new Date().toISOString()}] Starting index-repo workers (team_size=${WORKER_TEAM_SIZE})`,
+	process.stdout.write(
+		`[${new Date().toISOString()}] Starting index-repo workers (team_size=${WORKER_TEAM_SIZE})\n`,
 	);
 
 	// Register multiple workers by calling work() multiple times
@@ -58,8 +58,8 @@ export async function startIndexWorker(queue: PgBoss): Promise<void> {
 		);
 	}
 
-	console.log(
-		`[${new Date().toISOString()}] Index-repo workers registered successfully`,
+	process.stdout.write(
+		`[${new Date().toISOString()}] Index-repo workers registered successfully\n`,
 	);
 }
 
@@ -79,8 +79,8 @@ async function processIndexJob(
 	const supabase = getServiceClient();
 	const startTime = Date.now();
 
-	console.log(
-		`[${new Date().toISOString()}] Processing index job: job_id=${indexJobId}, repository_id=${repositoryId}`,
+	process.stdout.write(
+		`[${new Date().toISOString()}] Processing index job: job_id=${indexJobId}, repository_id=${repositoryId}\n`,
 	);
 
 	// Fetch repository metadata for context
@@ -105,8 +105,8 @@ async function processIndexJob(
 		await updateJobStatus(indexJobId, "processing", undefined, userId);
 
 		// STEP 1: Clone/fetch repository
-		console.log(
-			`[${new Date().toISOString()}] [STEP 1/7] Cloning repository: repository_id=${repositoryId}`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] [STEP 1/7] Cloning repository: repository_id=${repositoryId}\n`,
 		);
 
 		// Check if repository identifier is a local path (for testing or local repositories)
@@ -125,18 +125,18 @@ async function processIndexJob(
 		);
 
 		// STEP 2: Discover source files
-		console.log(
-			`[${new Date().toISOString()}] [STEP 2/7] Discovering source files: path=${repoContext.localPath}`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] [STEP 2/7] Discovering source files: path=${repoContext.localPath}\n`,
 		);
 
 		const filePaths = await discoverSources(repoContext.localPath);
-		console.log(
-			`[${new Date().toISOString()}] Discovered ${filePaths.length} source files`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] Discovered ${filePaths.length} source files\n`,
 		);
 
 		// STEP 3: Parse files
-		console.log(
-			`[${new Date().toISOString()}] [STEP 3/7] Parsing source files`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] [STEP 3/7] Parsing source files\n`,
 		);
 
 		const files: FileData[] = [];
@@ -160,18 +160,18 @@ async function processIndexJob(
 
 				fileContentMap.set(parsed.path, parsed.content);
 			} catch (error) {
-				console.warn(
-					`[${new Date().toISOString()}] Failed to parse file ${filePath}: ${error instanceof Error ? error.message : String(error)}`,
+				process.stderr.write(
+					`[${new Date().toISOString()}] Failed to parse file ${filePath}: ${error instanceof Error ? error.message : String(error)}\n`,
 				);
 				// Continue processing other files (partial failure tolerance)
 			}
 		}
 
-		console.log(`[${new Date().toISOString()}] Parsed ${files.length} files successfully`);
+		process.stdout.write(`[${new Date().toISOString()}] Parsed ${files.length} files successfully\n`);
 
 		// STEP 4: Extract symbols via AST
-		console.log(
-			`[${new Date().toISOString()}] [STEP 4/7] Extracting symbols`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] [STEP 4/7] Extracting symbols\n`,
 		);
 
 		const symbols: SymbolData[] = [];
@@ -198,20 +198,20 @@ async function processIndexJob(
 					});
 				}
 			} catch (error) {
-				console.warn(
-					`[${new Date().toISOString()}] Failed to extract symbols from ${file.path}: ${error instanceof Error ? error.message : String(error)}`,
+				process.stderr.write(
+					`[${new Date().toISOString()}] Failed to extract symbols from ${file.path}: ${error instanceof Error ? error.message : String(error)}\n`,
 				);
 				// Continue processing other files
 			}
 		}
 
-		console.log(
-			`[${new Date().toISOString()}] Extracted ${symbols.length} symbols`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] Extracted ${symbols.length} symbols\n`,
 		);
 
 		// STEP 5: Extract cross-file references
-		console.log(
-			`[${new Date().toISOString()}] [STEP 5/7] Extracting references`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] [STEP 5/7] Extracting references\n`,
 		);
 
 		// ARCHITECTURAL NOTE: Reference extraction requires post-storage processing
@@ -228,13 +228,13 @@ async function processIndexJob(
 		// For MVP, we store empty arrays and defer to follow-up issue #XXX
 		const references: ReferenceData[] = [];
 
-		console.log(
-			`[${new Date().toISOString()}] References deferred (requires database IDs - see issue #XXX)`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] References deferred (requires database IDs - see issue #XXX)\n`,
 		);
 
 		// STEP 6: Build dependency graph
-		console.log(
-			`[${new Date().toISOString()}] [STEP 6/7] Building dependency graph`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] [STEP 6/7] Building dependency graph\n`,
 		);
 
 		// ARCHITECTURAL NOTE: Dependency graph extraction has same limitation as references
@@ -243,13 +243,13 @@ async function processIndexJob(
 		// This must be solved alongside reference extraction in follow-up work.
 		const dependencyGraph: DependencyGraphEntry[] = [];
 
-		console.log(
-			`[${new Date().toISOString()}] Dependency graph deferred (requires database IDs - see issue #XXX)`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] Dependency graph deferred (requires database IDs - see issue #XXX)\n`,
 		);
 
 		// STEP 7: Store indexed data atomically
-		console.log(
-			`[${new Date().toISOString()}] [STEP 7/7] Storing indexed data`,
+		process.stdout.write(
+			`[${new Date().toISOString()}] [STEP 7/7] Storing indexed data\n`,
 		);
 
 		const stats = await storeIndexedData(
@@ -263,12 +263,12 @@ async function processIndexJob(
 
 		const duration = Date.now() - startTime;
 
-		console.log(
+		process.stdout.write(
 			`[${new Date().toISOString()}] Successfully indexed repository: ` +
 				`job_id=${indexJobId}, repository_id=${repositoryId}, ` +
 				`duration=${duration}ms, files=${stats.files_indexed}, ` +
 				`symbols=${stats.symbols_extracted}, references=${stats.references_found}, ` +
-				`dependencies=${stats.dependencies_extracted}`,
+				`dependencies=${stats.dependencies_extracted}\n`,
 		);
 
 		// Update job status to 'completed' with stats
@@ -284,9 +284,9 @@ async function processIndexJob(
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
 
-		console.error(
+		process.stderr.write(
 			`[${new Date().toISOString()}] Index job failed: job_id=${indexJobId}, ` +
-				`repository_id=${repositoryId}, error=${errorMessage}`,
+				`repository_id=${repositoryId}, error=${errorMessage}\n`,
 		);
 
 		// Update job status to 'failed' with error message

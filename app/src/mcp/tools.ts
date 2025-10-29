@@ -367,9 +367,9 @@ export async function executeIndexRepository(
 			userId,
 			repositoryId,
 		).catch((error) => {
-			console.error("Indexing workflow failed", error);
+			process.stderr.write(`Indexing workflow failed: ${JSON.stringify(error)}\n`);
 			updateIndexRunStatus(supabase, runId, "failed", error.message).catch(
-				console.error,
+				(err) => process.stderr.write(`Failed to update index run status: ${JSON.stringify(err)}\n`),
 			);
 		}),
 	);

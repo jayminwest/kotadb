@@ -70,7 +70,7 @@ export interface DependencyEdge {
  * const symbols = [{ id: 'sym1', file_id: 'file1', name: 'foo', ... }];
  * const references = [{ targetName: 'bar', referenceType: 'import', ... }];
  * const deps = extractDependencies(files, symbols, references, 'repo-uuid');
- * console.log(`Extracted ${deps.length} dependency edges`);
+ * process.stdout.write(`Extracted ${deps.length} dependency edges`);
  * ```
  */
 export function extractDependencies(
@@ -135,7 +135,7 @@ export function buildFileDependencies(
 
 		const importSource = ref.metadata.importSource;
 		if (!importSource) {
-			console.warn(
+			process.stderr.write(
 				`Import reference missing importSource metadata: ${JSON.stringify(ref)}`,
 			);
 			continue;
@@ -149,7 +149,7 @@ export function buildFileDependencies(
 		});
 
 		if (!sourceFile) {
-			console.warn(
+			process.stderr.write(
 				`Could not find source file for import reference at line ${ref.lineNumber}`,
 			);
 			continue;
@@ -159,7 +159,7 @@ export function buildFileDependencies(
 		const resolvedPath = resolveImport(importSource, sourceFile.path, files);
 
 		if (!resolvedPath) {
-			console.warn(
+			process.stderr.write(
 				`Could not resolve import "${importSource}" from ${sourceFile.path}`,
 			);
 			continue;
@@ -168,7 +168,7 @@ export function buildFileDependencies(
 		// Find the target file
 		const targetFile = fileByPath.get(resolvedPath);
 		if (!targetFile || !targetFile.id) {
-			console.warn(
+			process.stderr.write(
 				`Resolved import path "${resolvedPath}" not found in indexed files`,
 			);
 			continue;
@@ -267,7 +267,7 @@ export function buildSymbolDependencies(
 				callee = sameFileCallee;
 			} else {
 				// Ambiguous match, log and skip
-				console.warn(
+				process.stderr.write(
 					`Ambiguous call target "${ref.targetName}" at line ${ref.lineNumber} (${callees.length} matches)`,
 				);
 				continue;
@@ -275,7 +275,7 @@ export function buildSymbolDependencies(
 		}
 
 		if (!(callee as any).id) {
-			console.warn(`Callee symbol missing id: ${callee.name}`);
+			process.stderr.write(`Callee symbol missing id: ${callee.name}`);
 			continue;
 		}
 

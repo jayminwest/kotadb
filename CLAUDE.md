@@ -67,6 +67,60 @@ cd app && bun run test:validate-env        # Detect hardcoded environment URLs i
 
 **Testing Philosophy:** KotaDB follows an **antimocking philosophy**. All tests use real Supabase Local database connections instead of mocks for production parity. See `docs/testing-setup.md` for detailed configuration.
 
+### Logging Standards
+
+**IMPORTANT: Standardized Output Mechanisms**
+
+KotaDB enforces consistent logging patterns across all layers to enable structured logging, programmatic parsing, and uniform observability:
+
+**TypeScript/Application Layer** (`app/src/`):
+- ✅ **Use**: `process.stdout.write()` for informational output
+- ✅ **Use**: `process.stderr.write()` for errors and warnings
+- ❌ **Never use**: `console.log()`, `console.error()`, `console.warn()`, `console.info()`
+- **Rationale**: Direct stream writing enables:
+  - Structured logging frameworks (Winston, Pino)
+  - Log suppression during tests
+  - Uniform formatting and filtering
+  - Better control over output buffering
+
+**Python/Automation Layer** (`automation/adws/`):
+- ✅ **Use**: `sys.stdout.write()` for informational output
+- ✅ **Use**: `sys.stderr.write()` for errors and warnings
+- ❌ **Never use**: `print()` (except in standalone scripts under `adws/scripts/`)
+- **Rationale**: Direct stream writing enables:
+  - Integration with logging frameworks (structlog, loguru)
+  - Testability and output capture
+  - Consistent formatting across modules
+  - Better subprocess communication
+
+**Examples**:
+```typescript
+// TypeScript - CORRECT
+process.stdout.write("Indexing completed\n");
+process.stderr.write("Error: Failed to connect\n");
+
+// TypeScript - INCORRECT
+console.log("Indexing completed");
+console.error("Error: Failed to connect");
+```
+
+```python
+# Python - CORRECT
+import sys
+sys.stdout.write("Indexing completed\n")
+sys.stderr.write("Error: Failed to connect\n")
+
+# Python - INCORRECT
+print("Indexing completed")
+print("Error: Failed to connect", file=sys.stderr)
+```
+
+**Enforcement**:
+- **Pre-commit hooks** validate logging standards via Biome (TypeScript) and Ruff (Python)
+- **CI validation** blocks PRs with non-compliant logging patterns
+- **Biome config**: `app/biome.json` enables `suspicious/noConsole` rule
+- **Ruff config**: `automation/pyproject.toml` enables `T201` (flake8-print) rule
+
 ### Pre-commit Hooks
 Pre-commit hooks automatically run type-check and lint on staged files to prevent TypeScript errors and lint issues from reaching CI.
 

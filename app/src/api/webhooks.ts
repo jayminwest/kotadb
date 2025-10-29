@@ -70,7 +70,7 @@ export async function handleInvoicePaid(
 		typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
 
 	if (!subscriptionId || !customerId) {
-		console.warn("Invoice has no subscription or customer ID, skipping");
+		process.stderr.write("Invoice has no subscription or customer ID, skipping\n");
 		return;
 	}
 
@@ -86,8 +86,8 @@ export async function handleInvoicePaid(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		console.warn(
-			`Invoice ${invoice.id} has no user_id in subscription or customer metadata, skipping (subscription: ${subscriptionId})`,
+		process.stderr.write(
+			`Invoice ${invoice.id} has no user_id in subscription or customer metadata, skipping (subscription: ${subscriptionId})\n`,
 		);
 		return; // Return success to avoid Stripe webhook retries
 	}
@@ -137,8 +137,8 @@ export async function handleInvoicePaid(
 		throw new Error(`Failed to update API key tier: ${keyError.message}`);
 	}
 
-	console.log(
-		`Subscription ${subscriptionId} activated for user ${userId} (tier: ${tier})`,
+	process.stdout.write(
+		`Subscription ${subscriptionId} activated for user ${userId} (tier: ${tier})\n`,
 	);
 }
 
@@ -163,8 +163,8 @@ export async function handleSubscriptionUpdated(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		console.warn(
-			`Subscription update event has no user_id in metadata, skipping (subscription: ${subscription.id})`,
+		process.stderr.write(
+			`Subscription update event has no user_id in metadata, skipping (subscription: ${subscription.id})\n`,
 		);
 		return; // Return success to avoid Stripe webhook retries
 	}
@@ -215,8 +215,8 @@ export async function handleSubscriptionUpdated(
 		}
 	}
 
-	console.log(
-		`Subscription ${subscription.id} updated for user ${userId} (status: ${subscription.status}, tier: ${tier})`,
+	process.stdout.write(
+		`Subscription ${subscription.id} updated for user ${userId} (status: ${subscription.status}, tier: ${tier})\n`,
 	);
 }
 
@@ -241,8 +241,8 @@ export async function handleSubscriptionDeleted(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		console.warn(
-			`Subscription deleted event has no user_id in metadata, skipping (subscription: ${subscription.id})`,
+		process.stderr.write(
+			`Subscription deleted event has no user_id in metadata, skipping (subscription: ${subscription.id})\n`,
 		);
 		return; // Return success to avoid Stripe webhook retries
 	}
@@ -273,7 +273,7 @@ export async function handleSubscriptionDeleted(
 		throw new Error(`Failed to downgrade API key tier: ${keyError.message}`);
 	}
 
-	console.log(`Subscription ${subscription.id} canceled for user ${userId}`);
+	process.stdout.write(`Subscription ${subscription.id} canceled for user ${userId}\n`);
 }
 
 /**

@@ -63,7 +63,7 @@ export interface CircularChain {
  * ];
  * const filePaths = new Map([['a', '/repo/a.ts'], ['b', '/repo/b.ts']]);
  * const cycles = detectCircularDependencies(deps, filePaths, new Map());
- * console.log(cycles); // [{ type: 'file_import', chain: ['a', 'b', 'a'], ... }]
+ * process.stdout.write(cycles); // [{ type: 'file_import', chain: ['a', 'b', 'a'], ... }]
  * ```
  */
 export function detectCircularDependencies(
@@ -141,9 +141,9 @@ export function detectCircularDependencies(
  *   { from: 'c', to: 'a' }
  * ];
  * const graph = buildAdjacencyList(edges);
- * console.log(graph.get('a')); // ['b']
- * console.log(graph.get('b')); // ['c']
- * console.log(graph.get('c')); // ['a']
+ * process.stdout.write(graph.get('a')); // ['b']
+ * process.stdout.write(graph.get('b')); // ['c']
+ * process.stdout.write(graph.get('c')); // ['a']
  * ```
  */
 export function buildAdjacencyList(
@@ -184,7 +184,7 @@ export function buildAdjacencyList(
  *   ['c', ['a']]  // Back edge creating cycle
  * ]);
  * const cycles = findCycles(graph);
- * console.log(cycles); // [['a', 'b', 'c', 'a']]
+ * process.stdout.write(cycles); // [['a', 'b', 'c', 'a']]
  * ```
  */
 export function findCycles(graph: Map<string, string[]>): string[][] {

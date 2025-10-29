@@ -112,7 +112,7 @@ function cleanupExpiredEntries(): void {
 	}
 
 	if (removed > 0) {
-		console.log(
+		process.stdout.write(
 			`[Cache] Evicted ${removed} expired entries (size: ${cache.size})`,
 		);
 	}

@@ -34,7 +34,7 @@ export async function discoverSources(projectRoot: string): Promise<string[]> {
 		try {
 			entries = await readdir(current);
 		} catch (error) {
-			console.warn(
+			process.stderr.write(
 				`discoverSources: skipping ${current}: ${(error as Error).message}`,
 			);
 			continue;
@@ -50,7 +50,7 @@ export async function discoverSources(projectRoot: string): Promise<string[]> {
 			try {
 				stats = await stat(fullPath);
 			} catch (error) {
-				console.warn(
+				process.stderr.write(
 					`discoverSources: skipping ${fullPath}: ${(error as Error).message}`,
 				);
 				continue;
@@ -82,7 +82,7 @@ export async function parseSourceFile(
 	try {
 		content = await readFile(path, "utf8");
 	} catch (error) {
-		console.warn(
+		process.stderr.write(
 			`parseSourceFile: unable to read ${path}: ${(error as Error).message}`,
 		);
 		return null;

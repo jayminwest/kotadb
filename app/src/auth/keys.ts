@@ -131,7 +131,7 @@ const MAX_COLLISION_RETRIES = 3;
  *   userId: "00000000-0000-0000-0000-000000000001",
  *   tier: "free"
  * });
- * console.log("Your API key (save this!):", result.apiKey);
+ * process.stdout.write("Your API key (save this!):", result.apiKey);
  * // kota_free_ab1cd2ef3gh4_0123456789abcdef0123456789abcdef012345
  * ```
  */
@@ -191,7 +191,7 @@ export async function generateApiKey(
 				// Check if this is a unique constraint violation on key_id
 				// Supabase error code for unique violation: "23505"
 				if (error.code === "23505" && error.message.includes("key_id")) {
-					console.warn(
+					process.stderr.write(
 						`[Auth] key_id collision detected (attempt ${attempt + 1}/${MAX_COLLISION_RETRIES}): ${keyId}`,
 					);
 					lastError = new Error(`key_id collision: ${error.message}`);

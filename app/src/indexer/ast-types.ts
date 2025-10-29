@@ -32,9 +32,9 @@ export interface ParseError {
  * ```typescript
  * const result = parseFile('example.ts', content);
  * if (result.success) {
- *   console.log('Parsed program with', result.ast.body.length, 'statements');
+ *   process.stdout.write('Parsed program with', result.ast.body.length, 'statements');
  * } else {
- *   console.error('Parse error:', result.error.message);
+ *   process.stderr.write('Parse error:', result.error.message);
  * }
  * ```
  */

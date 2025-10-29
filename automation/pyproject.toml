@@ -25,3 +25,12 @@ python_functions = "test_*"
 
 [tool.uv]
 dev-dependencies = []
+
+[tool.ruff]
+# Enforce stdout/stderr standards by blocking print() usage
+select = ["T201"]  # Disallow print statements
+ignore = []
+
+[tool.ruff.per-file-ignores]
+# Allow print() in scripts that are meant to be run directly (not imported)
+"adws/scripts/*.py" = ["T201"]

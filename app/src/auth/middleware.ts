@@ -83,7 +83,7 @@ export async function authenticateRequest(
 	if (!validation) {
 		// Log failed authentication attempt (keyId if parseable)
 		if (shouldLog) {
-			console.warn("[Auth] Invalid API key attempt");
+			process.stderr.write("[Auth] Invalid API key attempt");
 		}
 
 		return {
@@ -114,7 +114,7 @@ export async function authenticateRequest(
 
 	// Log successful authentication
 	if (shouldLog) {
-		console.log(
+		process.stdout.write(
 			`[Auth] Success - userId: ${context.userId}, keyId: ${context.keyId}, tier: ${context.tier}`,
 		);
 	}
@@ -127,7 +127,7 @@ export async function authenticateRequest(
 
 	if (!rateLimit.allowed) {
 		if (shouldLog) {
-			console.warn(
+			process.stderr.write(
 				`[Auth] Rate limit exceeded - keyId: ${context.keyId}, limit: ${context.rateLimitPerHour}`,
 			);
 		}
@@ -158,7 +158,7 @@ export async function authenticateRequest(
 	// Update last_used_at asynchronously (non-blocking)
 	queueMicrotask(() => {
 		updateLastUsed(validation.keyId).catch((err: unknown) => {
-			console.error("[Auth] Failed to update last_used_at:", err);
+			process.stderr.write(`[Auth] Failed to update last_used_at: ${JSON.stringify(err)}\n`);
 		});
 	});
 

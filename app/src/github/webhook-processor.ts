@@ -39,7 +39,7 @@ export async function processPushEvent(payload: GitHubPushEvent): Promise<void> 
 		// Strip refs/heads/ prefix from ref to get branch name
 		const branchName = ref.replace(/^refs\/heads\//, "");
 
-		console.log(`[Webhook Processor] Processing push to ${fullName}@${branchName} (${commitSha.substring(0, 7)})`);
+		process.stdout.write(`[Webhook Processor] Processing push to ${fullName}@${branchName} (${commitSha.substring(0, 7)})\n`);
 
 		// Look up repository in database
 		const client = getServiceClient();
@@ -50,12 +50,12 @@ export async function processPushEvent(payload: GitHubPushEvent): Promise<void> 
 			.maybeSingle();
 
 		if (repoError) {
-			console.error(`[Webhook Processor] Database error looking up repository ${fullName}:`, repoError);
+			process.stderr.write(`[Webhook Processor] Database error looking up repository ${fullName}: ${JSON.stringify(repoError)}\n`);
 			return;
 		}
 
 		if (!repo) {
-			console.log(`[Webhook Processor] Ignoring push to untracked repository: ${fullName}`);
+			process.stdout.write(`[Webhook Processor] Ignoring push to untracked repository: ${fullName}\n`);
 			return;
 		}
 
@@ -63,7 +63,7 @@ export async function processPushEvent(payload: GitHubPushEvent): Promise<void> 
 		// Use repository's stored default_branch if available, otherwise fall back to payload
 		const effectiveDefaultBranch = repo.default_branch || defaultBranch;
 		if (branchName !== effectiveDefaultBranch) {
-			console.log(`[Webhook Processor] Ignoring push to non-default branch: ${fullName}@${branchName} (default: ${effectiveDefaultBranch})`);
+			process.stdout.write(`[Webhook Processor] Ignoring push to non-default branch: ${fullName}@${branchName} (default: ${effectiveDefaultBranch})\n`);
 			return;
 		}
 
@@ -77,25 +77,25 @@ export async function processPushEvent(payload: GitHubPushEvent): Promise<void> 
 			.maybeSingle();
 
 		if (jobError) {
-			console.error("[Webhook Processor] Database error checking for duplicate job:", jobError);
+			process.stderr.write(`[Webhook Processor] Database error checking for duplicate job: ${JSON.stringify(jobError)}\n`);
 			return;
 		}
 
 		if (existingJob) {
-			console.log(`[Webhook Processor] Duplicate job detected for ${fullName}@${commitSha.substring(0, 7)}: job ${existingJob.id} already pending`);
+			process.stdout.write(`[Webhook Processor] Duplicate job detected for ${fullName}@${commitSha.substring(0, 7)}: job ${existingJob.id} already pending\n`);
 			return;
 		}
 
 		// Resolve user context for RLS enforcement
 		const userId = await resolveUserIdForRepository(repo);
 		if (!userId) {
-			console.warn(`[Webhook Processor] Cannot queue job for ${fullName}: no user context found (orphaned repository)`);
+			process.stderr.write(`[Webhook Processor] Cannot queue job for ${fullName}: no user context found (orphaned repository)\n`);
 			return;
 		}
 
 		// Create index job via job-tracker
 		const job = await createIndexJob(repo.id, ref, commitSha, userId);
-		console.log(`[Webhook Processor] Queued job ${job.id} for ${fullName}@${branchName} (${commitSha.substring(0, 7)})`);
+		process.stdout.write(`[Webhook Processor] Queued job ${job.id} for ${fullName}@${branchName} (${commitSha.substring(0, 7)})\n`);
 
 		// Update repository last_push_at timestamp
 		const { error: updateError } = await client
@@ -104,15 +104,15 @@ export async function processPushEvent(payload: GitHubPushEvent): Promise<void> 
 			.eq("id", repo.id);
 
 		if (updateError) {
-			console.error(`[Webhook Processor] Failed to update last_push_at for ${fullName}:`, updateError);
+			process.stderr.write(`[Webhook Processor] Failed to update last_push_at for ${fullName}: ${JSON.stringify(updateError)}\n`);
 			// Don't return - job was successfully queued, this is just metadata
 		}
 
-		console.log(`[Webhook Processor] Successfully processed push event for ${fullName}`);
+		process.stdout.write(`[Webhook Processor] Successfully processed push event for ${fullName}\n`);
 	} catch (error) {
 		// Catch all errors to prevent webhook failures
 		// GitHub expects 200 OK for all valid signatures, even if we fail to process
-		console.error("[Webhook Processor] Unexpected error processing push event:", error);
+		process.stderr.write(`[Webhook Processor] Unexpected error processing push event: ${JSON.stringify(error)}\n`);
 	}
 }
 
@@ -144,7 +144,7 @@ async function resolveUserIdForRepository(
 			.maybeSingle();
 
 		if (error) {
-			console.error(`[Webhook Processor] Error querying user_organizations for org ${repo.org_id}:`, error);
+			process.stderr.write(`[Webhook Processor] Error querying user_organizations for org ${repo.org_id}: ${JSON.stringify(error)}\n`);
 			return null;
 		}
 
@@ -154,6 +154,6 @@ async function resolveUserIdForRepository(
 	}
 
 	// No user context found (orphaned repository)
-	console.warn(`[Webhook Processor] Repository ${repo.full_name} has no user or org association`);
+	process.stderr.write(`[Webhook Processor] Repository ${repo.full_name} has no user or org association\n`);
 	return null;
 }

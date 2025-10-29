@@ -50,7 +50,7 @@ export async function startQueue(): Promise<void> {
 		);
 	}
 
-	console.log(
+	process.stdout.write(
 		`[${new Date().toISOString()}] Starting job queue with connection: ${dbUrl.replace(/:[^:@]+@/, ":***@")}`,
 	);
 
@@ -62,11 +62,11 @@ export async function startQueue(): Promise<void> {
 		// Start pg-boss (creates pgboss schema and tables)
 		await queueInstance.start();
 
-		console.log(`[${new Date().toISOString()}] Job queue started successfully`);
+		process.stdout.write(`[${new Date().toISOString()}] Job queue started successfully`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
-		console.error(
+		process.stderr.write(
 			`[${new Date().toISOString()}] Failed to start job queue: ${errorMessage}`,
 		);
 		throw new Error(`Job queue startup failed: ${errorMessage}`);
@@ -84,18 +84,18 @@ export async function stopQueue(): Promise<void> {
 		throw new Error("Queue not started. Call startQueue() first.");
 	}
 
-	console.log(
+	process.stdout.write(
 		`[${new Date().toISOString()}] Stopping job queue (draining in-flight jobs)...`,
 	);
 
 	try {
 		await queueInstance.stop();
 		queueInstance = null;
-		console.log(`[${new Date().toISOString()}] Job queue stopped successfully`);
+		process.stdout.write(`[${new Date().toISOString()}] Job queue stopped successfully`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
-		console.error(
+		process.stderr.write(
 			`[${new Date().toISOString()}] Error stopping job queue: ${errorMessage}`,
 		);
 		throw new Error(`Job queue shutdown failed: ${errorMessage}`);
@@ -119,7 +119,7 @@ export async function checkQueueHealth(): Promise<boolean> {
 		await queueInstance.getQueue("index-repo");
 		return true;
 	} catch (error) {
-		console.error(
+		process.stderr.write(
 			`[${new Date().toISOString()}] Queue health check failed: ${error instanceof Error ? error.message : String(error)}`,
 		);
 		return false;
