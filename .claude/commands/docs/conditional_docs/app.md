@@ -200,6 +200,17 @@ Use this reference to decide which KotaDB application layer documentation source
     - When experiencing merge conflicts in migration directories during concurrent development
     - When Supabase CLI fails to recognize or apply migrations due to naming issues
 
+- docs/specs/feature-317-dev-session-endpoint.md
+  - Conditions:
+    - When working on issue #317 or implementing dev-mode authentication for testing
+    - When setting up Playwright tests that require authenticated sessions
+    - When implementing test infrastructure that needs to bypass GitHub OAuth
+    - When troubleshooting dev-session endpoint availability or environment guard logic
+    - When creating test accounts programmatically for automated workflows
+    - When working with `web/app/auth/dev-session/route.ts` or `web/lib/playwright-helpers.ts`
+    - When understanding cookie injection patterns for Supabase SSR authentication
+    - When implementing ADW workflows that require authenticated browser sessions
+
 - docs/migration-sqlite-to-supabase.md
   - Conditions:
     - When helping developers upgrade from pre-PR#29 SQLite-based code
