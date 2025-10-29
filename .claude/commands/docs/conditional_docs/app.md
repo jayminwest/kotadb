@@ -24,12 +24,110 @@ Use this reference to decide which KotaDB application layer documentation source
 
 - CLAUDE.md
   - Conditions:
-    - When editing files under `app/src/**` (API, indexer, database layers) and you need architecture context
-    - When working with TypeScript path aliases or Bun-specific project structure
-    - When clarifying validation commands or development workflows
-    - When understanding GitHub issue relationship standards and prioritization workflow (see "GitHub Issue Management and Relationship Standards" section)
-    - When working on issue dependency graphs or relationship documentation
-    - When working with Beads issue tracker integration, slash commands, or dependency-aware work selection (see "Beads Workflow" section)
+    - When needing high-level project overview and navigation to detailed documentation
+    - When looking for quick reference commands (dev-start, test, type-check)
+    - When verifying critical conventions (path aliases, migration sync, logging standards)
+    - When discovering available documentation organized by category
+    - When understanding MCP server availability and usage guidance reference
+
+- .claude/commands/app/dev-commands.md
+  - Conditions:
+    - When starting development environment or troubleshooting dev-start.sh issues
+    - When needing manual server startup commands or Docker usage
+    - When running tests or type-checking commands
+    - When managing test database (setup, reset)
+
+- .claude/commands/app/environment.md
+  - Conditions:
+    - When configuring environment variables for Supabase or job queue
+    - When troubleshooting port configuration or connection issues
+    - When understanding auto-generated .env files and their usage
+    - When setting up local vs production environment variables
+
+- .claude/commands/app/pre-commit-hooks.md
+  - Conditions:
+    - When troubleshooting pre-commit hook failures or installation issues
+    - When needing to bypass hooks in emergency situations
+    - When understanding what hooks validate (logging standards, type safety, lint rules)
+    - When hooks fail with "command not found" or take too long
+
+- .claude/commands/docs/architecture.md
+  - Conditions:
+    - When working with TypeScript path aliases (@api/*, @auth/*, @db/*, etc.)
+    - When understanding shared types infrastructure (@shared/types)
+    - When learning about core components (API layer, auth, indexer, validation, queue)
+    - When needing architectural overview before implementing features
+
+- .claude/commands/docs/database.md
+  - Conditions:
+    - When working with database schema, tables, or RLS policies
+    - When understanding Supabase Local port architecture (5434, 54322, 54325, 54326)
+    - When creating or modifying database migrations
+    - When troubleshooting migration sync between app/src/db/migrations and app/supabase/migrations
+    - When setting up test database or understanding Supabase client initialization
+
+- .claude/commands/docs/mcp-integration.md
+  - Conditions:
+    - When working with MCP server architecture or tool implementations
+    - When understanding MCP SDK behavior (content blocks, error codes, HTTP status codes)
+    - When writing MCP tests or troubleshooting MCP tool execution
+    - When implementing new MCP tools (search_code, index_repository, list_recent_files, search_dependencies)
+    - When debugging SDK error handling or response format issues
+
+- .claude/commands/docs/mcp-usage-guidance.md
+  - Conditions:
+    - When deciding whether to use MCP tools or direct file operations
+    - When performing code search, dependency analysis, or issue tracking
+    - When understanding performance implications of MCP calls (rate limiting, authentication overhead)
+    - When needing decision matrix for task type vs recommended approach
+    - When working with kotadb, beads, playwright, or sequential-thinking MCP servers
+
+- .claude/commands/docs/workflow.md
+  - Conditions:
+    - When implementing or troubleshooting authentication and rate limiting flow
+    - When working with /index endpoint (repository indexing workflow)
+    - When working with /search endpoint (code search queries)
+    - When working with /validate-output endpoint (schema validation)
+    - When understanding rate limit headers and tier-based limits
+
+- .claude/commands/testing/testing-guide.md
+  - Conditions:
+    - When writing tests and need to understand antimocking philosophy
+    - When validating migration sync or dealing with migration drift
+    - When understanding test commands and environment setup
+    - When working with MCP tests or queue tests
+    - When troubleshooting test environment variable loading
+
+- .claude/commands/testing/logging-standards.md
+  - Conditions:
+    - When implementing logging in TypeScript (app/src/) or Python (automation/adws/)
+    - When pre-commit hooks fail due to console.log or print() usage
+    - When understanding approved logging methods (process.stdout.write, sys.stdout.write)
+    - When configuring Biome or Ruff for logging validation
+
+- .claude/commands/workflows/adw-architecture.md
+  - Conditions:
+    - When working on ADW (AI Developer Workflows) automation system
+    - When understanding 3-phase architecture (plan, build, review)
+    - When working with atomic agents or parallel execution infrastructure
+    - When troubleshooting resilience patterns (retry logic, checkpoint recovery)
+    - When using orchestrator slash command or worktree isolation
+
+- .claude/commands/workflows/adw-observability.md
+  - Conditions:
+    - When analyzing ADW success rates or failure patterns
+    - When running log analysis scripts (analyze_logs.py)
+    - When interpreting ADW metrics workflow outputs
+    - When troubleshooting ADW metrics alerts or false positives
+    - When monitoring daily ADW metrics or downloading historical data
+
+- .claude/commands/ci/ci-configuration.md
+  - Conditions:
+    - When working with GitHub Actions workflows (app-ci.yml, automation-ci.yml)
+    - When troubleshooting CI parallelization, caching strategy, or test environment setup
+    - When understanding push trigger strategy for feature branches
+    - When debugging test environment variable loading in CI
+    - When monitoring CI performance or consumption
 
 - app/.dockerignore
   - Conditions:

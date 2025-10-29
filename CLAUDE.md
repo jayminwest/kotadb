@@ -4,698 +4,99 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-KotaDB is a lightweight HTTP API service for indexing and searching code repositories. It's built with Bun + TypeScript and uses Supabase (PostgreSQL) for storage with Row Level Security (RLS) for multi-tenant data isolation. The project is designed to power AI developer workflows through automated code intelligence.
+KotaDB is a lightweight HTTP API service for indexing and searching code repositories. Built with Bun + TypeScript and Supabase (PostgreSQL) for multi-tenant data isolation via RLS. Designed to power AI developer workflows through automated code intelligence.
 
-## Development Commands
-
-All commands should be run from the `app/` directory.
-
-### Quick Start (Recommended)
-```bash
-cd app && ./scripts/dev-start.sh            # Start Supabase + API server
-cd app && ./scripts/dev-start.sh --web      # Start Supabase + API + web app
-cd app && ./scripts/dev-start.sh --mcp-start --adws-mcp-start  # Include MCP servers
-```
-
-The `dev-start.sh` script automates:
-- Supabase container lifecycle (stop existing, start fresh)
-- `.env` file generation with correct Supabase credentials
-- Dependency installation (if `node_modules/` missing)
-- API server startup with health check validation
-- Optional web app startup (`--web` flag)
-- Optional MCP server startup (`--mcp-start` flag)
-- Optional ADW MCP server startup (`--adws-mcp-start` flag)
-- Graceful cleanup on Ctrl+C (kills all background processes)
-
-Press Ctrl+C to stop all services.
-
-### Manual Server Startup
-```bash
-cd app && bun run src/index.ts              # Start server (default port 3000)
-cd app && PORT=4000 bun run src/index.ts    # Start with custom port
-cd app && bun --watch src/index.ts          # Watch mode for development
-```
-
-### Testing and type-checking
-```bash
-cd app && bun test                          # Run test suite
-DEBUG=1 cd app && bun test                  # Verbose test output (auth logs, setup details)
-cd app && bunx tsc --noEmit                # Type-check without emitting files
-cd app && bun run test:validate-migrations # Validate migration sync (see below)
-cd app && bun run test:validate-env        # Detect hardcoded environment URLs in tests
-```
-
-**IMPORTANT: Migration Sync Requirement**
-- Database migrations exist in **two locations**: `app/src/db/migrations/` (source) and `app/supabase/migrations/` (copy for Supabase CLI)
-- When adding or modifying migrations in `app/src/db/migrations/`, you **must** also update `app/supabase/migrations/`
-- Run `cd app && bun run test:validate-migrations` to check for drift between directories
-- Keep both directories synchronized to prevent test environment divergence from production schema
-
-**Migration Naming Convention:**
-- All migration files must use timestamped format: `YYYYMMDDHHMMSS_description.sql`
-- Example: `20241024143000_add_rate_limiting.sql`
-- Rationale:
-  - Prevents merge conflicts when multiple developers create migrations concurrently
-  - Aligns with Supabase CLI expectations and industry standards
-  - Ensures deterministic ordering regardless of file system
-- Use current UTC timestamp when creating new migrations: `date -u +%Y%m%d%H%M%S`
+## Quick Reference
 
 ```bash
-./scripts/setup-test-db.sh       # Start Supabase Local test database
-./scripts/reset-test-db.sh       # Reset test database to clean state
+# Start development environment
+cd app && ./scripts/dev-start.sh
+
+# Run tests
+cd app && bun test
+
+# Type-check
+cd app && bunx tsc --noEmit
+
+# Validate migration sync
+cd app && bun run test:validate-migrations
 ```
 
-**Testing Philosophy:** KotaDB follows an **antimocking philosophy**. All tests use real Supabase Local database connections instead of mocks for production parity. See `docs/testing-setup.md` for detailed configuration.
+## Critical Conventions
+
+### Path Aliases
+
+Always use TypeScript path aliases (defined in `app/tsconfig.json`):
+- `@api/*`, `@auth/*`, `@db/*`, `@indexer/*`, `@mcp/*`, `@validation/*`, `@queue/*`
+- `@shared/*` → `../shared/*` (shared types for monorepo)
+
+### Migration Sync Requirement
+
+Database migrations exist in **two locations** and must stay synchronized:
+1. `app/src/db/migrations/` (source)
+2. `app/supabase/migrations/` (copy for Supabase CLI)
+
+Run `cd app && bun run test:validate-migrations` to check for drift.
+
+Migration naming: `YYYYMMDDHHMMSS_description.sql` (generate: `date -u +%Y%m%d%H%M%S`)
 
 ### Logging Standards
 
-**IMPORTANT: Standardized Output Mechanisms**
+- **TypeScript**: Use `process.stdout.write()` / `process.stderr.write()` (NEVER `console.*`)
+- **Python**: Use `sys.stdout.write()` / `sys.stderr.write()` (NEVER `print()`)
 
-KotaDB enforces consistent logging patterns across all layers to enable structured logging, programmatic parsing, and uniform observability:
+Enforced by pre-commit hooks and CI validation.
 
-**TypeScript/Application Layer** (`app/src/`):
-- ✅ **Use**: `process.stdout.write()` for informational output
-- ✅ **Use**: `process.stderr.write()` for errors and warnings
-- ❌ **Never use**: `console.log()`, `console.error()`, `console.warn()`, `console.info()`
-- **Rationale**: Direct stream writing enables:
-  - Structured logging frameworks (Winston, Pino)
-  - Log suppression during tests
-  - Uniform formatting and filtering
-  - Better control over output buffering
+### Testing Philosophy
 
-**Python/Automation Layer** (`automation/adws/`):
-- ✅ **Use**: `sys.stdout.write()` for informational output
-- ✅ **Use**: `sys.stderr.write()` for errors and warnings
-- ❌ **Never use**: `print()` (except in standalone scripts under `adws/scripts/`)
-- **Rationale**: Direct stream writing enables:
-  - Integration with logging frameworks (structlog, loguru)
-  - Testability and output capture
-  - Consistent formatting across modules
-  - Better subprocess communication
+**Antimocking**: All tests use real Supabase Local database connections for production parity.
 
-**Examples**:
-```typescript
-// TypeScript - CORRECT
-process.stdout.write("Indexing completed\n");
-process.stderr.write("Error: Failed to connect\n");
+See `.claude/commands/docs/anti-mock.md` for complete guidelines.
 
-// TypeScript - INCORRECT
-console.log("Indexing completed");
-console.error("Error: Failed to connect");
-```
+## Documentation Directory
 
-```python
-# Python - CORRECT
-import sys
-sys.stdout.write("Indexing completed\n")
-sys.stderr.write("Error: Failed to connect\n")
+### Development
+- [Development Commands](./.claude/commands/app/dev-commands.md) - Quick start, server startup, testing
+- [Environment Variables](./.claude/commands/app/environment.md) - Supabase config, ports, auto-generated files
+- [Pre-commit Hooks](./.claude/commands/app/pre-commit-hooks.md) - Installation, troubleshooting, bypass
 
-# Python - INCORRECT
-print("Indexing completed")
-print("Error: Failed to connect", file=sys.stderr)
-```
+### Architecture
+- [Architecture Overview](./.claude/commands/docs/architecture.md) - Path aliases, shared types, core components
+- [Database Schema](./.claude/commands/docs/database.md) - Tables, RLS policies, migrations, Supabase Local
+- [API Workflow](./.claude/commands/docs/workflow.md) - Auth flow, rate limiting, indexing, search, validation
 
-**Enforcement**:
-- **Pre-commit hooks** validate logging standards via Biome (TypeScript) and Ruff (Python)
-- **CI validation** blocks PRs with non-compliant logging patterns
-- **Biome config**: `app/biome.json` enables `suspicious/noConsole` rule
-- **Ruff config**: `automation/pyproject.toml` enables `T201` (flake8-print) rule
+### MCP Integration
+- [MCP Integration](./.claude/commands/docs/mcp-integration.md) - Server architecture, tools, SDK behavior
+- [MCP Usage Guidance](./.claude/commands/docs/mcp-usage-guidance.md) - When to use MCP vs direct operations
 
-### Pre-commit Hooks
-Pre-commit hooks automatically run type-check and lint on staged files to prevent TypeScript errors and lint issues from reaching CI.
+### Testing
+- [Testing Guide](./.claude/commands/testing/testing-guide.md) - Antimocking philosophy, migration sync, commands
+- [Logging Standards](./.claude/commands/testing/logging-standards.md) - TypeScript/Python logging rules
 
-**Installation:**
-```bash
-cd app && bun install                   # Automatically installs hooks via prepare script
-```
+### AI Developer Workflows (ADW)
+- [ADW Architecture](./.claude/commands/workflows/adw-architecture.md) - 3-phase system, atomic agents, resilience
+- [ADW Observability](./.claude/commands/workflows/adw-observability.md) - Metrics analysis, CI integration
 
-**Execution:**
-- Hooks run automatically on `git commit` for changes in `app/` or `shared/` directories
-- Type-check: Runs `bunx tsc --noEmit` in changed directories
-- Lint: Runs `bun run lint` in `app/` if app files changed
-- Skips checks if no relevant files changed (fast commits for docs, config, etc.)
+### CI/CD
+- [CI Configuration](./.claude/commands/ci/ci-configuration.md) - GitHub Actions, parallelization, caching
 
-**Bypass (emergency only):**
-```bash
-git commit --no-verify -m "emergency: bypass hooks"    # Skip all pre-commit checks
-```
+### Issue Management
+- [Issue Relationships](./.claude/commands/docs/issue-relationships.md) - Dependency types, prioritization
+- [Beads Workflow](./.claude/commands/beads/) - SQLite-based issue tracker with git sync
 
-**Troubleshooting:**
-- Hook fails with "command not found": Ensure `bun` is installed globally
-- Hook takes too long: Consider using `lint-staged` for incremental checks (already configured in `app/.lintstagedrc.json`)
-- Hook fails on valid code: Run `cd app && bunx tsc --noEmit` manually to debug
-- Disable hooks temporarily: `git config core.hooksPath /dev/null` (restore with `git config core.hooksPath .husky`)
+## MCP Server Availability
 
-### Docker
-```bash
-docker compose up dev   # Run in development container (builds from app/ directory)
-```
+KotaDB provides MCP servers for programmatic operations:
+- **kotadb**: Code search, indexing, dependency analysis
+- **beads**: Issue tracking, dependency management
+- **playwright**: Browser automation (available via MCP)
+- **sequential-thinking**: Complex reasoning tasks
 
-Note: The Docker build context for application services (`dev`, `home`) is set to the `app/` directory.
+See [MCP Usage Guidance](./.claude/commands/docs/mcp-usage-guidance.md) for decision matrix on when to use MCP tools vs direct file operations.
 
-## Architecture
+## Related Resources
 
-### Path Aliases
-The project uses TypeScript path aliases defined in `app/tsconfig.json`:
-- `@api/*` → `src/api/*`
-- `@auth/*` → `src/auth/*`
-- `@db/*` → `src/db/*`
-- `@indexer/*` → `src/indexer/*`
-- `@shared/*` → `../shared/*` (shared types for monorepo)
-- `@mcp/*` → `src/mcp/*`
-- `@validation/*` → `src/validation/*`
-- `@queue/*` → `src/queue/*`
-
-Always use these aliases for imports, not relative paths. All paths are relative to the `app/` directory.
-
-### Shared Types Infrastructure
-The `shared/` directory at repository root contains TypeScript types shared across all projects in the monorepo (backend, frontend, CLI tools). This provides a single source of truth for API contracts, database entities, and authentication types.
-
-**When to use `@shared/types`:**
-- API request/response types (e.g., `IndexRequest`, `SearchResponse`)
-- Database entity types (e.g., `Repository`, `IndexedFile`, `Symbol`)
-- Authentication types (e.g., `AuthContext`, `Tier`, `ApiKey`)
-- Rate limiting types (e.g., `RateLimitResult`, `RateLimitHeaders`)
-- Validation types (e.g., `ValidationRequest`, `ValidationResponse`)
-
-**When to keep types in `app/src/types`:**
-- Application-specific types (e.g., `ApiContext` with Supabase client)
-- Internal implementation details not exposed via API
-- Types that depend on app-specific runtime globals (e.g., Bun's `Request` type)
-
-**Import examples:**
-```typescript
-// Import shared types for API contracts
-import type { IndexRequest, SearchResponse } from "@shared/types";
-import type { AuthContext, Tier } from "@shared/types/auth";
-import type { Repository, IndexedFile } from "@shared/types/entities";
-
-// Import app-specific types
-import type { ApiContext } from "@shared/index";
-```
-
-**Breaking changes:**
-When modifying shared types, use TypeScript compiler errors to identify all affected consumers and update them in the same PR. Shared types follow semantic versioning (breaking changes require major version bump in `shared/package.json`).
-
-### Core Components
-
-All application code is located in the `app/` directory.
-
-**Entry Point (app/src/index.ts)**
-- Bootstraps the HTTP server using Express (runs on Bun runtime)
-- Initializes Supabase client and verifies database connection
-- Creates Express app and starts listening on configured port
-- Handles graceful shutdown via SIGTERM
-
-**API Layer (app/src/api/)**
-- `routes.ts`: Express app factory with middleware and route handlers
-  - Body parser middleware for JSON requests
-  - Authentication middleware (converts Express→Bun Request for existing auth logic)
-  - REST endpoints: `/health`, `/index`, `/search`, `/files/recent`, `/validate-output`
-  - MCP endpoint: `/mcp` (POST only, using SDK StreamableHTTPServerTransport)
-- `queries.ts`: Database query functions for indexed files and search
-
-**Authentication & Rate Limiting (app/src/auth/)**
-- `middleware.ts`: Authentication middleware and rate limit enforcement
-- `validator.ts`: API key validation and tier extraction
-- `keys.ts`: API key generation with bcrypt hashing
-- `rate-limit.ts`: Tier-based rate limiting logic (free=100/hr, solo=1000/hr, team=10000/hr)
-- `context.ts`: Auth context passed to handlers (includes user, tier, rate limit status)
-- `cache.ts`: In-memory caching for API key lookups (reduces database load)
-
-**Database (app/src/db/)**
-- `client.ts`: Supabase client initialization (service role and anon clients)
-- Tables: 10 tables including `api_keys`, `organizations`, `repositories`, `index_jobs`, `indexed_files`, `symbols`, `references`, `dependencies`, etc.
-- Connection: Configured via `SUPABASE_URL`, `SUPABASE_SERVICE_KEY`, and `SUPABASE_ANON_KEY` environment variables
-- RLS enabled for multi-tenant data isolation with user-scoped and organization-scoped policies
-- **Supabase Local Port Architecture** (for testing):
-  - Port 5434: PostgreSQL (migrations, seed scripts, psql)
-  - Port 54322: PostgREST API (raw HTTP access)
-  - Port 54325: GoTrue auth service
-  - Port 54326: Kong gateway (Supabase JS client - **use this for tests**)
-
-**Indexer (app/src/indexer/)**
-- `repos.ts`: Git repository management (clone, fetch, checkout)
-  - Clones repositories to `data/workspace/` directory
-  - Supports local paths or auto-cloning from GitHub (or custom git base via `KOTA_GIT_BASE_URL`)
-  - Handles ref/branch resolution with fallback to default branch (main/master)
-- `parsers.ts`: File discovery and parsing
-  - Supported: `.ts`, `.tsx`, `.js`, `.jsx`, `.cjs`, `.mjs`, `.json`
-  - Ignores: `.git`, `node_modules`, `dist`, `build`, `out`, `coverage`
-- `extractors.ts`: Dependency extraction and snippet generation
-
-**MCP (Model Context Protocol) Integration (app/src/mcp/)**
-- `server.ts`: MCP server factory using official `@modelcontextprotocol/sdk` (v1.20+)
-  - Creates per-request Server instances for user isolation (stateless mode)
-  - Registers four tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`
-  - Uses `StreamableHTTPServerTransport` with `enableJsonResponse: true` for simple JSON-RPC over HTTP
-  - No SSE streaming or session management (stateless design)
-- `tools.ts`: Tool execution logic and parameter validation
-  - Reused by SDK server handlers
-  - Type guards for parameter validation
-  - Returns JSON results wrapped in SDK content blocks
-  - `search_dependencies` tool: Query dependency graph for impact analysis
-    - Supports three search directions: dependents (reverse lookup), dependencies (forward lookup), both
-    - Recursive traversal with configurable depth (1-5)
-    - Detects circular dependencies during graph traversal
-    - Optional test file filtering via `include_tests` parameter
-- Integration with Express:
-  - SDK requires Node.js HTTP primitives (`IncomingMessage`, `ServerResponse`)
-  - Express provides Node-compatible interfaces running on Bun runtime
-  - Per-request server creation ensures user context isolation
-  - Rate limit headers set before SDK transport handles request
-
-**MCP SDK Behavior Notes (app/src/mcp/):**
-- **Content Block Response Format**: Tool results are wrapped in content blocks by the SDK
-  - Server returns: `{ content: [{ type: "text", text: JSON.stringify(result) }] }`
-  - Tests must extract results from `response.result.content[0].text` and parse JSON
-  - Use `extractToolResult()` helper from `app/tests/helpers/mcp.ts` for consistent extraction
-- **Error Code Mapping**: SDK error handling differs from custom implementations
-  - `-32700` (Parse Error): Invalid JSON or malformed JSON-RPC structure (returns HTTP 400)
-  - `-32601` (Method Not Found): Unknown JSON-RPC method (returns HTTP 200)
-  - `-32603` (Internal Error): Tool execution errors, validation failures, type errors (returns HTTP 200)
-  - SDK uses `-32603` for all tool-level errors (missing params, invalid types, unknown tools)
-  - SDK does NOT use `-32602` (Invalid Params) for tool validation (only for JSON-RPC structure)
-- **HTTP Status Codes**: SDK returns 400 for parse/structural errors, 200 for method-level errors
-- **Header Validation**: DNS rebinding protection disabled by default in `StreamableHTTPServerTransport`
-  - SDK does NOT enforce `Origin` or `MCP-Protocol-Version` headers unless explicitly configured
-  - Production deployments can enable via `allowedOrigins` transport option if needed
-- **Test Writing Guidelines**: When writing MCP tests
-  - Always use `extractToolResult(data)` helper to parse tool responses
-  - Expect `-32603` for tool-level validation errors (not `-32602`)
-  - Expect HTTP 400 for parse errors and invalid JSON-RPC (not HTTP 200)
-  - Do not test header enforcement unless DNS rebinding protection is enabled
-- **MCP Regression Testing** (issue #68, 9 test files, 100+ test cases):
-  - Comprehensive test coverage: lifecycle, errors, authentication, tool validation, integration, concurrency
-  - Test helpers: `sendMcpRequest()`, `extractToolResult()`, `assertToolResult()`, `assertJsonRpcError()`
-  - Test fixtures: `app/tests/fixtures/mcp/sample-repository/` for integration testing
-  - Claude Code integration guide: `docs/guides/mcp-claude-code-integration.md`
-  - See `docs/testing-setup.md` "MCP Testing" section for complete testing guide
-
-**Validation (app/src/validation/)**
-- `schemas.ts`: Core validation logic using Zod for command output validation
-  - Converts JSON schema objects to Zod schemas
-  - Validates strings (with pattern/length constraints), numbers, booleans, arrays, objects
-  - Returns structured validation errors with path and message
-- `types.ts`: TypeScript types for validation API (ValidationRequest, ValidationResponse, ValidationError)
-- `common-schemas.ts`: Reusable schema helpers for common patterns
-  - `FilePathOutput(extension?)`: Validates relative file paths (no leading slash)
-  - `JSONBlockOutput(schema)`: Validates JSON structure (with markdown extraction)
-  - `MarkdownSectionOutput(sections)`: Validates markdown with required sections
-  - `PlainTextOutput(options)`: Validates plain text with length/format constraints
-- Integration with Express:
-  - POST `/validate-output` endpoint validates command outputs against schemas
-  - Requires authentication (API key via Bearer token)
-  - Rate limiting applied (consumes user's hourly quota)
-  - Returns `{valid: true}` or `{valid: false, errors: [{path, message}]}`
-
-**Queue (app/src/queue/)**
-- `client.ts`: pg-boss job queue lifecycle management
-  - Singleton pattern for queue instance (`getQueue()` accessor)
-  - `startQueue()`: Initializes pg-boss with Supabase Postgres connection
-  - `stopQueue()`: Graceful shutdown with in-flight job draining
-  - `checkQueueHealth()`: Database connectivity verification for monitoring
-  - Automatic `pgboss` schema creation on first start (separate from `public` schema)
-  - Password redaction in logs for security
-- `config.ts`: Queue behavior configuration constants
-  - Retry policy: 3 attempts with exponential backoff (60s, 120s, 180s)
-  - Job expiration: 24 hours (automatic cleanup of stale jobs)
-  - Archive completed jobs after 1 hour
-  - Worker concurrency: 3 concurrent workers (for future worker implementation)
-- `types.ts`: TypeScript job payload interfaces
-  - `IndexRepoJobPayload`: Repository indexing job data (indexJobId, repositoryId, commitSha)
-  - `JobResult`: Worker completion result (success, filesProcessed, symbolsExtracted, error)
-- Integration with server bootstrap (`app/src/index.ts`):
-  - Queue starts after successful database health check
-  - SIGTERM handler calls `stopQueue()` before HTTP server shutdown
-  - Ensures graceful shutdown drains in-flight jobs before process exit
-- Testing philosophy:
-  - All tests use real Supabase Local PostgreSQL (no mocks)
-  - Tests validate `pgboss` schema creation via `psql` queries
-  - Integration tests verify queue persistence across restart cycles
-
-### Workflow
-
-**Authentication & Rate Limiting Flow** (all authenticated endpoints):
-1. Request arrives with `Authorization: Bearer <api_key>` header
-2. `authenticateRequest()` middleware validates API key and extracts tier
-3. `enforceRateLimit()` checks hourly request count via `increment_rate_limit()` DB function
-4. If limit exceeded, return 429 with `Retry-After` header
-5. If allowed, attach auth context (user, tier, rate limit status) to request
-6. Handler executes with rate limit headers injected into response
-
-**POST /index** triggers repository indexing:
-- Ensures repository exists in `repositories` table (creates if new)
-- Records index job in `index_jobs` table (status: pending → completed/failed/skipped)
-- Queues asynchronous indexing via `queueMicrotask()`
-- Repository preparation: clones if needed, checks out ref
-- File discovery: walks project tree, filters by extension
-- Parsing: extracts content and dependencies
-- Storage: saves to `indexed_files` table with `UNIQUE (repository_id, path)` constraint
-
-**GET /search** queries indexed files:
-- Full-text search on content
-- Optional filters: `project` (project_root), `limit`
-- Returns results with context snippets
-
-**POST /validate-output** validates command outputs against schemas:
-- Accepts JSON payload: `{schema: object, output: string}`
-- Schema format: JSON-compatible Zod schema (type, pattern, minLength, maxLength, etc.)
-- Returns validation result: `{valid: boolean, errors?: [{path, message}]}`
-- Use case: Automation layer validates slash command outputs before parsing
-- Command templates include schemas in `## Output Schema` section
-
-**Rate Limit Response Headers** (all authenticated endpoints):
-- `X-RateLimit-Limit`: Total requests allowed per hour for the tier
-- `X-RateLimit-Remaining`: Requests remaining in current window
-- `X-RateLimit-Reset`: Unix timestamp when the limit resets
-- `Retry-After`: Seconds until retry (429 responses only)
-
-### Environment Variables
-- `PORT`: Server port (default: 3000)
-- `SUPABASE_URL`: Supabase project URL (required)
-- `SUPABASE_SERVICE_KEY`: Supabase service role key for admin operations (required)
-- `SUPABASE_ANON_KEY`: Supabase anon key for RLS-enforced queries (required)
-- `SUPABASE_DB_URL`: Native Postgres connection string for pg-boss job queue (required)
-  - Local: `postgresql://postgres:postgres@localhost:5434/postgres`
-  - Production: `postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres`
-  - Auto-generated by `dev-start.sh` from Docker Compose ports
-- `KOTA_GIT_BASE_URL`: Git clone base URL (default: https://github.com)
-
-### AI Developer Workflows (automation/adws/)
-Python-based automation pipeline for autonomous GitHub issue workflows:
-- **3-Phase Architecture** (as of #136): `adw_plan.py` → `adw_build.py` → `adw_review.py`
-  - Plan phase: Issue classification and implementation planning
-  - Build phase: Implementation and PR creation
-  - Review phase: Automated code review and reporting
-- **Atomic Agent Catalog** (chore #216, #255): Decomposed agents following "one agent, one task, one prompt" philosophy
-  - `adw_agents/`: 10 atomic agents + orchestrator for fine-grained workflow execution
-  - Migration status: Phase 1-3 complete (extraction, orchestration, parallel execution infrastructure)
-  - Phase 3 deliverables (chore #255):
-    - Parallel execution infrastructure via ThreadPoolExecutor
-    - Thread-safe state management with global locking
-    - 7 new integration tests for concurrency and thread safety
-    - Configurable parallelism via `ADW_MAX_PARALLEL_AGENTS` (default: 2)
-    - Current limitation: data dependency between classify_issue and generate_branch prevents parallel execution
-  - Feature flag: `ADW_USE_ATOMIC_AGENTS` (default: false, legacy phase scripts)
-  - Phase 4 (next): Real-world validation on 10-20 test issues, success rate measurement (target: >80%)
-  - See `automation/adws/adw_agents/README.md` for agent catalog and parallel execution architecture
-  - See `docs/specs/phase3-validation-results.md` for Phase 3 infrastructure completion summary
-- `adw_modules/`: Shared utilities (Claude CLI wrapper, git ops with worktree isolation, GitHub integration, state management)
-- `adw_tests/`: Pytest suite for workflow validation
-- `trigger_webhook.py`, `trigger_cron.py`: Webhook and polling-based trigger systems
-
-All workflows execute in isolated git worktrees (`trees/`) to prevent conflicts during concurrent agent execution and local development. Worktrees are automatically created before agent execution and cleaned up after successful PR creation (configurable via `ADW_CLEANUP_WORKTREES` environment variable).
-
-**Interactive Worktree Development** (added in PR #157): Use `/spawn_interactive` slash command to create isolated Claude Code development environments for:
-- Working on multiple features concurrently without branch switching
-- Inspecting ADW-generated code without affecting main working directory
-- Testing experimental changes in complete isolation
-- See `.claude/commands/worktree/spawn_interactive.md` for detailed usage
-
-**Orchestrator Slash Command** (feature #187): Use `/orchestrator` to automate the full end-to-end issue-to-PR workflow with a single command:
-- Automates all 3 phases: plan → build (with PR creation) → review
-- Validates issue metadata and dependencies before execution
-- Creates isolated worktree with conventional branch naming
-- Implements checkpoint-based recovery for failure scenarios
-- Supports dry-run validation, cleanup control, and manual resume
-- Complements Python ADW layer with manual/interactive execution mode
-- See `.claude/commands/workflows/orchestrator.md` for detailed usage
-
-The agentic layer operates on the application layer (in `app/`) to automate development workflows. See `automation/adws/README.md` for complete automation architecture and usage examples.
-
-**Recent Simplification** (PR #136): The ADW system was simplified from a 5-phase to a 3-phase flow by removing broken test/document/patch phases (519 lines deleted). PR creation was moved from plan phase to build phase to ensure PRs only open after successful implementation. Target completion rate: >80%.
-
-**Resilience Architecture** (PR #157, issue #148): Hybrid resilience system with automatic retry logic and checkpoint-based recovery:
-- Automatic retry with exponential backoff (1s, 3s, 5s) for transient errors (network issues, API rate limits, timeouts)
-- Checkpoint system saves progress at logical breakpoints for resume-after-failure capability
-- Retry codes classify error types (CLAUDE_CODE_ERROR, TIMEOUT_ERROR, EXECUTION_ERROR) for targeted recovery
-- Checkpoint storage in `agents/{adw_id}/{phase}/checkpoints.json` with atomic writes
-- See `automation/adws/README.md` "Resilience & Recovery" section for usage examples
-
-**ADW Observability**:
-- `automation/adws/scripts/analyze_logs.py`: Automated log analysis for ADW success rates and failure patterns
-  - Parses execution logs from `automation/logs/kota-db-ts/{env}/{adw_id}/adw_sdlc/execution.log`
-  - Correlates with agent state from `automation/agents/{adw_id}/adw_state.json`
-  - Outputs text, JSON, or markdown reports with success rates, phase funnels, and failure distributions
-  - CI integration via `.github/workflows/adw-metrics.yml` (daily analysis with alerting)
-  - Key metrics: success rate, phase progression, worktree staleness, failure patterns by phase
-  - Agent-level metrics (Phase 4): `--agent-metrics` flag for agent success rates, retry counts, execution times (stub)
-  - Usage: `uv run automation/adws/scripts/analyze_logs.py --format json --hours 24`
-- **ADW Metrics Analysis Workflow** (`.github/workflows/adw-metrics.yml`):
-  - **Schedule**: Runs daily at 00:00 UTC for automated metrics collection
-  - **Manual Trigger**: Available via `gh workflow run "ADW Metrics Analysis" --ref main`
-  - **Outputs**: JSON metrics artifact + markdown summary in GitHub Step Summary
-  - **Alerting**: Creates/updates GitHub issue when success rate < 50% AND total_runs > 0
-  - **False Positive Prevention**: Workflow skips alerts when no runs found (0 total_runs) to prevent timing-related false positives
-  - **Critical Threshold**: Workflow fails if success rate < 20%
-  - **Artifacts**: 90-day retention for historical tracking
-  - **Target Success Rate**: >80% (per 3-phase architecture goals)
-  - View runs: `gh run list --workflow="ADW Metrics Analysis" --limit 5`
-  - Download metrics: `gh run download <run_id> -n adw-metrics-<run_number>`
-  - **Troubleshooting**: If alert triggered with 0 runs, verify recent runs exist in `automation/logs/kota-db-ts/local/` and check time window alignment (workflow runs at 00:00 UTC, logs may be created after analysis)
-
-### GitHub Issue Management and Relationship Standards
-
-**Issue Prioritization Workflow**:
-When working with GitHub issues, both human developers and AI agents follow relationship-aware prioritization standards to ensure efficient dependency management and context discovery.
-
-**Relationship Types** (per issue #151):
-- **Depends On**: Issues that MUST be completed before work can start on the current issue
-  - Example: Feature #110 depends on #25 (API key generation) being merged first
-  - Blocked issues should not be started until dependencies are resolved
-- **Related To**: Issues providing context or sharing technical concerns (not strict blockers)
-  - Example: Feature #26 (rate limiting) related to #25 (API keys) - both touch auth layer
-  - Useful for understanding architectural patterns and design decisions
-- **Blocks**: Issues waiting on current work to complete
-  - Example: Epic #70 (AST parsing) blocks #74 (symbol extraction) and #116 (dependency search)
-  - Helps identify downstream impact and prioritize high-leverage work
-- **Supersedes**: Current issue replaces or deprecates previous work
-  - Example: Chore #27 (Postgres) supersedes all SQLite-based implementations
-  - Indicates architectural shifts or cleanup efforts
-- **Child Of**: Current issue is part of larger epic or tracking issue
-  - Example: Phase 1 (#110) is child of multi-agent framework epic
-  - Connects granular tasks to strategic initiatives
-- **Follow-Up**: Planned next steps after current work completes (not blockers)
-  - Example: Feature #145 (ADW MCP) has follow-up #148 (hybrid resilience patterns)
-  - Captures future work without creating false dependencies
-
-**Documentation Standards**:
-- **Spec Files** (`docs/specs/`): All spec files include `## Issue Relationships` section with explicit mappings
-- **GitHub Issues**: Relationship metadata documented in issue description via templates
-- **Pull Requests**: All PRs reference related issues and dependencies in description
-- **Commit Messages**: Footer metadata for dependencies: `Depends-On: #XXX`, `Related-To: #YYY`
-
-**Prioritization Strategy**:
-1. **Fetch all open issues** via `gh issue list` with filters for labels, status, and assignee
-2. **Parse relationship metadata** from issue bodies and linked spec files
-3. **Build dependency graph** to identify:
-   - Unblocked issues (no unresolved dependencies) eligible for immediate work
-   - High-leverage issues (blocking multiple downstream tasks)
-   - Isolated issues (no dependencies, safe for parallel execution)
-4. **Select highest-priority unblocked issue** based on:
-   - Labels: `priority:high` > `priority:medium` > `priority:low`
-   - Effort: `effort:small` preferred for quick wins
-   - Strategic alignment: Issues tied to active epics or OKRs
-5. **Verify dependency resolution** before starting work (check if "Depends On" issues are closed/merged)
-
-**AI Agent Context Discovery**:
-- ADW workflows automatically fetch related issues before planning implementation
-- Agents read spec files for relationship metadata to understand prerequisite work
-- Log analysis correlates success rates with dependency chain complexity
-- Agents update relationship metadata when discovering new dependencies during implementation
-
-**Benefits**:
-- **Reduced Wasted Effort**: Prevents starting work on blocked issues
-- **Better Context**: Related issues provide architectural insights and design patterns
-- **Improved Traceability**: Clear history of how features evolved across multiple issues
-- **Faster Onboarding**: New contributors understand issue context from relationship graph
-- **Smarter Automation**: AI agents discover dependencies automatically, reducing planning errors
-
-**Issue Management Slash Commands** (added in PR #166):
-- `/issues:prioritize`: Identify highest-priority unblocked work by building dependency graphs and analyzing relationship metadata
-- `/issues:audit`: Clean up issue tracker by closing completed, obsolete, duplicate, or stale issues
-- See `.claude/commands/docs/issue-relationships.md` for relationship type definitions and documentation standards
-
-See issue #151 for complete documentation standards and implementation details.
-
-### Beads Workflow
-
-**Overview**:
-KotaDB uses Beads, a lightweight SQLite-based issue tracker with git-synchronized state, for dependency-aware work tracking. Beads operates via MCP tools and provides programmatic access to issue CRUD operations, dependency management, and work selection queries. This complements GitHub Issues for internal development workflows while maintaining GitHub as the primary collaboration interface for external contributors.
-
-**Database Discovery**:
-Beads searches for the database in the following order:
-1. Project root `.beads/` directory (preferred for KotaDB)
-2. Ancestor directories (searches up the tree)
-3. `~/.beads/default.db` (global fallback)
-
-For KotaDB, the database is located at `.beads/beads.db` (gitignored). The source of truth for team synchronization is `.beads/issues.jsonl` (version controlled).
-
-**Issue ID Conventions**:
-- **Prefix**: `kota-` (matches repository naming)
-- **Format**: `kota-{number}` (e.g., `kota-1`, `kota-123`)
-- **Auto-increment**: Beads automatically assigns sequential numbers
-- **GitHub linking**: Use `external_ref` field to link GitHub issues
-
-**Dependency Relationship Types**:
-- **blocks**: Hard blocker - issue cannot start until dependency completes (default)
-  - Example: `kota-123` (rate limiting) blocks on `kota-25` (API key generation)
-  - Blocked issues won't appear in `/beads:ready` queries until blockers are closed
-- **related**: Soft link - issues share technical context but no strict ordering
-  - Example: Multiple issues touching the authentication layer
-  - Useful for discovering design patterns and architectural decisions
-- **parent-child**: Epic/subtask hierarchy - child is part of larger parent epic
-  - Example: Symbol extraction (`kota-74`) is child of AST parsing epic (`kota-70`)
-  - Enables epic progress tracking and scope management
-- **discovered-from**: Issue was found while working on another issue
-  - Example: Bug found during rate limiting implementation
-  - Tracks discovery path and follow-up work context
-
-**Git Workflow for JSONL Sync**:
-1. **Auto-export**: Beads auto-exports to `.beads/issues.jsonl` with 5-second debounce after any write operation
-2. **Commit strategy**: Commit JSONL changes alongside code changes in the same PR
-   - Wait 5 seconds after creating/updating issues before committing
-   - Recommended: Create issues → verify JSONL updated → commit
-3. **Merge conflicts**: JSONL format is line-based (one issue per line) for merge-friendly diffs
-   - If conflicts occur, resolve manually in JSONL file
-   - Worst case: `bd import issues.jsonl` re-imports from git after resolution
-4. **Team sync**: Teammates pull JSONL changes and beads auto-imports if JSONL is newer than database
-5. **Worktree isolation**: ADW workflows execute in isolated worktrees, sharing the same `.beads/` database via SQLite locking
-
-**Slash Commands for Manual Workflow**:
-- `/beads:ready [assignee] [priority] [limit]`: Query ready-to-work tasks (no unresolved blockers)
-  - Returns markdown table with priority, labels, links to spec files
-  - Recommends highest-priority issue based on priority + effort labels
-- `/beads:create <title> [type] [priority] [description] [deps]`: Create issue with dependencies
-  - Types: bug, feature, task, epic, chore
-  - Priority: 0 (low), 1 (medium), 2 (high)
-  - Returns created issue ID for immediate use
-- `/beads:show <issue_id>`: Show detailed issue information and dependency tree
-  - Displays metadata, dependencies (with status), dependents, spec file links
-  - Highlights unresolved blockers
-- `/beads:update <issue_id> [status] [priority] [assignee] [description]`: Update issue fields
-  - Status: open, in_progress, blocked, closed
-  - Use to claim work: `/beads:update kota-123 in_progress "" claude`
-  - Use to mark complete: `/beads:update kota-123 closed`
-- `/beads:dep <issue_id> <depends_on_id> [relationship_type]`: Add dependency relationship
-  - Creates links between issues for dependency tracking
-  - Supports all relationship types (blocks, related, parent-child, discovered-from)
-
-**Common Beads Operations**:
-
-```bash
-# Find next ready-to-work task
-/beads:ready
-
-# Create a new feature issue
-/beads:create "Add rate limiting" feature 2 "Implement tier-based limits"
-
-# Add dependency (feature depends on prerequisite)
-/beads:dep kota-123 kota-25 blocks
-
-# Claim work on an issue
-/beads:update kota-123 in_progress "" claude
-
-# Check dependency status
-/beads:show kota-123
-
-# Mark issue complete
-/beads:update kota-123 closed
-
-# Find newly unblocked work
-/beads:ready
-```
-
-**When to Use Beads vs GitHub Issues**:
-- **Use Beads for**:
-  - Internal work tracking with explicit dependency management
-  - ADW workflow automation (programmatic work selection)
-  - Blocking relationships that require strict ordering
-  - Quick work queries without GitHub API rate limits
-  - Worktree-isolated development with shared state
-- **Use GitHub Issues for**:
-  - External contributor collaboration and discussions
-  - Public issue tracking and visibility
-  - Integration with GitHub Projects and milestones
-  - Cross-repository issue references
-
-**Migration from GitHub Issues**:
-- **Selective migration**: Start fresh with beads for new work, selectively migrate active GitHub issues
-- **No forced migration**: Phase 1 is opt-in for manual testing; GitHub Issues remain primary
-- **GitHub linking**: Use `external_ref` field to link beads issues to GitHub issues for traceability
-- **Future sync** (Phase 4): Bidirectional GitHub sync for seamless integration
-
-**CI Validation**:
-- JSONL syntax validation runs in CI setup job via `bun run test:validate-beads`
-- Checks `.beads/issues.jsonl` for valid JSON structure using `jq`
-- Skips validation if `.beads/` directory doesn't exist (no false failures on fresh clones)
-- Future: Add timestamp staleness checks in Phase 2
-
-See `.claude/commands/beads/` for slash command documentation and issue #300 (epic) for complete Beads integration roadmap.
-
-### CI/CD Testing Infrastructure
-**GitHub Actions Workflows**:
-- **Application CI** (`.github/workflows/app-ci.yml`): Tests the TypeScript/Bun application layer
-  - **Workflow Structure** (parallelized for ~15s runtime improvement):
-    - `setup` job: Installs dependencies, validates migration sync, caches node_modules
-    - `typecheck` job: Runs type-checking for shared types and application (depends on setup)
-    - `lint` job: Runs ESLint validation (depends on setup)
-    - `test` job: Runs full test suite (depends on typecheck and lint)
-  - **Caching Strategy**: Uses `actions/cache@v4` with `bun-${{ hashFiles('app/bun.lockb') }}` key for node_modules reuse across parallel jobs
-  - Uses Docker Compose with isolated project names for test environment
-  - Runs `.github/scripts/setup-supabase-ci.sh` to start containerized Supabase stack
-  - Auto-generates `app/.env.test` from Docker Compose container ports for dynamic credentials
-  - Executes full test suite (133 tests) against real Supabase stack (PostgreSQL + PostgREST + Kong + Auth)
-  - Ensures **exact parity** between local and CI testing environments (antimocking compliance)
-  - **Project isolation**: unique project names prevent port conflicts across concurrent CI runs
-  - Validates migration sync between `app/src/db/migrations/` and `app/supabase/migrations/` in setup job
-  - Teardown via `app/scripts/cleanup-test-containers.sh` in cleanup step (always runs)
-  - Migrations applied directly to containerized Postgres via `psql` (bypasses Supabase CLI)
-  - **Parallel Execution**: typecheck and lint jobs run concurrently after setup completes, reducing total workflow runtime
-
-- **Automation CI** (`.github/workflows/automation-ci.yml`): Tests the Python automation layer
-  - Runs pytest suite (63 tests) for ADW workflow validation
-  - Python syntax check on all modules (`adws/adw_modules/*.py`, `adws/adw_phases/*.py`)
-  - Uses `uv` package manager with dependency caching for fast builds
-  - Configures git identity for worktree isolation tests
-  - Path filtering: only runs on changes to `automation/**`
-  - Validates automation infrastructure without external service dependencies
-  - Target runtime: < 2 minutes for full test suite execution
-
-**Push Trigger Strategy for Feature Branches**:
-All CI workflows trigger on both `push` and `pull_request` events to ensure validation regardless of PR creation timing. This prevents PRs from merging without CI validation when commits are pushed before PR creation (common in worktree workflows).
-
-**Supported Branch Patterns** (issue #193):
-- `main` - Production branch
-- `develop` - Development integration branch
-- `feat/**` - Feature branches
-- `bug/**` - Bug fix branches
-- `chore/**` - Chore branches
-- `fix/**` - Alternative fix branch naming
-- `refactor/**` - Refactoring branches
-- `interactive-*` - Interactive worktree branches (created via `/spawn_interactive`)
-
-**Trigger Behavior**:
-- Push to any supported branch triggers CI workflows (filtered by path)
-- Pull requests trigger CI workflows for code review validation
-- Fork PRs rely on `pull_request` trigger (push triggers may be restricted by GitHub security)
-- Path filters limit CI runs to relevant component changes
-
-**Monitoring**:
-- Track GitHub Actions minutes consumption via Settings → Billing
-- Alert if consumption increases >10% from baseline
-- Path filters mitigate unnecessary CI runs
-
-**Test Environment Variable Loading Strategy**:
-- **Problem**: CI uses dynamic Docker Compose ports, but tests were hardcoding `localhost:54322`
-- **Solution**: Tests automatically load `.env.test` via preload script before running
-- **Implementation**:
-  - `app/tests/setup.ts`: Preload script that parses `.env.test` and loads into `process.env`
-  - `app/package.json`: Test script uses `bun test --preload ./tests/setup.ts`
-  - `app/tests/helpers/db.ts`: Reads `SUPABASE_URL` and `SUPABASE_SERVICE_KEY` from `process.env` with fallback to defaults
-  - All test files removed hardcoded env var assignments (lines like `process.env.SUPABASE_URL = "http://localhost:54322"`)
-  - CI workflow: Preload script automatically loads `app/.env.test` (no manual export needed)
-  - Local development: Preload script loads `.env.test` automatically, falls back to standard ports if file missing
-- **Validation**: Run `cd app && bun run test:validate-env` to detect hardcoded environment variable assignments in tests
-- **Result**: Tests automatically respect dynamic ports from `app/.env.test` in both CI and local development
+- Complete automation architecture: `automation/adws/README.md`
+- Testing setup details: `docs/testing-setup.md`
+- MCP Claude Code integration: `docs/guides/mcp-claude-code-integration.md`
+- Beads integration roadmap: Issue #300 (epic)
