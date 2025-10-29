@@ -51,3 +51,13 @@ export const ARCHIVE_COMPLETED_AFTER = 3600;
  * Note: This will be used by the worker implementation in issue #237
  */
 export const WORKER_TEAM_SIZE = 3;
+
+/**
+ * Batch Size (files per chunk)
+ * Number of files to process in a single database transaction during indexing.
+ * Balances transaction size vs API overhead:
+ * - Larger batches: Fewer database calls but higher timeout risk
+ * - Smaller batches: More overhead but better progress granularity
+ * Default of 50 prevents statement timeouts for large repositories (200+ files)
+ */
+export const BATCH_SIZE = 50;

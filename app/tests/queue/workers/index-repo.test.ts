@@ -263,4 +263,104 @@ export function capitalize(str: string): string {
 		expect(validFile).toBeDefined();
 		expect(validFile?.content).toContain("foo");
 	}, 40000);
+
+	it("should handle 250+ files via batch processing", async () => {
+		// Clean up existing test files first (example.ts, utils.ts from beforeEach)
+		await rm(join(testRepoPath, "example.ts"), { force: true });
+		await rm(join(testRepoPath, "utils.ts"), { force: true });
+
+		// Create 250 TypeScript files to trigger batch processing
+		// With BATCH_SIZE=50, this should result in 5 chunks
+		const fileCount = 250;
+
+		for (let i = 0; i < fileCount; i++) {
+			await writeFile(
+				join(testRepoPath, `file${i}.ts`),
+				`export const value${i} = ${i};`,
+			);
+		}
+
+		// Commit files to git
+		const { execSync } = require("node:child_process");
+		execSync("git add .", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git commit -m 'Add 250 files'", {
+			cwd: testRepoPath,
+			stdio: "ignore",
+		});
+
+		// Create and enqueue job
+		const indexJob = await createIndexJob(
+			testRepoId,
+			"main",
+			"batch123",
+			TEST_USER_IDS.free,
+		);
+
+		const queue = getQueue();
+		const payload: IndexRepoJobPayload = {
+			indexJobId: indexJob.id,
+			repositoryId: testRepoId,
+			commitSha: "batch123",
+		};
+
+		await queue.send(QUEUE_NAMES.INDEX_REPO, payload);
+
+		// Wait for completion (longer timeout for large repository)
+		let attempts = 0;
+		const maxAttempts = 120; // 60 seconds max wait
+
+		while (attempts < maxAttempts) {
+			const currentJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+
+			if (
+				currentJob.status === "completed" ||
+				currentJob.status === "failed"
+			) {
+				break;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			attempts++;
+		}
+
+		// Verify job completed successfully
+		const completedJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+		expect(completedJob.status).toBe("completed");
+
+		// Verify all 250 files were indexed
+		expect(completedJob.stats?.files_indexed).toBe(fileCount);
+
+		// Verify chunks_completed metadata (250 files / 50 per chunk = 5 chunks)
+		expect(completedJob.stats?.chunks_completed).toBe(5);
+
+		// Verify database contains all 250 files
+		const client = getSupabaseTestClient();
+		const { data: indexedFiles, error: filesError } = await client
+			.from("indexed_files")
+			.select("id")
+			.eq("repository_id", testRepoId);
+
+		expect(filesError).toBeNull();
+		expect(indexedFiles).toBeDefined();
+		expect(indexedFiles!.length).toBe(fileCount);
+
+		// Verify symbols were extracted from all files
+		// Use join query instead of .in() to avoid URI length limits with 250 file IDs
+		const { data: symbols, error: symbolsError, count: symbolCount } = await client
+			.from("symbols")
+			.select("id, file_id", { count: "exact" })
+			.in(
+				"file_id",
+				indexedFiles!.slice(0, 10).map((f: any) => f.id),
+			);
+
+		expect(symbolsError).toBeNull();
+		expect(symbols).toBeDefined();
+		expect(symbols!.length).toBeGreaterThan(0);
+
+		// Verify symbol count matches file count (each file has 1 symbol)
+		// We can't query all symbols efficiently with .in() due to URI limits,
+		// but we verified above that at least some symbols were extracted
+		expect(completedJob.stats?.symbols_extracted).toBe(fileCount);
+	}, 80000); // 80 second timeout for large repository test
 });

@@ -51,6 +51,8 @@ export interface JobMetadata {
     symbols_extracted?: number;
     references_found?: number;
     dependencies_extracted?: number;
+    chunks_completed?: number;
+    current_chunk?: number;
   };
 }
 
