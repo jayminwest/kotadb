@@ -40,7 +40,6 @@ except ImportError:
 AGENT_PLANNER = "sdlc_planner"
 AGENT_IMPLEMENTOR = "sdlc_implementor"
 AGENT_CLASSIFIER = "issue_classifier"
-AGENT_PLAN_FINDER = "plan_finder"
 AGENT_BRANCH_GENERATOR = "branch_generator"
 AGENT_PR_CREATOR = "pr_creator"
 AGENT_TESTER = "test_runner"
@@ -433,72 +432,6 @@ def generate_worktree_name(issue_class: str, issue_number: str, adw_id: str) -> 
     # Use first 8 chars of ADW ID for uniqueness without excessive length
     adw_short = adw_id[:8]
     return f"{clean_class}-{issue_number}-{adw_short}"
-
-
-def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Logger, cwd: Optional[str] = None) -> AgentPromptResponse:
-    """Generate an implementation plan using the planner agent."""
-
-    request = AgentTemplateRequest(
-        agent_name=AGENT_PLANNER,
-        slash_command=command,
-        args=[f"{issue.title}: {issue.body}"],
-        adw_id=adw_id,
-        model="sonnet",
-        cwd=cwd,
-    )
-    logger.debug(f"build_plan request: {request.model_dump_json(indent=2, by_alias=True)}")
-    response = execute_template(request)
-    logger.debug(f"build_plan response: {response.model_dump_json(indent=2)}")
-    logger.info("Plan generation complete, checking for created files...")
-    return response
-
-
-def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger, cwd: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
-    """Use the plan finder agent to convert planner output into a concrete file path."""
-
-    request = AgentTemplateRequest(
-        agent_name=AGENT_PLAN_FINDER,
-        slash_command="/find_plan_file",
-        args=[plan_output],
-        adw_id=adw_id,
-        model="sonnet",
-        cwd=cwd,
-    )
-    logger.debug(f"locate_plan_file request: {request.model_dump_json(indent=2, by_alias=True)}")
-    response = execute_template(request)
-    logger.debug(f"locate_plan_file response: {response.model_dump_json(indent=2)}")
-
-    if not response.success:
-        return None, response.output
-
-    # Extract path from response, handling markdown code blocks
-    plan_path = response.output.strip()
-
-    # Try to extract from markdown code blocks - use the LAST one (most specific)
-    # Agents often include git output in first block and the final path in last block
-    code_blocks = re.findall(r'```\s*([^\n`]+)\s*```', plan_path)
-    if code_blocks:
-        plan_path = code_blocks[-1].strip()  # Use last code block
-
-    # Strip git status prefixes like "?? ", "M ", "A ", etc.
-    git_status_prefix = re.match(r'^[?MAD!]{1,2}\s+', plan_path)
-    if git_status_prefix:
-        plan_path = plan_path[git_status_prefix.end():].strip()
-
-    if plan_path == "0":
-        return None, "No plan file returned"
-    if "/" not in plan_path:
-        return None, f"Invalid plan path returned: {plan_path}"
-
-    # Log the absolute path for debugging
-    if cwd:
-        from pathlib import Path
-        absolute_path = Path(cwd) / plan_path
-        logger.info(f"Plan file located: {plan_path} (absolute: {absolute_path})")
-    else:
-        logger.info(f"Plan file located: {plan_path}")
-
-    return plan_path, None
 
 
 def implement_plan(plan_file: str, adw_id: str, logger: logging.Logger, agent_name: str | None = None, cwd: Optional[str] = None) -> AgentPromptResponse:
@@ -1119,7 +1052,6 @@ __all__ = [
     "AGENT_REVIEWER",
     "AGENT_DOCUMENTOR",
     "AGENT_PATCHER",
-    "AGENT_PLAN_FINDER",
     "AGENT_PLANNER",
     "AGENT_PR_CREATOR",
     "AVAILABLE_ADW_WORKFLOWS",
@@ -1127,7 +1059,6 @@ __all__ = [
     "DEFAULT_VALIDATION_SEQUENCE",
     "PhaseMetricsCollector",
     "ValidationCommandResult",
-    "build_plan",
     "classify_issue",
     "create_commit_message",
     "create_pull_request",
@@ -1141,7 +1072,6 @@ __all__ = [
     "generate_worktree_name",
     "implement_plan",
     "load_checkpoint",
-    "locate_plan_file",
     "lockfile_changed",
     "persist_issue_snapshot",
     "record_git_failure",

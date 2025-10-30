@@ -13,6 +13,7 @@ from __future__ import annotations
 import json
 import logging
 import os
+import re
 import shutil
 import sys
 import time
@@ -25,20 +26,19 @@ automation_dir = Path(__file__).parent.parent.parent
 if str(automation_dir) not in sys.path:
     sys.path.insert(0, str(automation_dir))
 
+from adws.adw_agents.agent_create_plan import build_plan
 from adws.adw_modules import git_ops
 from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
 from adws.adw_modules.utils import load_adw_env
 from adws.adw_modules.workflow_ops import (
     AGENT_PLANNER,
     PhaseMetricsCollector,
-    build_plan,
     classify_issue,
     create_commit_message,
     ensure_state,
     format_issue_message,
     generate_branch_name,
     generate_worktree_name,
-    locate_plan_file,
     persist_issue_snapshot,
     start_logger,
 )
@@ -182,7 +182,7 @@ def main() -> None:
             sys.exit(1)
 
         # Generate worktree name
-        worktree_base_path = os.getenv("ADW_WORKTREE_BASE_PATH", "trees")
+        worktree_base_path = os.getenv("ADW_WORKTREE_BASE_PATH", "automation/trees")
         worktree_name = generate_worktree_name(issue_command, issue_number, adw_id)
         logger.info(f"Generated worktree name: {worktree_name}")
 
@@ -233,11 +233,31 @@ def main() -> None:
         logger.info(f"Git status output:\n{status_after_agent.stdout if status_after_agent.stdout else '(empty)'}")
         logger.info("=" * 80)
 
-        plan_file, error = locate_plan_file(plan_response.output, adw_id, logger, cwd=str(worktree_path))
-        if error or not plan_file:
-            logger.error(f"Plan file resolution failed: {error}")
-            make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Error locating plan file: {error}"))
+        # Extract plan file path directly from planner response
+        # The planner now returns the path directly instead of using a separate find_plan_file agent
+        plan_file = plan_response.output.strip()
+
+        # Defensive parsing: extract from markdown code blocks if present
+        code_blocks = re.findall(r'```\s*([^\n`]+)\s*```', plan_file)
+        if code_blocks:
+            plan_file = code_blocks[-1].strip()  # Use last code block
+
+        # Strip git status prefixes like "?? ", "M ", "A ", etc.
+        git_status_prefix = re.match(r'^[?MAD!]{1,2}\s+', plan_file)
+        if git_status_prefix:
+            plan_file = plan_file[git_status_prefix.end():].strip()
+
+        # Validate the plan file path
+        if plan_file == "0":
+            logger.error("Plan file not found - planner returned '0'")
+            make_issue_comment(issue_number, format_issue_message(adw_id, "ops", "❌ No plan file returned by planner"))
             sys.exit(1)
+        if "/" not in plan_file:
+            logger.error(f"Invalid plan path returned: {plan_file}")
+            make_issue_comment(issue_number, format_issue_message(adw_id, "ops", f"❌ Invalid plan path: {plan_file}"))
+            sys.exit(1)
+
+        logger.info(f"Plan file path extracted from planner: {plan_file}")
 
         # Check plan file existence in worktree context
         plan_file_full_path = worktree_path / plan_file

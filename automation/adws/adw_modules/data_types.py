@@ -280,7 +280,7 @@ class HomeServerCronConfig(BaseModel):
     tasks_endpoint: str = Field(default="/api/kota-tasks", description="Tasks API endpoint")
     dry_run: bool = Field(default=False, description="Run without making changes")
     max_concurrent_tasks: int = Field(default=3, ge=1, description="Max parallel tasks")
-    worktree_base_path: str = Field(default="trees", description="Base path for worktrees")
+    worktree_base_path: str = Field(default="automation/trees", description="Base path for worktrees")
     status_filter: List[TaskStatus] = Field(
         default=[TaskStatus.PENDING],
         description="Task statuses to fetch"

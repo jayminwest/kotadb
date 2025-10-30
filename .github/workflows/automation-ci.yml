@@ -14,10 +14,12 @@ on:
     paths:
       - 'automation/**'
       - '.github/workflows/automation-ci.yml'
+      - '.github/workflows/adw-metrics.yml'
   pull_request:
     paths:
       - 'automation/**'
       - '.github/workflows/automation-ci.yml'
+      - '.github/workflows/adw-metrics.yml'
 
 jobs:
   test:

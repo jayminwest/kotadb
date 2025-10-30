@@ -165,13 +165,13 @@ def execute_bun_validate_migrations(adw_id: str, cwd: Optional[str]=None) -> Dic
     except Exception as e:
         return {'drift_detected': False, 'error': str(e)}
 
-def create_worktree(worktree_name: str, base_branch: str, base_path: str='trees') -> Dict[str, Any]:
+def create_worktree(worktree_name: str, base_branch: str, base_path: str='automation/trees') -> Dict[str, Any]:
     """Create a git worktree.
 
     Args:
         worktree_name: Name for the worktree directory and branch
         base_branch: Base branch to branch from
-        base_path: Base directory for worktrees (default: 'trees')
+        base_path: Base directory for worktrees (default: 'automation/trees')
 
     Returns:
         Dictionary with worktree creation result
@@ -182,12 +182,12 @@ def create_worktree(worktree_name: str, base_branch: str, base_path: str='trees'
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
-def cleanup_worktree(worktree_name: str, base_path: str='trees', delete_branch: bool=True) -> Dict[str, Any]:
+def cleanup_worktree(worktree_name: str, base_path: str='automation/trees', delete_branch: bool=True) -> Dict[str, Any]:
     """Clean up a git worktree and optionally delete its branch.
 
     Args:
         worktree_name: Name of the worktree to remove
-        base_path: Base directory for worktrees (default: 'trees')
+        base_path: Base directory for worktrees (default: 'automation/trees')
         delete_branch: Whether to delete the associated branch
 
     Returns:
@@ -272,7 +272,7 @@ def main() -> None:
             sys.exit(1)
         worktree_name = sys.argv[2]
         base_branch = sys.argv[3]
-        base_path = sys.argv[4] if len(sys.argv) > 4 else 'trees'
+        base_path = sys.argv[4] if len(sys.argv) > 4 else 'automation/trees'
         result = create_worktree(worktree_name, base_branch, base_path)
         sys.stdout.write(json.dumps(result, indent=2) + '\n')
     elif command == 'cleanup_worktree':
@@ -280,7 +280,7 @@ def main() -> None:
             sys.stdout.write(json.dumps({'error': 'Usage: cleanup_worktree <worktree_name> [base_path] [delete_branch]'}) + '\n')
             sys.exit(1)
         worktree_name = sys.argv[2]
-        base_path = sys.argv[3] if len(sys.argv) > 3 else 'trees'
+        base_path = sys.argv[3] if len(sys.argv) > 3 else 'automation/trees'
         delete_branch = sys.argv[4].lower() == 'true' if len(sys.argv) > 4 else True
         result = cleanup_worktree(worktree_name, base_path, delete_branch)
         sys.stdout.write(json.dumps(result, indent=2) + '\n')

@@ -23,7 +23,7 @@ def cleanup_worktree(
     Args:
         worktree_name: Name of the worktree to clean up
         logger: Logger instance for debugging
-        base_path: Base path for worktrees (defaults to ADW_WORKTREE_BASE_PATH or "trees")
+        base_path: Base path for worktrees (defaults to ADW_WORKTREE_BASE_PATH or "automation/trees")
         delete_branch: Whether to delete the associated branch (default: False)
 
     Returns:
@@ -37,7 +37,7 @@ def cleanup_worktree(
         True
     """
     if base_path is None:
-        base_path = os.getenv("ADW_WORKTREE_BASE_PATH", "trees")
+        base_path = os.getenv("ADW_WORKTREE_BASE_PATH", "automation/trees")
 
     logger.info(f"Cleaning up worktree: {worktree_name}")
     success = git_ops.cleanup_worktree(

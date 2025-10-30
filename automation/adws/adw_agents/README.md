@@ -299,7 +299,7 @@ result = push_branch("feat/123-add-auth", logger)
 **Inputs:**
 - `worktree_name`: Worktree to clean up
 - `logger`: Logger instance
-- `base_path`: Optional base path (defaults to `ADW_WORKTREE_BASE_PATH` or `trees`)
+- `base_path`: Optional base path (defaults to `ADW_WORKTREE_BASE_PATH` or `automation/trees`)
 - `delete_branch`: Whether to delete associated branch (default: False)
 
 **Outputs:**

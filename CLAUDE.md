@@ -108,9 +108,13 @@ curl -X POST http://localhost:3001/auth/dev-session \
 ### AI Developer Workflows (ADW)
 - [ADW Architecture](./.claude/commands/workflows/adw-architecture.md) - 3-phase system, atomic agents, resilience
 - [ADW Observability](./.claude/commands/workflows/adw-observability.md) - Metrics analysis, CI integration
+- [ADW Exit Codes](./automation/adws/docs/exit-codes.md) - Standardized exit codes for debugging (blockers, validation, execution, resources)
 
 ### CI/CD
-- [CI Configuration](./.claude/commands/ci/ci-configuration.md) - GitHub Actions, parallelization, caching
+- [CI Configuration](./.claude/commands/ci/ci-configuration.md) - GitHub Actions, parallelization, caching, path filtering
+
+### Deployment
+- [Staging Environments](./docs/deployment/staging-environments.md) - Vercel preview deployments, backend configuration, environment variables
 
 ### Issue Management
 - [Issue Relationships](./.claude/commands/docs/issue-relationships.md) - Dependency types, prioritization

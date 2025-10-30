@@ -11,14 +11,7 @@ interface RateLimitInfo {
   reset: number
 }
 
-interface Subscription {
-  id: string
-  tier: 'free' | 'solo' | 'team'
-  status: 'trialing' | 'active' | 'past_due' | 'canceled' | 'unpaid'
-  current_period_start: string | null
-  current_period_end: string | null
-  cancel_at_period_end: boolean
-}
+type Subscription = NonNullable<CurrentSubscriptionResponse['subscription']>
 
 interface AuthContextType {
   session: Session | null

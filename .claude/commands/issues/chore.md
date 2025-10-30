@@ -81,27 +81,27 @@ All commits for this chore will be validated. Ensure commit messages:
 ```
 
 ## Report
-Summarise the plan in 2-3 bullets highlighting key changes and risks.
+Return ONLY the plan file path as plain text on a single line.
 
-**Important Notes:**
-- The plan file path will be automatically detected by `/find_plan_file` agent
-- Focus output on summarizing what was planned, not the file location
-- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
+**CRITICAL - Output Format:**
+- Return the relative path from the worktree root
+- NO explanatory text, markdown formatting, or additional commentary
+- NO code blocks, quotes, asterisks, or punctuation around the path
+- Just the path itself
 
 **Correct output:**
 ```
-- Created chore plan for dependency refresh (bun 1.1.x upgrade)
-- Plan covers lockfile updates, test validation, and CI verification
-- Low risk: no breaking changes expected, validation confirms compatibility
+docs/specs/chore-1450-refresh-deps.md
 ```
 
-**INCORRECT output (do NOT do this):**
+**INCORRECT outputs (do NOT do this):**
 ```
-# Chore Plan Created
-
-I have successfully created a maintenance plan!
-
-**Plan location:** docs/specs/chore-1450-refresh-deps.md
-
-The plan includes...
+Created chore plan at docs/specs/chore-1450-refresh-deps.md
 ```
+```
+Plan file: docs/specs/chore-1450-refresh-deps.md
+```
+```
+**docs/specs/chore-1450-refresh-deps.md**
+```
+

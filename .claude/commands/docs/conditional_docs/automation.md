@@ -38,6 +38,16 @@ Use this reference to decide which KotaDB automation layer documentation sources
     - When working with automation directory structure (adw_phases/, adw_modules/, adw_triggers/)
     - When updating automation trigger systems or home server integration
     - When troubleshooting worktree isolation or cleanup behavior
+    - When understanding standardized worktree paths (`automation/trees/`)
+
+- automation/adws/docs/exit-codes.md
+  - Conditions:
+    - When working on ADW phase scripts that need to return structured exit codes
+    - When debugging ADW failures and need to understand exit code meanings
+    - When implementing error handling logic that responds to different failure types
+    - When creating orchestrators that need to intelligently retry based on failure category
+    - When understanding exit code ranges (1-9 blockers, 10-19 validation, 20-29 execution, 30-39 resources)
+    - When adding new exit codes or extending failure categorization
 
 - docs/specs/chore-update-automation-commands-path.md
   - Conditions:

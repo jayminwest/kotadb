@@ -15,12 +15,16 @@ on:
       - 'web/**'
       - 'shared/**'
       - '.github/workflows/web-ci.yml'
+      - 'package.json'
+      - 'bun.lock'
   pull_request:
     branches: [main, develop]
     paths:
       - 'web/**'
       - 'shared/**'
       - '.github/workflows/web-ci.yml'
+      - 'package.json'
+      - 'bun.lock'
 
 jobs:
   test:

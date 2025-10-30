@@ -160,6 +160,16 @@ Use this reference to decide which KotaDB application layer documentation source
     - When running or authoring migrations that interact with Supabase
     - When preparing staging/production infrastructure that depends on Supabase
 
+- docs/deployment/staging-environments.md
+  - Conditions:
+    - When configuring Vercel preview deployments or staging environment setup
+    - When troubleshooting backend URL configuration (NEXT_PUBLIC_API_URL)
+    - When understanding staging vs production environment architecture
+    - When working with Vercel environment variables or deployment triggers
+    - When debugging preview deployment issues or environment parity problems
+    - When setting up staging backend (Fly.io) or preview database branches
+    - When implementing feature flag or multi-environment testing strategies
+
 - docs/github-app-setup.md
   - Conditions:
     - When working on GitHub App integration features (issues #257, #259, #260)

@@ -91,28 +91,27 @@ All commits for this bug fix will be validated. Ensure commit messages:
 ```
 
 ## Report
-Provide a 2-3 bullet summary of the fix strategy and risks.
+Return ONLY the plan file path as plain text on a single line.
 
-**Important Notes:**
-- The plan file path will be automatically detected by `/find_plan_file` agent
-- Focus output on summarizing the fix approach, not the file location
-- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
+**CRITICAL - Output Format:**
+- Return the relative path from the worktree root
+- NO explanatory text, markdown formatting, or additional commentary
+- NO code blocks, quotes, asterisks, or punctuation around the path
+- Just the path itself
 
 **Correct output:**
 ```
-- Created bug fix plan for missing search results issue
-- Root cause: RLS policy incorrectly filtering user-scoped queries
-- Fix strategy: update policy predicate, add regression tests
-- Risk: policy change affects all search endpoints, requires careful validation
+docs/specs/chore-1450-refresh-deps.md
 ```
 
-**INCORRECT output (do NOT do this):**
+**INCORRECT outputs (do NOT do this):**
 ```
-# Bug Fix Plan
-
-**Summary:** I've created a comprehensive bug fix plan!
-
-The plan file is located at: **docs/specs/bug-2210-missing-search-results.md**
-
-This plan addresses...
+Created chore plan at docs/specs/chore-1450-refresh-deps.md
 ```
+```
+Plan file: docs/specs/chore-1450-refresh-deps.md
+```
+```
+**docs/specs/chore-1450-refresh-deps.md**
+```
+

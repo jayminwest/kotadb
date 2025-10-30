@@ -43,7 +43,7 @@ def test_diagnostic_worktree_plan_file_workflow(temp_git_repo, capsys):
     sys.stdout.write('DIAGNOSTIC TEST: Simulating issue #83 plan file workflow' + '\n')
     sys.stdout.write('=' * 80 + '\n')
     sys.stdout.write('\n[Step 1] Creating worktree...' + '\n')
-    worktree_path = create_worktree(worktree_name, 'develop', base_path='trees')
+    worktree_path = create_worktree(worktree_name, 'develop')
     sys.stdout.write(f'✓ Worktree created at: {worktree_path}' + '\n')
     sys.stdout.write('\n[Step 2] Checking initial git status...' + '\n')
     assert has_changes(cwd=worktree_path) is False

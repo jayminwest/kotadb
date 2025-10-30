@@ -83,7 +83,7 @@ async function processIndexJob(
 		`[${new Date().toISOString()}] Processing index job: job_id=${indexJobId}, repository_id=${repositoryId}\n`,
 	);
 
-	// Fetch repository metadata for context
+	// Fetch repository metadata for context (including installation_id for GitHub App auth - Issue #337)
 	const { data: repo, error: repoError } = await supabase
 		.from("repositories")
 		.select("full_name, git_url, default_branch, user_id, installation_id")
@@ -133,7 +133,7 @@ async function processIndexJob(
 						repository: repositoryIdentifier,
 						ref: commitSha || repo.default_branch || "main",
 					},
-			installationId ?? undefined,
+			installationId ?? undefined, // Pass installation_id for GitHub App authentication (Issue #337)
 		);
 
 		// STEP 2: Discover source files

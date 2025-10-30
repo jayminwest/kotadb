@@ -100,23 +100,30 @@ All commits for this feature will be validated. Ensure commit messages:
 - Use direct statements: `feat: add event streaming API` not `Based on the plan, this commit adds event streaming`
 
 ## Report
-Summarise the plan in 2-3 bullets highlighting key technical decisions and risks.
+Return ONLY the plan file path as plain text on a single line.
 
-**Important Notes:**
-- The plan file path will be automatically detected by `/find_plan_file` agent
-- Focus output on summarizing the feature approach, not the file location
-- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
+**CRITICAL - Output Format:**
+- Return the relative path from the worktree root
+- NO explanatory text, markdown formatting, or additional commentary
+- NO code blocks, quotes, asterisks, or punctuation around the path
+- Just the path itself
 
 **Correct output:**
 ```
-- Created feature plan for event streaming API
-- Plan covers 3 phases: WebSocket foundation, event publishing, client SDK
-- Key decisions: Server-Sent Events over WebSocket for simplicity, PostgreSQL LISTEN/NOTIFY for pub/sub
-- Risks: connection scalability needs load testing, requires schema migration for event log table
+docs/specs/chore-1450-refresh-deps.md
 ```
 
-**INCORRECT output (do NOT do this):**
+**INCORRECT outputs (do NOT do this):**
 ```
+Created chore plan at docs/specs/chore-1450-refresh-deps.md
+```
+```
+Plan file: docs/specs/chore-1450-refresh-deps.md
+```
+```
+**docs/specs/chore-1450-refresh-deps.md**
+```
+
 ## Feature Plan Summary
 
 I've created a comprehensive plan for the event streaming feature!

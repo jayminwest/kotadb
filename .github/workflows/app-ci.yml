@@ -15,11 +15,21 @@ on:
       - 'app/**'
       - 'shared/**'
       - '.github/workflows/app-ci.yml'
+      - '.github/scripts/setup-supabase-ci.sh'
+      - 'docker-compose.test.yml'
+      - 'supabase/**'
+      - 'package.json'
+      - 'bun.lock'
   pull_request:
     paths:
       - 'app/**'
       - 'shared/**'
       - '.github/workflows/app-ci.yml'
+      - '.github/scripts/setup-supabase-ci.sh'
+      - 'docker-compose.test.yml'
+      - 'supabase/**'
+      - 'package.json'
+      - 'bun.lock'
 
 jobs:
   setup:

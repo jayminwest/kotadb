@@ -138,19 +138,19 @@ def get_logger(adw_id: str) -> logging.Logger:
     return logging.getLogger(f"adw_{adw_id}")
 
 
-def resolve_worktree_path(worktree_name: str, base_path: str = "trees") -> Path:
+def resolve_worktree_path(worktree_name: str, base_path: str = "automation/trees") -> Path:
     """Resolve the full path to a worktree directory.
 
     Args:
         worktree_name: Name of the worktree
-        base_path: Base directory for worktrees (default: 'trees')
+        base_path: Base directory for worktrees (default: 'automation/trees')
 
     Returns:
         Absolute path to the worktree directory
 
     Example:
         >>> resolve_worktree_path("feat-65-abc123de")
-        Path('/path/to/project/trees/feat-65-abc123de')
+        Path('/path/to/project/automation/trees/feat-65-abc123de')
     """
     return project_root() / base_path / worktree_name
 

@@ -105,10 +105,10 @@ Subprocess execution is used when:
 **Example: Correct Invocation Flow**
 ```typescript
 // 1. Create worktree (Phase 2)
-Bash({ command: "git worktree add trees/feat-187-orch -b feat-187-orch develop" });
+Bash({ command: "git worktree add automation/trees/feat-187-orch -b feat-187-orch develop" });
 
 // 2. Change to worktree directory
-process.chdir("trees/feat-187-orch");
+process.chdir("automation/trees/feat-187-orch");
 
 // 3. Invoke planning agent (executes in worktree context)
 SlashCommand({ command: "/feat 187" });
@@ -122,7 +122,7 @@ SlashCommand({ command: "/feat 187" });
 # Python automation layer sets cwd explicitly
 subprocess.run(
     ["claude", "/feat", "187"],
-    cwd="trees/feat-187-orch",  # Explicit worktree path
+    cwd="automation/trees/feat-187-orch",  # Explicit worktree path
     capture_output=True,
     text=True
 )
@@ -560,7 +560,7 @@ If `--dry-run` flag is set:
   - Remove type prefixes ("feat:", "bug:", etc.)
   - Sanitize to alphanumeric + hyphens only
 - **Worktree Name**: Same as branch name
-- **Worktree Path**: `trees/<worktree_name>` (relative to project root)
+- **Worktree Path**: `automation/trees/<worktree_name>` (relative to project root)
 
 ### Create Worktree
 ```bash
@@ -568,7 +568,7 @@ If `--dry-run` flag is set:
 git worktree list | grep <worktree_name>
 
 # Create worktree from develop branch
-git worktree add trees/<worktree_name> -b <branch_name> develop
+git worktree add automation/trees/<worktree_name> -b <branch_name> develop
 ```
 
 **Error Handling:**

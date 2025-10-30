@@ -1120,7 +1120,7 @@ All ADW workflows (GitHub issue and home server) execute in isolated git worktre
 **Configuration**:
 - `ADW_CLEANUP_WORKTREES=true` - Automatic cleanup after PR (default: true)
 - `ADW_CLEANUP_ON_FAILURE=false` - Cleanup on workflow failure (default: false, useful for debugging)
-- `ADW_WORKTREE_BASE_PATH=trees` - Base directory for worktrees (default: trees)
+- `ADW_WORKTREE_BASE_PATH=automation/trees` - Base directory for worktrees (default: automation/trees)
 - `--skip-cleanup` CLI flag - Preserve worktree for manual inspection
 
 Example worktree structure:
@@ -1786,7 +1786,7 @@ python3 automation/adws/scripts/validate-worktree-setup.py <worktree-name>
 # Option 1: Use centralized cleanup function (recommended)
 # From Python script or interactive shell:
 from adw_modules.git_ops import cleanup_worktree
-cleanup_worktree(worktree_name="feat-xyz", base_path="trees", delete_branch=True)
+cleanup_worktree(worktree_name="feat-xyz", base_path="automation/trees", delete_branch=True)
 
 # Option 2: Manual git commands
 # List all worktrees

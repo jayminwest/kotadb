@@ -21,6 +21,16 @@ automation_dir = Path(__file__).parent.parent.parent
 if str(automation_dir) not in sys.path:
     sys.path.insert(0, str(automation_dir))
 
+from adws.adw_modules.exit_codes import (
+    EXIT_BLOCKER_MISSING_ENV,
+    EXIT_BLOCKER_MISSING_SPEC,
+    EXIT_BLOCKER_MISSING_STATE,
+    EXIT_BLOCKER_MISSING_WORKTREE,
+    EXIT_EXEC_AGENT_FAILED,
+    EXIT_RESOURCE_REPO_ERROR,
+    EXIT_SUCCESS,
+    EXIT_VALIDATION_BLOCKERS_DETECTED,
+)
 from adws.adw_modules.github import extract_repo_path, fetch_issue, get_repo_url, make_issue_comment
 from adws.adw_modules.state import ADWState, StateNotFoundError
 from adws.adw_modules.utils import load_adw_env
@@ -44,13 +54,13 @@ def check_env(logger: logging.Logger) -> None:
     if missing:
         for item in missing:
             logger.error(f"Missing prerequisite: {item}")
-        sys.exit(1)
+        sys.exit(EXIT_BLOCKER_MISSING_ENV)
 
 
 def parse_args(argv: list[str]) -> tuple[str, Optional[str]]:
     if len(argv) < 2:
         sys.stderr.write("Usage: uv run adws/adw_review.py <issue-number> [adw-id]" + "\n")
-        sys.exit(1)
+        sys.exit(EXIT_BLOCKER_MISSING_ENV)
     issue_number = argv[1]
     adw_id = argv[2] if len(argv) > 2 else None
     return issue_number, adw_id
@@ -88,7 +98,7 @@ def main() -> None:
             repo_path = extract_repo_path(repo_url)
         except ValueError as exc:
             logger.error(f"Unable to resolve repository: {exc}")
-            sys.exit(1)
+            sys.exit(EXIT_RESOURCE_REPO_ERROR)
 
         # Load worktree metadata from state
         if not state.worktree_name or not state.worktree_path:
@@ -97,7 +107,7 @@ def main() -> None:
                 issue_number,
                 format_issue_message(state.adw_id, "ops", "❌ Review blocked: missing worktree information."),
             )
-            sys.exit(1)
+            sys.exit(EXIT_BLOCKER_MISSING_STATE)
 
         # Verify worktree exists
         worktree_path = Path(state.worktree_path)
@@ -107,7 +117,7 @@ def main() -> None:
                 issue_number,
                 format_issue_message(state.adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
             )
-            sys.exit(1)
+            sys.exit(EXIT_BLOCKER_MISSING_WORKTREE)
 
         logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
 
@@ -126,7 +136,7 @@ def main() -> None:
                     "❌ Review blocked: no plan/spec file found. Run planning phase or attach a spec.",
                 ),
             )
-            sys.exit(1)
+            sys.exit(EXIT_BLOCKER_MISSING_SPEC)
 
         make_issue_comment(
             issue_number,
@@ -143,7 +153,7 @@ def main() -> None:
                 issue_number,
                 format_issue_message(state.adw_id, AGENT_REVIEWER, f"❌ Review failed: {error}"),
             )
-            sys.exit(1)
+            sys.exit(EXIT_EXEC_AGENT_FAILED)
 
         summary = summarize_review_result(review_result)
         make_issue_comment(issue_number, format_issue_message(state.adw_id, AGENT_REVIEWER, summary))
@@ -165,7 +175,7 @@ def main() -> None:
                     "⚠️ Blockers detected during review. Please address the reported issues before approval.",
                 ),
             )
-            sys.exit(1)
+            sys.exit(EXIT_VALIDATION_BLOCKERS_DETECTED)
 
         make_issue_comment(
             issue_number,
