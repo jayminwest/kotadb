@@ -4,6 +4,7 @@ Run repository validation gates after implementation. Choose the correct level b
 
 ## Quick Reference
 
+<<<<<<< HEAD
 All commands assume `app/` as working directory. Levels 2-3 require Docker and Supabase Local stack.
 
 ```bash
@@ -26,12 +27,31 @@ cd app && bun test --filter integration
 cd app && bun test
 cd app && bun test:teardown || true
 cd app && bun run build
+=======
+```bash
+# Level 1 – Quick Gate (≤ 1 minute)
+bun run lint
+bun run typecheck
+
+# Level 2 – Integration Gate (3-4 minutes)
+bun run lint
+bun run typecheck
+bun test --filter integration
+
+# Level 3 – Release Gate (5-7 minutes)
+bun run lint
+bun run typecheck
+bun test --filter integration
+bun test
+bun run build
+>>>>>>> origin/main
 ```
 
 ## Level Selection Guide
 
 | Change Type                          | Level | Commands to Run                                          |
 | ------------------------------------ | ----- | -------------------------------------------------------- |
+<<<<<<< HEAD
 | Docs-only, configuration comments    | 1     | `lint + typecheck` (no test environment required)        |
 | Core logic, new endpoints, bug fixes | 2     | `lint + typecheck + test:setup + integration tests + test:teardown` |
 | Release prep, migrations, auth flows | 3     | `lint + typecheck + test:setup + all tests + test:teardown + build` |
@@ -58,6 +78,21 @@ docker info &> /dev/null 2>&1 || echo "ERROR: Start Docker Desktop"
 
 **Reference**: `.claude/commands/docs/test-lifecycle.md` for complete Docker setup and troubleshooting.
 
+=======
+| Docs-only, configuration comments    | 1     | `bun run lint && bun run typecheck`                      |
+| Core logic, new endpoints, bug fixes | 2     | `bun run lint && bun run typecheck && bun test --filter integration` |
+| Release prep, migrations, auth flows | 3     | `bun run lint && bun run typecheck && bun test --filter integration && bun test && bun run build` |
+
+## Environment Prerequisites
+
+| Variable / Service        | Why It Matters                                        | Notes |
+| ------------------------- | ----------------------------------------------------- | ----- |
+| `SUPABASE_URL`            | Points tests at the shared Supabase project           | Load from `.env.develop`; do **not** swap in local mocks |
+| `SUPABASE_SERVICE_KEY`    | Authenticates integration queries and failure cases   | Rotate via platform team when compromised |
+| Background job processor  | Ensures async flows run during integration suites     | Start any required workers before Level 2+ |
+| Observability (logs, etc) | Capture evidence that real services ran during tests | Attach snippets in PR report |
+
+>>>>>>> origin/main
 ## Level Details
 
 ### Level 1 – Quick Gate
@@ -67,6 +102,7 @@ docker info &> /dev/null 2>&1 || echo "ERROR: Start Docker Desktop"
 
 ### Level 2 – Integration Gate
 - Default for feature and bug work; mandates `/anti-mock` compliance.
+<<<<<<< HEAD
 - Starts Supabase Local stack with `bun test:setup` before running tests.
 - Runs integration-focused specs with `bun test --filter integration`, exercising real Supabase database.
 - Cleans up containers with `bun test:teardown || true` after tests complete.
@@ -77,24 +113,41 @@ docker info &> /dev/null 2>&1 || echo "ERROR: Start Docker Desktop"
 - Starts Supabase Local stack with `bun test:setup` before running tests.
 - Executes Level 2 integration tests plus full test suite (`bun test`) and build.
 - Cleans up containers with `bun test:teardown || true` after tests complete.
+=======
+- Runs integration-focused specs with `bun test --filter integration`, exercising Supabase via real credentials.
+- Capture Supabase query logs or other proof that remote services were hit.
+
+### Level 3 – Release Gate
+- Required for schema, authentication, billing, or other high-risk paths.
+- Executes Level 2 plus the full test suite and a build to surface regressions.
+>>>>>>> origin/main
 - Ensure background workers and webhooks are active so flows are validated end-to-end.
 
 ## How to Use
 
 1. Resolve plan tasks, add/update tests, and ensure fixtures are committed with real-service coverage (see `/anti-mock`).
 2. Select the appropriate level from the table above (features/bugs default to Level 2; infra-critical tasks require Level 3).
+<<<<<<< HEAD
 3. **For Level 2-3**: Verify Docker is available before starting validation.
 4. Run commands in order. Stop immediately to fix failures before proceeding.
 5. Capture command summaries for handoff (test counts, Supabase evidence, notable warnings).
 6. Document the level executed and outcomes in your report or PR body, explicitly noting which real-service suites ran.
+=======
+3. Run commands in order. Stop immediately to fix failures before proceeding.
+4. Capture command summaries for handoff (`bun test --filter integration` counts, Supabase evidence, notable warnings).
+5. Document the level executed and outcomes in your report or PR body, explicitly noting which real-service suites ran.
+>>>>>>> origin/main
 
 ## Troubleshooting
 
 - **Lint errors**: `bun run lint --apply` for autofix-able issues; manually address remaining failures.
 - **Type errors**: inspect the reported file and re-run `bun run typecheck` after fixes.
+<<<<<<< HEAD
 - **Docker errors**: See `.claude/commands/docs/test-lifecycle.md` for Docker prerequisite checks and troubleshooting.
 - **Connection errors**: Run `cd app && bun test:setup` to ensure Supabase containers are running.
 - **Port conflicts**: Run `cd app && bun test:teardown` to clean up stale containers.
+=======
+>>>>>>> origin/main
 - **Tests**: scope with `bun test <pattern>` while debugging, then re-run the full suite.
 - **Build**: fix type or runtime import errors surfaced during `bun run build`.
 

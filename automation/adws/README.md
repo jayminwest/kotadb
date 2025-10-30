@@ -24,6 +24,7 @@ adws/
 │   ├── ts_commands.py    # Bun validation command catalogue
 │   ├── utils.py          # Env loading, logging, JSON helpers
 │   └── workflow_ops.py   # Agent wrappers for plan/build/test/review/etc.
+<<<<<<< HEAD
 ├── playwright_helpers/   # Playwright authentication for frontend testing (issue #318)
 │   ├── auth.py           # PlaywrightAuthHelper class + authenticate_playwright_session()
 │   ├── README.md         # Authentication patterns guide with examples
@@ -53,6 +54,12 @@ adws/
 │   ├── test_frontend_dashboard.py   # Example: Dashboard access authentication
 │   ├── test_frontend_search.py      # Example: Search flow with form interaction
 │   └── test_frontend_indexing.py    # Example: Async indexing operation
+=======
+├── adw_phases/           # Single-phase execution scripts (3-phase architecture as of #136)
+│   ├── adw_plan.py       # Plan phase (classify → branch → plan)
+│   ├── adw_build.py      # Build phase (implement plan → commit → push → PR)
+│   └── adw_review.py     # Review phase (Claude review + reporting)
+>>>>>>> origin/main
 ├── adw_sdlc.py           # Full SDLC orchestrator (plan → build → review)
 ├── adw_tests/            # Pytest suite covering utilities and workflows
 ├── adw_triggers/         # Automation trigger systems
@@ -85,6 +92,7 @@ The SDLC orchestrator (`adw_sdlc.py`) chains single-phase scripts using `adw_mod
 
 ---
 
+<<<<<<< HEAD
 ## Surgical Fix Workflow
 
 **Feature #354: Critical Bug Automation**
@@ -161,6 +169,8 @@ See `adw_agents/README.md` for complete agent documentation, including inputs, o
 
 ---
 
+=======
+>>>>>>> origin/main
 ## Resilience & Recovery
 
 **Feature #148: Hybrid ADW Resilience Architecture**
@@ -246,6 +256,7 @@ if checkpoint_file:
 
 ---
 
+<<<<<<< HEAD
 ## Auto-Merge Workflow
 
 **Feature #305: Auto-Merge for ADW PRs**
@@ -323,6 +334,8 @@ Auto-Merge Metrics:
 
 ---
 
+=======
+>>>>>>> origin/main
 ## ADW Observability
 
 The ADW Metrics Analysis workflow provides automated observability into ADW success rates and failure patterns through daily log analysis and metrics collection.
@@ -414,6 +427,7 @@ Each workflow run renders a markdown summary visible in the GitHub Actions UI:
 
 ---
 
+<<<<<<< HEAD
 ## Orchestrator Slash Command Integration
 
 **Feature #187: `/orchestrator` End-to-End Workflow Automation**
@@ -521,6 +535,8 @@ Future enhancements (MCP Tasks API, automated retry, parallel execution) are tra
 
 ---
 
+=======
+>>>>>>> origin/main
 ## Tests
 
 The beginnings of an automated regression suite lives under `adws/adw_tests/`:
@@ -709,6 +725,7 @@ If rate limits are exceeded, the health check will report 429 status codes and w
 
 ---
 
+<<<<<<< HEAD
 ## Frontend Testing Examples
 
 **Feature #319: ADW Integration Examples for Agent Authentication**
@@ -945,6 +962,8 @@ Beads uses JSONL for git-based sync (`.beads/issues.jsonl`):
 
 ---
 
+=======
+>>>>>>> origin/main
 ## Logs & State
 
 Run metadata is rooted at `logs/kota-db-ts/<env>/<adw_id>/`:
@@ -1063,7 +1082,10 @@ sudo systemctl enable --now adw-webhook.service
 - `ADW_REPO_URL` – Optional explicit Git URL override (falls back to the image's embedded remote).
 - `ADW_RUNNER_AUTO_PULL` – Set to `false` to skip `docker pull` checks before each run.
 - `ADW_LOG_VOLUME` – Optional Docker volume name shared with runner containers (defaults to `kotadb_adw_logs`).
+<<<<<<< HEAD
 - `ADW_AUTO_MERGE` – Enable auto-merge for ADW-generated PRs after CI validation (default: `false`). Set to `true` to enable automatic PR merging.
+=======
+>>>>>>> origin/main
 
 Secrets such as `ANTHROPIC_API_KEY` and `GITHUB_PAT` must still be available in the webhook container environment (e.g. via `.env` + `adws/.env`, Docker secrets, or a secrets manager). The runner receives them per invocation through `docker run -e`.
 
@@ -1160,7 +1182,11 @@ All ADW workflows (GitHub issue and home server) execute in isolated git worktre
 **Configuration**:
 - `ADW_CLEANUP_WORKTREES=true` - Automatic cleanup after PR (default: true)
 - `ADW_CLEANUP_ON_FAILURE=false` - Cleanup on workflow failure (default: false, useful for debugging)
+<<<<<<< HEAD
 - `ADW_WORKTREE_BASE_PATH=automation/trees` - Base directory for worktrees (default: automation/trees)
+=======
+- `ADW_WORKTREE_BASE_PATH=trees` - Base directory for worktrees (default: trees)
+>>>>>>> origin/main
 - `--skip-cleanup` CLI flag - Preserve worktree for manual inspection
 
 Example worktree structure:
@@ -1826,7 +1852,11 @@ python3 automation/adws/scripts/validate-worktree-setup.py <worktree-name>
 # Option 1: Use centralized cleanup function (recommended)
 # From Python script or interactive shell:
 from adw_modules.git_ops import cleanup_worktree
+<<<<<<< HEAD
 cleanup_worktree(worktree_name="feat-xyz", base_path="automation/trees", delete_branch=True)
+=======
+cleanup_worktree(worktree_name="feat-xyz", base_path="trees", delete_branch=True)
+>>>>>>> origin/main
 
 # Option 2: Manual git commands
 # List all worktrees

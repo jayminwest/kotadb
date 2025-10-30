@@ -41,7 +41,11 @@ export default function ApiKeyInput() {
   if (!isEditing && isAuthenticated) {
     return (
       <div className="flex items-center space-x-2">
+<<<<<<< HEAD
         <div className="px-3 py-1 glass-light dark:glass-dark bg-green-100/50 dark:bg-green-900/50 text-green-800 dark:text-green-200 rounded-md text-sm font-medium">
+=======
+        <div className="px-3 py-1 bg-green-100 dark:bg-green-900 text-green-800 dark:text-green-200 rounded-md text-sm font-medium">
+>>>>>>> origin/main
           API Key Set
         </div>
         <button
@@ -67,7 +71,11 @@ export default function ApiKeyInput() {
         value={inputValue}
         onChange={(e) => setInputValue(e.target.value)}
         placeholder="kota_<tier>_<key_id>_<secret>"
+<<<<<<< HEAD
         className="px-3 py-2 rounded-md text-sm glass-light dark:glass-dark text-gray-900 dark:text-gray-100 placeholder:text-gray-600 dark:placeholder:text-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64 transition-all"
+=======
+        className="px-3 py-2 border border-gray-300 dark:border-gray-700 rounded-md text-sm bg-white dark:bg-gray-900 text-gray-900 dark:text-gray-100 focus:outline-none focus:ring-2 focus:ring-blue-500 w-64"
+>>>>>>> origin/main
         onKeyDown={(e) => {
           if (e.key === 'Enter') handleSave()
           if (e.key === 'Escape') handleCancel()

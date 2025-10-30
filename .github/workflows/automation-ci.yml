@@ -5,6 +5,7 @@ on:
     branches:
       - main
       - develop
+<<<<<<< HEAD
       - 'feat/**'
       - 'bug/**'
       - 'chore/**'
@@ -15,11 +16,19 @@ on:
       - 'automation/**'
       - '.github/workflows/automation-ci.yml'
       - '.github/workflows/adw-metrics.yml'
+=======
+    paths:
+      - 'automation/**'
+      - '.github/workflows/automation-ci.yml'
+>>>>>>> origin/main
   pull_request:
     paths:
       - 'automation/**'
       - '.github/workflows/automation-ci.yml'
+<<<<<<< HEAD
       - '.github/workflows/adw-metrics.yml'
+=======
+>>>>>>> origin/main
 
 jobs:
   test:

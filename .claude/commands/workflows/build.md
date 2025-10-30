@@ -10,7 +10,11 @@ Direct implementation workflow for simple tasks without a planning phase.
 
 **Project**: KotaDB - HTTP API service for code indexing (Bun + TypeScript + Supabase)
 **Path Aliases**: Use `@api/*`, `@db/*`, `@indexer/*`, `@shared/*` for imports
+<<<<<<< HEAD
 **Testing**: See `.claude/commands/docs/test-lifecycle.md` for test environment setup requirements
+=======
+**Testing**: Run `bun test` for tests, `bunx tsc --noEmit` for type-checking
+>>>>>>> origin/main
 
 ## Instructions
 
@@ -24,11 +28,15 @@ Direct implementation workflow for simple tasks without a planning phase.
    - Follow TypeScript strict mode
 5. **Validate changes**:
    - Run `bunx tsc --noEmit` to check for type errors
+<<<<<<< HEAD
    - If tests are affected, follow the test lifecycle pattern:
      - Verify Docker: `command -v docker &> /dev/null || echo "Docker required"`
      - Setup: `cd app && bun test:setup`
      - Test: `cd app && bun test`
      - Cleanup: `cd app && bun test:teardown || true`
+=======
+   - Run `bun test` if tests are affected
+>>>>>>> origin/main
 6. **Commit changes**: Create a commit with a descriptive message using Conventional Commits format
 
 ## Commit Message Format
@@ -73,9 +81,13 @@ Implementation complete:
 - Created: tests/integration/rate-limit.test.ts
 - Commit: a1b2c3d4
 - Type-check: ✓ Passed
+<<<<<<< HEAD
 - Test environment: ✓ Supabase containers started
 - Tests: ✓ All 133 tests passed
 - Cleanup: ✓ Containers stopped
+=======
+- Tests: ✓ All 133 tests passed
+>>>>>>> origin/main
 ```
 
 ## Use Cases

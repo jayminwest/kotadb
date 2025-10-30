@@ -73,7 +73,11 @@ services:
       GOTRUE_JWT_DEFAULT_GROUP_NAME: authenticated
       GOTRUE_JWT_EXP: 3600
       GOTRUE_JWT_SECRET: super-secret-jwt-token-with-at-least-32-characters-long
+<<<<<<< HEAD
       GOTRUE_EXTERNAL_EMAIL_ENABLED: "true"
+=======
+      GOTRUE_EXTERNAL_EMAIL_ENABLED: "false"
+>>>>>>> origin/main
       GOTRUE_MAILER_AUTOCONFIRM: "true"
       GOTRUE_SMTP_ADMIN_EMAIL: admin@example.com
       GOTRUE_SMTP_HOST: localhost

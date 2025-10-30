@@ -105,7 +105,10 @@ dependencies = [
     { name = "httpx" },
     { name = "pydantic" },
     { name = "pytest" },
+<<<<<<< HEAD
     { name = "pytest-asyncio" },
+=======
+>>>>>>> origin/main
     { name = "python-dotenv" },
 ]
 
@@ -114,7 +117,10 @@ requires-dist = [
     { name = "httpx", specifier = ">=0.27.0" },
     { name = "pydantic", specifier = ">=2.0.0" },
     { name = "pytest", specifier = ">=8.0.0" },
+<<<<<<< HEAD
     { name = "pytest-asyncio", specifier = ">=0.23.0" },
+=======
+>>>>>>> origin/main
     { name = "python-dotenv", specifier = ">=1.0.0" },
 ]
 
@@ -251,6 +257,7 @@ wheels = [
 ]
 
 [[package]]
+<<<<<<< HEAD
 name = "pytest-asyncio"
 version = "1.2.0"
 source = { registry = "https://pypi.org/simple" }
@@ -264,6 +271,8 @@ wheels = [
 ]
 
 [[package]]
+=======
+>>>>>>> origin/main
 name = "python-dotenv"
 version = "1.1.1"
 source = { registry = "https://pypi.org/simple" }

@@ -6,9 +6,13 @@ import json
 import logging
 import re
 import subprocess
+<<<<<<< HEAD
 import time
 from dataclasses import dataclass
 from datetime import datetime
+=======
+from dataclasses import dataclass
+>>>>>>> origin/main
 from pathlib import Path
 from typing import Iterable, List, Optional, Sequence, Tuple
 
@@ -21,7 +25,10 @@ from .data_types import (
     DocumentationResult,
     GitHubIssue,
     IssueClassSlashCommand,
+<<<<<<< HEAD
     PhaseMetrics,
+=======
+>>>>>>> origin/main
     ReviewResult,
 )
 from .git_ops import GitError
@@ -30,6 +37,7 @@ from .state import ADWState, ensure_adw_id as core_ensure_adw_id
 from .ts_commands import Command, serialize_commands, validation_commands
 from .utils import parse_json, project_root, setup_logger
 
+<<<<<<< HEAD
 # Optional dependency for memory tracking
 try:
     import psutil
@@ -40,6 +48,12 @@ except ImportError:
 AGENT_PLANNER = "sdlc_planner"
 AGENT_IMPLEMENTOR = "sdlc_implementor"
 AGENT_CLASSIFIER = "issue_classifier"
+=======
+AGENT_PLANNER = "sdlc_planner"
+AGENT_IMPLEMENTOR = "sdlc_implementor"
+AGENT_CLASSIFIER = "issue_classifier"
+AGENT_PLAN_FINDER = "plan_finder"
+>>>>>>> origin/main
 AGENT_BRANCH_GENERATOR = "branch_generator"
 AGENT_PR_CREATOR = "pr_creator"
 AGENT_TESTER = "test_runner"
@@ -86,6 +100,7 @@ META_COMMENTARY_PATTERNS = [
 ]
 
 
+<<<<<<< HEAD
 class PhaseMetricsCollector:
     """Context manager for automatic phase metrics collection.
 
@@ -219,6 +234,8 @@ class PhaseMetricsCollector:
         )
 
 
+=======
+>>>>>>> origin/main
 def validate_commit_message(message: str) -> Tuple[bool, Optional[str]]:
     """Validate commit message follows Conventional Commits format.
 
@@ -340,6 +357,7 @@ def _extract_slash_command(output: str, allowed: Sequence[str]) -> Optional[str]
 
 
 def classify_issue(issue: GitHubIssue, adw_id: str, logger: logging.Logger) -> Tuple[Optional[IssueClassSlashCommand], Optional[str]]:
+<<<<<<< HEAD
     """Ask the classifier agent for a slash command classification.
 
     Returns:
@@ -349,6 +367,9 @@ def classify_issue(issue: GitHubIssue, adw_id: str, logger: logging.Logger) -> T
         - (None, error): Classification failed
     """
     from .github import make_issue_comment
+=======
+    """Ask the classifier agent for a slash command classification."""
+>>>>>>> origin/main
 
     request = AgentTemplateRequest(
         agent_name=AGENT_CLASSIFIER,
@@ -364,6 +385,7 @@ def classify_issue(issue: GitHubIssue, adw_id: str, logger: logging.Logger) -> T
     if not response.success:
         return None, response.output
 
+<<<<<<< HEAD
     # Check for out-of-scope classification (agent returns "0")
     if response.output.strip() == "0":
         logger.info("Issue classified as out-of-scope (test/analysis work)")
@@ -377,6 +399,8 @@ def classify_issue(issue: GitHubIssue, adw_id: str, logger: logging.Logger) -> T
         )
         return None, None  # Signal graceful skip (not an error)
 
+=======
+>>>>>>> origin/main
     command = _extract_slash_command(response.output, ["/chore", "/bug", "/feature"])
     if not command:
         return None, f"Unrecognised classification: {response.output}"
@@ -434,6 +458,75 @@ def generate_worktree_name(issue_class: str, issue_number: str, adw_id: str) -> 
     return f"{clean_class}-{issue_number}-{adw_short}"
 
 
+<<<<<<< HEAD
+=======
+def build_plan(issue: GitHubIssue, command: str, adw_id: str, logger: logging.Logger, cwd: Optional[str] = None) -> AgentPromptResponse:
+    """Generate an implementation plan using the planner agent."""
+
+    request = AgentTemplateRequest(
+        agent_name=AGENT_PLANNER,
+        slash_command=command,
+        args=[f"{issue.title}: {issue.body}"],
+        adw_id=adw_id,
+        model="sonnet",
+        cwd=cwd,
+    )
+    logger.debug(f"build_plan request: {request.model_dump_json(indent=2, by_alias=True)}")
+    response = execute_template(request)
+    logger.debug(f"build_plan response: {response.model_dump_json(indent=2)}")
+    logger.info("Plan generation complete, checking for created files...")
+    return response
+
+
+def locate_plan_file(plan_output: str, adw_id: str, logger: logging.Logger, cwd: Optional[str] = None) -> Tuple[Optional[str], Optional[str]]:
+    """Use the plan finder agent to convert planner output into a concrete file path."""
+
+    request = AgentTemplateRequest(
+        agent_name=AGENT_PLAN_FINDER,
+        slash_command="/find_plan_file",
+        args=[plan_output],
+        adw_id=adw_id,
+        model="sonnet",
+        cwd=cwd,
+    )
+    logger.debug(f"locate_plan_file request: {request.model_dump_json(indent=2, by_alias=True)}")
+    response = execute_template(request)
+    logger.debug(f"locate_plan_file response: {response.model_dump_json(indent=2)}")
+
+    if not response.success:
+        return None, response.output
+
+    # Extract path from response, handling markdown code blocks
+    plan_path = response.output.strip()
+
+    # Try to extract from markdown code blocks - use the LAST one (most specific)
+    # Agents often include git output in first block and the final path in last block
+    code_blocks = re.findall(r'```\s*([^\n`]+)\s*```', plan_path)
+    if code_blocks:
+        plan_path = code_blocks[-1].strip()  # Use last code block
+
+    # Strip git status prefixes like "?? ", "M ", "A ", etc.
+    git_status_prefix = re.match(r'^[?MAD!]{1,2}\s+', plan_path)
+    if git_status_prefix:
+        plan_path = plan_path[git_status_prefix.end():].strip()
+
+    if plan_path == "0":
+        return None, "No plan file returned"
+    if "/" not in plan_path:
+        return None, f"Invalid plan path returned: {plan_path}"
+
+    # Log the absolute path for debugging
+    if cwd:
+        from pathlib import Path
+        absolute_path = Path(cwd) / plan_path
+        logger.info(f"Plan file located: {plan_path} (absolute: {absolute_path})")
+    else:
+        logger.info(f"Plan file located: {plan_path}")
+
+    return plan_path, None
+
+
+>>>>>>> origin/main
 def implement_plan(plan_file: str, adw_id: str, logger: logging.Logger, agent_name: str | None = None, cwd: Optional[str] = None) -> AgentPromptResponse:
     """Run the implementor agent against the generated plan."""
 
@@ -1052,13 +1145,22 @@ __all__ = [
     "AGENT_REVIEWER",
     "AGENT_DOCUMENTOR",
     "AGENT_PATCHER",
+<<<<<<< HEAD
+=======
+    "AGENT_PLAN_FINDER",
+>>>>>>> origin/main
     "AGENT_PLANNER",
     "AGENT_PR_CREATOR",
     "AVAILABLE_ADW_WORKFLOWS",
     "LOCKFILE_NAMES",
     "DEFAULT_VALIDATION_SEQUENCE",
+<<<<<<< HEAD
     "PhaseMetricsCollector",
     "ValidationCommandResult",
+=======
+    "ValidationCommandResult",
+    "build_plan",
+>>>>>>> origin/main
     "classify_issue",
     "create_commit_message",
     "create_pull_request",
@@ -1072,6 +1174,10 @@ __all__ = [
     "generate_worktree_name",
     "implement_plan",
     "load_checkpoint",
+<<<<<<< HEAD
+=======
+    "locate_plan_file",
+>>>>>>> origin/main
     "lockfile_changed",
     "persist_issue_snapshot",
     "record_git_failure",

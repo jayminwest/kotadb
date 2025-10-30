@@ -21,7 +21,11 @@ export default function FileList({ files, emptyMessage = 'No files found' }: Fil
       {files.map((file, index) => (
         <div
           key={file.id || `${file.path}-${index}`}
+<<<<<<< HEAD
           className="glass-light dark:glass-dark rounded-lg p-4 hover:shadow-lg hover:scale-[1.01] transition-all"
+=======
+          className="border border-gray-200 dark:border-gray-800 rounded-lg p-4 hover:border-blue-500 dark:hover:border-blue-400 transition-colors"
+>>>>>>> origin/main
         >
           <div className="flex items-start justify-between mb-2">
             <div className="flex-1">
@@ -41,7 +45,11 @@ export default function FileList({ files, emptyMessage = 'No files found' }: Fil
 
           {file.snippet && (
             <div className="mt-3">
+<<<<<<< HEAD
               <pre className="glass-light dark:glass-dark p-3 rounded text-sm overflow-x-auto">
+=======
+              <pre className="bg-gray-50 dark:bg-gray-900 p-3 rounded text-sm overflow-x-auto">
+>>>>>>> origin/main
                 <code className="text-gray-800 dark:text-gray-200">
                   {file.snippet}
                 </code>
@@ -58,7 +66,11 @@ export default function FileList({ files, emptyMessage = 'No files found' }: Fil
                 {file.dependencies.map((dep, depIndex) => (
                   <span
                     key={`${dep}-${depIndex}`}
+<<<<<<< HEAD
                     className="px-2 py-1 glass-light dark:glass-dark bg-blue-100/50 dark:bg-blue-900/50 text-blue-800 dark:text-blue-200 rounded text-xs font-medium"
+=======
+                    className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded text-xs font-medium"
+>>>>>>> origin/main
                   >
                     {dep}
                   </span>

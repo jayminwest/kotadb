@@ -26,4 +26,7 @@ yarn-error.log*
 /playwright-report/
 /blob-report/
 /playwright/.cache/
+<<<<<<< HEAD
 .vercel
+=======
+>>>>>>> origin/main

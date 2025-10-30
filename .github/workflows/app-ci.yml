@@ -5,26 +5,33 @@ on:
     branches:
       - main
       - develop
+<<<<<<< HEAD
       - 'feat/**'
       - 'bug/**'
       - 'chore/**'
       - 'fix/**'
       - 'refactor/**'
       - 'interactive-*'
+=======
+>>>>>>> origin/main
     paths:
       - 'app/**'
       - 'shared/**'
       - '.github/workflows/app-ci.yml'
+<<<<<<< HEAD
       - '.github/scripts/setup-supabase-ci.sh'
       - 'docker-compose.test.yml'
       - 'supabase/**'
       - 'package.json'
       - 'bun.lock'
+=======
+>>>>>>> origin/main
   pull_request:
     paths:
       - 'app/**'
       - 'shared/**'
       - '.github/workflows/app-ci.yml'
+<<<<<<< HEAD
       - '.github/scripts/setup-supabase-ci.sh'
       - 'docker-compose.test.yml'
       - 'supabase/**'
@@ -33,6 +40,11 @@ on:
 
 jobs:
   setup:
+=======
+
+jobs:
+  build:
+>>>>>>> origin/main
     runs-on: ubuntu-latest
     defaults:
       run:
@@ -47,6 +59,7 @@ jobs:
         with:
           bun-version: 1.1.29
 
+<<<<<<< HEAD
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
@@ -91,6 +104,23 @@ jobs:
       - name: Install dependencies (cache miss fallback)
         run: bun install --frozen-lockfile
 
+=======
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Setup Docker Compose test stack and generate credentials
+        working-directory: .
+        run: |
+          chmod +x .github/scripts/setup-supabase-ci.sh
+          chmod +x app/scripts/generate-env-test-compose.sh
+          chmod +x app/scripts/run-migrations-compose.sh
+          chmod +x app/scripts/cleanup-test-containers.sh
+          .github/scripts/setup-supabase-ci.sh
+
+      - name: Validate migration sync
+        run: bun run test:validate-migrations
+
+>>>>>>> origin/main
       - name: Type check shared types
         working-directory: shared
         run: bunx tsc --noEmit
@@ -98,6 +128,7 @@ jobs:
       - name: Type check application
         run: bunx tsc --noEmit
 
+<<<<<<< HEAD
   lint:
     runs-on: ubuntu-latest
     needs: setup
@@ -187,11 +218,17 @@ jobs:
           chmod +x app/scripts/cleanup-test-containers.sh
           .github/scripts/setup-supabase-ci.sh
 
+=======
+      - name: Lint
+        run: bun run lint
+
+>>>>>>> origin/main
       - name: Test
         run: |
           # Tests automatically load .env.test via preload script (tests/setup.ts)
           # No manual export needed - keeping for backwards compatibility
           export $(grep -v '^#' ../.env.test | xargs) || true
+<<<<<<< HEAD
           bun run test --coverage
 
       - name: Upload coverage report
@@ -200,6 +237,9 @@ jobs:
           name: coverage-report
           path: app/coverage/
           retention-days: 30
+=======
+          bun test
+>>>>>>> origin/main
 
       - name: Teardown Docker Compose test stack
         if: always()
@@ -207,6 +247,7 @@ jobs:
         run: |
           chmod +x app/scripts/cleanup-test-containers.sh
           app/scripts/cleanup-test-containers.sh || true
+<<<<<<< HEAD
 
   build:
     runs-on: ubuntu-latest
@@ -240,3 +281,5 @@ jobs:
 
       # Note: Bun runtime doesn't require compilation artifacts
       # The build script runs type-checking which is sufficient validation
+=======
+>>>>>>> origin/main

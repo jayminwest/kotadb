@@ -15,7 +15,11 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Create a new markdown plan under `docs/specs/` named `feature-<issue-number>-<slug>.md` (e.g., `docs/specs/feature-1024-event-streaming.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Reference issue metadata from `$ARGUMENTS` at the top of the plan for traceability.
+<<<<<<< HEAD
 - Review `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and read any documentation whose conditions match the feature scope.
+=======
+- Review `.claude/commands/docs/conditional_docs.md` and read any documentation whose conditions match the feature scope.
+>>>>>>> origin/main
 - Follow the repo git flow: work from `feat/<issue-number>-<slug>` branching off `develop`, with releases promoted from `develop` to `main`.
 - Populate the exact format below so automation can reference each section without guesswork.
 - Research existing patterns in `src/**`, `tests/**`, and platform docs before proposing changes.
@@ -24,7 +28,11 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Enumerate relevant code paths and new assets in their dedicated sections.
 - Incorporate `/anti-mock` guidance: plan for real Supabase coverage, failure injection, and follow-up for any unavoidable skips.
 - Ensure the plan's final tasks rerun validation and push the branch so a PR can be created (PR titles must end with the issue number, e.g. `feat: add search filters (#210)`).
+<<<<<<< HEAD
 - If the plan introduces new documentation areas, append or update the relevant entry in `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md`.
+=======
+- If the plan introduces new documentation areas, append or update the relevant entry in `.claude/commands/docs/conditional_docs.md`.
+>>>>>>> origin/main
 
 ## ADW Agent Integration
 - If executing via ADW orchestration, query workflow state via MCP instead of searching:
@@ -100,6 +108,7 @@ All commits for this feature will be validated. Ensure commit messages:
 - Use direct statements: `feat: add event streaming API` not `Based on the plan, this commit adds event streaming`
 
 ## Report
+<<<<<<< HEAD
 Return ONLY the plan file path as plain text on a single line.
 
 **CRITICAL - Output Format:**
@@ -124,6 +133,25 @@ Plan file: docs/specs/chore-1450-refresh-deps.md
 **docs/specs/chore-1450-refresh-deps.md**
 ```
 
+=======
+Summarise the plan in 2-3 bullets highlighting key technical decisions and risks.
+
+**Important Notes:**
+- The plan file path will be automatically detected by `/find_plan_file` agent
+- Focus output on summarizing the feature approach, not the file location
+- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
+
+**Correct output:**
+```
+- Created feature plan for event streaming API
+- Plan covers 3 phases: WebSocket foundation, event publishing, client SDK
+- Key decisions: Server-Sent Events over WebSocket for simplicity, PostgreSQL LISTEN/NOTIFY for pub/sub
+- Risks: connection scalability needs load testing, requires schema migration for event log table
+```
+
+**INCORRECT output (do NOT do this):**
+```
+>>>>>>> origin/main
 ## Feature Plan Summary
 
 I've created a comprehensive plan for the event streaming feature!

@@ -2,8 +2,11 @@ import type { Metadata } from 'next'
 import './globals.css'
 import { AuthProvider } from '@/context/AuthContext'
 import Navigation from '@/components/Navigation'
+<<<<<<< HEAD
 import { Analytics } from '@vercel/analytics/next'
 import { SpeedInsights } from '@vercel/speed-insights/next'
+=======
+>>>>>>> origin/main
 
 export const metadata: Metadata = {
   title: 'KotaDB - Code Intelligence Platform',
@@ -31,8 +34,11 @@ export default function RootLayout({
             </footer>
           </div>
         </AuthProvider>
+<<<<<<< HEAD
         <Analytics />
         <SpeedInsights />
+=======
+>>>>>>> origin/main
       </body>
     </html>
   )

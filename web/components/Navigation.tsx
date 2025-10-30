@@ -2,12 +2,16 @@
 
 import Link from 'next/link'
 import { usePathname } from 'next/navigation'
+<<<<<<< HEAD
 import { useAuth } from '@/context/AuthContext'
+=======
+>>>>>>> origin/main
 import ApiKeyInput from './ApiKeyInput'
 import RateLimitStatus from './RateLimitStatus'
 
 export default function Navigation() {
   const pathname = usePathname()
+<<<<<<< HEAD
   const { isAuthenticated, user, subscription, signOut } = useAuth()
 
   const isActive = (path: string) => pathname === path
@@ -30,6 +34,13 @@ export default function Navigation() {
 
   return (
     <nav className="sticky top-0 z-50 glass-light dark:glass-dark border-b border-gray-200/50 dark:border-gray-800/50 shadow-sm">
+=======
+
+  const isActive = (path: string) => pathname === path
+
+  return (
+    <nav className="border-b border-gray-200 dark:border-gray-800 bg-white dark:bg-gray-950">
+>>>>>>> origin/main
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between h-16">
           <div className="flex items-center space-x-8">
@@ -70,6 +81,7 @@ export default function Navigation() {
               >
                 Files
               </Link>
+<<<<<<< HEAD
 
               {isAuthenticated && (
                 <>
@@ -96,11 +108,14 @@ export default function Navigation() {
                   </Link>
                 </>
               )}
+=======
+>>>>>>> origin/main
             </div>
           </div>
 
           <div className="flex items-center space-x-4">
             <RateLimitStatus />
+<<<<<<< HEAD
 
             {isAuthenticated ? (
               <>
@@ -133,6 +148,9 @@ export default function Navigation() {
                 </Link>
               </>
             )}
+=======
+            <ApiKeyInput />
+>>>>>>> origin/main
           </div>
         </div>
       </div>

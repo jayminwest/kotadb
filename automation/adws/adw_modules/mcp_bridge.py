@@ -3,12 +3,19 @@
 This module provides a Python interface for the TypeScript MCP server to interact with
 ADW state, git operations, validation, and phase execution.
 """
+<<<<<<< HEAD
 from __future__ import annotations
+=======
+
+from __future__ import annotations
+
+>>>>>>> origin/main
 import json
 import subprocess
 import sys
 from pathlib import Path
 from typing import Any, Dict, List, Optional
+<<<<<<< HEAD
 try:
     from .state import ADWState, StateNotFoundError, agents_root
     from .utils import project_root
@@ -21,6 +28,14 @@ except ImportError:
     from utils import project_root
     from git_ops import create_worktree as git_create_worktree_impl
     from git_ops import cleanup_worktree as git_cleanup_worktree_impl
+=======
+
+from .state import ADWState, StateNotFoundError, agents_root
+from .utils import project_root
+from .git_ops import create_worktree as git_create_worktree_impl
+from .git_ops import cleanup_worktree as git_cleanup_worktree_impl
+
+>>>>>>> origin/main
 
 def get_adw_state(adw_id: str) -> Dict[str, Any]:
     """Load ADW state for a given adw_id.
@@ -38,6 +53,7 @@ def get_adw_state(adw_id: str) -> Dict[str, Any]:
         state = ADWState.load(adw_id)
         return state.to_dict()
     except StateNotFoundError as e:
+<<<<<<< HEAD
         return {'error': str(e), 'success': False}
 
 def list_adw_workflows(adw_id_filter: Optional[str]=None, status_filter: Optional[str]=None, limit: int=50) -> Dict[str, Any]:
@@ -80,6 +96,50 @@ def list_adw_workflows(adw_id_filter: Optional[str]=None, status_filter: Optiona
     return {'workflows': workflows, 'total': len(all_dirs), 'filtered': len(workflows), 'limit': limit}
 
 def execute_git_commit(adw_id: str, message: str, files: Optional[List[str]]=None) -> Dict[str, Any]:
+=======
+        return {"error": str(e), "success": False}
+
+
+def list_adw_workflows(adw_id_filter: Optional[str] = None) -> Dict[str, Any]:
+    """List all ADW workflows or filter by adw_id.
+
+    Args:
+        adw_id_filter: Optional ADW ID to filter results
+
+    Returns:
+        Dictionary with workflows list and total count
+    """
+    agents_dir = agents_root()
+    if not agents_dir.exists():
+        return {"workflows": [], "total": 0}
+
+    workflows = []
+    for agent_dir in agents_dir.iterdir():
+        if not agent_dir.is_dir():
+            continue
+
+        if adw_id_filter and agent_dir.name != adw_id_filter:
+            continue
+
+        state_file = agent_dir / "adw_state.json"
+        if not state_file.exists():
+            continue
+
+        try:
+            state = ADWState.load(agent_dir.name)
+            workflows.append(state.to_dict())
+        except Exception:
+            continue
+
+    return {"workflows": workflows, "total": len(workflows)}
+
+
+def execute_git_commit(
+    adw_id: str,
+    message: str,
+    files: Optional[List[str]] = None,
+) -> Dict[str, Any]:
+>>>>>>> origin/main
     """Execute git commit in the ADW worktree.
 
     Args:
@@ -92,6 +152,7 @@ def execute_git_commit(adw_id: str, message: str, files: Optional[List[str]]=Non
     """
     try:
         state = ADWState.load(adw_id)
+<<<<<<< HEAD
         worktree_path = state.get('worktree_path')
         if not worktree_path:
             return {'success': False, 'error': 'No worktree_path found in state'}
@@ -117,6 +178,89 @@ def execute_git_commit(adw_id: str, message: str, files: Optional[List[str]]=Non
         return {'success': False, 'error': str(e)}
 
 def execute_bun_validate(cwd: Optional[str]=None) -> Dict[str, Any]:
+=======
+        worktree_path = state.get("worktree_path")
+
+        if not worktree_path:
+            return {
+                "success": False,
+                "error": "No worktree_path found in state",
+            }
+
+        worktree = Path(worktree_path)
+        if not worktree.exists():
+            return {
+                "success": False,
+                "error": f"Worktree path does not exist: {worktree_path}",
+            }
+
+        # Stage files
+        if files:
+            for file in files:
+                subprocess.run(
+                    ["git", "add", file],
+                    cwd=worktree,
+                    check=True,
+                    capture_output=True,
+                    text=True,
+                )
+        else:
+            subprocess.run(
+                ["git", "add", "."],
+                cwd=worktree,
+                check=True,
+                capture_output=True,
+                text=True,
+            )
+
+        # Create commit
+        result = subprocess.run(
+            ["git", "commit", "-m", message],
+            cwd=worktree,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        # Get commit hash
+        hash_result = subprocess.run(
+            ["git", "rev-parse", "HEAD"],
+            cwd=worktree,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+        commit_hash = hash_result.stdout.strip()
+
+        # Get files changed count
+        stat_result = subprocess.run(
+            ["git", "show", "--stat", "--oneline", commit_hash],
+            cwd=worktree,
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+
+        # Count files changed (rough approximation)
+        files_changed = len([line for line in stat_result.stdout.split("\n") if "|" in line])
+
+        return {
+            "success": True,
+            "commit_hash": commit_hash,
+            "message": message,
+            "files_changed": files_changed,
+        }
+
+    except StateNotFoundError as e:
+        return {"success": False, "error": f"State not found: {e}"}
+    except subprocess.CalledProcessError as e:
+        return {"success": False, "error": f"Git command failed: {e.stderr}"}
+    except Exception as e:
+        return {"success": False, "error": str(e)}
+
+
+def execute_bun_validate(cwd: Optional[str] = None) -> Dict[str, Any]:
+>>>>>>> origin/main
     """Execute bun validation commands (lint + typecheck).
 
     Args:
@@ -126,6 +270,7 @@ def execute_bun_validate(cwd: Optional[str]=None) -> Dict[str, Any]:
         Dictionary with validation result and any errors
     """
     work_dir = Path(cwd) if cwd else project_root()
+<<<<<<< HEAD
     errors = []
     warnings = []
     try:
@@ -139,6 +284,47 @@ def execute_bun_validate(cwd: Optional[str]=None) -> Dict[str, Any]:
     return {'valid': len(errors) == 0, 'errors': errors if errors else None, 'warnings': warnings if warnings else None}
 
 def execute_bun_validate_migrations(adw_id: str, cwd: Optional[str]=None) -> Dict[str, Any]:
+=======
+
+    errors = []
+    warnings = []
+
+    try:
+        # Run lint
+        subprocess.run(
+            ["bun", "run", "lint"],
+            cwd=work_dir / "app",
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        errors.append(f"Lint failed: {e.stderr}")
+
+    try:
+        # Run typecheck
+        subprocess.run(
+            ["bunx", "tsc", "--noEmit"],
+            cwd=work_dir / "app",
+            check=True,
+            capture_output=True,
+            text=True,
+        )
+    except subprocess.CalledProcessError as e:
+        errors.append(f"Typecheck failed: {e.stderr}")
+
+    return {
+        "valid": len(errors) == 0,
+        "errors": errors if errors else None,
+        "warnings": warnings if warnings else None,
+    }
+
+
+def execute_bun_validate_migrations(
+    adw_id: str,
+    cwd: Optional[str] = None,
+) -> Dict[str, Any]:
+>>>>>>> origin/main
     """Execute migration validation to detect drift.
 
     Args:
@@ -148,14 +334,31 @@ def execute_bun_validate_migrations(adw_id: str, cwd: Optional[str]=None) -> Dic
     Returns:
         Dictionary with drift detection result and details
     """
+<<<<<<< HEAD
     work_dir = Path(cwd) if cwd else project_root() / 'app'
     try:
         result = subprocess.run(['bun', 'run', 'test:validate-migrations'], cwd=work_dir, capture_output=True, text=True)
         drift_detected = result.returncode != 0
+=======
+    work_dir = Path(cwd) if cwd else (project_root() / "app")
+
+    try:
+        result = subprocess.run(
+            ["bun", "run", "test:validate-migrations"],
+            cwd=work_dir,
+            capture_output=True,
+            text=True,
+        )
+
+        drift_detected = result.returncode != 0
+
+        # Update state with migration drift status
+>>>>>>> origin/main
         try:
             state = ADWState.load(adw_id)
             state.update(migration_drift_detected=drift_detected)
         except StateNotFoundError:
+<<<<<<< HEAD
             pass
         if drift_detected:
             return {'drift_detected': True, 'details': result.stderr.split('\n') if result.stderr else [], 'files_out_of_sync': []}
@@ -166,28 +369,89 @@ def execute_bun_validate_migrations(adw_id: str, cwd: Optional[str]=None) -> Dic
         return {'drift_detected': False, 'error': str(e)}
 
 def create_worktree(worktree_name: str, base_branch: str, base_path: str='automation/trees') -> Dict[str, Any]:
+=======
+            pass  # State might not exist yet
+
+        if drift_detected:
+            return {
+                "drift_detected": True,
+                "details": result.stderr.split("\n") if result.stderr else [],
+                "files_out_of_sync": [],  # Could parse from output
+            }
+
+        return {
+            "drift_detected": False,
+        }
+
+    except subprocess.CalledProcessError as e:
+        return {
+            "drift_detected": True,
+            "error": f"Validation command failed: {e.stderr}",
+        }
+    except Exception as e:
+        return {
+            "drift_detected": False,
+            "error": str(e),
+        }
+
+
+def create_worktree(
+    worktree_name: str,
+    base_branch: str,
+    base_path: str = "trees",
+) -> Dict[str, Any]:
+>>>>>>> origin/main
     """Create a git worktree.
 
     Args:
         worktree_name: Name for the worktree directory and branch
         base_branch: Base branch to branch from
+<<<<<<< HEAD
         base_path: Base directory for worktrees (default: 'automation/trees')
+=======
+        base_path: Base directory for worktrees (default: 'trees')
+>>>>>>> origin/main
 
     Returns:
         Dictionary with worktree creation result
     """
     try:
         worktree_path = git_create_worktree_impl(worktree_name, base_branch, base_path)
+<<<<<<< HEAD
         return {'success': True, 'worktree_path': str(worktree_path), 'worktree_name': worktree_name, 'base_branch': base_branch}
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
 def cleanup_worktree(worktree_name: str, base_path: str='automation/trees', delete_branch: bool=True) -> Dict[str, Any]:
+=======
+        return {
+            "success": True,
+            "worktree_path": str(worktree_path),
+            "worktree_name": worktree_name,
+            "base_branch": base_branch,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+def cleanup_worktree(
+    worktree_name: str,
+    base_path: str = "trees",
+    delete_branch: bool = True,
+) -> Dict[str, Any]:
+>>>>>>> origin/main
     """Clean up a git worktree and optionally delete its branch.
 
     Args:
         worktree_name: Name of the worktree to remove
+<<<<<<< HEAD
         base_path: Base directory for worktrees (default: 'automation/trees')
+=======
+        base_path: Base directory for worktrees (default: 'trees')
+>>>>>>> origin/main
         delete_branch: Whether to delete the associated branch
 
     Returns:
@@ -195,11 +459,27 @@ def cleanup_worktree(worktree_name: str, base_path: str='automation/trees', dele
     """
     try:
         success = git_cleanup_worktree_impl(worktree_name, base_path, delete_branch)
+<<<<<<< HEAD
         return {'success': success, 'worktree_name': worktree_name, 'branch_deleted': delete_branch}
     except Exception as e:
         return {'success': False, 'error': str(e)}
 
 def execute_command(command: str, args: List[str], adw_id: Optional[str]=None) -> Dict[str, Any]:
+=======
+        return {
+            "success": success,
+            "worktree_name": worktree_name,
+            "branch_deleted": delete_branch,
+        }
+    except Exception as e:
+        return {
+            "success": False,
+            "error": str(e),
+        }
+
+
+def execute_command(command: str, args: List[str], adw_id: Optional[str] = None) -> Dict[str, Any]:
+>>>>>>> origin/main
     """Execute a slash command via the orchestrator.
 
     Args:
@@ -210,11 +490,28 @@ def execute_command(command: str, args: List[str], adw_id: Optional[str]=None) -
     Returns:
         Dictionary with command execution result
     """
+<<<<<<< HEAD
     return {'success': False, 'error': 'Command execution not yet implemented', 'command': command, 'args': args}
+=======
+    # TODO: This is a stub implementation. In a real system, this would:
+    # 1. Parse the command and route to appropriate handler
+    # 2. Load ADW context if adw_id provided
+    # 3. Execute the command with proper permissions
+    # 4. Return structured result
+
+    return {
+        "success": False,
+        "error": "Command execution not yet implemented",
+        "command": command,
+        "args": args,
+    }
+
+>>>>>>> origin/main
 
 def main() -> None:
     """CLI entry point for testing bridge functions."""
     if len(sys.argv) < 2:
+<<<<<<< HEAD
         sys.stdout.write('Usage: python -m adw_modules.mcp_bridge <command> [args...]' + '\n')
         sys.stdout.write('Commands: get_state, list_workflows, git_commit, validate, validate_migrations, create_worktree, cleanup_worktree, execute_command' + '\n')
         sys.exit(1)
@@ -248,11 +545,36 @@ def main() -> None:
     elif command == 'git_commit':
         if len(sys.argv) < 4:
             sys.stdout.write(json.dumps({'error': 'Usage: git_commit <adw_id> <message> [files...]'}) + '\n')
+=======
+        print("Usage: python -m adw_modules.mcp_bridge <command> [args...]")
+        print("Commands: get_state, list_workflows, git_commit, validate, validate_migrations, create_worktree, cleanup_worktree, execute_command")
+        sys.exit(1)
+
+    command = sys.argv[1]
+
+    if command == "get_state":
+        adw_id = sys.argv[2] if len(sys.argv) > 2 else None
+        if not adw_id:
+            print(json.dumps({"error": "adw_id required"}))
+            sys.exit(1)
+        result = get_adw_state(adw_id)
+        print(json.dumps(result, indent=2))
+
+    elif command == "list_workflows":
+        adw_id_filter = sys.argv[2] if len(sys.argv) > 2 else None
+        result = list_adw_workflows(adw_id_filter)
+        print(json.dumps(result, indent=2))
+
+    elif command == "git_commit":
+        if len(sys.argv) < 4:
+            print(json.dumps({"error": "Usage: git_commit <adw_id> <message> [files...]"}))
+>>>>>>> origin/main
             sys.exit(1)
         adw_id = sys.argv[2]
         message = sys.argv[3]
         files = sys.argv[4:] if len(sys.argv) > 4 else None
         result = execute_git_commit(adw_id, message, files)
+<<<<<<< HEAD
         sys.stdout.write(json.dumps(result, indent=2) + '\n')
     elif command == 'validate':
         cwd = sys.argv[2] if len(sys.argv) > 2 else None
@@ -261,10 +583,23 @@ def main() -> None:
     elif command == 'validate_migrations':
         if len(sys.argv) < 3:
             sys.stdout.write(json.dumps({'error': 'adw_id required'}) + '\n')
+=======
+        print(json.dumps(result, indent=2))
+
+    elif command == "validate":
+        cwd = sys.argv[2] if len(sys.argv) > 2 else None
+        result = execute_bun_validate(cwd)
+        print(json.dumps(result, indent=2))
+
+    elif command == "validate_migrations":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "adw_id required"}))
+>>>>>>> origin/main
             sys.exit(1)
         adw_id = sys.argv[2]
         cwd = sys.argv[3] if len(sys.argv) > 3 else None
         result = execute_bun_validate_migrations(adw_id, cwd)
+<<<<<<< HEAD
         sys.stdout.write(json.dumps(result, indent=2) + '\n')
     elif command == 'create_worktree':
         if len(sys.argv) < 4:
@@ -287,19 +622,51 @@ def main() -> None:
     elif command == 'execute_command':
         if len(sys.argv) < 3:
             sys.stdout.write(json.dumps({'error': 'Usage: execute_command <slash_command> [args...] [--adw-id <id>]'}) + '\n')
+=======
+        print(json.dumps(result, indent=2))
+
+    elif command == "create_worktree":
+        if len(sys.argv) < 4:
+            print(json.dumps({"error": "Usage: create_worktree <worktree_name> <base_branch> [base_path]"}))
+            sys.exit(1)
+        worktree_name = sys.argv[2]
+        base_branch = sys.argv[3]
+        base_path = sys.argv[4] if len(sys.argv) > 4 else "trees"
+        result = create_worktree(worktree_name, base_branch, base_path)
+        print(json.dumps(result, indent=2))
+
+    elif command == "cleanup_worktree":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Usage: cleanup_worktree <worktree_name> [base_path] [delete_branch]"}))
+            sys.exit(1)
+        worktree_name = sys.argv[2]
+        base_path = sys.argv[3] if len(sys.argv) > 3 else "trees"
+        delete_branch = sys.argv[4].lower() == "true" if len(sys.argv) > 4 else True
+        result = cleanup_worktree(worktree_name, base_path, delete_branch)
+        print(json.dumps(result, indent=2))
+
+    elif command == "execute_command":
+        if len(sys.argv) < 3:
+            print(json.dumps({"error": "Usage: execute_command <slash_command> [args...] [--adw-id <id>]"}))
+>>>>>>> origin/main
             sys.exit(1)
         slash_command = sys.argv[2]
         cmd_args = []
         adw_id = None
         i = 3
         while i < len(sys.argv):
+<<<<<<< HEAD
             if sys.argv[i] == '--adw-id' and i + 1 < len(sys.argv):
+=======
+            if sys.argv[i] == "--adw-id" and i + 1 < len(sys.argv):
+>>>>>>> origin/main
                 adw_id = sys.argv[i + 1]
                 i += 2
             else:
                 cmd_args.append(sys.argv[i])
                 i += 1
         result = execute_command(slash_command, cmd_args, adw_id)
+<<<<<<< HEAD
         sys.stdout.write(json.dumps(result, indent=2) + '\n')
     else:
         sys.stdout.write(json.dumps({'error': f'Unknown command: {command}'}) + '\n')
@@ -307,3 +674,26 @@ def main() -> None:
 if __name__ == '__main__':
     main()
 __all__ = ['get_adw_state', 'list_adw_workflows', 'execute_git_commit', 'execute_bun_validate', 'execute_bun_validate_migrations', 'create_worktree', 'cleanup_worktree', 'execute_command']
+=======
+        print(json.dumps(result, indent=2))
+
+    else:
+        print(json.dumps({"error": f"Unknown command: {command}"}))
+        sys.exit(1)
+
+
+if __name__ == "__main__":
+    main()
+
+
+__all__ = [
+    "get_adw_state",
+    "list_adw_workflows",
+    "execute_git_commit",
+    "execute_bun_validate",
+    "execute_bun_validate_migrations",
+    "create_worktree",
+    "cleanup_worktree",
+    "execute_command",
+]
+>>>>>>> origin/main

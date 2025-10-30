@@ -213,6 +213,7 @@ git worktree prune
 
 **Note:** The `--force` flag removes the worktree even with uncommitted changes. Commit or stash important work before cleanup.
 
+<<<<<<< HEAD
 ## CI Trigger Behavior
 
 GitHub Actions CI workflows are configured to run automatically on all feature branch pushes, including interactive worktree branches. This ensures CI validation happens regardless of when you create a PR.
@@ -280,6 +281,8 @@ CI workflows use path filters to limit runs to relevant changes:
 
 Only the workflows matching your changed files will run, reducing unnecessary CI consumption.
 
+=======
+>>>>>>> origin/main
 ## Integration with ADW
 
 This command mirrors ADW patterns from `automation/adws/adw_modules/git_ops.py`:
