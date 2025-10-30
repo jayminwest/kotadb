@@ -363,4 +363,124 @@ export function capitalize(str: string): string {
 		// but we verified above that at least some symbols were extracted
 		expect(completedJob.stats?.symbols_extracted).toBe(fileCount);
 	}, 80000); // 80 second timeout for large repository test
+
+	it("should pass installation_id to prepareRepository when available", async () => {
+		// Update test repository with installation_id
+		const client = getSupabaseTestClient();
+		const testInstallationId = 87654321;
+
+		await client
+			.from("repositories")
+			.update({ installation_id: testInstallationId })
+			.eq("id", testRepoId);
+
+		// Create and enqueue job
+		const indexJob = await createIndexJob(
+			testRepoId,
+			"main",
+			"installation456",
+			TEST_USER_IDS.free,
+		);
+
+		const queue = getQueue();
+		const payload: IndexRepoJobPayload = {
+			indexJobId: indexJob.id,
+			repositoryId: testRepoId,
+			commitSha: "installation456",
+		};
+
+		await queue.send(QUEUE_NAMES.INDEX_REPO, payload);
+
+		// Wait for completion
+		let attempts = 0;
+		const maxAttempts = 60;
+
+		while (attempts < maxAttempts) {
+			const currentJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+
+			if (
+				currentJob.status === "completed" ||
+				currentJob.status === "failed"
+			) {
+				break;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			attempts++;
+		}
+
+		// Verify job completed successfully
+		const completedJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+		expect(completedJob.status).toBe("completed");
+
+		// Verify files were indexed (confirms prepareRepository succeeded)
+		const { data: indexedFiles } = await client
+			.from("indexed_files")
+			.select("*")
+			.eq("repository_id", testRepoId);
+
+		expect(indexedFiles).toBeDefined();
+		expect(indexedFiles!.length).toBeGreaterThan(0);
+
+		// Note: We can't directly verify that installation_id was used for authentication
+		// since this is a local path test, but the worker code path is exercised
+		// and the installation_id is logged in worker output
+	}, 40000);
+
+	it("should handle null installation_id gracefully (public repos)", async () => {
+		// Ensure installation_id is null (default for test repos)
+		const client = getSupabaseTestClient();
+		await client
+			.from("repositories")
+			.update({ installation_id: null })
+			.eq("id", testRepoId);
+
+		// Create and enqueue job
+		const indexJob = await createIndexJob(
+			testRepoId,
+			"main",
+			"noinstall789",
+			TEST_USER_IDS.free,
+		);
+
+		const queue = getQueue();
+		const payload: IndexRepoJobPayload = {
+			indexJobId: indexJob.id,
+			repositoryId: testRepoId,
+			commitSha: "noinstall789",
+		};
+
+		await queue.send(QUEUE_NAMES.INDEX_REPO, payload);
+
+		// Wait for completion
+		let attempts = 0;
+		const maxAttempts = 60;
+
+		while (attempts < maxAttempts) {
+			const currentJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+
+			if (
+				currentJob.status === "completed" ||
+				currentJob.status === "failed"
+			) {
+				break;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			attempts++;
+		}
+
+		// Verify job completed successfully without installation_id
+		const completedJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+		expect(completedJob.status).toBe("completed");
+
+		// Verify files were indexed
+		const { data: indexedFiles } = await client
+			.from("indexed_files")
+			.select("*")
+			.eq("repository_id", testRepoId);
+
+		expect(indexedFiles).toBeDefined();
+		expect(indexedFiles!.length).toBeGreaterThan(0);
+	}, 40000);
 });

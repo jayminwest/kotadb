@@ -391,4 +391,107 @@ describe("Webhook Processor - Unit Tests", () => {
 		// This should not throw even if there are internal errors
 		await expect(processPushEvent(payload)).resolves.toBeUndefined();
 	});
+
+	test("stores installation_id when present in push event", async () => {
+		const payload: GitHubPushEvent = {
+			ref: "refs/heads/main",
+			after: "installation123",
+			repository: {
+				id: 123456,
+				name: "webhook-test-repo",
+				full_name: "testuser/webhook-test-repo",
+				private: true,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+			installation: {
+				id: 12345678,
+			},
+		};
+
+		await processPushEvent(payload);
+
+		// Verify installation_id was stored
+		const { data: repo, error } = await supabase
+			.from("repositories")
+			.select("installation_id")
+			.eq("id", testRepoId)
+			.single();
+
+		expect(error).toBeNull();
+		expect(repo!.installation_id).toBe(12345678);
+	});
+
+	test("handles missing installation field gracefully (public repos)", async () => {
+		const payload: GitHubPushEvent = {
+			ref: "refs/heads/main",
+			after: "noinstallation123",
+			repository: {
+				id: 123456,
+				name: "webhook-test-repo",
+				full_name: "testuser/webhook-test-repo",
+				private: false,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+			// No installation field for public repo
+		};
+
+		// Should not throw
+		await expect(processPushEvent(payload)).resolves.toBeUndefined();
+
+		// Verify job was still created
+		const { data: jobs, error } = await supabase
+			.from("index_jobs")
+			.select("*")
+			.eq("commit_sha", "noinstallation123");
+
+		expect(error).toBeNull();
+		expect(jobs).toHaveLength(1);
+	});
+
+	test("updates installation_id for existing repository", async () => {
+		// First set installation_id to an old value
+		await supabase
+			.from("repositories")
+			.update({ installation_id: 11111111 })
+			.eq("id", testRepoId);
+
+		const payload: GitHubPushEvent = {
+			ref: "refs/heads/main",
+			after: "updateinstallation123",
+			repository: {
+				id: 123456,
+				name: "webhook-test-repo",
+				full_name: "testuser/webhook-test-repo",
+				private: true,
+				default_branch: "main",
+			},
+			sender: {
+				login: "testuser",
+				id: 789,
+			},
+			installation: {
+				id: 99999999,
+			},
+		};
+
+		await processPushEvent(payload);
+
+		// Verify installation_id was updated to new value
+		const { data: repo, error } = await supabase
+			.from("repositories")
+			.select("installation_id")
+			.eq("id", testRepoId)
+			.single();
+
+		expect(error).toBeNull();
+		expect(repo!.installation_id).toBe(99999999);
+	});
 });

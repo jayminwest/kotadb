@@ -86,7 +86,7 @@ async function processIndexJob(
 	// Fetch repository metadata for context
 	const { data: repo, error: repoError } = await supabase
 		.from("repositories")
-		.select("full_name, git_url, default_branch, user_id")
+		.select("full_name, git_url, default_branch, user_id, installation_id")
 		.eq("id", repositoryId)
 		.single();
 
@@ -97,8 +97,19 @@ async function processIndexJob(
 	}
 
 	const userId = repo.user_id;
+	const installationId = repo.installation_id;
 	// Use git_url if available, otherwise use full_name (for GitHub repos or local paths)
 	const repositoryIdentifier = repo.git_url || repo.full_name;
+
+	if (installationId !== null) {
+		process.stdout.write(
+			`[${new Date().toISOString()}] Using installation_id=${installationId} for repository authentication\n`,
+		);
+	} else {
+		process.stdout.write(
+			`[${new Date().toISOString()}] No installation_id found, using public clone for ${repo.full_name}\n`,
+		);
+	}
 
 	try {
 		// Update job status to 'processing'
@@ -122,6 +133,7 @@ async function processIndexJob(
 						repository: repositoryIdentifier,
 						ref: commitSha || repo.default_branch || "main",
 					},
+			installationId ?? undefined,
 		);
 
 		// STEP 2: Discover source files

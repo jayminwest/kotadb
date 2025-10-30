@@ -106,4 +106,9 @@ export interface GitHubPushEvent {
 		/** GitHub user ID */
 		id: number;
 	};
+	/** GitHub App installation information (present for app-authenticated webhooks) */
+	installation?: {
+		/** Installation ID for this GitHub App installation */
+		id: number;
+	};
 }

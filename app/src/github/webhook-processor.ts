@@ -32,14 +32,18 @@ import type { GitHubPushEvent } from "./types";
  */
 export async function processPushEvent(payload: GitHubPushEvent): Promise<void> {
 	try {
-		const { ref, after: commitSha, repository } = payload;
+		const { ref, after: commitSha, repository, installation } = payload;
 		const fullName = repository.full_name;
 		const defaultBranch = repository.default_branch;
+		const installationId = installation?.id;
 
 		// Strip refs/heads/ prefix from ref to get branch name
 		const branchName = ref.replace(/^refs\/heads\//, "");
 
 		process.stdout.write(`[Webhook Processor] Processing push to ${fullName}@${branchName} (${commitSha.substring(0, 7)})\n`);
+		if (installationId !== undefined) {
+			process.stdout.write(`[Webhook Processor] GitHub App installation_id=${installationId} present in webhook payload\n`);
+		}
 
 		// Look up repository in database
 		const client = getServiceClient();
@@ -57,6 +61,21 @@ export async function processPushEvent(payload: GitHubPushEvent): Promise<void> 
 		if (!repo) {
 			process.stdout.write(`[Webhook Processor] Ignoring push to untracked repository: ${fullName}\n`);
 			return;
+		}
+
+		// Store installation_id in repositories table if present
+		if (installationId !== undefined) {
+			const { error: updateError } = await client
+				.from("repositories")
+				.update({ installation_id: installationId })
+				.eq("id", repo.id);
+
+			if (updateError) {
+				process.stderr.write(`[Webhook Processor] Failed to store installation_id for ${fullName}: ${JSON.stringify(updateError)}\n`);
+				// Continue processing - installation_id storage is not critical for public repos
+			} else {
+				process.stdout.write(`[Webhook Processor] Stored installation_id=${installationId} for repository ${fullName}\n`);
+			}
 		}
 
 		// Filter to default branch only
