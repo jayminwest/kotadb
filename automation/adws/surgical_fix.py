@@ -343,6 +343,11 @@ def spawn_planning_agent(issue_number: str, worktree_path: Path) -> Tuple[bool, 
     """
     logger.info(f"Spawning planning agent for issue #{issue_number}")
 
+    # Create logs directory for debugging
+    logs_dir = SURGICAL_FIX_STATE_DIR / worktree_path.name / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    output_log = logs_dir / "planning_agent_output.log"
+
     try:
         result = subprocess.run(
             ["claude", "/bug", issue_number],
@@ -351,6 +356,18 @@ def spawn_planning_agent(issue_number: str, worktree_path: Path) -> Tuple[bool, 
             timeout=300,  # 5 minute timeout
             cwd=worktree_path
         )
+
+        # Save output for debugging
+        with open(output_log, "w", encoding="utf-8") as f:
+            f.write(f"Planning Agent Output - Issue #{issue_number}\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Return Code: {result.returncode}\n\n")
+            f.write("STDOUT:\n")
+            f.write(result.stdout)
+            f.write("\n\nSTDERR:\n")
+            f.write(result.stderr)
+
+        logger.debug(f"Planning agent output saved to {output_log}")
 
         if result.returncode != 0:
             return False, result.stdout, result.stderr
@@ -452,6 +469,11 @@ def spawn_implementation_agent(plan_file: str, worktree_path: Path) -> Tuple[boo
     """
     logger.info(f"Spawning implementation agent for plan: {plan_file}")
 
+    # Create logs directory for debugging
+    logs_dir = SURGICAL_FIX_STATE_DIR / worktree_path.name / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    output_log = logs_dir / "implementation_agent_output.log"
+
     try:
         result = subprocess.run(
             ["claude", "/implement", plan_file],
@@ -460,6 +482,18 @@ def spawn_implementation_agent(plan_file: str, worktree_path: Path) -> Tuple[boo
             timeout=600,  # 10 minute timeout
             cwd=worktree_path
         )
+
+        # Save output for debugging
+        with open(output_log, "w", encoding="utf-8") as f:
+            f.write(f"Implementation Agent Output - Plan: {plan_file}\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Return Code: {result.returncode}\n\n")
+            f.write("STDOUT:\n")
+            f.write(result.stdout)
+            f.write("\n\nSTDERR:\n")
+            f.write(result.stderr)
+
+        logger.debug(f"Implementation agent output saved to {output_log}")
 
         if result.returncode != 0:
             return False, result.stdout, result.stderr
@@ -558,6 +592,11 @@ def create_pull_request(worktree_path: Path, issue_number: str) -> Tuple[bool, s
     """
     logger.info("Creating pull request")
 
+    # Create logs directory for debugging
+    logs_dir = SURGICAL_FIX_STATE_DIR / worktree_path.name / "logs"
+    logs_dir.mkdir(parents=True, exist_ok=True)
+    output_log = logs_dir / "pr_creation_agent_output.log"
+
     try:
         result = subprocess.run(
             ["claude", "/pull_request"],
@@ -566,6 +605,18 @@ def create_pull_request(worktree_path: Path, issue_number: str) -> Tuple[bool, s
             timeout=300,  # 5 minute timeout
             cwd=worktree_path
         )
+
+        # Save output for debugging
+        with open(output_log, "w", encoding="utf-8") as f:
+            f.write("PR Creation Agent Output\n")
+            f.write("=" * 80 + "\n\n")
+            f.write(f"Return Code: {result.returncode}\n\n")
+            f.write("STDOUT:\n")
+            f.write(result.stdout)
+            f.write("\n\nSTDERR:\n")
+            f.write(result.stderr)
+
+        logger.debug(f"PR creation agent output saved to {output_log}")
 
         if result.returncode != 0:
             return False, result.stdout, result.stderr
