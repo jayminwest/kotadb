@@ -411,8 +411,18 @@ async function populateInstallationId(
 			return;
 		}
 
+		// Log before lookup
+		process.stdout.write(
+			`[Installation Lookup] Starting installation_id lookup for ${fullName} (repository_id=${repositoryId})\n`,
+		);
+
 		// Query GitHub App installations to find installation_id
 		const installationId = await getInstallationForRepository(owner, repo);
+
+		// Log result of lookup
+		process.stdout.write(
+			`[Installation Lookup] Lookup result for ${fullName}: installation_id=${installationId ?? "null"}\n`,
+		);
 
 		if (installationId !== null) {
 			// Update repository with installation_id

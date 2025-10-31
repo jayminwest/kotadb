@@ -25,6 +25,11 @@ function getGitHubAppConfig(): GitHubAppConfig {
 	const appId = process.env.GITHUB_APP_ID;
 	const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
 
+	// Log environment variable presence for production debugging
+	process.stdout.write(
+		`[Installation Lookup] GitHub App config check: GITHUB_APP_ID=${appId ? "present" : "missing"}, GITHUB_APP_PRIVATE_KEY=${privateKey ? "present" : "missing"}\n`,
+	);
+
 	if (!appId) {
 		throw new GitHubAppError(
 			"Missing GITHUB_APP_ID environment variable. Set this to your GitHub App ID from app settings.",
@@ -105,8 +110,12 @@ export async function getInstallationForRepository(
 
 	// Check failed lookup cache
 	if (isFailureCached(fullName)) {
+		const cachedAt = failedLookupCache.get(fullName);
+		const ageMinutes = cachedAt
+			? Math.floor((Date.now() - cachedAt) / 60000)
+			: 0;
 		process.stdout.write(
-			`[Installation Lookup] Skipping cached failed lookup for ${fullName}\n`,
+			`[Installation Lookup] Skipping cached failed lookup for ${fullName} (cached ${ageMinutes}m ago, TTL=60m)\n`,
 		);
 		return null;
 	}
