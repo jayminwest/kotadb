@@ -51,7 +51,7 @@ export async function startQueue(): Promise<void> {
 	}
 
 	process.stdout.write(
-		`[${new Date().toISOString()}] Starting job queue with connection: ${dbUrl.replace(/:[^:@]+@/, ":***@")}`,
+		`[${new Date().toISOString()}] Starting job queue with connection: ${dbUrl.replace(/:[^:@]+@/, ":***@")}\n`,
 	);
 
 	try {
@@ -62,13 +62,18 @@ export async function startQueue(): Promise<void> {
 		// Start pg-boss (creates pgboss schema and tables)
 		await queueInstance.start();
 
-		process.stdout.write(`[${new Date().toISOString()}] Job queue started successfully`);
+		process.stdout.write(`[${new Date().toISOString()}] Job queue started successfully\n`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
-		process.stderr.write(
-			`[${new Date().toISOString()}] Failed to start job queue: ${errorMessage}`,
-		);
+		const errorStack = error instanceof Error ? error.stack : undefined;
+
+		process.stderr.write(`[${new Date().toISOString()}] Failed to start job queue\n`);
+		process.stderr.write(`  Connection: ${dbUrl.replace(/:[^:@]+@/, ":***@")}\n`);
+		process.stderr.write(`  Error: ${errorMessage}\n`);
+		if (errorStack) {
+			process.stderr.write(`  Stack:\n${errorStack}\n`);
+		}
 		throw new Error(`Job queue startup failed: ${errorMessage}`);
 	}
 }
@@ -85,13 +90,13 @@ export async function stopQueue(): Promise<void> {
 	}
 
 	process.stdout.write(
-		`[${new Date().toISOString()}] Stopping job queue (draining in-flight jobs)...`,
+		`[${new Date().toISOString()}] Stopping job queue (draining in-flight jobs)...\n`,
 	);
 
 	try {
 		await queueInstance.stop();
 		queueInstance = null;
-		process.stdout.write(`[${new Date().toISOString()}] Job queue stopped successfully`);
+		process.stdout.write(`[${new Date().toISOString()}] Job queue stopped successfully\n`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);

@@ -71,6 +71,7 @@ async function bootstrap() {
 	if (healthError) {
 		throw new Error(`Supabase connection failed: ${healthError.message}`);
 	}
+	process.stdout.write(`[${new Date().toISOString()}] ✓ Supabase connection successful\n`);
 
 	// Start job queue
 	try {
@@ -80,7 +81,7 @@ async function bootstrap() {
 		// pg-boss requires queues to exist before workers can be registered
 		const queue = getQueue();
 		await queue.createQueue(QUEUE_NAMES.INDEX_REPO);
-		process.stdout.write(`[${new Date().toISOString()}] Created queue: ${QUEUE_NAMES.INDEX_REPO}\n`);
+		process.stdout.write(`[${new Date().toISOString()}] ✓ Job queue started and index-repo queue created\n`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
@@ -92,6 +93,7 @@ async function bootstrap() {
 	try {
 		const queue = getQueue();
 		await startIndexWorker(queue);
+		process.stdout.write(`[${new Date().toISOString()}] ✓ Indexing worker registered\n`);
 	} catch (error) {
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
@@ -100,7 +102,9 @@ async function bootstrap() {
 	}
 
 	// Create Express app
+	process.stdout.write(`[${new Date().toISOString()}] Creating Express app...\n`);
 	const app = createExpressApp(supabase);
+	process.stdout.write(`[${new Date().toISOString()}] ✓ Express app created\n`);
 
 	// Start server
 	const server = app.listen(PORT, () => {
@@ -130,6 +134,16 @@ async function bootstrap() {
 }
 
 bootstrap().catch((error) => {
-	process.stderr.write(`Failed to start server: ${JSON.stringify(error)}\n`);
+	// Extract error details for better diagnostics
+	const errorMessage = error instanceof Error ? error.message : String(error);
+	const errorStack = error instanceof Error ? error.stack : undefined;
+	const errorName = error instanceof Error ? error.name : "Unknown";
+
+	process.stderr.write("Failed to start server:\n");
+	process.stderr.write(`  Error: ${errorName}\n`);
+	process.stderr.write(`  Message: ${errorMessage}\n`);
+	if (errorStack) {
+		process.stderr.write(`  Stack:\n${errorStack}\n`);
+	}
 	process.exit(1);
 });
