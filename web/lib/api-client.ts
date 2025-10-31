@@ -5,6 +5,7 @@ import type {
   SearchResponse,
   RecentFilesResponse,
   HealthResponse,
+  JobStatusResponse,
 } from '@shared/types/api'
 
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
@@ -120,6 +121,21 @@ export const apiClient = {
   ): Promise<{ response: RecentFilesResponse; headers: Headers }> {
     const { data, headers } = await fetchApi<RecentFilesResponse>(
       `/files/recent?limit=${limit}`,
+      { apiKey },
+    )
+
+    return { response: data, headers }
+  },
+
+  /**
+   * Get index job status by job ID
+   */
+  async getJobStatus(
+    jobId: string,
+    apiKey?: string,
+  ): Promise<{ response: JobStatusResponse; headers: Headers }> {
+    const { data, headers } = await fetchApi<JobStatusResponse>(
+      `/jobs/${jobId}`,
       { apiKey },
     )
 

@@ -1,8 +1,9 @@
 'use client'
 
-import { useState, FormEvent } from 'react'
+import { useState, useEffect, useRef, FormEvent } from 'react'
 import { apiClient, ApiError } from '@/lib/api-client'
 import { useAuth } from '@/context/AuthContext'
+import type { JobStatusResponse } from '@shared/types/api'
 
 export default function IndexPage() {
   const { apiKey, updateRateLimitInfo, isAuthenticated } = useAuth()
@@ -11,6 +12,46 @@ export default function IndexPage() {
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
+  const [jobDetails, setJobDetails] = useState<JobStatusResponse | null>(null)
+  const [pollingActive, setPollingActive] = useState(false)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
+  const pollJobStatus = async (jobId: string) => {
+    try {
+      const { response, headers } = await apiClient.getJobStatus(jobId, apiKey!)
+      updateRateLimitInfo(headers)
+      setJobDetails(response)
+
+      // Stop polling if terminal state reached
+      if (['completed', 'failed', 'skipped'].includes(response.status)) {
+        setPollingActive(false)
+        if (pollingIntervalRef.current) {
+          clearInterval(pollingIntervalRef.current)
+          pollingIntervalRef.current = null
+        }
+      }
+    } catch (err) {
+      // Don't crash UI on polling errors - just log them
+      if (err instanceof Error) {
+        process.stderr.write(`Polling error: ${err.message}\n`)
+      }
+    }
+  }
+
+  useEffect(() => {
+    if (pollingActive && jobDetails?.id) {
+      const interval = setInterval(() => {
+        pollJobStatus(jobDetails.id)
+      }, 3000) // Poll every 3 seconds (adjusted from 2s for rate limiting)
+
+      pollingIntervalRef.current = interval
+
+      return () => {
+        clearInterval(interval)
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pollingActive, jobDetails?.id])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -42,6 +83,14 @@ export default function IndexPage() {
       setSuccess(`Indexing job started successfully! Job ID: ${response.jobId}`)
       setRepository('')
       setRef('')
+
+      // Start polling for job status
+      setJobDetails({
+        id: response.jobId,
+        repository_id: '',
+        status: response.status as JobStatusResponse['status'],
+      })
+      setPollingActive(true)
     } catch (err) {
       if (err instanceof ApiError) {
         if (err.status === 401) {
@@ -57,6 +106,33 @@ export default function IndexPage() {
     } finally {
       setIsLoading(false)
     }
+  }
+
+  function getStatusColorClass(status: string): string {
+    switch (status) {
+      case 'pending':
+        return 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+      case 'processing':
+        return 'bg-yellow-200 text-yellow-800 dark:bg-yellow-700 dark:text-yellow-200'
+      case 'completed':
+        return 'bg-green-200 text-green-800 dark:bg-green-700 dark:text-green-200'
+      case 'failed':
+        return 'bg-red-200 text-red-800 dark:bg-red-700 dark:text-red-200'
+      case 'skipped':
+        return 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+      default:
+        return 'bg-gray-200 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+    }
+  }
+
+  function formatElapsedTime(startedAt: string): string {
+    const elapsed = Date.now() - new Date(startedAt).getTime()
+    const seconds = Math.floor(elapsed / 1000)
+    const minutes = Math.floor(seconds / 60)
+    if (minutes > 0) {
+      return `${minutes}m ${seconds % 60}s`
+    }
+    return `${seconds}s`
   }
 
   return (
@@ -134,6 +210,72 @@ export default function IndexPage() {
           <p className="text-green-700 dark:text-green-300 text-sm mt-2">
             The repository is being indexed in the background. You can search for files once indexing completes.
           </p>
+        </div>
+      )}
+
+      {jobDetails && (
+        <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-lg p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h3 className="font-semibold text-blue-900 dark:text-blue-100">
+              Indexing Progress
+            </h3>
+            <span
+              className={`px-2 py-1 rounded text-sm font-medium ${getStatusColorClass(jobDetails.status)}`}
+            >
+              {jobDetails.status}
+            </span>
+          </div>
+
+          {jobDetails.stats?.files_indexed !== undefined && (
+            <p className="text-blue-800 dark:text-blue-200 text-sm">
+              Files indexed: {jobDetails.stats.files_indexed}
+            </p>
+          )}
+
+          {jobDetails.started_at && (
+            <p className="text-blue-700 dark:text-blue-300 text-sm mt-1">
+              Elapsed: {formatElapsedTime(jobDetails.started_at)}
+            </p>
+          )}
+
+          {jobDetails.status === 'completed' && (
+            <p className="text-green-700 dark:text-green-300 text-sm mt-2 font-medium">
+              ✓ Indexing completed successfully! You can now search this
+              repository.
+            </p>
+          )}
+
+          {jobDetails.status === 'failed' && jobDetails.error_message && (
+            <p className="text-red-700 dark:text-red-300 text-sm mt-2">
+              ✗ Error: {jobDetails.error_message}
+            </p>
+          )}
+
+          {pollingActive && (
+            <div className="flex items-center gap-2 mt-3 text-blue-600 dark:text-blue-400 text-sm">
+              <svg
+                className="animate-spin h-4 w-4"
+                xmlns="http://www.w3.org/2000/svg"
+                fill="none"
+                viewBox="0 0 24 24"
+              >
+                <circle
+                  className="opacity-25"
+                  cx="12"
+                  cy="12"
+                  r="10"
+                  stroke="currentColor"
+                  strokeWidth="4"
+                />
+                <path
+                  className="opacity-75"
+                  fill="currentColor"
+                  d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
+                />
+              </svg>
+              <span>Updating status...</span>
+            </div>
+          )}
         </div>
       )}
 
