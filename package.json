@@ -6,12 +6,8 @@
     "app",
     "shared",
     "web"
-<<<<<<< HEAD
   ],
   "scripts": {
     "prepare": "husky || true"
   }
-=======
-  ]
->>>>>>> origin/main
 }
