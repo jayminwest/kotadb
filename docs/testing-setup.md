@@ -803,13 +803,10 @@ Breakdown:
 - Ensure `src/db/migrations/` and `supabase/migrations/` are synchronized
 - Run `bun run test:validate-migrations` locally before pushing
 - CI runs this validation automatically to catch drift
-<<<<<<< HEAD
 - **Migration Naming Convention**: All migrations must use timestamped format `YYYYMMDDHHMMSS_description.sql` (e.g., `20241024143000_add_feature.sql`)
   - Prevents merge conflicts in concurrent development
   - Ensures deterministic ordering across file systems
   - Aligns with Supabase CLI expectations
-=======
->>>>>>> origin/main
 
 ## Antimocking Migration Complete
 

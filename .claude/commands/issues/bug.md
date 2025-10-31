@@ -21,11 +21,7 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 - Reference the repo git flow: work from `bug/<issue-number>-<slug>` off `develop`, with `develop` promoted to `main` on release.
 - Integrate `/anti-mock` expectations: propose real Supabase test coverage, failure injection, and follow-ups for any temporary skips.
 - Ensure the plan's closing tasks rerun validation and push the branch so a PR can be raised (PR titles must end with the issue number, e.g. `fix: correct row filters (#210)`).
-<<<<<<< HEAD
 - Consult `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and read only the documentation whose conditions align with the defect.
-=======
-- Consult `.claude/commands/docs/conditional_docs.md` and read only the documentation whose conditions align with the defect.
->>>>>>> origin/main
 - When the remediation introduces new documentation, add or update the relevant conditional entry so future agents can discover it quickly.
 
 ## ADW Agent Integration
@@ -95,7 +91,6 @@ All commits for this bug fix will be validated. Ensure commit messages:
 ```
 
 ## Report
-<<<<<<< HEAD
 Return ONLY the plan file path as plain text on a single line.
 
 **CRITICAL - Output Format:**
@@ -120,30 +115,3 @@ Plan file: docs/specs/chore-1450-refresh-deps.md
 **docs/specs/chore-1450-refresh-deps.md**
 ```
 
-=======
-Provide a 2-3 bullet summary of the fix strategy and risks.
-
-**Important Notes:**
-- The plan file path will be automatically detected by `/find_plan_file` agent
-- Focus output on summarizing the fix approach, not the file location
-- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
-
-**Correct output:**
-```
-- Created bug fix plan for missing search results issue
-- Root cause: RLS policy incorrectly filtering user-scoped queries
-- Fix strategy: update policy predicate, add regression tests
-- Risk: policy change affects all search endpoints, requires careful validation
-```
-
-**INCORRECT output (do NOT do this):**
-```
-# Bug Fix Plan
-
-**Summary:** I've created a comprehensive bug fix plan!
-
-The plan file is located at: **docs/specs/bug-2210-missing-search-results.md**
-
-This plan addresses...
-```
->>>>>>> origin/main

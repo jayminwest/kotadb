@@ -1,4 +1,3 @@
-<<<<<<< HEAD
 import subprocess
 from pathlib import Path
 from unittest.mock import MagicMock
@@ -6,10 +5,6 @@ from unittest.mock import MagicMock
 import pytest
 
 from adws.adw_modules.utils import parse_json, project_root
-=======
-
-from adws.adw_modules.utils import parse_json
->>>>>>> origin/main
 
 
 def test_parse_json_from_code_block():
@@ -39,7 +34,6 @@ def test_parse_json_list_of_models():
     assert len(results) == 2
     assert results[0].label == "lint"
     assert results[1].passed is False
-<<<<<<< HEAD
 
 
 def test_project_root_from_subdirectory(monkeypatch: pytest.MonkeyPatch):
@@ -70,5 +64,3 @@ def test_project_root_fallback_outside_git(monkeypatch: pytest.MonkeyPatch):
     root = project_root()
     # Should fall back to file-based detection (2 parents up from utils.py)
     assert isinstance(root, Path)
-=======
->>>>>>> origin/main

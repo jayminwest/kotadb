@@ -3,7 +3,6 @@
 This test simulates the workflow described in issue #83 where plan files
 are created by agents and need to be staged and committed in worktrees.
 """
-<<<<<<< HEAD
 from __future__ import annotations
 import sys
 import subprocess
@@ -11,34 +10,12 @@ import tempfile
 from pathlib import Path
 import pytest
 from adws.adw_modules.git_ops import _run_git, cleanup_worktree, commit_all, create_worktree, has_changes, stage_paths, verify_file_in_index
-=======
-
-from __future__ import annotations
-
-import subprocess
-import tempfile
-from pathlib import Path
-
-import pytest
-
-from adws.adw_modules.git_ops import (
-    _run_git,
-    cleanup_worktree,
-    commit_all,
-    create_worktree,
-    has_changes,
-    stage_paths,
-    verify_file_in_index,
-)
-
->>>>>>> origin/main
 
 @pytest.fixture
 def temp_git_repo(monkeypatch):
     """Create a temporary git repository for testing."""
     with tempfile.TemporaryDirectory() as tmpdir:
         repo_path = Path(tmpdir)
-<<<<<<< HEAD
         subprocess.run(['git', 'init'], cwd=repo_path, check=True, capture_output=True)
         subprocess.run(['git', 'config', 'user.name', 'Test User'], cwd=repo_path, check=True, capture_output=True)
         subprocess.run(['git', 'config', 'user.email', 'test@example.com'], cwd=repo_path, check=True, capture_output=True)
@@ -50,49 +27,6 @@ def temp_git_repo(monkeypatch):
         monkeypatch.setattr(git_ops_module, 'project_root', lambda: repo_path)
         yield repo_path
 
-=======
-
-        # Initialize git repository
-        subprocess.run(["git", "init"], cwd=repo_path, check=True, capture_output=True)
-        subprocess.run(
-            ["git", "config", "user.name", "Test User"],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-        )
-        subprocess.run(
-            ["git", "config", "user.email", "test@example.com"],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-        )
-
-        # Create initial commit
-        (repo_path / "README.md").write_text("# Test Repo\n")
-        subprocess.run(["git", "add", "README.md"], cwd=repo_path, check=True, capture_output=True)
-        subprocess.run(
-            ["git", "commit", "-m", "Initial commit"],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-        )
-
-        # Create develop branch
-        subprocess.run(
-            ["git", "checkout", "-b", "develop"],
-            cwd=repo_path,
-            check=True,
-            capture_output=True,
-        )
-
-        # Monkeypatch project_root to return our temp repo
-        import adws.adw_modules.git_ops as git_ops_module
-        monkeypatch.setattr(git_ops_module, "project_root", lambda: repo_path)
-
-        yield repo_path
-
-
->>>>>>> origin/main
 def test_diagnostic_worktree_plan_file_workflow(temp_git_repo, capsys):
     """Test the complete plan file workflow with diagnostic logging (simulating issue #83 scenario).
 
@@ -104,7 +38,6 @@ def test_diagnostic_worktree_plan_file_workflow(temp_git_repo, capsys):
     5. Commit operations
     6. Enhanced diagnostic logging output
     """
-<<<<<<< HEAD
     worktree_name = 'diagnostic-test-83'
     sys.stdout.write('\n' + '=' * 80 + '\n')
     sys.stdout.write('DIAGNOSTIC TEST: Simulating issue #83 plan file workflow' + '\n')
@@ -188,125 +121,3 @@ def test_diagnostic_worktree_plan_file_workflow(temp_git_repo, capsys):
     assert 'File tracked after staging' in captured.out
 if __name__ == '__main__':
     pytest.main([__file__, '-v', '-s'])
-=======
-    worktree_name = "diagnostic-test-83"
-
-    print("\n" + "=" * 80)
-    print("DIAGNOSTIC TEST: Simulating issue #83 plan file workflow")
-    print("=" * 80)
-
-    # Step 1: Create worktree
-    print("\n[Step 1] Creating worktree...")
-    worktree_path = create_worktree(worktree_name, "develop", base_path="trees")
-    print(f"✓ Worktree created at: {worktree_path}")
-
-    # Step 2: Verify initial state (no changes)
-    print("\n[Step 2] Checking initial git status...")
-    assert has_changes(cwd=worktree_path) is False
-    print("✓ Initial state clean (no changes)")
-
-    # Step 3: Simulate agent creating plan file
-    print("\n[Step 3] Simulating agent creating plan file...")
-    plan_file_path = worktree_path / "docs" / "specs" / "test-plan.md"
-    plan_file_path.parent.mkdir(parents=True, exist_ok=True)
-    plan_file_path.write_text("# Test Plan\n\nThis is a diagnostic test plan.\n")
-    print(f"✓ Plan file created: {plan_file_path}")
-
-    # Step 4: Check git detects changes (diagnostic logging)
-    print("\n[Step 4] DIAGNOSTIC: Checking git status after file creation...")
-    status_after_creation = _run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
-    print("git status --porcelain output:")
-    print(f"{status_after_creation.stdout if status_after_creation.stdout else '(empty)'}")
-
-    has_changes_result = has_changes(cwd=worktree_path)
-    print(f"has_changes() result: {has_changes_result}")
-    assert has_changes_result is True, "has_changes() should return True after creating file"
-    print("✓ Git detected changes")
-
-    # Step 5: Check file tracking status before staging (diagnostic logging)
-    print("\n[Step 5] DIAGNOSTIC: Checking file tracking before staging...")
-    ls_files_before = _run_git(["ls-files", "docs/specs/test-plan.md"], cwd=worktree_path, check=False)
-    print(f"git ls-files output: {ls_files_before.stdout if ls_files_before.stdout else '(file not tracked)'}")
-
-    tracked_before, track_error = verify_file_in_index("docs/specs/test-plan.md", cwd=worktree_path)
-    print(f"verify_file_in_index() result: {tracked_before}, error: {track_error}")
-    assert tracked_before is False, "File should not be tracked before staging"
-    print("✓ File not yet tracked (as expected)")
-
-    # Step 6: Stage the file
-    print("\n[Step 6] Staging plan file...")
-    stage_paths(["docs/specs/test-plan.md"], cwd=worktree_path)
-    print("✓ File staged")
-
-    # Step 7: Verify file is now tracked (diagnostic logging)
-    print("\n[Step 7] DIAGNOSTIC: Checking file tracking after staging...")
-    ls_files_after = _run_git(["ls-files", "docs/specs/test-plan.md"], cwd=worktree_path, check=False)
-    print(f"git ls-files output: {ls_files_after.stdout if ls_files_after.stdout else '(empty)'}")
-
-    tracked_after, _ = verify_file_in_index("docs/specs/test-plan.md", cwd=worktree_path)
-    print(f"verify_file_in_index() result: {tracked_after}")
-    assert tracked_after is True, "File should be tracked after staging"
-    print("✓ File tracked after staging")
-
-    # Step 8: Check git status before commit (diagnostic logging)
-    print("\n[Step 8] DIAGNOSTIC: Comprehensive git state before commit...")
-    status_before_commit = _run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
-    print("git status --porcelain:")
-    print(f"{status_before_commit.stdout if status_before_commit.stdout else '(empty)'}")
-
-    has_changes_staged = has_changes(cwd=worktree_path)
-    print(f"has_changes() result: {has_changes_staged}")
-
-    diff_index = _run_git(["diff-index", "--cached", "HEAD"], cwd=worktree_path, check=False)
-    print("git diff-index --cached HEAD:")
-    print(f"{diff_index.stdout if diff_index.stdout else '(empty)'}")
-
-    ls_files_all = _run_git(["ls-files"], cwd=worktree_path, check=False)
-    print("git ls-files (all tracked):")
-    print(f"{ls_files_all.stdout if ls_files_all.stdout else '(empty)'}")
-
-    # Step 9: Commit the changes
-    print("\n[Step 9] Committing changes...")
-    committed, commit_error = commit_all("chore: add diagnostic test plan", cwd=worktree_path)
-
-    if not committed:
-        print(f"✗ Commit failed: {commit_error}")
-        print("\nDIAGNOSTIC: Additional debug info on commit failure")
-        print(f"  Commit error message: {commit_error}")
-        print(f"  Worktree path exists: {worktree_path.exists()}")
-        print(f"  Plan file exists: {plan_file_path.exists()}")
-        final_status = _run_git(["status"], cwd=worktree_path, check=False)
-        print(f"  git status (full):\n{final_status.stdout}")
-        raise AssertionError(f"Commit should succeed. Error: {commit_error}")
-
-    print("✓ Commit succeeded")
-
-    # Step 10: Verify final state
-    print("\n[Step 10] Verifying final state...")
-    assert has_changes(cwd=worktree_path) is False, "has_changes() should return False after commit"
-    print("✓ Working tree clean after commit")
-
-    tracked_final, _ = verify_file_in_index("docs/specs/test-plan.md", cwd=worktree_path)
-    assert tracked_final is True, "File should remain tracked after commit"
-    print("✓ File still tracked after commit")
-
-    # Step 11: Cleanup
-    print("\n[Step 11] Cleaning up test worktree...")
-    cleanup_success = cleanup_worktree(worktree_name)
-    assert cleanup_success is True
-    print("✓ Worktree cleaned up")
-
-    print("\n" + "=" * 80)
-    print("DIAGNOSTIC TEST COMPLETED SUCCESSFULLY")
-    print("=" * 80)
-
-    # Capture output for analysis
-    captured = capsys.readouterr()
-    assert "DIAGNOSTIC TEST COMPLETED SUCCESSFULLY" in captured.out
-    assert "has_changes() result: True" in captured.out
-    assert "File tracked after staging" in captured.out
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v", "-s"])
->>>>>>> origin/main

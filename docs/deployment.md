@@ -105,13 +105,8 @@ flyctl secrets set \
 # Set custom git base URL (defaults to https://github.com)
 flyctl secrets set KOTA_GIT_BASE_URL="https://your-git-server.com" --app kota-db-staging
 
-<<<<<<< HEAD
 # Set allowed origins for CORS (comma-separated, for web app and MCP clients)
 flyctl secrets set KOTA_ALLOWED_ORIGINS="https://kota-db-web-staging.vercel.app,https://app.example.com" --app kota-db-staging
-=======
-# Set allowed MCP origins (comma-separated, defaults to localhost)
-flyctl secrets set KOTA_ALLOWED_ORIGINS="https://app.example.com,https://staging.example.com" --app kota-db-staging
->>>>>>> origin/main
 ```
 
 **Verify secrets:**
@@ -300,7 +295,6 @@ app = "kota-db-production"
   memory_mb = 1024  # Increase for production load
 ```
 
-<<<<<<< HEAD
 ## Web Application Deployment (Next.js Frontend)
 
 The KotaDB monorepo includes a Next.js web application (`web/`) that provides a user interface for the API. This section covers deployment strategies for the frontend, with Vercel as the recommended platform and Fly.io as an alternative.
@@ -799,8 +793,6 @@ Error: `Error: failed to fetch an image or build from source: error building: co
 3. Check Dockerfile uses multi-stage builds to reduce image size
 4. Verify network connectivity to Fly.io registry
 
-=======
->>>>>>> origin/main
 ## Troubleshooting
 
 ### Deployment Failures
@@ -998,7 +990,6 @@ flyctl releases --app kota-db-staging
 flyctl releases rollback v123 --app kota-db-staging
 ```
 
-<<<<<<< HEAD
 ## Web Application Deployment
 
 The KotaDB web application is a Next.js frontend that provides GitHub OAuth authentication, API key management, and subscription billing. This section covers deploying the web app to Fly.io.
@@ -1147,8 +1138,6 @@ flyctl releases rollback v123 --app kotadb-web-production
 - Check rate limits haven't been exceeded
 - Ensure backend API is accessible from MCP client
 
-=======
->>>>>>> origin/main
 ## Security Considerations
 
 ### Secrets Management

@@ -28,10 +28,7 @@ from adws.adw_modules.ts_commands import validation_commands
 from adws.adw_modules.utils import load_adw_env
 from adws.adw_modules.workflow_ops import (
     AGENT_TESTER,
-<<<<<<< HEAD
     PhaseMetricsCollector,
-=======
->>>>>>> origin/main
     classify_issue,
     format_issue_message,
     lockfile_changed,
@@ -189,7 +186,6 @@ def main() -> None:
 
     check_env(logger)
 
-<<<<<<< HEAD
     # Wrap main logic in metrics collector
     with PhaseMetricsCollector(adw_id, "adw_test", logger) as metrics:
         try:
@@ -380,185 +376,6 @@ def main() -> None:
                     logger
                 )
 
-=======
-    try:
-        repo_url = get_repo_url()
-        repo_path = extract_repo_path(repo_url)
-    except ValueError as exc:
-        logger.error(f"Unable to resolve repository: {exc}")
-        sys.exit(1)
-
-    # Load worktree metadata from state
-    if not state.worktree_name or not state.worktree_path:
-        logger.error("No worktree information in state. Run adws/adw_plan.py first.")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", "❌ Missing worktree information. Run planning first."),
-        )
-        sys.exit(1)
-
-    # Verify worktree exists
-    worktree_path = Path(state.worktree_path)
-    if not worktree_path.exists():
-        logger.error(f"Worktree not found at: {worktree_path}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Worktree not found: {worktree_path}"),
-        )
-        sys.exit(1)
-
-    logger.info(f"Using worktree: {state.worktree_name} at {worktree_path}")
-
-    # Provision isolated test environment
-    try:
-        project_name = setup_test_environment(worktree_path, adw_id, logger)
-        state.update(test_project_name=project_name)
-        state.save()
-    except Exception as exc:
-        logger.error(f"Test environment provisioning failed: {exc}")
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", f"❌ Test environment setup failed: {exc}"),
-        )
-        sys.exit(1)
-
-    issue = fetch_issue(issue_number, repo_path)
-    persist_issue_snapshot(state, issue)
-    state.save()
-
-    if not state.issue_class:
-        issue_command, error = classify_issue(issue, adw_id, logger)
-        if issue_command:
-            state.update(issue_class=issue_command)
-            state.save()
-
-    try:
-        # Pre-validation health checks (non-blocking)
-        app_package_json = worktree_path / "app" / "package.json"
-        app_env_test = worktree_path / "app" / ".env.test"
-
-        if not app_package_json.exists():
-            logger.warning(f"Worktree structure check: app/package.json not found at {app_package_json}")
-        if not app_env_test.exists():
-            logger.warning(f"Test environment check: app/.env.test not found at {app_env_test}")
-
-        lockfile_dirty = lockfile_changed(cwd=worktree_path)
-        commands = validation_commands(lockfile_dirty and not args.skip_install)
-        serialized_commands = serialize_validation(commands)
-
-        make_issue_comment(
-            issue_number,
-            f"{format_issue_message(adw_id, 'ops', '✅ Starting validation run')}\n"
-            f"Commands:\n" + "\n".join(f"- `{entry['cmd']}`" for entry in serialized_commands),
-        )
-
-        # Check if agent resolution is enabled (default: true)
-        enable_resolution = os.getenv("ADW_ENABLE_RESOLUTION", "true").lower() == "true"
-
-        if enable_resolution:
-            results, success = run_validation_with_resolution(
-                commands=commands,
-                worktree_path=worktree_path,
-                adw_id=adw_id,
-                issue_number=issue_number,
-                logger=logger,
-                max_attempts=3,
-            )
-        else:
-            from adws.adw_modules.workflow_ops import run_validation_commands
-            results = run_validation_commands(commands, cwd=worktree_path, logger=logger)
-            success = all(r.ok for r in results)
-
-        _, summary = summarize_validation_results(results)
-
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, AGENT_TESTER, summary),
-        )
-
-        # Always persist validation results for post-mortem analysis, regardless of outcome
-        state.update(
-            last_validation=json.dumps([asdict(result) for result in results], indent=2),
-            last_validation_success=success,
-        )
-        state.save()
-
-        if not success:
-            # Extract first failed result for detailed error reporting
-            failed_result = next((r for r in results if not r.ok), None)
-            if failed_result:
-                # Truncate outputs to 2000 chars with ellipsis
-                def truncate(text: str, limit: int = 2000) -> str:
-                    return text[:limit] + "..." if len(text) > limit else text
-
-                error_details = [
-                    f"**Command**: `{' '.join(failed_result.command)}`",
-                    f"**Label**: {failed_result.label}",
-                    f"**Exit code**: {failed_result.returncode}",
-                    "",
-                ]
-
-                # Add resolution attempt details if enabled
-                if enable_resolution:
-                    retry_count = state.get("validation_retry_count", 0)
-                    error_details.extend([
-                        f"**Resolution attempts**: {retry_count}",
-                        "",
-                    ])
-
-                    # Include last resolution attempts (truncated to 500 chars)
-                    last_attempts = state.get("last_resolution_attempts", "")
-                    if last_attempts:
-                        truncated_attempts = truncate(last_attempts, limit=500)
-                        error_details.extend([
-                            "**Resolution history**:",
-                            "```",
-                            truncated_attempts,
-                            "```",
-                            "",
-                        ])
-
-                error_details.extend([
-                    "**Stderr**:",
-                    "```",
-                    truncate(failed_result.stderr) if failed_result.stderr else "(empty)",
-                    "```",
-                    "",
-                    "**Stdout**:",
-                    "```",
-                    truncate(failed_result.stdout) if failed_result.stdout else "(empty)",
-                    "```",
-                ])
-                error_message = "\n".join(error_details)
-
-                make_issue_comment(
-                    issue_number,
-                    f"{format_issue_message(adw_id, 'ops', '❌ Validation command failed')}\n\n{error_message}",
-                )
-
-            logger.error("Validation run failed")
-            sys.exit(1)
-
-        make_issue_comment(
-            issue_number,
-            format_issue_message(adw_id, "ops", "✅ Validation phase completed"),
-        )
-        make_issue_comment(
-            issue_number,
-            f"{format_issue_message(adw_id, 'ops', '📋 Test phase state')}\n```json\n{json.dumps(state.data, indent=2)}\n```",
-        )
-        logger.info("Validation completed successfully")
-
-    finally:
-        # Always tear down test environment, even on failure
-        if state.get("test_project_name"):
-            teardown_test_environment(
-                worktree_path,
-                state.get("test_project_name"),
-                logger
-            )
-
->>>>>>> origin/main
 
 if __name__ == "__main__":
     main()

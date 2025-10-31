@@ -3,36 +3,25 @@
 from __future__ import annotations
 
 import json
-<<<<<<< HEAD
 import logging
 import sqlite3
 import time
 from dataclasses import dataclass, field
 from datetime import datetime
-=======
-from dataclasses import dataclass, field
->>>>>>> origin/main
 from pathlib import Path
 from typing import Any, Dict, Optional
 
 from .utils import make_adw_id, project_root
 
-<<<<<<< HEAD
 logger = logging.getLogger(__name__)
 
-=======
->>>>>>> origin/main
 STATE_FILENAME = "adw_state.json"
 
 
 def agents_root() -> Path:
     """Base directory for per-agent state and logs."""
 
-<<<<<<< HEAD
     return project_root() / "automation" / "agents"
-=======
-    return project_root() / "agents"
->>>>>>> origin/main
 
 
 def state_path(adw_id: str) -> Path:
@@ -52,14 +41,11 @@ class ADWState:
     Resolution tracking fields (stored in extra):
         - last_resolution_attempts: JSON string of resolution history for debugging
         - validation_retry_count: Number of validation retry attempts performed
-<<<<<<< HEAD
         - beads_issue_id: Beads issue ID for tracking (e.g., kota-db-ts-303)
         - beads_sync: Sync metadata (last_sync, source, beads_available)
         - auto_merge_enabled: Auto-merge enabled for PR (default: False)
         - merge_status: Merge status (pending, success, failed, conflict)
         - merge_timestamp: Timestamp when merge status was updated
-=======
->>>>>>> origin/main
     """
 
     adw_id: str
@@ -72,14 +58,11 @@ class ADWState:
     worktree_created_at: Optional[str] = None
     test_project_name: Optional[str] = None
     pr_created: Optional[bool] = None
-<<<<<<< HEAD
     beads_issue_id: Optional[str] = None
     beads_sync: Optional[Dict[str, Any]] = None
     auto_merge_enabled: Optional[bool] = None
     merge_status: Optional[str] = None
     merge_timestamp: Optional[float] = None
-=======
->>>>>>> origin/main
     extra: Dict[str, Any] = field(default_factory=dict)
 
     @property
@@ -102,14 +85,11 @@ class ADWState:
             "worktree_created_at": self.worktree_created_at,
             "test_project_name": self.test_project_name,
             "pr_created": self.pr_created,
-<<<<<<< HEAD
             "beads_issue_id": self.beads_issue_id,
             "beads_sync": self.beads_sync,
             "auto_merge_enabled": self.auto_merge_enabled,
             "merge_status": self.merge_status,
             "merge_timestamp": self.merge_timestamp,
-=======
->>>>>>> origin/main
         }
         payload.update(self.extra)
         return {key: value for key, value in payload.items() if value is not None}
@@ -132,11 +112,7 @@ class ADWState:
         with open(path, "r", encoding="utf-8") as handle:
             data = json.load(handle)
 
-<<<<<<< HEAD
         extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at", "test_project_name", "pr_created", "beads_issue_id", "beads_sync", "auto_merge_enabled", "merge_status", "merge_timestamp"}}
-=======
-        extra = {key: value for key, value in data.items() if key not in {"adw_id", "issue_number", "branch_name", "plan_file", "issue_class", "worktree_name", "worktree_path", "worktree_created_at", "test_project_name", "pr_created"}}
->>>>>>> origin/main
 
         return cls(
             adw_id=data.get("adw_id", adw_id),
@@ -149,14 +125,11 @@ class ADWState:
             worktree_created_at=data.get("worktree_created_at"),
             test_project_name=data.get("test_project_name"),
             pr_created=data.get("pr_created"),
-<<<<<<< HEAD
             beads_issue_id=data.get("beads_issue_id"),
             beads_sync=data.get("beads_sync"),
             auto_merge_enabled=data.get("auto_merge_enabled"),
             merge_status=data.get("merge_status"),
             merge_timestamp=data.get("merge_timestamp"),
-=======
->>>>>>> origin/main
             extra=extra,
         )
 
@@ -190,7 +163,6 @@ class ADWState:
     def data(self) -> Dict[str, Any]:
         return self.to_dict()
 
-<<<<<<< HEAD
     def get_phase_metrics(self, phase_name: str) -> Optional[Any]:
         """Retrieve metrics for a specific phase.
 
@@ -267,8 +239,6 @@ class ADWState:
         """
         return self.auto_merge_enabled is True
 
-=======
->>>>>>> origin/main
 
 def ensure_adw_id(existing: str | None = None) -> str:
     """Return an existing ADW id or generate a new one."""
@@ -278,7 +248,6 @@ def ensure_adw_id(existing: str | None = None) -> str:
     return make_adw_id()
 
 
-<<<<<<< HEAD
 class BeadsStateManager:
     """Database-backed state manager for ADW workflows.
 
@@ -608,10 +577,6 @@ class BeadsStateManager:
 __all__ = [
     "ADWState",
     "BeadsStateManager",
-=======
-__all__ = [
-    "ADWState",
->>>>>>> origin/main
     "STATE_FILENAME",
     "StateNotFoundError",
     "agents_root",

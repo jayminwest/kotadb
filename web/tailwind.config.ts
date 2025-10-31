@@ -12,7 +12,6 @@ const config: Config = {
         background: 'var(--background)',
         foreground: 'var(--foreground)',
       },
-<<<<<<< HEAD
       backdropBlur: {
         xs: '2px',
         sm: '4px',
@@ -23,8 +22,6 @@ const config: Config = {
       backdropSaturate: {
         180: '180%',
       },
-=======
->>>>>>> origin/main
     },
   },
   plugins: [],

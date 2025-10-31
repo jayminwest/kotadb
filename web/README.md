@@ -132,7 +132,6 @@ cd web && bun run build
 
 ## Deployment
 
-<<<<<<< HEAD
 ### Vercel
 
 When deploying to Vercel, configure the following environment variables in Project Settings → Environment Variables:
@@ -155,9 +154,6 @@ When deploying to Vercel, configure the following environment variables in Proje
 - Install Command: `bun install`
 
 See `docs/deployment.md` for backend API deployment instructions.
-=======
-See `docs/deployment.md` for deployment instructions (Fly.io, Vercel, etc.).
->>>>>>> origin/main
 
 ## Contributing
 

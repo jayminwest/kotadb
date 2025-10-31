@@ -5,7 +5,6 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
-<<<<<<< HEAD
 
   /* Glass design tokens */
   --glass-blur-sm: 4px;
@@ -17,15 +16,12 @@
   --glass-border-dark: rgba(255, 255, 255, 0.12);
   --glass-bg-light: rgba(255, 255, 255, 0.7);
   --glass-bg-dark: rgba(255, 255, 255, 0.05);
-=======
->>>>>>> origin/main
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
     --background: #0a0a0a;
     --foreground: #ededed;
-<<<<<<< HEAD
     --glass-bg-light: rgba(10, 10, 10, 0.7);
     --glass-bg-dark: rgba(0, 0, 0, 0.5);
   }
@@ -45,8 +41,6 @@
       --glass-bg-light: rgba(10, 10, 10, 0.95);
       --glass-bg-dark: rgba(0, 0, 0, 0.95);
     }
-=======
->>>>>>> origin/main
   }
 }
 
@@ -60,7 +54,6 @@ body {
   .text-balance {
     text-wrap: balance;
   }
-<<<<<<< HEAD
 
   /* Glass utility classes */
   .glass-light {
@@ -110,6 +103,4 @@ body {
       -webkit-backdrop-filter: none;
     }
   }
-=======
->>>>>>> origin/main
 }

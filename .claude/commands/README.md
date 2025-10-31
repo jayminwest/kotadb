@@ -59,17 +59,12 @@ When creating new slash commands, follow these guidelines:
 
 ## Documentation References
 
-<<<<<<< HEAD
 - **conditional_docs/** - Layer-specific documentation guides (see "Conditional Documentation Structure" below)
-=======
-- **conditional_docs.md** - Guide for determining which documentation to read based on task scope
->>>>>>> origin/main
 - **anti-mock.md** - Testing philosophy and guidelines for writing tests without mocks
 - **prompt-code-alignment.md** - Guidelines for ensuring slash command templates align with parsing code
 - **CLAUDE.md** (root) - Complete project architecture and development workflows
 - **automation/adws/README.md** - ADW automation pipeline documentation
 
-<<<<<<< HEAD
 ## Conditional Documentation Structure
 
 The `conditional_docs/` directory contains layer-specific documentation guides that help agents determine which KotaDB documentation to consult based on their task scope. This structure minimizes context window usage by loading only relevant documentation for each layer.
@@ -102,8 +97,6 @@ The `conditional_docs/` directory contains layer-specific documentation guides t
 - **Better separation of concerns**: Clear boundaries between application, automation, and web layers
 - **Scalable pattern**: Easy to add new layers (CLI tools, SDKs, etc.) in future
 
-=======
->>>>>>> origin/main
 ## Command Organization History
 
 The subdirectory structure was established in issue #58 to improve command discoverability and maintainability. Prior to this reorganization, all commands were stored in a flat directory structure at `automation/.claude/commands/`. The current structure provides better separation of concerns and makes it easier for developers to locate and understand available commands.

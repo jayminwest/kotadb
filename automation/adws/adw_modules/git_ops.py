@@ -177,7 +177,6 @@ def push(branch_name: str, remote: str = "origin", force: bool = False, cwd: Pat
     return _run_git(args, cwd=cwd, check=False)
 
 
-<<<<<<< HEAD
 def classify_push_error(stderr: str) -> str:
     """Classify push error type from stderr output.
 
@@ -274,15 +273,6 @@ def push_branch(branch_name: str, remote: str = "origin", force: bool = False, c
         "error_type": "unknown",
         "error_message": "Push failed after all retry attempts",
     }
-=======
-def push_branch(branch_name: str, remote: str = "origin", force: bool = False, cwd: Path | None = None) -> tuple[bool, Optional[str]]:
-    """Push the branch to the remote."""
-
-    result = push(branch_name, remote=remote, force=force, cwd=cwd)
-    if not result.ok:
-        return False, result.stderr or "git push failed"
-    return True, None
->>>>>>> origin/main
 
 
 def finalize_git_operations(
@@ -308,21 +298,13 @@ def finalize_git_operations(
             raise GitError(push_result.stderr or "git push failed")
 
 
-<<<<<<< HEAD
 def create_worktree(worktree_name: str, base_branch: str, base_path: str = "automation/trees") -> Path:
-=======
-def create_worktree(worktree_name: str, base_branch: str, base_path: str = "trees") -> Path:
->>>>>>> origin/main
     """Create a git worktree in the specified base path.
 
     Args:
         worktree_name: Name for the worktree directory and branch
         base_branch: Base branch to branch from (e.g., 'develop')
-<<<<<<< HEAD
         base_path: Base directory for worktrees (default: 'automation/trees')
-=======
-        base_path: Base directory for worktrees (default: 'trees')
->>>>>>> origin/main
 
     Returns:
         Path to the created worktree
@@ -342,20 +324,12 @@ def create_worktree(worktree_name: str, base_branch: str, base_path: str = "tree
     return worktree_path
 
 
-<<<<<<< HEAD
 def cleanup_worktree(worktree_name: str, base_path: str = "automation/trees", delete_branch: bool = True) -> bool:
-=======
-def cleanup_worktree(worktree_name: str, base_path: str = "trees", delete_branch: bool = True) -> bool:
->>>>>>> origin/main
     """Remove a git worktree and optionally delete its branch.
 
     Args:
         worktree_name: Name of the worktree to remove
-<<<<<<< HEAD
         base_path: Base directory for worktrees (default: 'automation/trees')
-=======
-        base_path: Base directory for worktrees (default: 'trees')
->>>>>>> origin/main
         delete_branch: Whether to delete the associated branch (default: True)
 
     Returns:
@@ -420,20 +394,12 @@ def list_worktrees() -> list[dict]:
     return worktrees
 
 
-<<<<<<< HEAD
 def worktree_exists(worktree_name: str, base_path: str = "automation/trees") -> bool:
-=======
-def worktree_exists(worktree_name: str, base_path: str = "trees") -> bool:
->>>>>>> origin/main
     """Check if a worktree exists at the expected path.
 
     Args:
         worktree_name: Name of the worktree to check
-<<<<<<< HEAD
         base_path: Base directory for worktrees (default: 'automation/trees')
-=======
-        base_path: Base directory for worktrees (default: 'trees')
->>>>>>> origin/main
 
     Returns:
         True if worktree exists, False otherwise

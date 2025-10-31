@@ -4,11 +4,7 @@ Create a new git worktree with sparse checkout for isolated task execution.
 
 ## Inputs
 - `$1` (worktree_name): Name for the new worktree (must be a valid git branch name)
-<<<<<<< HEAD
 - `$2` (target_directory): Optional target directory for the worktree. Defaults to "automation/trees/{worktree_name}"
-=======
-- `$2` (target_directory): Optional target directory for the worktree. Defaults to "trees/{worktree_name}"
->>>>>>> origin/main
 
 ## Instructions
 
@@ -30,28 +26,17 @@ Create a new git worktree with sparse checkout for isolated task execution.
 git worktree list
 
 # Create worktree (from develop branch)
-<<<<<<< HEAD
 git worktree add automation/trees/{worktree_name} -b {worktree_name} develop
 
 # If develop doesn't exist, use main/master
 git worktree add automation/trees/{worktree_name} -b {worktree_name} main
-=======
-git worktree add trees/{worktree_name} -b {worktree_name} develop
-
-# If develop doesn't exist, use main/master
-git worktree add trees/{worktree_name} -b {worktree_name} main
->>>>>>> origin/main
 ```
 
 ## Expected Output
 
 Return the absolute path to the created worktree:
 ```
-<<<<<<< HEAD
 /Users/jayminwest/Projects/kota-db-ts/automation/trees/feat-rate-limiting
-=======
-/Users/jayminwest/Projects/kota-db-ts/trees/feat-rate-limiting
->>>>>>> origin/main
 ```
 
 ## Error Handling

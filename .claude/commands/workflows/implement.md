@@ -4,11 +4,7 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 
 ## Instructions
 - Read the entire plan before making changes; clarify assumptions in inline notes if something is ambiguous.
-<<<<<<< HEAD
 - Consult `.claude/commands/docs/conditional_docs/app.md` (for backend/API changes) or `.claude/commands/docs/conditional_docs/automation.md` (for ADW/automation changes) for any documentation that matches the implementation scope.
-=======
-- Consult `.claude/commands/docs/conditional_docs.md` for any documentation that matches the implementation scope.
->>>>>>> origin/main
 - Execute tasks in the documented order, touching only the files listed unless the plan explicitly allows otherwise.
 - Keep commits incremental and logically grouped. Use Conventional Commit subjects referencing the issue.
   - **CRITICAL**: Avoid meta-commentary patterns in commit messages (e.g., "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me")
@@ -49,15 +45,9 @@ Before creating the PR, select and execute the appropriate validation level:
 5. Stop immediately if any command fails; fix before proceeding
 
 **Commands by Level**:
-<<<<<<< HEAD
 - Level 1: `cd app && bun run lint && cd app && bunx tsc --noEmit`
 - Level 2: `cd app && bun run lint && cd app && bunx tsc --noEmit && cd app && bun test:setup && cd app && bun test --filter integration && cd app && bun test:teardown || true`
 - Level 3: `cd app && bun run lint && cd app && bunx tsc --noEmit && cd app && bun test:setup && cd app && bun test --filter integration && cd app && bun test && cd app && bun test:teardown || true && cd app && bun run build`
-=======
-- Level 1: `bun run lint && bun run typecheck`
-- Level 2: `bun run lint && bun run typecheck && bun test --filter integration`
-- Level 3: `bun run lint && bun run typecheck && bun test --filter integration && bun test && bun run build`
->>>>>>> origin/main
 
 **Evidence Required**:
 - Document which level you selected and why
@@ -105,7 +95,6 @@ All tests passed successfully! The validation level was Level 2.
 
 You can view the pull request at: https://github.com/user/repo/pull/123
 ```
-<<<<<<< HEAD
 
 ## Output Schema
 
@@ -149,5 +138,3 @@ This command's output is validated against the following structure for orchestra
 ```
 
 The orchestrator parses the bullet list output to extract these fields using pattern matching. While the output is plain text (not JSON), the schema defines what information must be present and parseable from the output.
-=======
->>>>>>> origin/main

@@ -47,7 +47,6 @@ def main() -> None:
     logger = start_logger(adw_id, "adw_sdlc")
     logger.info(f"Starting simplified SDLC workflow | issue #{issue_number} | adw_id={adw_id}")
 
-<<<<<<< HEAD
     # Check for atomic agent orchestrator feature flag (Phase 2)
     use_atomic_agents = os.environ.get("ADW_USE_ATOMIC_AGENTS", "false").lower() == "true"
 
@@ -67,8 +66,6 @@ def main() -> None:
     # Legacy 3-phase workflow (backwards compatibility)
     logger.info("Using legacy 3-phase workflow (ADW_USE_ATOMIC_AGENTS=false)")
 
-=======
->>>>>>> origin/main
     # Create environment for multi-phase execution
     # Skip worktree cleanup in plan phase since subsequent phases need the worktree
     sdlc_env = os.environ.copy()

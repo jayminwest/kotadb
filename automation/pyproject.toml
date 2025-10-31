@@ -5,10 +5,7 @@ description = "KotaDB AI Developer Workflows automation layer"
 requires-python = ">=3.12"
 dependencies = [
     "pytest>=8.0.0",
-<<<<<<< HEAD
     "pytest-asyncio>=0.23.0",
-=======
->>>>>>> origin/main
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
@@ -26,7 +23,6 @@ testpaths = ["adws/adw_tests"]
 python_files = "test_*.py"
 python_classes = "Test*"
 python_functions = "test_*"
-<<<<<<< HEAD
 markers = [
     "integration: marks tests as integration tests requiring dev server (deselect with '-m \"not integration\"')",
     "asyncio: marks tests as async (handled by pytest-asyncio plugin)",
@@ -43,8 +39,3 @@ ignore = []
 [tool.ruff.per-file-ignores]
 # Allow print() in scripts that are meant to be run directly (not imported)
 "adws/scripts/*.py" = ["T201"]
-=======
-
-[tool.uv]
-dev-dependencies = []
->>>>>>> origin/main

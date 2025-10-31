@@ -173,7 +173,6 @@ if [ -f "app/supabase/seed.sql" ]; then
     echo "✅ Test data seeded successfully!"
 fi
 
-<<<<<<< HEAD
 # Start Stripe CLI listener if credentials configured
 if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
     echo "🔧 Starting Stripe CLI listener..."
@@ -201,18 +200,13 @@ if [ -n "${STRIPE_SECRET_KEY:-}" ]; then
     fi
 fi
 
-=======
->>>>>>> origin/main
 echo ""
 echo "Configuration:"
 echo "  API URL (Kong):  $SUPABASE_URL"
 echo "  Database:        $DATABASE_URL"
 echo "  Project Name:    $PROJECT_NAME"
-<<<<<<< HEAD
 if [ -n "${STRIPE_SECRET_KEY:-}" ] && [ -n "${STRIPE_WEBHOOK_SECRET:-}" ]; then
     echo "  Stripe webhook:  ${SUPABASE_URL}/webhooks/stripe"
 fi
-=======
->>>>>>> origin/main
 echo ""
 echo "🎉 Docker Compose test setup complete for CI!"

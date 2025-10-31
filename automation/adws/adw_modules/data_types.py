@@ -280,11 +280,7 @@ class HomeServerCronConfig(BaseModel):
     tasks_endpoint: str = Field(default="/api/kota-tasks", description="Tasks API endpoint")
     dry_run: bool = Field(default=False, description="Run without making changes")
     max_concurrent_tasks: int = Field(default=3, ge=1, description="Max parallel tasks")
-<<<<<<< HEAD
     worktree_base_path: str = Field(default="automation/trees", description="Base path for worktrees")
-=======
-    worktree_base_path: str = Field(default="trees", description="Base path for worktrees")
->>>>>>> origin/main
     status_filter: List[TaskStatus] = Field(
         default=[TaskStatus.PENDING],
         description="Task statuses to fetch"
@@ -309,7 +305,6 @@ class CheckpointFile(BaseModel):
     checkpoints: List[CheckpointData] = Field(default_factory=list, description="List of checkpoints in this phase")
 
 
-<<<<<<< HEAD
 class PhaseMetrics(BaseModel):
     """Execution metrics for a single ADW phase."""
     phase_name: str = Field(..., description="Phase identifier (adw_plan, adw_build, etc.)")
@@ -398,23 +393,16 @@ class SurgicalFixState(BaseModel):
     checkpoints: List[CheckpointData] = Field(default_factory=list, description="Workflow checkpoints")
 
 
-=======
->>>>>>> origin/main
 __all__ = [
     "AgentPromptRequest",
     "AgentPromptResponse",
     "AgentTemplateRequest",
-<<<<<<< HEAD
     "AutoMergeResult",
     "BeadsIssue",
     "BeadsSyncMetadata",
     "CheckpointData",
     "CheckpointFile",
     "CIMonitoringResult",
-=======
-    "CheckpointData",
-    "CheckpointFile",
->>>>>>> origin/main
     "ClaudeCodeResultMessage",
     "CommandMapping",
     "CommandType",
@@ -431,7 +419,6 @@ __all__ = [
     "HomeServerTaskUpdate",
     "IssueClassSlashCommand",
     "ModelType",
-<<<<<<< HEAD
     "PhaseMetrics",
     "ReproductionResult",
     "ReviewIssue",
@@ -442,14 +429,6 @@ __all__ = [
     "TestResult",
     "TriggerStatsReport",
     "WorkflowMetrics",
-=======
-    "ReviewIssue",
-    "ReviewResult",
-    "SlashCommand",
-    "TaskStatus",
-    "TestResult",
-    "TriggerStatsReport",
->>>>>>> origin/main
     "WorkflowType",
     "resolve_category",
 ]

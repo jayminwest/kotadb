@@ -20,13 +20,8 @@ Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lea
 - Call out all affected files (and any new artefacts) in the plan to avoid churn during implementation.
 - Reference the git flow: branch from `develop` using `chore/<issue-number>-<slug>`, merging back into `develop` before promotion to `main`.
 - Ensure the plan's final tasks rerun validation and push the branch so reviewers can create a PR (PR titles must end with the issue number, e.g. `chore: refresh deps (#210)`).
-<<<<<<< HEAD
 - Consult `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and pull in only the docs relevant to this maintenance scope.
 - If the chore introduces new documentation artefacts, extend `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` with conditions that describe when to read them.
-=======
-- Consult `.claude/commands/docs/conditional_docs.md` and pull in only the docs relevant to this maintenance scope.
-- If the chore introduces new documentation artefacts, extend `.claude/commands/docs/conditional_docs.md` with conditions that describe when to read them.
->>>>>>> origin/main
 
 ## ADW Agent Integration
 - If executing via ADW orchestration, query workflow state via MCP instead of searching:
@@ -86,7 +81,6 @@ All commits for this chore will be validated. Ensure commit messages:
 ```
 
 ## Report
-<<<<<<< HEAD
 Return ONLY the plan file path as plain text on a single line.
 
 **CRITICAL - Output Format:**
@@ -111,29 +105,3 @@ Plan file: docs/specs/chore-1450-refresh-deps.md
 **docs/specs/chore-1450-refresh-deps.md**
 ```
 
-=======
-Summarise the plan in 2-3 bullets highlighting key changes and risks.
-
-**Important Notes:**
-- The plan file path will be automatically detected by `/find_plan_file` agent
-- Focus output on summarizing what was planned, not the file location
-- Do NOT format output with markdown (no **bold**, no ` ``` blocks`, no # headers)
-
-**Correct output:**
-```
-- Created chore plan for dependency refresh (bun 1.1.x upgrade)
-- Plan covers lockfile updates, test validation, and CI verification
-- Low risk: no breaking changes expected, validation confirms compatibility
-```
-
-**INCORRECT output (do NOT do this):**
-```
-# Chore Plan Created
-
-I have successfully created a maintenance plan!
-
-**Plan location:** docs/specs/chore-1450-refresh-deps.md
-
-The plan includes...
-```
->>>>>>> origin/main
