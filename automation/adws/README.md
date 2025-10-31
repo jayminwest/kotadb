@@ -85,46 +85,6 @@ The SDLC orchestrator (`adw_sdlc.py`) chains single-phase scripts using `adw_mod
 
 ---
 
-## Surgical Fix Workflow
-
-**Feature #354: Critical Bug Automation**
-
-Specialized workflow for rapid deployment of critical bug fixes (priority:critical or priority:high) with minimal human intervention.
-
-**Key Features:**
-- **Bug Reproduction**: Validates bug existence by executing reproduction steps from issue body
-- **Automated Plan + Implementation**: Delegates to `/bug` and `/implement` slash commands
-- **CI Monitoring**: Polls GitHub Actions with automated retry logic (max 2 attempts)
-- **Auto-Merge**: Merges PR when CI passes and review approved
-
-**Usage:**
-```bash
-# Start new surgical fix workflow
-uv run adws/surgical_fix.py --issue 123
-
-# Resume from checkpoint
-uv run adws/surgical_fix.py --resume fix-123-20251029120000
-
-# Dry-run validation
-uv run adws/surgical_fix.py --issue 123 --dry-run
-
-# Skip worktree cleanup
-uv run adws/surgical_fix.py --issue 123 --skip-cleanup
-```
-
-**Success Metrics:**
-- Time-to-merge < 15 minutes for critical bugs
-- CI auto-fix success rate > 70%
-- End-to-end success rate > 80%
-- Zero false-positive merges (Level 2+ validation required)
-
-**State Management:**
-Surgical fix state is stored in `automation/agents/<surgical_fix_id>/surgical_fix_state.json` with checkpoint-based recovery for resume capability.
-
-See `docs/surgical-fix-usage.md` for troubleshooting guide and workflow details.
-
----
-
 ## Atomic Agent Catalog
 
 **Chore #216: Migrate ADW to Atomic Agents** (Phase 1 Complete)

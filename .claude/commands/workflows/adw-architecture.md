@@ -96,41 +96,6 @@ Feature #187: Use `/orchestrator` to automate the full end-to-end issue-to-PR wo
 
 See `.claude/commands/workflows/orchestrator.md` for detailed usage.
 
-## Surgical Fix Workflow
-
-Feature #354: Specialized workflow for critical bug fixes requiring rapid deployment with minimal human intervention.
-
-**Purpose**: Optimize time-to-merge for critical bugs (priority:critical or priority:high) through:
-- Built-in verification at each step with test validation and CI monitoring
-- Autonomous progression through auto-merge when all checks pass
-- Reproducibility validation to confirm bug exists before attempting fixes
-
-**Architecture**: Extends 3-phase ADW with specialized phases:
-1. **Pre-plan reproduction**: Validates bug existence by executing reproduction steps from issue body
-2. **Plan + Implementation**: Delegates to `/bug` and `/implement` slash commands
-3. **CI monitoring**: Polls GitHub Actions for results with automated retry logic (max 2 attempts)
-4. **Auto-merge**: Merges PR when CI passes and review approved (reviewDecision: APPROVED)
-
-**Usage**:
-```bash
-# Start new surgical fix workflow
-cd automation && uv run adws/surgical_fix.py --issue 123
-
-# Resume from checkpoint
-cd automation && uv run adws/surgical_fix.py --resume fix-123-20251029120000
-
-# Dry-run to validate preconditions
-cd automation && uv run adws/surgical_fix.py --issue 123 --dry-run
-```
-
-**Success metrics**:
-- Time-to-merge < 15 minutes for critical bugs
-- CI auto-fix success rate > 70%
-- End-to-end success rate > 80%
-- Zero false-positive merges (all validation required)
-
-See `automation/adws/docs/surgical-fix-usage.md` for complete usage guide and troubleshooting.
-
 ## Resilience Architecture
 
 PR #157, issue #148: Hybrid resilience system with automatic retry logic and checkpoint-based recovery.

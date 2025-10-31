@@ -348,61 +348,16 @@ class BeadsSyncMetadata(BaseModel):
     beads_available: bool = Field(default=False, description="Whether beads MCP tools are available")
 
 
-class ReproductionResult(BaseModel):
-    """Result of bug reproduction phase."""
-    steps_executed: List[str] = Field(default_factory=list, description="Reproduction steps executed")
-    evidence_files: List[str] = Field(default_factory=list, description="Paths to evidence files")
-    confirmed_at: str = Field(..., description="ISO timestamp when bug confirmed")
-    success: bool = Field(..., description="Whether reproduction succeeded")
-    error_message: Optional[str] = Field(None, description="Error message if reproduction failed")
-
-
-class CIMonitoringResult(BaseModel):
-    """Result of CI monitoring phase."""
-    checks_passed: bool = Field(..., description="Whether all CI checks passed")
-    retry_count: int = Field(default=0, description="Number of CI fix retry attempts")
-    last_check_at: str = Field(..., description="ISO timestamp of last CI check")
-    failing_checks: List[str] = Field(default_factory=list, description="Names of failing CI checks")
-
-
-class AutoMergeResult(BaseModel):
-    """Result of auto-merge phase."""
-    eligible: bool = Field(..., description="Whether PR is eligible for auto-merge")
-    merge_attempted: bool = Field(default=False, description="Whether merge was attempted")
-    merge_result: Optional[str] = Field(None, description="Merge result message")
-
-
-class SurgicalFixState(BaseModel):
-    """State for surgical fix workflow."""
-    model_config = ConfigDict(populate_by_name=True)
-
-    surgical_fix_id: str = Field(..., description="Unique surgical fix identifier")
-    issue_number: str = Field(..., description="GitHub issue number")
-    issue_title: str = Field(..., description="GitHub issue title")
-    worktree_path: Optional[str] = Field(None, description="Worktree path for isolated execution")
-    branch_name: Optional[str] = Field(None, description="Git branch name")
-    created_at: str = Field(..., description="ISO timestamp when workflow started")
-    phase_status: Dict[str, str] = Field(default_factory=dict, description="Status of each phase")
-    reproduction: Optional[ReproductionResult] = Field(None, description="Bug reproduction result")
-    plan_file: Optional[str] = Field(None, description="Path to plan file")
-    validation: Optional[Dict[str, Any]] = Field(None, description="Validation results")
-    pr_number: Optional[str] = Field(None, description="GitHub PR number")
-    pr_url: Optional[str] = Field(None, description="GitHub PR URL")
-    ci_monitoring: Optional[CIMonitoringResult] = Field(None, description="CI monitoring result")
-    auto_merge: Optional[AutoMergeResult] = Field(None, description="Auto-merge result")
-    checkpoints: List[CheckpointData] = Field(default_factory=list, description="Workflow checkpoints")
 
 
 __all__ = [
     "AgentPromptRequest",
     "AgentPromptResponse",
     "AgentTemplateRequest",
-    "AutoMergeResult",
     "BeadsIssue",
     "BeadsSyncMetadata",
     "CheckpointData",
     "CheckpointFile",
-    "CIMonitoringResult",
     "ClaudeCodeResultMessage",
     "CommandMapping",
     "CommandType",
@@ -420,11 +375,9 @@ __all__ = [
     "IssueClassSlashCommand",
     "ModelType",
     "PhaseMetrics",
-    "ReproductionResult",
     "ReviewIssue",
     "ReviewResult",
     "SlashCommand",
-    "SurgicalFixState",
     "TaskStatus",
     "TestResult",
     "TriggerStatsReport",
