@@ -76,6 +76,17 @@ Use this reference to decide which KotaDB automation layer documentation sources
     - When modifying agent.py environment construction logic (get_claude_env function)
     - When root repository branch changes unexpectedly during ADW execution
 
+- docs/specs/chore-215-stale-worktree-cleanup.md
+  - Conditions:
+    - When working on issue #215 or implementing stale worktree cleanup
+    - When troubleshooting disk space issues caused by orphaned worktrees
+    - When implementing or modifying `automation/adws/scripts/cleanup-stale-worktrees.py`
+    - When debugging staleness detection logic or state file modification time checks
+    - When adding or modifying the weekly cleanup CI workflow (`.github/workflows/cleanup-stale-worktrees.yml`)
+    - When orphaned worktrees accumulate in `automation/trees/` after failed workflows
+    - When configuring staleness thresholds or cleanup safety mechanisms
+    - When understanding worktree naming conventions for ADW ID extraction
+
 - .claude/commands/docs/prompt-code-alignment.md
   - Conditions:
     - When creating or modifying slash command templates in `.claude/commands/`

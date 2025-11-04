@@ -57,8 +57,11 @@ Before creating the PR, select and execute the appropriate validation level:
 
 ## Final Steps
 - After validation passes, confirm `git status --short` is clean apart from intended artifacts.
-- Push the branch (`git push -u origin <branch>`).
-- Verify the PR body will include validation evidence and the title suffix `(#<issue-number>)`.
+- **DO NOT push the branch or create a PR** - the build phase handles all git operations.
+- The build phase will:
+  1. Commit your implementation changes
+  2. Push the branch to remote
+  3. Create a PR with proper title and description
 
 ## Report
 Provide a concise bullet list of the implementation work performed.
@@ -77,8 +80,7 @@ Provide a concise bullet list of the implementation work performed.
 - Commands executed: lint (pass), typecheck (pass), integration tests (pass, 133/133)
 - Real-service evidence: Supabase query logs show rate limit increments in api_keys table
 - git diff --stat: 4 files changed, 156 insertions(+), 12 deletions(-)
-- Pushed branch feat/26-abc12345-rate-limiting
-- Created PR: https://github.com/user/repo/pull/123
+- Implementation complete, ready for build phase to commit/push/PR
 ```
 
 **INCORRECT output (do NOT do this):**
@@ -93,8 +95,14 @@ I have successfully completed the implementation! Here's what I did:
 **Validation:**
 All tests passed successfully! The validation level was Level 2.
 
-You can view the pull request at: https://github.com/user/repo/pull/123
+I pushed the branch and created a pull request at: https://github.com/user/repo/pull/123
 ```
+
+**Why this is wrong:**
+- Uses markdown formatting (# headers, **bold**)
+- Includes explanatory preambles
+- Agent should NOT push branch or create PR (build phase owns these operations)
+- Violates single responsibility: implementation agents write code, build phase handles git operations
 
 ## Output Schema
 

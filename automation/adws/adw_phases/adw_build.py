@@ -195,16 +195,82 @@ def main() -> None:
                 state.update(issue_class=issue_command)
                 state.save()
 
-        # Check if there are any changes to commit
-        has_changes = not git_ops.ensure_clean_worktree(cwd=worktree_path)
+        # Check if there are any uncommitted changes to commit
+        has_uncommitted_changes = not git_ops.ensure_clean_worktree(cwd=worktree_path)
 
-        if not has_changes:
-            logger.info("No changes detected - implementation already complete or no modifications needed")
+        if has_uncommitted_changes:
+            # Track agent invocation: create_commit_message
+            start_time = time.time()
+            commit_message, error = create_commit_message(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger, cwd=str(worktree_path))
+            metrics.record_agent_invocation(duration=time.time() - start_time)
+            if error or not commit_message:
+                logger.error(f"Implementation commit message failure: {error}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error drafting commit: {error}"),
+                )
+                sys.exit(1)
+
+            # Log git status before commit for debugging
+            status_result = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
+            logger.info(f"Git status before commit:\n{status_result.stdout}")
+
+            # Track git operation: commit_all
+            start_time = time.time()
+            committed, commit_error = git_ops.commit_all(commit_message, cwd=worktree_path)
+            metrics.record_git_operation(duration=time.time() - start_time)
+            if not committed:
+                logger.error(f"Implementation commit failed: {commit_error}")
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error committing implementation: {commit_error}"),
+                )
+                sys.exit(1)
+
+            # Post outcome-specific message with file count
+            changed_count = get_changed_files_count(worktree_path)
+            if changed_count > 0:
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"✅ Implementation complete ({changed_count} files changed)"),
+                )
+            else:
+                # This shouldn't happen (we already checked has_uncommitted_changes), but handle gracefully
+                make_issue_comment(
+                    issue_number,
+                    format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed"),
+                )
+        else:
+            logger.info("No uncommitted changes detected")
+
+        # Check if PR already exists (idempotency)
+        if state.pr_created:
+            logger.info("Pull request already exists, skipping push and PR creation")
+            state.save()
+            make_issue_comment(
+                issue_number,
+                f"{format_issue_message(adw_id, 'ops', '📋 Final build state')}\n```json\n{json.dumps(state.data, indent=2)}\n```",
+            )
+            make_issue_comment(
+                issue_number,
+                format_issue_message(adw_id, "ops", "✅ Build phase completed (PR already exists)"),
+            )
+            logger.info("Build phase completed successfully (PR already exists)")
+            return
+
+        # Check if branch has diverged from base (has commits to PR)
+        branch_has_commits = git_ops.branch_differs_from_base(
+            branch=state.worktree_name,
+            base="develop",
+            cwd=worktree_path,
+        )
+
+        if not branch_has_commits:
+            logger.info("No commits on branch, nothing to PR - implementation already complete or no modifications needed")
             make_issue_comment(
                 issue_number,
                 format_issue_message(adw_id, AGENT_IMPLEMENTOR, "⏭️ No implementation needed (test issue or already complete)"),
             )
-            # Skip commit, push, and PR creation since there's nothing to commit
             state.save()
             make_issue_comment(
                 issue_number,
@@ -217,48 +283,7 @@ def main() -> None:
             logger.info("Build phase completed successfully (no changes needed)")
             return
 
-        # Track agent invocation: create_commit_message
-        start_time = time.time()
-        commit_message, error = create_commit_message(AGENT_IMPLEMENTOR, issue, issue_command, adw_id, logger, cwd=str(worktree_path))
-        metrics.record_agent_invocation(duration=time.time() - start_time)
-        if error or not commit_message:
-            logger.error(f"Implementation commit message failure: {error}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error drafting commit: {error}"),
-            )
-            sys.exit(1)
-
-        # Log git status before commit for debugging
-        status_result = git_ops._run_git(["status", "--porcelain"], cwd=worktree_path, check=False)
-        logger.info(f"Git status before commit:\n{status_result.stdout}")
-
-        # Track git operation: commit_all
-        start_time = time.time()
-        committed, commit_error = git_ops.commit_all(commit_message, cwd=worktree_path)
-        metrics.record_git_operation(duration=time.time() - start_time)
-        if not committed:
-            logger.error(f"Implementation commit failed: {commit_error}")
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"❌ Error committing implementation: {commit_error}"),
-            )
-            sys.exit(1)
-
-        # Post outcome-specific message with file count
-        changed_count = get_changed_files_count(worktree_path)
-        if changed_count > 0:
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, AGENT_IMPLEMENTOR, f"✅ Implementation complete ({changed_count} files changed)"),
-            )
-        else:
-            # This shouldn't happen (we already checked has_changes), but handle gracefully
-            make_issue_comment(
-                issue_number,
-                format_issue_message(adw_id, AGENT_IMPLEMENTOR, "✅ Implementation committed"),
-            )
-
+        # Branch has commits, proceed with push and PR creation
         # Track git operation: push_branch
         start_time = time.time()
         push_result = git_ops.push_branch(state.worktree_name, cwd=worktree_path)
@@ -278,7 +303,7 @@ def main() -> None:
                 format_issue_message(adw_id, "ops", f"✅ Branch pushed: {state.worktree_name}"),
             )
 
-        if pushed and state.plan_file and not state.pr_created:
+        if pushed and state.plan_file:
             # Track agent invocation: create_pull_request
             start_time = time.time()
             pr_url, pr_error = create_pull_request(state.worktree_name, issue, state.plan_file, adw_id, logger, cwd=str(worktree_path))
@@ -329,8 +354,6 @@ def main() -> None:
                         )
                 else:
                     logger.info("Auto-merge feature flag disabled, skipping auto-merge enablement")
-        elif state.pr_created:
-            logger.info("Pull request already exists, skipping creation")
 
         state.save()
         make_issue_comment(
@@ -339,14 +362,14 @@ def main() -> None:
         )
 
         # Final message with outcome summary
-        if changed_count > 0:
+        final_changed_count = get_changed_files_count(worktree_path)
+        if final_changed_count > 0:
             make_issue_comment(
                 issue_number,
-                format_issue_message(adw_id, "ops", f"✅ Build phase completed ({changed_count} files changed)"),
+                format_issue_message(adw_id, "ops", f"✅ Build phase completed ({final_changed_count} files changed)"),
             )
-            logger.info(f"Build phase completed successfully ({changed_count} files changed)")
+            logger.info(f"Build phase completed successfully ({final_changed_count} files changed)")
         else:
-            # Fallback if count couldn't be determined (shouldn't happen in normal flow)
             make_issue_comment(
                 issue_number,
                 format_issue_message(adw_id, "ops", "✅ Build phase completed"),

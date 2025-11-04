@@ -1139,6 +1139,48 @@ kota-db-ts/
     └── abc123/            # ADW execution artifacts for home server task
 ```
 
+**Stale Worktree Cleanup**:
+
+Failed workflows may leave orphaned worktrees in `automation/trees/`, accumulating disk space over time. The cleanup script detects and removes stale worktrees based on state file modification time.
+
+**Staleness Detection**:
+- Worktrees are considered stale if state file `automation/agents/{adw_id}/adw_state.json` has not been modified within the threshold (default: 7 days)
+- Orphaned worktrees (no state file) are marked stale immediately
+- Fresh worktrees (modified within threshold) are preserved
+
+**Manual Cleanup**:
+```bash
+# Preview stale worktrees (dry-run mode, default)
+cd automation && uv run adws/scripts/cleanup-stale-worktrees.py
+
+# Execute cleanup with 7-day threshold
+cd automation && uv run adws/scripts/cleanup-stale-worktrees.py --no-dry-run
+
+# Custom staleness threshold (14 days) and delete branches
+cd automation && uv run adws/scripts/cleanup-stale-worktrees.py --max-age-days 14 --delete-branches --no-dry-run
+
+# Verbose logging for debugging
+cd automation && uv run adws/scripts/cleanup-stale-worktrees.py --verbose
+```
+
+**Automated Cleanup**:
+- Scheduled weekly via GitHub Actions (Sundays at 00:00 UTC)
+- Workflow: `.github/workflows/cleanup-stale-worktrees.yml`
+- Manual trigger available via GitHub Actions UI with custom parameters
+- Creates GitHub Actions summary with cleanup metrics
+
+**Safety Mechanisms**:
+- Dry-run mode enabled by default (use `--no-dry-run` to execute)
+- Structured logging with timestamps for audit trail
+- Individual failures are logged but non-blocking (continues cleanup)
+- Conservative 7-day default threshold prevents deletion of active workflows
+
+**Troubleshooting**:
+- Check state file existence: `ls automation/agents/{adw_id}/adw_state.json`
+- Verify worktree modification time: `stat automation/trees/{worktree_name}`
+- Review cleanup logs: Check GitHub Actions artifacts or local stdout
+- Emergency manual removal: `git worktree remove automation/trees/{worktree_name} --force && git branch -D {worktree_name}`
+
 ### Model Selection
 
 Control which Claude model executes tasks:
