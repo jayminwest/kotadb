@@ -242,10 +242,22 @@ def main() -> None:
         if code_blocks:
             plan_file = code_blocks[-1].strip()  # Use last code block
 
-        # Strip git status prefixes like "?? ", "M ", "A ", etc.
-        git_status_prefix = re.match(r'^[?MAD!]{1,2}\s+', plan_file)
-        if git_status_prefix:
-            plan_file = plan_file[git_status_prefix.end():].strip()
+        # Handle multi-line responses with narrative text before the path
+        # Example: "Now let me return the plan file path:\n\ndocs/specs/chore-215-plan.md"
+        if '\n' in plan_file:
+            for line in plan_file.split('\n'):
+                line = line.strip()
+                # Match expected pattern: docs/specs/<type>-<number>-<slug>.md
+                # Also handle git status prefixes like "?? ", "M ", "A ", etc.
+                if re.match(r'^(?:[?MAD!]{1,2}\s+)?docs/specs/[a-z]+-\d+-[\w-]+\.md$', line):
+                    plan_file = re.sub(r'^[?MAD!]{1,2}\s+', '', line).strip()
+                    logger.info(f"Extracted plan file path from multi-line response: {plan_file}")
+                    break
+        else:
+            # Strip git status prefixes like "?? ", "M ", "A ", etc. for single-line responses
+            git_status_prefix = re.match(r'^[?MAD!]{1,2}\s+', plan_file)
+            if git_status_prefix:
+                plan_file = plan_file[git_status_prefix.end():].strip()
 
         # Validate the plan file path
         if plan_file == "0":
