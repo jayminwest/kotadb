@@ -121,11 +121,9 @@ export function functionB() {
 			const parsed = await parseSourceFile(filePath, testRepoPath);
 			if (!parsed) continue;
 
-			// Use absolute paths for proper import resolution
-			const absolutePath = join(testRepoPath, parsed.path);
-
+			// Use relative paths to match real worker behavior
 			files.push({
-				path: absolutePath,
+				path: parsed.path,
 				content: parsed.content,
 				language: "typescript",
 				size_bytes: Buffer.byteLength(parsed.content, "utf8"),
@@ -140,7 +138,7 @@ export function functionB() {
 			const fileSymbols = extractSymbols(ast, parsed.path);
 			for (const symbol of fileSymbols) {
 				symbols.push({
-					file_path: absolutePath,
+					file_path: parsed.path,
 					name: symbol.name,
 					kind: symbol.kind,
 					line_start: symbol.lineStart,
@@ -272,10 +270,9 @@ export function functionB() {
 			const parsed = await parseSourceFile(filePath, testRepoPath);
 			if (!parsed) continue;
 
-			const absolutePath = join(testRepoPath, parsed.path);
-
+			// Use relative paths to match real worker behavior
 			files.push({
-				path: absolutePath,
+				path: parsed.path,
 				content: parsed.content,
 				language: "typescript",
 				size_bytes: Buffer.byteLength(parsed.content, "utf8"),
@@ -290,7 +287,7 @@ export function functionB() {
 			const fileSymbols = extractSymbols(ast, parsed.path);
 			for (const symbol of fileSymbols) {
 				symbols.push({
-					file_path: absolutePath,
+					file_path: parsed.path,
 					name: symbol.name,
 					kind: symbol.kind,
 					line_start: symbol.lineStart,
@@ -390,6 +387,20 @@ export function functionB() {
 			dependency_type: edge.dependencyType,
 			metadata: edge.metadata,
 		}));
+
+		// Verify file-level dependencies have valid paths
+		const fileDeps = dependencyData.filter(d => d.dependency_type === "file_import");
+		const allFilePathsDefined = fileDeps.every(d =>
+			d.from_file_path && d.to_file_path
+		);
+		expect(allFilePathsDefined).toBe(true);
+
+		// Verify file paths match stored files
+		const storedPaths = new Set((storedFiles || []).map(f => f.path));
+		for (const dep of fileDeps) {
+			expect(storedPaths.has(dep.from_file_path!)).toBe(true);
+			expect(storedPaths.has(dep.to_file_path!)).toBe(true);
+		}
 
 		// PASS 2: Store dependencies with skipDelete=true and empty files/symbols
 		const pass2Stats = await storeIndexedData(

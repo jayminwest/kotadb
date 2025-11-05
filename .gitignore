@@ -47,6 +47,9 @@ automation/trees/
 # test infrastructure
 .test-project-name
 
+# app data directory
+app/data/
+
 # trees
 automation/trees/
 
