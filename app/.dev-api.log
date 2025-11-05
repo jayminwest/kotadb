@@ -1,0 +1,215 @@
+[Info] Stripe not configured. Subscription features disabled.
+[2025-11-04T02:46:03.368Z] ✓ Supabase connection successful
+[2025-11-04T02:46:03.368Z] Starting job queue with connection: postgresql://postgres:***@localhost:5434/postgres
+[2025-11-04T02:46:03.391Z] Job queue started successfully
+[2025-11-04T02:46:03.400Z] ✓ Job queue started and index-repo queue created
+[2025-11-04T02:46:03.401Z] Starting index-repo workers (team_size=3)
+[2025-11-04T02:46:03.401Z] Index-repo workers registered successfully
+[2025-11-04T02:46:03.401Z] ✓ Indexing worker registered
+[2025-11-04T02:46:03.401Z] Creating Express app...
+[2025-11-04T02:46:03.402Z] ✓ Express app created
+KotaDB server listening on http://localhost:3000
+Connected to Supabase at http://127.0.0.1:54322
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
+[Cache] Evicted 1 expired entries (size: 0)131 |     })
+132 | 
+133 |     this._attachListeners(con)
+134 | 
+135 |     con.once('end', () => {
+136 |       const error = this._ending ? new Error('Connection terminated') : new Error('Connection terminated unexpectedly')
+                                                                              ^
+error: Connection terminated unexpectedly
+ client: Client {
+  _events: [Object ...],
+  _eventsCount: 1,
+  _maxListeners: undefined,
+  [Symbol(kCapture)]: false,
+  connectionParameters: [Object ...],
+  user: "postgres",
+  database: "postgres",
+  port: 5434,
+  host: "localhost",
+  password: "postgres",
+  replication: undefined,
+  _Promise: [Function: Promise],
+  _types: [Object ...],
+  _ending: true,
+  _ended: true,
+  _connecting: false,
+  _connected: true,
+  _connectionError: false,
+  _queryable: false,
+  enableChannelBinding: false,
+  connection: [Object ...],
+  queryQueue: [],
+  binary: false,
+  processID: 12047,
+  secretKey: 1313810398,
+  ssl: false,
+  _connectionTimeoutMillis: 0,
+  _connectionCallback: null,
+  saslSession: null,
+  release: [Function],
+  activeQuery: null,
+  readyForQuery: true,
+  hasExecuted: true,
+  _poolUseCount: 700,
+  _errorAllQueries: [Function: _errorAllQueries],
+  _connect: [Function: _connect],
+  connect: [Function: connect],
+  _attachListeners: [Function: _attachListeners],
+  _checkPgPass: [Function: _checkPgPass],
+  _handleAuthCleartextPassword: [Function: _handleAuthCleartextPassword],
+  _handleAuthMD5Password: [Function: _handleAuthMD5Password],
+  _handleAuthSASL: [Function: _handleAuthSASL],
+  _handleAuthSASLContinue: [AsyncFunction: _handleAuthSASLContinue],
+  _handleAuthSASLFinal: [Function: _handleAuthSASLFinal],
+  _handleBackendKeyData: [Function: _handleBackendKeyData],
+  _handleReadyForQuery: [Function: _handleReadyForQuery],
+  _handleErrorWhileConnecting: [Function: _handleErrorWhileConnecting],
+  _handleErrorEvent: [Function: _handleErrorEvent],
+  _handleErrorMessage: [Function: _handleErrorMessage],
+  _handleRowDescription: [Function: _handleRowDescription],
+  _handleDataRow: [Function: _handleDataRow],
+  _handlePortalSuspended: [Function: _handlePortalSuspended],
+  _handleEmptyQuery: [Function: _handleEmptyQuery],
+  _handleCommandComplete: [Function: _handleCommandComplete],
+  _handleParseComplete: [Function: _handleParseComplete],
+  _handleCopyInResponse: [Function: _handleCopyInResponse],
+  _handleCopyData: [Function: _handleCopyData],
+  _handleNotification: [Function: _handleNotification],
+  _handleNotice: [Function: _handleNotice],
+  getStartupConf: [Function: getStartupConf],
+  cancel: [Function: cancel],
+  setTypeParser: [Function: setTypeParser],
+  getTypeParser: [Function: getTypeParser],
+  escapeIdentifier: [Function: escapeIdentifier],
+  escapeLiteral: [Function: escapeLiteral],
+  _pulseQueryQueue: [Function: _pulseQueryQueue],
+  query: [Function: query],
+  ref: [Function: ref],
+  unref: [Function: unref],
+  end: [Function: end],
+  setMaxListeners: [Function: setMaxListeners],
+  getMaxListeners: [Function: getMaxListeners],
+  emit: [Function: emit],
+  addListener: [Function: addListener],
+  on: [Function: addListener],
+  prependListener: [Function: prependListener],
+  once: [Function: once],
+  prependOnceListener: [Function: prependOnceListener],
+  removeListener: [Function: removeListener],
+  off: [Function: removeListener],
+  removeAllListeners: [Function: removeAllListeners],
+  listeners: [Function: listeners],
+  rawListeners: [Function: rawListeners],
+  listenerCount: [Function: listenerCount],
+  eventNames: [Function: eventNames],
+},
+
+      at <anonymous> (/Users/jayminwest/Projects/kota-db-ts/node_modules/pg/lib/client.js:136:73)
+      at emit (node:events:86:22)
+      at <anonymous> (/Users/jayminwest/Projects/kota-db-ts/node_modules/pg/lib/connection.js:62:12)
+      at emit (node:events:86:22)
+      at emitCloseNT (node:net:32:15)
+
+Bun v1.2.9 (macOS arm64)

@@ -8,7 +8,6 @@ Guidance for AI agents on when and how to use MCP tools versus direct file opera
 
 - Performing programmatic queries (`search_code`, `list_recent_files`)
 - Querying dependency graphs (`search_dependencies`)
-- Managing issues/tasks (beads MCP tools)
 - Interacting with browser automation (playwright MCP tools)
 - Operations requiring rate limiting and authentication
 - Full-text search across repository
@@ -34,18 +33,6 @@ Code search, indexing, dependency analysis:
 - `index_repository`: Trigger repository indexing
 - `list_recent_files`: List recently indexed files
 - `search_dependencies`: Query dependency graph for impact analysis
-
-### beads MCP (`mcp__plugin_beads_beads__*`)
-
-Issue tracking, dependency management:
-
-- `ready`: Find tasks with no blockers
-- `list`: List issues with filters
-- `show`: Show issue details and dependency tree
-- `create`: Create new issue
-- `update`: Update issue status/priority/assignee
-- `close`: Mark issue as completed
-- `dep`: Add dependency relationship
 
 ### playwright MCP (`mcp__playwright__*`)
 
@@ -121,8 +108,6 @@ await tools.Edit({
 | Update import statement in routes.ts | Direct `Edit` | Precise change |
 | List recently indexed files | MCP `list_recent_files` | Database query |
 | Create new file app/src/utils/helper.ts | Direct `Write` | Simple file creation |
-| Find ready-to-work issues | MCP `beads__ready` | Database query with filtering |
-| Update issue status to in_progress | MCP `beads__update` | Database write operation |
 
 ## Rate Limiting Awareness
 

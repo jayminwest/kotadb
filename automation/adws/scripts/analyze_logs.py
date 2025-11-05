@@ -22,7 +22,6 @@ Usage:
 import argparse
 import json
 import re
-import sqlite3
 import sys
 from collections import Counter, defaultdict
 from dataclasses import dataclass, field
@@ -520,67 +519,6 @@ def format_output(metrics: AnalysisMetrics, format_type: str) -> str:
     else:
         return format_text(metrics)
 
-def get_db_path() -> Path:
-    """Get path to beads database.
-
-    Returns:
-        Path to beads database
-
-    Raises:
-        FileNotFoundError: If database not found
-    """
-    db_path = project_root() / '.beads' / 'beads.db'
-    if not db_path.exists():
-        raise FileNotFoundError(f'Beads database not found at {db_path}. Run migrations first: python automation/adws/scripts/migrate_beads_schema.py --apply')
-    return db_path
-
-def query_database_metrics(time_window_hours: int) -> AnalysisMetrics:
-    """Query ADW metrics from beads database.
-
-    Args:
-        time_window_hours: Hours to look back from now
-
-    Returns:
-        AnalysisMetrics populated from database queries
-    """
-    db_path = get_db_path()
-    conn = sqlite3.connect(db_path)
-    conn.row_factory = sqlite3.Row
-    try:
-        cutoff_time = datetime.now() - timedelta(hours=time_window_hours)
-        cutoff_str = cutoff_time.isoformat()
-        cursor = conn.cursor()
-        cursor.execute('\n            SELECT e.*, i.title, i.issue_type\n            FROM adw_executions e\n            LEFT JOIN issues i ON e.issue_id = i.id\n            WHERE e.started_at >= ?\n            ORDER BY e.started_at DESC\n            ', (cutoff_str,))
-        rows = cursor.fetchall()
-        total_runs = len(rows)
-        if total_runs == 0:
-            return AnalysisMetrics(total_runs=0, success_rate=0.0, outcomes={}, issues={}, phase_reaches={}, failure_phases={}, runs=[], time_window_hours=time_window_hours, analysis_time=datetime.now(), environment='database')
-        runs = []
-        outcomes = Counter()
-        issues = Counter()
-        phase_reaches = Counter()
-        failure_phases = Counter()
-        for row in rows:
-            run_id = row['id']
-            issue_id = row['issue_id'] or 'unknown'
-            phase = row['phase']
-            status = row['status']
-            error_msg = row['error_message']
-            outcome = status if status in ('completed', 'failed') else 'in_progress'
-            outcomes[outcome] += 1
-            if issue_id and issue_id != 'unknown':
-                issues[issue_id] += 1
-            phase_reaches[phase] += 1
-            failures = []
-            if status == 'failed' and error_msg:
-                failures.append((phase, error_msg))
-                failure_phases[phase] += 1
-            runs.append(RunAnalysis(run_id=run_id, issue=issue_id, phases=[phase], failures=failures, outcome=outcome, errors=[error_msg] if error_msg else [], timestamp=datetime.fromisoformat(row['started_at']), agent_state=None))
-        completed_count = outcomes.get('completed', 0)
-        success_rate = completed_count / total_runs * 100 if total_runs > 0 else 0.0
-        return AnalysisMetrics(total_runs=total_runs, success_rate=success_rate, outcomes=dict(outcomes), issues=dict(issues), phase_reaches=dict(phase_reaches), failure_phases=dict(failure_phases), runs=runs, time_window_hours=time_window_hours, analysis_time=datetime.now(), environment='database')
-    finally:
-        conn.close()
 
 def main() -> int:
     """Main entry point for log analysis script."""
@@ -591,7 +529,6 @@ def main() -> int:
     parser.add_argument('--output-file', type=str, help='Output file path (required when --output=file)')
     parser.add_argument('--env', type=str, default='local', help='Environment to analyze (default: local)')
     parser.add_argument('--agent-metrics', action='store_true', help='Include agent-level success rate metrics (Phase 4)')
-    parser.add_argument('--backend', choices=['json', 'database'], default='json', help='Data source backend (json=log files, database=beads database) (default: json)')
     args = parser.parse_args()
     if args.agent_metrics:
         sys.stderr.write('Warning: --agent-metrics flag is not yet implemented (Phase 4)' + '\n')
@@ -603,16 +540,9 @@ def main() -> int:
         sys.stderr.write('' + '\n')
     if args.output == 'file' and (not args.output_file):
         parser.error('--output-file is required when --output=file')
-    if args.backend == 'database':
-        try:
-            metrics = query_database_metrics(args.hours)
-        except FileNotFoundError as e:
-            sys.stderr.write(f'Error: {e}' + '\n')
-            return 1
-    else:
-        time_window = timedelta(hours=args.hours)
-        runs = parse_execution_logs(time_window, args.env)
-        metrics = calculate_metrics(runs, args.hours, args.env)
+    time_window = timedelta(hours=args.hours)
+    runs = parse_execution_logs(time_window, args.env)
+    metrics = calculate_metrics(runs, args.hours, args.env)
     output = format_output(metrics, args.format)
     if args.output == 'file':
         try:
