@@ -56,6 +56,35 @@ supabase db diff
 
 Expected tables: `api_keys`, `organizations`, `repositories`, `index_jobs`, `indexed_files`, `symbols`, `references`, `dependencies`, `rate_limits`, and related RLS policies.
 
+**Post-Deployment Schema Validation:**
+
+After deploying to staging or production, verify that critical schema elements exist:
+
+```sql
+-- Verify api_keys table has all required columns
+SELECT column_name, data_type
+FROM information_schema.columns
+WHERE table_name = 'api_keys'
+ORDER BY ordinal_position;
+
+-- Expected columns: id, user_id, key_id, secret_hash, tier, rate_limit_per_hour,
+-- enabled, created_at, last_used_at, metadata, revoked_at
+
+-- Verify critical indexes exist
+SELECT indexname, indexdef
+FROM pg_indexes
+WHERE tablename = 'api_keys'
+AND indexname IN ('idx_api_keys_key_id', 'idx_api_keys_revoked_at');
+
+-- Check which migrations have been applied
+SELECT name, applied_at
+FROM migrations
+ORDER BY applied_at DESC
+LIMIT 10;
+```
+
+If any critical columns or indexes are missing, apply the missing migrations from `app/src/db/migrations/` using the Supabase SQL Editor or `bun run scripts/apply-migrations.ts`.
+
 ## Staging Deployment
 
 ### 1. Authenticate with Fly.io
