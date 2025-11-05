@@ -681,6 +681,148 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		}
 	});
 
+	// GET /api/keys/current - Get current API key metadata
+	app.get("/api/keys/current", async (req: Request, res: Response) => {
+		try {
+			// Extract JWT token from Authorization header
+			const authHeader = req.get("Authorization");
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).json({ error: "Missing or invalid Authorization header" });
+			}
+
+			const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+			// Verify JWT with Supabase Auth
+			const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+			if (authError || !user) {
+				return res.status(401).json({ error: "Invalid or expired token" });
+			}
+
+			// Query for user's active API key metadata
+			const { data: keyData, error: queryError } = await supabase
+				.from("api_keys")
+				.select("key_id, tier, rate_limit_per_hour, created_at, last_used_at, enabled")
+				.eq("user_id", user.id)
+				.is("revoked_at", null)
+				.maybeSingle();
+
+			if (queryError) {
+				process.stderr.write(`[API Keys] Query error: ${JSON.stringify(queryError)}\n`);
+				return res.status(500).json({ error: "Failed to fetch API key metadata" });
+			}
+
+			if (!keyData) {
+				return res.status(404).json({ error: "No active API key found" });
+			}
+
+			res.json({
+				keyId: keyData.key_id,
+				tier: keyData.tier,
+				rateLimitPerHour: keyData.rate_limit_per_hour,
+				createdAt: keyData.created_at,
+				lastUsedAt: keyData.last_used_at,
+				enabled: keyData.enabled,
+			});
+		} catch (error) {
+			process.stderr.write(`[API Keys] Get current error: ${JSON.stringify(error)}\n`);
+			res.status(500).json({ error: "Failed to fetch API key metadata" });
+		}
+	});
+
+	// POST /api/keys/reset - Reset API key (revoke old + generate new)
+	app.post("/api/keys/reset", async (req: Request, res: Response) => {
+		try {
+			// Extract JWT token from Authorization header
+			const authHeader = req.get("Authorization");
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).json({ error: "Missing or invalid Authorization header" });
+			}
+
+			const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+			// Verify JWT with Supabase Auth
+			const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+			if (authError || !user) {
+				return res.status(401).json({ error: "Invalid or expired token" });
+			}
+
+			// Enforce rate limit for reset endpoint (max 5 per hour)
+			const resetKeyId = `api-key-reset:${user.id}`;
+			const { enforceRateLimit } = await import("@auth/rate-limit");
+			const rateLimit = await enforceRateLimit(resetKeyId, 5);
+
+			if (!rateLimit.allowed) {
+				return res.status(429).json({
+					error: "Rate limit exceeded for API key reset",
+					retryAfter: rateLimit.retryAfter,
+				});
+			}
+
+			// Reset API key (revoke old + generate new)
+			const { resetApiKey } = await import("@auth/keys");
+			const result = await resetApiKey(user.id);
+
+			res.json({
+				apiKey: result.apiKey,
+				keyId: result.keyId,
+				tier: result.tier,
+				rateLimitPerHour: result.rateLimitPerHour,
+				createdAt: result.createdAt,
+				message: "Old API key revoked, new key generated",
+			});
+		} catch (error) {
+			process.stderr.write(`[API Keys] Reset error: ${JSON.stringify(error)}\n`);
+			const errorMessage = error instanceof Error ? error.message : "Failed to reset API key";
+
+			// Return 404 if no active key exists
+			if (errorMessage.includes("No active API key found")) {
+				return res.status(404).json({ error: errorMessage });
+			}
+
+			res.status(500).json({ error: errorMessage });
+		}
+	});
+
+	// DELETE /api/keys/current - Revoke current API key
+	app.delete("/api/keys/current", async (req: Request, res: Response) => {
+		try {
+			// Extract JWT token from Authorization header
+			const authHeader = req.get("Authorization");
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).json({ error: "Missing or invalid Authorization header" });
+			}
+
+			const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+			// Verify JWT with Supabase Auth
+			const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+			if (authError || !user) {
+				return res.status(401).json({ error: "Invalid or expired token" });
+			}
+
+			// Revoke API key
+			const { revokeApiKey } = await import("@auth/keys");
+			const result = await revokeApiKey(user.id);
+
+			res.json({
+				success: true,
+				message: "API key revoked successfully",
+				keyId: result.keyId,
+				revokedAt: result.revokedAt,
+			});
+		} catch (error) {
+			process.stderr.write(`[API Keys] Revoke error: ${JSON.stringify(error)}\n`);
+			const errorMessage = error instanceof Error ? error.message : "Failed to revoke API key";
+
+			// Return 404 if no active key exists
+			if (errorMessage.includes("No active API key found")) {
+				return res.status(404).json({ error: errorMessage });
+			}
+
+			res.status(500).json({ error: errorMessage });
+		}
+	});
+
 	// 404 handler
 	app.use((req: Request, res: Response) => {
 		res.status(404).json({ error: "Not found" });
