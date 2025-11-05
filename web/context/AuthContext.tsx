@@ -25,6 +25,9 @@ interface AuthContextType {
   isAuthenticated: boolean
   signOut: () => Promise<void>
   refreshSubscription: () => Promise<void>
+  refreshApiKey: () => Promise<void>
+  revokeApiKey: () => Promise<void>
+  resetApiKey: (newKey: string) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -129,6 +132,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const refreshApiKey = async () => {
+    if (session) {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+        const response = await fetch(`${apiUrl}/api/keys/current`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          // Key metadata refresh successful (no secret returned)
+        }
+      } catch (error) {
+        // Error refreshing API key metadata
+      }
+    }
+  }
+
+  const revokeApiKey = async () => {
+    setApiKey(null)
+  }
+
+  const resetApiKey = (newKey: string) => {
+    setApiKey(newKey)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -143,6 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session,
         signOut,
         refreshSubscription,
+        refreshApiKey,
+        revokeApiKey,
+        resetApiKey,
       }}
     >
       {children}
