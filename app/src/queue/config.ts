@@ -61,3 +61,14 @@ export const WORKER_TEAM_SIZE = 3;
  * Default of 50 prevents statement timeouts for large repositories (200+ files)
  */
 export const BATCH_SIZE = 50;
+
+/**
+ * Symbol Query Batch Size (file IDs per query)
+ * Number of file IDs to include in a single `.in()` filter when querying symbols
+ * during Pass 2 dependency extraction. Prevents PostgREST URI length overflow:
+ * - PostgREST URI limit: ~8KB
+ * - Each UUID: 36 chars + query syntax overhead
+ * - 100 file IDs ≈ 3.6KB (safe margin below limit)
+ * - Larger batches risk "URI too long" errors for repositories with 1000+ files
+ */
+export const SYMBOL_QUERY_BATCH_SIZE = 100;

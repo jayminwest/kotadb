@@ -27,7 +27,7 @@ import type PgBoss from "pg-boss";
 import { getServiceClient } from "@db/client";
 import { updateJobStatus } from "@queue/job-tracker";
 import type { IndexRepoJobPayload } from "@queue/types";
-import { WORKER_TEAM_SIZE, QUEUE_NAMES, BATCH_SIZE } from "@queue/config";
+import { WORKER_TEAM_SIZE, QUEUE_NAMES, BATCH_SIZE, SYMBOL_QUERY_BATCH_SIZE } from "@queue/config";
 import { prepareRepository } from "@indexer/repos";
 import { discoverSources, parseSourceFile } from "@indexer/parsers";
 import { parseFile, isSupportedForAST } from "@indexer/ast-parser";
@@ -317,15 +317,31 @@ async function processIndexJob(
 				`[${new Date().toISOString()}] [PASS 2] No files found in database, skipping Pass 2\n`,
 			);
 		} else {
-			// Query database to get symbols with IDs
-			const { data: storedSymbols, error: symbolsError } = await supabase
-				.from("symbols")
-				.select("id, file_id, name, kind, line_start, line_end, signature, documentation")
-				.in("file_id", storedFiles.map(f => f.id));
+			// Query database to get symbols with IDs (batched to prevent URI overflow)
+			const allSymbols: any[] = [];
+			const totalBatches = Math.ceil(storedFiles.length / SYMBOL_QUERY_BATCH_SIZE);
 
-			if (symbolsError) {
-				throw new Error(`Failed to query symbols: ${symbolsError.message}`);
+			for (let i = 0; i < storedFiles.length; i += SYMBOL_QUERY_BATCH_SIZE) {
+				const batch = storedFiles.slice(i, i + SYMBOL_QUERY_BATCH_SIZE);
+				const batchNumber = Math.floor(i / SYMBOL_QUERY_BATCH_SIZE) + 1;
+
+				process.stdout.write(
+					`[${new Date().toISOString()}] [PASS 2] Batch ${batchNumber}/${totalBatches}: querying symbols for ${batch.length} files\n`,
+				);
+
+				const { data: batchSymbols, error: symbolsError } = await supabase
+					.from("symbols")
+					.select("id, file_id, name, kind, line_start, line_end, signature, documentation")
+					.in("file_id", batch.map(f => f.id));
+
+				if (symbolsError) {
+					throw new Error(`Failed to query symbols for batch ${batchNumber}: ${symbolsError.message}`);
+				}
+
+				allSymbols.push(...(batchSymbols || []));
 			}
+
+			const storedSymbols = allSymbols;
 
 			// Build IndexedFile[] with populated IDs
 			const indexedFiles: IndexedFile[] = storedFiles.map(f => ({
