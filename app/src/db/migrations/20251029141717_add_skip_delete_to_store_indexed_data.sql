@@ -53,6 +53,27 @@ BEGIN
         DELETE FROM indexed_files WHERE repository_id = p_repository_id;
     END IF;
 
+    -- When skipDelete is true and no files/symbols provided, we're in Pass 2
+    -- Build ID maps from existing database records for reference/dependency insertion
+    IF p_skip_delete AND jsonb_array_length(p_files) = 0 THEN
+        -- Build file_id_map from existing indexed_files
+        SELECT COALESCE(jsonb_object_agg(path, id::text), '{}'::jsonb)
+        INTO v_file_id_map
+        FROM indexed_files
+        WHERE repository_id = p_repository_id;
+
+        -- Build symbol_id_map from existing symbols joined with files
+        -- Symbol key format: "file_path::symbol_name::line_start"
+        SELECT COALESCE(jsonb_object_agg(
+            f.path || '::' || s.name || '::' || s.line_start::text,
+            s.id::text
+        ), '{}'::jsonb)
+        INTO v_symbol_id_map
+        FROM symbols s
+        JOIN indexed_files f ON s.file_id = f.id
+        WHERE f.repository_id = p_repository_id;
+    END IF;
+
     -- Insert indexed files
     FOR v_file IN SELECT * FROM jsonb_to_recordset(p_files) AS (
         path text,

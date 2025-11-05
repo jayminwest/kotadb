@@ -263,7 +263,149 @@ export function functionB() {
 	});
 
 	test("should store dependencies in database via Pass 2", async () => {
-		// Query dependency graph table
+		// First, run Pass 1 to store files and symbols
+		const files: FileData[] = [];
+		const symbols: SymbolData[] = [];
+
+		const filePaths = await discoverSources(testRepoPath);
+		for (const filePath of filePaths) {
+			const parsed = await parseSourceFile(filePath, testRepoPath);
+			if (!parsed) continue;
+
+			const absolutePath = join(testRepoPath, parsed.path);
+
+			files.push({
+				path: absolutePath,
+				content: parsed.content,
+				language: "typescript",
+				size_bytes: Buffer.byteLength(parsed.content, "utf8"),
+				metadata: {},
+			});
+
+			if (!isSupportedForAST(parsed.path)) continue;
+
+			const ast = parseFile(parsed.path, parsed.content);
+			if (!ast) continue;
+
+			const fileSymbols = extractSymbols(ast, parsed.path);
+			for (const symbol of fileSymbols) {
+				symbols.push({
+					file_path: absolutePath,
+					name: symbol.name,
+					kind: symbol.kind,
+					line_start: symbol.lineStart,
+					line_end: symbol.lineEnd,
+					signature: symbol.signature || undefined,
+					documentation: symbol.documentation || undefined,
+					metadata: {},
+				});
+			}
+		}
+
+		// Store files and symbols (Pass 1)
+		await storeIndexedData(
+			supabase,
+			testRepoId,
+			files,
+			symbols,
+			[],
+			[],
+			false,
+		);
+
+		// Query stored data for Pass 2
+		const { data: storedFiles } = await supabase
+			.from("indexed_files")
+			.select("id, path, content, language")
+			.eq("repository_id", testRepoId);
+
+		const { data: storedSymbols } = await supabase
+			.from("symbols")
+			.select("id, file_id, name, kind, line_start, line_end, signature, documentation")
+			.in("file_id", storedFiles!.map(f => f.id));
+
+		// Build IndexedFile[] and ExtractedSymbol[]
+		const indexedFiles: IndexedFile[] = storedFiles!.map(f => ({
+			id: f.id,
+			path: f.path,
+			content: f.content,
+			language: f.language,
+			projectRoot: testRepoId,
+			dependencies: [],
+			indexedAt: new Date(),
+		}));
+
+		const extractedSymbols: ExtractedSymbol[] = (storedSymbols || []).map(s => ({
+			id: s.id,
+			file_id: s.file_id,
+			name: s.name,
+			kind: s.kind as any,
+			lineStart: s.line_start,
+			lineEnd: s.line_end,
+			columnStart: 0,
+			columnEnd: 0,
+			signature: s.signature || null,
+			documentation: s.documentation || null,
+			isExported: false,
+		}));
+
+		// Extract references and dependencies
+		const allReferences: Array<{ filePath: string; fileId: string; references: any[] }> = [];
+		for (const file of indexedFiles) {
+			if (!isSupportedForAST(file.path)) continue;
+			const ast = parseFile(file.path, file.content);
+			if (!ast) continue;
+			const refs = extractReferences(ast, file.path);
+			if (refs.length > 0) {
+				allReferences.push({
+					filePath: file.path,
+					fileId: file.id!,
+					references: refs,
+				});
+			}
+		}
+
+		const dependencyEdges = extractDependencies(
+			indexedFiles,
+			extractedSymbols,
+			allReferences.flatMap(fr =>
+				fr.references.map(r => ({
+					...r,
+					file_id: fr.fileId,
+				}))
+			),
+			testRepoId,
+		);
+
+		// Convert dependency edges to storage format
+		const dependencyData = dependencyEdges.map(edge => ({
+			from_file_path: edge.fromFileId
+				? indexedFiles.find(f => f.id === edge.fromFileId)?.path
+				: undefined,
+			to_file_path: edge.toFileId
+				? indexedFiles.find(f => f.id === edge.toFileId)?.path
+				: undefined,
+			from_symbol_key: undefined, // Symbol-level deps not tested here
+			to_symbol_key: undefined,
+			dependency_type: edge.dependencyType,
+			metadata: edge.metadata,
+		}));
+
+		// PASS 2: Store dependencies with skipDelete=true and empty files/symbols
+		const pass2Stats = await storeIndexedData(
+			supabase,
+			testRepoId,
+			[], // Empty files array
+			[], // Empty symbols array
+			[], // Empty references
+			dependencyData,
+			true, // skipDelete=true
+		);
+
+		// Verify Pass 2 stored dependencies
+		expect(pass2Stats.dependencies_extracted).toBeGreaterThan(0);
+
+		// Query dependency graph table to verify storage
 		const { data: deps, error: depsError } = await supabase
 			.from("dependency_graph")
 			.select("*")
@@ -271,9 +413,17 @@ export function functionB() {
 
 		expect(depsError).toBeNull();
 		expect(deps).not.toBeNull();
+		expect(deps!.length).toBeGreaterThan(0);
 
-		// After two-pass storage, dependencies should be in database
-		// Note: This test assumes previous test ran successfully
-		// In a real scenario, you'd run the full indexing workflow here
+		// Verify specific file import dependency exists
+		const fileAId = indexedFiles.find(f => f.path.endsWith("fileA.ts"))?.id;
+		const fileBId = indexedFiles.find(f => f.path.endsWith("fileB.ts"))?.id;
+
+		const importDep = deps!.find(
+			dep => dep.from_file_id === fileBId && dep.to_file_id === fileAId
+		);
+
+		expect(importDep).toBeDefined();
+		expect(importDep!.dependency_type).toBe("file_import");
 	});
 });
