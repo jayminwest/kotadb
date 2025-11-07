@@ -15,6 +15,7 @@ export default function IndexPage() {
   const [jobDetails, setJobDetails] = useState<JobStatusResponse | null>(null)
   const [pollingActive, setPollingActive] = useState(false)
   const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+  const [pollingDelay, setPollingDelay] = useState(3000) // Start at 3s
 
   const pollJobStatus = async (jobId: string) => {
     try {
@@ -25,8 +26,9 @@ export default function IndexPage() {
       // Stop polling if terminal state reached
       if (['completed', 'failed', 'skipped'].includes(response.status)) {
         setPollingActive(false)
+        setPollingDelay(3000) // Reset for next job
         if (pollingIntervalRef.current) {
-          clearInterval(pollingIntervalRef.current)
+          clearTimeout(pollingIntervalRef.current as unknown as NodeJS.Timeout)
           pollingIntervalRef.current = null
         }
       }
@@ -40,18 +42,21 @@ export default function IndexPage() {
 
   useEffect(() => {
     if (pollingActive && jobDetails?.id) {
-      const interval = setInterval(() => {
+      const timeout = setTimeout(() => {
         pollJobStatus(jobDetails.id)
-      }, 3000) // Poll every 3 seconds (adjusted from 2s for rate limiting)
 
-      pollingIntervalRef.current = interval
+        // Exponential backoff: multiply by 1.5, cap at 30s
+        setPollingDelay((prevDelay) => Math.min(prevDelay * 1.5, 30000))
+      }, pollingDelay)
+
+      pollingIntervalRef.current = timeout as unknown as NodeJS.Timeout
 
       return () => {
-        clearInterval(interval)
+        clearTimeout(timeout)
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [pollingActive, jobDetails?.id])
+  }, [pollingActive, jobDetails?.id, pollingDelay])
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault()
@@ -90,6 +95,7 @@ export default function IndexPage() {
         repository_id: '',
         status: response.status as JobStatusResponse['status'],
       })
+      setPollingDelay(3000) // Reset delay for new job
       setPollingActive(true)
     } catch (err) {
       if (err instanceof ApiError) {

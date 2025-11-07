@@ -77,3 +77,5 @@ migrations-backup.tar.gz
 
 # Supabase CLI metadata
 supabase/
+
+.mcp.json

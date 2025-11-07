@@ -31,7 +31,7 @@ export default function LoginPage() {
     })
 
     if (error) {
-      console.error('Error logging in:', error.message)
+      process.stderr.write(`Error logging in: ${error.message}\n`)
       setLoading(false)
     }
   }

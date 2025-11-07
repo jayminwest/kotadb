@@ -58,7 +58,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSubscription(null)
       }
     } catch (error) {
-      console.error('Error fetching subscription:', error)
+      process.stderr.write(`Error fetching subscription: ${error instanceof Error ? error.message : String(error)}\n`)
       setSubscription(null)
     }
   }

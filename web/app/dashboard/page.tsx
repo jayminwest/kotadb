@@ -78,10 +78,10 @@ function DashboardContent() {
         const data: CreatePortalSessionResponse = await response.json()
         window.location.href = data.url
       } else {
-        console.error('Failed to create portal session')
+        process.stderr.write('Failed to create portal session\n')
       }
     } catch (error) {
-      console.error('Error creating portal session:', error)
+      process.stderr.write(`Error creating portal session: ${error instanceof Error ? error.message : String(error)}\n`)
     } finally {
       setLoadingPortal(false)
     }
@@ -134,7 +134,7 @@ function DashboardContent() {
         setKeyGenError(errorData.error || 'Failed to generate API key')
       }
     } catch (error) {
-      console.error('Error generating API key:', error)
+      process.stderr.write(`Error generating API key: ${error instanceof Error ? error.message : String(error)}\n`)
       setKeyGenError('An unexpected error occurred. Please try again.')
     } finally {
       setLoadingKeyGen(false)
