@@ -1,4 +1,4 @@
-import { authenticateRequest } from "@auth/middleware";
+import { authenticateRequest, requireAdmin } from "@auth/middleware";
 import type { RateLimitResult } from "@shared/types/rate-limit";
 import { buildSnippet } from "@indexer/extractors";
 import { createMcpServer, createMcpTransport } from "@mcp/server";
@@ -54,8 +54,48 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	}));
 
 	// Health check endpoint (public, no auth)
-	app.get("/health", (req: Request, res: Response) => {
-		res.json({ status: "ok", timestamp: new Date().toISOString() });
+	app.get("/health", async (req: Request, res: Response) => {
+		const queue = getQueue();
+
+		try {
+			// Query pg-boss for queue metrics
+			const queueInfo = await queue.getQueue(QUEUE_NAMES.INDEX_REPO);
+			const failedJobs = await queue.fetch(QUEUE_NAMES.INDEX_REPO, { includeMetadata: true });
+
+			// Calculate failed jobs in last 24 hours
+			const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+			const recentFailed = failedJobs.filter(j =>
+				j.state === 'failed' && j.completedOn && new Date(j.completedOn) > twentyFourHoursAgo
+			).length;
+
+			// Calculate oldest pending job age (fetch created jobs)
+			const pendingJobs = await queue.fetch(QUEUE_NAMES.INDEX_REPO, { includeMetadata: true });
+			const oldestPending = pendingJobs
+				.filter(j => j.state === 'created')
+				.sort((a, b) => a.createdOn.getTime() - b.createdOn.getTime())[0];
+
+			const oldestAge = oldestPending
+				? Math.floor((Date.now() - oldestPending.createdOn.getTime()) / 1000)
+				: 0;
+
+			res.json({
+				status: "ok",
+				timestamp: new Date().toISOString(),
+				queue: {
+					depth: queueInfo?.queuedCount || 0,
+					workers: 3, // WORKER_TEAM_SIZE from config
+					failed_24h: recentFailed,
+					oldest_pending_age_seconds: oldestAge
+				}
+			});
+		} catch (error) {
+			// If queue not available, return basic health status
+			res.json({
+				status: "ok",
+				timestamp: new Date().toISOString(),
+				queue: null
+			});
+		}
 	});
 
 	// GitHub webhook endpoint (public, signature-verified)
@@ -214,6 +254,85 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			});
 		}
 		next(err);
+	});
+
+	// Admin endpoints (require service role key authentication)
+	app.get("/admin/jobs/failed", async (req: Request, res: Response) => {
+		const authHeader = req.get("authorization") || null;
+
+		if (!requireAdmin(authHeader)) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
+
+		const queue = getQueue();
+		const limit = parseInt(req.query.limit as string) || 50;
+		const offset = parseInt(req.query.offset as string) || 0;
+
+		try {
+			// Fetch failed jobs from pg-boss archive
+			const jobs = await queue.fetch(QUEUE_NAMES.INDEX_REPO, { includeMetadata: true });
+
+			// Filter to failed jobs only and apply offset
+			const failedJobs = jobs
+				.filter(j => j.state === 'failed')
+				.slice(offset, offset + limit)
+				.map(j => {
+					const data = j.data as { repositoryId?: string; commitSha?: string; ref?: string } | undefined;
+					const output = j.output as { error?: string } | undefined;
+					return {
+						id: j.id || '',
+						repository_id: data?.repositoryId,
+						commit_sha: data?.commitSha,
+						ref: data?.ref,
+						error: output?.error || "Unknown error",
+						failed_at: j.completedOn,
+						retry_count: j.retryCount || 0
+					};
+				});
+
+			res.json({
+				jobs: failedJobs,
+				limit,
+				offset,
+				total: jobs.filter(j => j.state === 'failed').length
+			});
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			res.status(500).json({ error: `Failed to fetch jobs: ${errorMessage}` });
+		}
+	});
+
+	app.post("/admin/jobs/:jobId/retry", async (req: Request, res: Response) => {
+		const authHeader = req.get("authorization") || null;
+
+		if (!requireAdmin(authHeader)) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
+
+		const { jobId } = req.params;
+		if (!jobId) {
+			return res.status(400).json({ error: "Missing job ID" });
+		}
+
+		const queue = getQueue();
+
+		try {
+			// Retry job via pg-boss (moves from archive back to active queue)
+			await queue.retry(QUEUE_NAMES.INDEX_REPO, jobId);
+
+			res.json({
+				message: "Job requeued for retry",
+				job_id: jobId
+			});
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			if (errorMessage.includes("not found")) {
+				res.status(404).json({ error: "Job not found or not eligible for retry" });
+			} else {
+				res.status(500).json({ error: `Retry failed: ${errorMessage}` });
+			}
+		}
 	});
 
 	// Authentication middleware for all other routes

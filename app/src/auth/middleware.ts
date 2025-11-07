@@ -201,3 +201,22 @@ export function createForbiddenResponse(
 		},
 	);
 }
+
+/**
+ * Require service role key for admin operations.
+ * Validates Authorization header against SUPABASE_SERVICE_KEY.
+ * Use this middleware for admin-only endpoints.
+ *
+ * @param authHeader - Authorization header value
+ * @returns True if valid service role key, false otherwise
+ */
+export function requireAdmin(authHeader: string | null): boolean {
+	const expectedKey = process.env.SUPABASE_SERVICE_KEY;
+
+	if (!authHeader || !expectedKey) {
+		return false;
+	}
+
+	const token = authHeader.replace(/^Bearer /, "");
+	return token === expectedKey;
+}
