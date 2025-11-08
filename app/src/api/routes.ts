@@ -942,6 +942,23 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		}
 	});
 
+	// GET /api/keys/validate - Validate API key or JWT token
+	app.get("/api/keys/validate", async (req: AuthenticatedRequest, res: Response) => {
+		// Uses existing authenticateRequest middleware (automatically validates)
+		const context = req.authContext!;
+
+		res.json({
+			valid: true,
+			tier: context.tier,
+			userId: context.userId,
+			rateLimitInfo: {
+				limit: context.rateLimitPerHour,
+				remaining: context.rateLimit?.remaining ?? context.rateLimitPerHour,
+				reset: context.rateLimit?.resetAt,
+			},
+		});
+	});
+
 	// 404 handler
 	app.use((req: Request, res: Response) => {
 		res.status(404).json({ error: "Not found" });

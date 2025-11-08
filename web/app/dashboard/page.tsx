@@ -2,7 +2,7 @@
 
 import { useAuth } from '@/context/AuthContext'
 import { useState, useEffect, Suspense } from 'react'
-import { useRouter, useSearchParams } from 'next/navigation'
+import { useRouter } from 'next/navigation'
 import type { CreatePortalSessionResponse } from '@shared/types/api'
 import KeyResetModal from '@/components/KeyResetModal'
 import KeyRevokeModal from '@/components/KeyRevokeModal'
@@ -17,7 +17,7 @@ interface KeyMetadata {
 }
 
 function DashboardContent() {
-  const { user, subscription, apiKey, isLoading } = useAuth()
+  const { user, subscription, apiKey, setApiKey, isLoading } = useAuth()
   const [loadingPortal, setLoadingPortal] = useState(false)
   const [loadingKeyGen, setLoadingKeyGen] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)
@@ -29,29 +29,6 @@ function DashboardContent() {
   const [showResetModal, setShowResetModal] = useState(false)
   const [showRevokeModal, setShowRevokeModal] = useState(false)
   const router = useRouter()
-  const searchParams = useSearchParams()
-
-  // Handle OAuth callback query parameters
-  useEffect(() => {
-    const apiKeyParam = searchParams.get('api_key')
-    const keyGenerated = searchParams.get('key_generated')
-    const existingKey = searchParams.get('existing_key')
-    const keyError = searchParams.get('key_error')
-
-    if (apiKeyParam && keyGenerated) {
-      // New API key generated during OAuth flow
-      localStorage.setItem('kotadb_api_key', apiKeyParam)
-      setKeyGenSuccess('API key successfully generated!')
-      // Clear query params after storing key
-      router.replace('/dashboard')
-    } else if (existingKey) {
-      setKeyGenSuccess('Welcome back! Your existing API key is still active.')
-      router.replace('/dashboard')
-    } else if (keyError) {
-      setKeyGenError('Failed to generate API key. Please try again using the button below.')
-      router.replace('/dashboard')
-    }
-  }, [searchParams, router])
 
   // Fetch key metadata when user is authenticated and has an API key
   useEffect(() => {
@@ -122,10 +99,10 @@ function DashboardContent() {
 
         if (keyData.apiKey) {
           // New key generated
-          localStorage.setItem('kotadb_api_key', keyData.apiKey)
+          setApiKey(keyData.apiKey)
           setKeyGenSuccess('API key successfully generated!')
-          // Reload the page to update the auth context
-          window.location.reload()
+          // Auto-refresh metadata to show new key info
+          await fetchKeyMetadata()
         } else if (keyData.message?.includes('already exists')) {
           setKeyGenError('You already have an API key. Please contact support if you need a new one.')
         }

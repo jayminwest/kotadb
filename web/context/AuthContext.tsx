@@ -63,11 +63,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
-  // Load API key from localStorage on mount (for backwards compatibility)
+  // Validate API key against backend
+  const validateApiKey = async (key: string): Promise<boolean> => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const response = await fetch(`${apiUrl}/api/keys/validate`, {
+        headers: {
+          'Authorization': `Bearer ${key}`,
+        },
+      })
+      return response.ok
+    } catch (error) {
+      process.stderr.write(`[Auth] API key validation error: ${error instanceof Error ? error.message : String(error)}\n`)
+      return false
+    }
+  }
+
+  // Load API key from localStorage on mount and validate it
   useEffect(() => {
     const stored = localStorage.getItem('kotadb_api_key')
     if (stored) {
-      setApiKeyState(stored)
+      validateApiKey(stored).then(valid => {
+        if (valid) {
+          setApiKeyState(stored)
+        } else {
+          localStorage.removeItem('kotadb_api_key')
+          process.stderr.write('[Auth] Removed invalid API key from localStorage\n')
+        }
+      })
     }
   }, [])
 
