@@ -3,8 +3,8 @@
 import { useState } from 'react'
 import { apiClient, ApiError } from '@/lib/api-client'
 import { useAuth } from '@/context/AuthContext'
-import SearchBar from '@/components/SearchBar'
-import FileList from '@/components/FileList'
+import SearchBar from '../components/SearchBar'
+import FileList from '../components/FileList'
 import type { SearchResult } from '@shared/types/api'
 
 export default function SearchPage() {

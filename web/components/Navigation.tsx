@@ -38,39 +38,6 @@ export default function Navigation() {
             </Link>
 
             <div className="hidden md:flex space-x-4">
-              <Link
-                href="/search"
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/search')
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900'
-                }`}
-              >
-                Search
-              </Link>
-
-              <Link
-                href="/repository-index"
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/repository-index')
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900'
-                }`}
-              >
-                Index
-              </Link>
-
-              <Link
-                href="/files"
-                className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
-                  isActive('/files')
-                    ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
-                    : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900'
-                }`}
-              >
-                Files
-              </Link>
-
               {isAuthenticated && (
                 <>
                   <Link
@@ -93,6 +60,17 @@ export default function Navigation() {
                     }`}
                   >
                     Pricing
+                  </Link>
+
+                  <Link
+                    href="/mcp"
+                    className={`px-3 py-2 rounded-md text-sm font-medium transition-colors ${
+                      isActive('/mcp')
+                        ? 'bg-gray-100 dark:bg-gray-800 text-gray-900 dark:text-gray-100'
+                        : 'text-gray-600 dark:text-gray-400 hover:bg-gray-50 dark:hover:bg-gray-900'
+                    }`}
+                  >
+                    MCP
                   </Link>
                 </>
               )}

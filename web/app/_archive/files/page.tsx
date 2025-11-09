@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react'
 import { apiClient, ApiError } from '@/lib/api-client'
 import { useAuth } from '@/context/AuthContext'
-import FileList from '@/components/FileList'
+import FileList from '../components/FileList'
 import type { SearchResult } from '@shared/types/api'
 
 export default function FilesPage() {

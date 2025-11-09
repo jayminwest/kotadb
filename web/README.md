@@ -1,14 +1,37 @@
 # KotaDB Web Application
 
-Next.js web interface for KotaDB code intelligence platform.
+Next.js web interface for KotaDB MCP-first onboarding.
+
+## Product Philosophy
+
+KotaDB makes AI agents more effective by providing code intelligence through MCP (Model Context Protocol). The web frontend supports the onboarding flow: sign up → generate API key → copy config → better agents.
 
 ## Features
 
-- **Code Search**: Full-text search across indexed repositories with context snippets
-- **Repository Indexing**: Index GitHub repositories for searchable code intelligence
-- **Recent Files**: View recently indexed files across all repositories
+- **GitHub OAuth Authentication**: Secure sign-up and login via GitHub
+- **API Key Management**: Generate, reset, and revoke API keys for MCP access
+- **MCP Configuration**: Copy-paste configuration for Claude Code CLI integration
+- **Stripe Integration**: Upgrade from free to solo/team tiers
 - **Rate Limiting**: Visual rate limit quota tracking with countdown timer
 - **Type-Safe API Client**: Shared TypeScript types with backend for compile-time safety
+
+## User Journey
+
+1. Sign up via GitHub OAuth (`/login`)
+2. Generate API key (`/dashboard`)
+3. Copy MCP configuration (`/mcp`)
+4. Paste config into Claude Code CLI
+5. AI agents can now search code, analyze dependencies, and more
+
+## Archived Pages
+
+The following pages have been archived to `web/app/_archive/` to reduce maintenance burden and clarify product focus:
+
+- `/search` - Full-text search interface (duplicates `mcp__kotadb__search-code` tool)
+- `/repository-index` - Repository indexing UI (duplicates `mcp__kotadb__index-repository` tool)
+- `/files` - Recent files browser (duplicates `mcp__kotadb__list-recent-files` tool)
+
+These pages duplicate MCP tool functionality and are not part of the core onboarding flow. Users interact with KotaDB via AI agents, not web forms.
 
 ## Getting Started
 
@@ -92,21 +115,36 @@ Managed by `AuthContext` provider in `context/AuthContext.tsx`.
 ```
 web/
 ├── app/                      # Next.js 14 App Router
+│   ├── _archive/             # Archived pages (ignored by Next.js routing)
+│   │   ├── components/       # Components only used by archived pages
+│   │   │   ├── SearchBar.tsx
+│   │   │   └── FileList.tsx
+│   │   ├── search/page.tsx   # Archived search interface
+│   │   ├── repository-index/page.tsx  # Archived indexing UI
+│   │   └── files/page.tsx    # Archived files browser
+│   ├── auth/                 # Authentication routes
+│   │   └── dev-session/route.ts  # Dev-mode session endpoint
 │   ├── layout.tsx            # Root layout with navigation
 │   ├── page.tsx              # Landing page
-│   ├── search/page.tsx       # Code search interface
-│   ├── repository-index/page.tsx  # Repository indexing
-│   └── files/page.tsx        # Recent files view
+│   ├── login/page.tsx        # GitHub OAuth authentication
+│   ├── dashboard/page.tsx    # API key management + billing
+│   ├── pricing/page.tsx      # Stripe checkout
+│   └── mcp/page.tsx          # MCP configuration copy-paste
 ├── components/               # Reusable React components
 │   ├── Navigation.tsx        # Top navigation bar
 │   ├── ApiKeyInput.tsx       # API key management
 │   ├── RateLimitStatus.tsx   # Rate limit indicator
-│   ├── SearchBar.tsx         # Search input
-│   └── FileList.tsx          # File results display
+│   ├── KeyResetModal.tsx     # API key reset confirmation
+│   ├── KeyRevokeModal.tsx    # API key revoke confirmation
+│   └── mcp/                  # MCP page components
+│       ├── ConfigurationDisplay.tsx
+│       ├── CopyButton.tsx
+│       └── ToolReference.tsx
 ├── context/                  # React context providers
 │   └── AuthContext.tsx       # Authentication state
 ├── lib/                      # Utility libraries
-│   └── api-client.ts         # Type-safe API client
+│   ├── api-client.ts         # Type-safe API client
+│   └── playwright-helpers.ts # Test session management
 └── public/                   # Static assets
 ```
 
