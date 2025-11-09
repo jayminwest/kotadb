@@ -198,6 +198,26 @@ export async function handleCheckoutSessionCompleted(
 	process.stdout.write(`[Webhook] Upserting subscription for user ${userId}\n`);
 	process.stdout.write(`[Webhook] Subscription period values - start: ${subscription.current_period_start}, end: ${subscription.current_period_end}, type: ${typeof subscription.current_period_start}\n`);
 
+	// Validate timestamp values before conversion
+	if (!subscription.current_period_start || typeof subscription.current_period_start !== 'number') {
+		throw new Error(`Invalid current_period_start: ${subscription.current_period_start} (type: ${typeof subscription.current_period_start})`);
+	}
+	if (!subscription.current_period_end || typeof subscription.current_period_end !== 'number') {
+		throw new Error(`Invalid current_period_end: ${subscription.current_period_end} (type: ${typeof subscription.current_period_end})`);
+	}
+
+	// Convert Unix timestamps to Date objects
+	const periodStart = new Date(subscription.current_period_start * 1000);
+	const periodEnd = new Date(subscription.current_period_end * 1000);
+
+	// Validate Date objects are valid
+	if (Number.isNaN(periodStart.getTime())) {
+		throw new Error(`Invalid Date created from current_period_start: ${subscription.current_period_start}`);
+	}
+	if (Number.isNaN(periodEnd.getTime())) {
+		throw new Error(`Invalid Date created from current_period_end: ${subscription.current_period_end}`);
+	}
+
 	// Upsert subscription record (idempotent for duplicate events)
 	const { error: subError } = await supabase
 		.from("subscriptions")
@@ -208,12 +228,8 @@ export async function handleCheckoutSessionCompleted(
 				stripe_subscription_id: subscriptionId,
 				tier,
 				status: "active" as const,
-				current_period_start: new Date(
-					subscription.current_period_start * 1000,
-				).toISOString(),
-				current_period_end: new Date(
-					subscription.current_period_end * 1000,
-				).toISOString(),
+				current_period_start: periodStart.toISOString(),
+				current_period_end: periodEnd.toISOString(),
 				cancel_at_period_end: subscription.cancel_at_period_end,
 				trial_end: subscription.trial_end
 					? new Date(subscription.trial_end * 1000).toISOString()
