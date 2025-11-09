@@ -57,3 +57,18 @@ export type {
 	ValidationRequest,
 	ValidationResponse,
 } from "./validation";
+
+// MCP tools types (impact analysis and spec validation)
+export type {
+	ChangeImpactRequest,
+	ChangeImpactResponse,
+	AffectedFile,
+	TestScope,
+	ConflictInfo,
+	ImplementationSpec,
+	FileSpec,
+	MigrationSpec,
+	DependencySpec,
+	ValidationResult,
+	ValidationIssue,
+} from "./mcp-tools";

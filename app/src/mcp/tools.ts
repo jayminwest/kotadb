@@ -15,9 +15,15 @@ import {
 	type DependencyResult,
 } from "@api/queries";
 import { buildSnippet } from "@indexer/extractors";
-import type { IndexRequest } from "@shared/types";
+import type {
+	IndexRequest,
+	ChangeImpactRequest,
+	ImplementationSpec,
+} from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invalidParams } from "./jsonrpc";
+import { analyzeChangeImpact } from "./impact-analysis";
+import { validateImplementationSpec } from "./spec-validation";
 
 /**
  * MCP Tool Definition
@@ -151,6 +157,135 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
 };
 
 /**
+ * Tool: analyze_change_impact
+ */
+export const ANALYZE_CHANGE_IMPACT_TOOL: ToolDefinition = {
+	name: "analyze_change_impact",
+	description:
+		"Analyze the impact of proposed code changes by examining dependency graphs, test scope, and potential conflicts. Returns comprehensive analysis including affected files, test recommendations, architectural warnings, and risk assessment. Useful for planning implementations and avoiding breaking changes.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			files_to_modify: {
+				type: "array",
+				items: { type: "string" },
+				description: "List of files to be modified (relative paths)",
+			},
+			files_to_create: {
+				type: "array",
+				items: { type: "string" },
+				description: "List of files to be created (relative paths)",
+			},
+			files_to_delete: {
+				type: "array",
+				items: { type: "string" },
+				description: "List of files to be deleted (relative paths)",
+			},
+			change_type: {
+				type: "string",
+				enum: ["feature", "refactor", "fix", "chore"],
+				description: "Type of change being made",
+			},
+			description: {
+				type: "string",
+				description: "Brief description of the proposed change",
+			},
+			breaking_changes: {
+				type: "boolean",
+				description: "Whether this change includes breaking changes (default: false)",
+			},
+			repository: {
+				type: "string",
+				description: "Repository ID to analyze (optional, uses first repository if not specified)",
+			},
+		},
+		required: ["change_type", "description"],
+	},
+};
+
+/**
+ * Tool: validate_implementation_spec
+ */
+export const VALIDATE_IMPLEMENTATION_SPEC_TOOL: ToolDefinition = {
+	name: "validate_implementation_spec",
+	description:
+		"Validate an implementation specification against KotaDB conventions and repository state. Checks for file conflicts, naming conventions, path alias usage, test coverage, and dependency compatibility. Returns validation errors, warnings, and approval conditions checklist.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			feature_name: {
+				type: "string",
+				description: "Name of the feature or change",
+			},
+			files_to_create: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						path: { type: "string" },
+						purpose: { type: "string" },
+						estimated_lines: { type: "number" },
+					},
+					required: ["path", "purpose"],
+				},
+				description: "Files to create with their purposes",
+			},
+			files_to_modify: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						path: { type: "string" },
+						purpose: { type: "string" },
+						estimated_lines: { type: "number" },
+					},
+					required: ["path", "purpose"],
+				},
+				description: "Files to modify with their purposes",
+			},
+			migrations: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						filename: { type: "string" },
+						description: { type: "string" },
+						tables_affected: {
+							type: "array",
+							items: { type: "string" },
+						},
+					},
+					required: ["filename", "description"],
+				},
+				description: "Database migrations to add",
+			},
+			dependencies_to_add: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						name: { type: "string" },
+						version: { type: "string" },
+						dev: { type: "boolean" },
+					},
+					required: ["name"],
+				},
+				description: "npm dependencies to add",
+			},
+			breaking_changes: {
+				type: "boolean",
+				description: "Whether this includes breaking changes (default: false)",
+			},
+			repository: {
+				type: "string",
+				description: "Repository ID (optional, uses first repository if not specified)",
+			},
+		},
+		required: ["feature_name"],
+	},
+};
+
+/**
  * Get all available tool definitions
  */
 export function getToolDefinitions(): ToolDefinition[] {
@@ -159,6 +294,8 @@ export function getToolDefinitions(): ToolDefinition[] {
 		INDEX_REPOSITORY_TOOL,
 		LIST_RECENT_FILES_TOOL,
 		SEARCH_DEPENDENCIES_TOOL,
+		ANALYZE_CHANGE_IMPACT_TOOL,
+		VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 	];
 }
 
@@ -531,6 +668,150 @@ export async function executeSearchDependencies(
 }
 
 /**
+ * Execute analyze_change_impact tool
+ */
+export async function executeAnalyzeChangeImpact(
+	supabase: SupabaseClient,
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameters
+	if (p.change_type === undefined) {
+		throw new Error("Missing required parameter: change_type");
+	}
+	if (typeof p.change_type !== "string") {
+		throw new Error("Parameter 'change_type' must be a string");
+	}
+	if (!["feature", "refactor", "fix", "chore"].includes(p.change_type)) {
+		throw new Error(
+			"Parameter 'change_type' must be one of: feature, refactor, fix, chore",
+		);
+	}
+
+	if (p.description === undefined) {
+		throw new Error("Missing required parameter: description");
+	}
+	if (typeof p.description !== "string") {
+		throw new Error("Parameter 'description' must be a string");
+	}
+
+	// Validate optional parameters
+	if (p.files_to_modify !== undefined && !Array.isArray(p.files_to_modify)) {
+		throw new Error("Parameter 'files_to_modify' must be an array");
+	}
+	if (p.files_to_create !== undefined && !Array.isArray(p.files_to_create)) {
+		throw new Error("Parameter 'files_to_create' must be an array");
+	}
+	if (p.files_to_delete !== undefined && !Array.isArray(p.files_to_delete)) {
+		throw new Error("Parameter 'files_to_delete' must be an array");
+	}
+	if (
+		p.breaking_changes !== undefined &&
+		typeof p.breaking_changes !== "boolean"
+	) {
+		throw new Error("Parameter 'breaking_changes' must be a boolean");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const validatedParams: ChangeImpactRequest = {
+		files_to_modify: p.files_to_modify as string[] | undefined,
+		files_to_create: p.files_to_create as string[] | undefined,
+		files_to_delete: p.files_to_delete as string[] | undefined,
+		change_type: p.change_type as "feature" | "refactor" | "fix" | "chore",
+		description: p.description as string,
+		breaking_changes: p.breaking_changes as boolean | undefined,
+		repository: p.repository as string | undefined,
+	};
+
+	const result = await analyzeChangeImpact(
+		supabase,
+		validatedParams,
+		userId,
+	);
+
+	return result;
+}
+
+/**
+ * Execute validate_implementation_spec tool
+ */
+export async function executeValidateImplementationSpec(
+	supabase: SupabaseClient,
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameters
+	if (p.feature_name === undefined) {
+		throw new Error("Missing required parameter: feature_name");
+	}
+	if (typeof p.feature_name !== "string") {
+		throw new Error("Parameter 'feature_name' must be a string");
+	}
+
+	// Validate optional parameters
+	if (p.files_to_create !== undefined && !Array.isArray(p.files_to_create)) {
+		throw new Error("Parameter 'files_to_create' must be an array");
+	}
+	if (p.files_to_modify !== undefined && !Array.isArray(p.files_to_modify)) {
+		throw new Error("Parameter 'files_to_modify' must be an array");
+	}
+	if (p.migrations !== undefined && !Array.isArray(p.migrations)) {
+		throw new Error("Parameter 'migrations' must be an array");
+	}
+	if (
+		p.dependencies_to_add !== undefined &&
+		!Array.isArray(p.dependencies_to_add)
+	) {
+		throw new Error("Parameter 'dependencies_to_add' must be an array");
+	}
+	if (
+		p.breaking_changes !== undefined &&
+		typeof p.breaking_changes !== "boolean"
+	) {
+		throw new Error("Parameter 'breaking_changes' must be a boolean");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const validatedParams: ImplementationSpec = {
+		feature_name: p.feature_name as string,
+		files_to_create: p.files_to_create as any,
+		files_to_modify: p.files_to_modify as any,
+		migrations: p.migrations as any,
+		dependencies_to_add: p.dependencies_to_add as any,
+		breaking_changes: p.breaking_changes as boolean | undefined,
+		repository: p.repository as string | undefined,
+	};
+
+	const result = await validateImplementationSpec(
+		supabase,
+		validatedParams,
+		userId,
+	);
+
+	return result;
+}
+
+/**
  * Main tool call dispatcher
  */
 export async function handleToolCall(
@@ -549,6 +830,20 @@ export async function handleToolCall(
 			return await executeListRecentFiles(supabase, params, requestId, userId);
 		case "search_dependencies":
 			return await executeSearchDependencies(
+				supabase,
+				params,
+				requestId,
+				userId,
+			);
+		case "analyze_change_impact":
+			return await executeAnalyzeChangeImpact(
+				supabase,
+				params,
+				requestId,
+				userId,
+			);
+		case "validate_implementation_spec":
+			return await executeValidateImplementationSpec(
 				supabase,
 				params,
 				requestId,

@@ -18,10 +18,14 @@ import {
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_CODE_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
+	ANALYZE_CHANGE_IMPACT_TOOL,
+	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearchCode,
 	executeSearchDependencies,
+	executeAnalyzeChangeImpact,
+	executeValidateImplementationSpec,
 } from "./tools";
 
 /**
@@ -56,6 +60,8 @@ export function createMcpServer(context: McpServerContext): Server {
 				INDEX_REPOSITORY_TOOL,
 				LIST_RECENT_FILES_TOOL,
 				SEARCH_DEPENDENCIES_TOOL,
+				ANALYZE_CHANGE_IMPACT_TOOL,
+				VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 			],
 		};
 	});
@@ -93,6 +99,22 @@ export function createMcpServer(context: McpServerContext): Server {
 				break;
 			case "search_dependencies":
 				result = await executeSearchDependencies(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "analyze_change_impact":
+				result = await executeAnalyzeChangeImpact(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "validate_implementation_spec":
+				result = await executeValidateImplementationSpec(
 					context.supabase,
 					toolArgs,
 					"", // requestId not used
