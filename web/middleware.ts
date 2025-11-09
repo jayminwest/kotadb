@@ -35,9 +35,9 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Only dashboard requires OAuth session
+  // Only dashboard and MCP configuration require OAuth session
   // Other routes work with API key authentication (handled by backend)
-  const oauthOnlyRoutes = ['/dashboard']
+  const oauthOnlyRoutes = ['/dashboard', '/mcp']
   const requiresOAuth = oauthOnlyRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   )
