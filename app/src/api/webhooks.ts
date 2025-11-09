@@ -170,9 +170,8 @@ export async function handleCheckoutSessionCompleted(
 
 	const stripe = getStripeClient();
 	process.stdout.write(`[Webhook] Retrieving subscription: ${subscriptionId}\n`);
-	const subscription = (await stripe.subscriptions.retrieve(
-		subscriptionId,
-	)) as unknown as StripeSubscriptionFull;
+	const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as Stripe.Subscription;
+	process.stdout.write(`[Webhook] Subscription status: ${subscription.status}, current_period_start: ${(subscription as any).current_period_start}, current_period_end: ${(subscription as any).current_period_end}\n`);
 
 	// Get user_id from subscription metadata or customer metadata
 	const customer = await stripe.customers.retrieve(customerId);
@@ -196,26 +195,37 @@ export async function handleCheckoutSessionCompleted(
 	const supabase = getServiceClient();
 
 	process.stdout.write(`[Webhook] Upserting subscription for user ${userId}\n`);
-	process.stdout.write(`[Webhook] Subscription period values - start: ${subscription.current_period_start}, end: ${subscription.current_period_end}, type: ${typeof subscription.current_period_start}\n`);
+
+	// Access period fields (Stripe SDK types don't include these but they exist at runtime)
+	const currentPeriodStart = (subscription as any).current_period_start;
+	const currentPeriodEnd = (subscription as any).current_period_end;
+	const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end;
+	const trialEnd = (subscription as any).trial_end;
 
 	// Validate timestamp values before conversion
-	if (!subscription.current_period_start || typeof subscription.current_period_start !== 'number') {
-		throw new Error(`Invalid current_period_start: ${subscription.current_period_start} (type: ${typeof subscription.current_period_start})`);
+	if (!currentPeriodStart || typeof currentPeriodStart !== 'number') {
+		throw new Error(
+			`Invalid current_period_start: ${currentPeriodStart} (type: ${typeof currentPeriodStart}, ` +
+			`subscription status: ${subscription.status}, subscription id: ${subscriptionId})`
+		);
 	}
-	if (!subscription.current_period_end || typeof subscription.current_period_end !== 'number') {
-		throw new Error(`Invalid current_period_end: ${subscription.current_period_end} (type: ${typeof subscription.current_period_end})`);
+	if (!currentPeriodEnd || typeof currentPeriodEnd !== 'number') {
+		throw new Error(
+			`Invalid current_period_end: ${currentPeriodEnd} (type: ${typeof currentPeriodEnd}, ` +
+			`subscription status: ${subscription.status}, subscription id: ${subscriptionId})`
+		);
 	}
 
 	// Convert Unix timestamps to Date objects
-	const periodStart = new Date(subscription.current_period_start * 1000);
-	const periodEnd = new Date(subscription.current_period_end * 1000);
+	const periodStart = new Date(currentPeriodStart * 1000);
+	const periodEnd = new Date(currentPeriodEnd * 1000);
 
 	// Validate Date objects are valid
 	if (Number.isNaN(periodStart.getTime())) {
-		throw new Error(`Invalid Date created from current_period_start: ${subscription.current_period_start}`);
+		throw new Error(`Invalid Date created from current_period_start: ${currentPeriodStart}`);
 	}
 	if (Number.isNaN(periodEnd.getTime())) {
-		throw new Error(`Invalid Date created from current_period_end: ${subscription.current_period_end}`);
+		throw new Error(`Invalid Date created from current_period_end: ${currentPeriodEnd}`);
 	}
 
 	// Upsert subscription record (idempotent for duplicate events)
@@ -230,9 +240,9 @@ export async function handleCheckoutSessionCompleted(
 				status: "active" as const,
 				current_period_start: periodStart.toISOString(),
 				current_period_end: periodEnd.toISOString(),
-				cancel_at_period_end: subscription.cancel_at_period_end,
-				trial_end: subscription.trial_end
-					? new Date(subscription.trial_end * 1000).toISOString()
+				cancel_at_period_end: cancelAtPeriodEnd,
+				trial_end: trialEnd
+					? new Date(trialEnd * 1000).toISOString()
 					: null,
 				updated_at: new Date().toISOString(),
 			},
