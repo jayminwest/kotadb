@@ -196,6 +196,8 @@ export async function handleCheckoutSessionCompleted(
 	const supabase = getServiceClient();
 
 	process.stdout.write(`[Webhook] Upserting subscription for user ${userId}\n`);
+	process.stdout.write(`[Webhook] Subscription period values - start: ${subscription.current_period_start}, end: ${subscription.current_period_end}, type: ${typeof subscription.current_period_start}\n`);
+
 	// Upsert subscription record (idempotent for duplicate events)
 	const { error: subError } = await supabase
 		.from("subscriptions")
