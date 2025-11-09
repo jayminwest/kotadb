@@ -18,14 +18,10 @@ import {
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_CODE_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
-	GET_ADW_STATE_TOOL,
-	LIST_ADW_WORKFLOWS_TOOL,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearchCode,
 	executeSearchDependencies,
-	executeGetAdwState,
-	executeListAdwWorkflows,
 } from "./tools";
 
 /**
@@ -60,8 +56,6 @@ export function createMcpServer(context: McpServerContext): Server {
 				INDEX_REPOSITORY_TOOL,
 				LIST_RECENT_FILES_TOOL,
 				SEARCH_DEPENDENCIES_TOOL,
-				GET_ADW_STATE_TOOL,
-				LIST_ADW_WORKFLOWS_TOOL,
 			],
 		};
 	});
@@ -99,22 +93,6 @@ export function createMcpServer(context: McpServerContext): Server {
 				break;
 			case "search_dependencies":
 				result = await executeSearchDependencies(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "get_adw_state":
-				result = await executeGetAdwState(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "list_adw_workflows":
-				result = await executeListAdwWorkflows(
 					context.supabase,
 					toolArgs,
 					"", // requestId not used
