@@ -202,18 +202,25 @@ export async function handleCheckoutSessionCompleted(
 	const cancelAtPeriodEnd = (subscription as any).cancel_at_period_end;
 	const trialEnd = (subscription as any).trial_end;
 
-	// Validate timestamp values before conversion
-	if (!currentPeriodStart || typeof currentPeriodStart !== 'number') {
-		throw new Error(
-			`Invalid current_period_start: ${currentPeriodStart} (type: ${typeof currentPeriodStart}, ` +
-			`subscription status: ${subscription.status}, subscription id: ${subscriptionId})`
+	// If period fields are undefined, skip checkout handler and rely on invoice.paid event
+	// This happens when checkout.session.completed fires before subscription is fully initialized
+	if (!currentPeriodStart || !currentPeriodEnd) {
+		process.stdout.write(
+			`[Webhook] Subscription ${subscriptionId} (status: ${subscription.status}) missing billing period data. ` +
+			`Skipping checkout handler, will process via invoice.paid event. ` +
+			`(start: ${currentPeriodStart}, end: ${currentPeriodEnd})\n`
 		);
+		return; // Return success to avoid Stripe retries
 	}
-	if (!currentPeriodEnd || typeof currentPeriodEnd !== 'number') {
-		throw new Error(
-			`Invalid current_period_end: ${currentPeriodEnd} (type: ${typeof currentPeriodEnd}, ` +
-			`subscription status: ${subscription.status}, subscription id: ${subscriptionId})`
+
+	// Validate timestamp types
+	if (typeof currentPeriodStart !== 'number' || typeof currentPeriodEnd !== 'number') {
+		process.stdout.write(
+			`[Webhook] Subscription ${subscriptionId} has invalid period types ` +
+			`(start: ${typeof currentPeriodStart}, end: ${typeof currentPeriodEnd}). ` +
+			`Skipping checkout handler, will process via invoice.paid event.\n`
 		);
+		return;
 	}
 
 	// Convert Unix timestamps to Date objects
