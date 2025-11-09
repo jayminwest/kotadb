@@ -169,15 +169,18 @@ export async function handleCheckoutSessionCompleted(
 	}
 
 	const stripe = getStripeClient();
+	process.stdout.write(`[Webhook] Retrieving subscription: ${subscriptionId}\n`);
 	const subscription = (await stripe.subscriptions.retrieve(
 		subscriptionId,
 	)) as unknown as StripeSubscriptionFull;
 
 	// Get user_id from subscription metadata or customer metadata
 	const customer = await stripe.customers.retrieve(customerId);
+	process.stdout.write(`[Webhook] Customer retrieved, checking metadata\n`);
 	const userId =
 		subscription.metadata?.user_id ||
 		(customer.deleted ? undefined : customer.metadata?.user_id);
+	process.stdout.write(`[Webhook] user_id extracted: ${userId || 'NOT FOUND'}\n`);
 
 	if (!userId) {
 		process.stderr.write(
@@ -192,6 +195,7 @@ export async function handleCheckoutSessionCompleted(
 
 	const supabase = getServiceClient();
 
+	process.stdout.write(`[Webhook] Upserting subscription for user ${userId}\n`);
 	// Upsert subscription record (idempotent for duplicate events)
 	const { error: subError } = await supabase
 		.from("subscriptions")

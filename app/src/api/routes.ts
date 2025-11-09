@@ -209,30 +209,54 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			if (event.type === "checkout.session.completed") {
 				handleCheckoutSessionCompleted(event as Stripe.CheckoutSessionCompletedEvent).catch(
 					(error) => {
+						const errorDetails = {
+							message: error?.message || String(error),
+							stack: error?.stack,
+							name: error?.name,
+							cause: error?.cause,
+						};
 						process.stderr.write(
-							`[Stripe Webhook] checkout.session.completed handler error: ${JSON.stringify(error)}\n`,
+							`[Stripe Webhook] checkout.session.completed handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
 						);
 					},
 				);
 			} else if (event.type === "invoice.paid") {
 					handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
+						const errorDetails = {
+							message: error?.message || String(error),
+							stack: error?.stack,
+							name: error?.name,
+							cause: error?.cause,
+						};
 						process.stderr.write(
-							`[Stripe Webhook] invoice.paid handler error: ${JSON.stringify(error)}\n`,
+							`[Stripe Webhook] invoice.paid handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
 						);
 					});
 				} else if (event.type === "customer.subscription.updated") {
 					handleSubscriptionUpdated(event as Stripe.CustomerSubscriptionUpdatedEvent).catch(
 						(error) => {
+							const errorDetails = {
+								message: error?.message || String(error),
+								stack: error?.stack,
+								name: error?.name,
+								cause: error?.cause,
+							};
 							process.stderr.write(
-								`[Stripe Webhook] customer.subscription.updated handler error: ${JSON.stringify(error)}\n`,
+								`[Stripe Webhook] customer.subscription.updated handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
 							);
 						},
 					);
 				} else if (event.type === "customer.subscription.deleted") {
 					handleSubscriptionDeleted(event as Stripe.CustomerSubscriptionDeletedEvent).catch(
 						(error) => {
+							const errorDetails = {
+								message: error?.message || String(error),
+								stack: error?.stack,
+								name: error?.name,
+								cause: error?.cause,
+							};
 							process.stderr.write(
-								`[Stripe Webhook] customer.subscription.deleted handler error: ${JSON.stringify(error)}\n`,
+								`[Stripe Webhook] customer.subscription.deleted handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
 							);
 						},
 					);
