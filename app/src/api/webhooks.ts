@@ -143,6 +143,100 @@ export async function handleInvoicePaid(
 }
 
 /**
+ * Handle checkout.session.completed event.
+ * Creates initial subscription record immediately after checkout completion.
+ *
+ * @param event - Stripe checkout.session.completed event
+ */
+export async function handleCheckoutSessionCompleted(
+	event: Stripe.CheckoutSessionCompletedEvent,
+): Promise<void> {
+	const session = event.data.object;
+	const customerId =
+		typeof session.customer === "string"
+			? session.customer
+			: session.customer?.id;
+	const subscriptionId =
+		typeof session.subscription === "string"
+			? session.subscription
+			: session.subscription?.id;
+
+	if (!subscriptionId || !customerId) {
+		process.stderr.write(
+			"Checkout session has no subscription or customer ID, skipping\n",
+		);
+		return;
+	}
+
+	const stripe = getStripeClient();
+	const subscription = (await stripe.subscriptions.retrieve(
+		subscriptionId,
+	)) as unknown as StripeSubscriptionFull;
+
+	// Get user_id from subscription metadata or customer metadata
+	const customer = await stripe.customers.retrieve(customerId);
+	const userId =
+		subscription.metadata?.user_id ||
+		(customer.deleted ? undefined : customer.metadata?.user_id);
+
+	if (!userId) {
+		process.stderr.write(
+			`Checkout session ${session.id} has no user_id in subscription or customer metadata, skipping (subscription: ${subscriptionId})\n`,
+		);
+		return; // Return success to avoid Stripe webhook retries
+	}
+
+	// Determine tier from price ID
+	const priceId = subscription.items.data[0]?.price.id;
+	const tier = getTierFromPriceId(priceId);
+
+	const supabase = getServiceClient();
+
+	// Upsert subscription record (idempotent for duplicate events)
+	const { error: subError } = await supabase
+		.from("subscriptions")
+		.upsert(
+			{
+				user_id: userId,
+				stripe_customer_id: customerId,
+				stripe_subscription_id: subscriptionId,
+				tier,
+				status: "active" as const,
+				current_period_start: new Date(
+					subscription.current_period_start * 1000,
+				).toISOString(),
+				current_period_end: new Date(
+					subscription.current_period_end * 1000,
+				).toISOString(),
+				cancel_at_period_end: subscription.cancel_at_period_end,
+				trial_end: subscription.trial_end
+					? new Date(subscription.trial_end * 1000).toISOString()
+					: null,
+				updated_at: new Date().toISOString(),
+			},
+			{ onConflict: "user_id" },
+		);
+
+	if (subError) {
+		throw new Error(`Failed to upsert subscription: ${subError.message}`);
+	}
+
+	// Update ALL api_keys tier for this user (not just primary key)
+	const { error: keyError } = await supabase
+		.from("api_keys")
+		.update({ tier })
+		.eq("user_id", userId);
+
+	if (keyError) {
+		throw new Error(`Failed to update API key tier: ${keyError.message}`);
+	}
+
+	process.stdout.write(
+		`Subscription ${subscriptionId} created for user ${userId} (tier: ${tier})\n`,
+	);
+}
+
+/**
  * Handle customer.subscription.updated event.
  * Syncs subscription status and tier changes.
  *

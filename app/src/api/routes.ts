@@ -31,6 +31,7 @@ import { QUEUE_NAMES } from "@queue/config";
 import type { IndexRepoJobPayload } from "@queue/types";
 import {
 	verifyWebhookSignature as verifyStripeSignature,
+	handleCheckoutSessionCompleted,
 	handleInvoicePaid,
 	handleSubscriptionUpdated,
 	handleSubscriptionDeleted,
@@ -205,7 +206,15 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				);
 
 				// Route events to handlers asynchronously (don't block webhook response)
-				if (event.type === "invoice.paid") {
+			if (event.type === "checkout.session.completed") {
+				handleCheckoutSessionCompleted(event as Stripe.CheckoutSessionCompletedEvent).catch(
+					(error) => {
+						process.stderr.write(
+							`[Stripe Webhook] checkout.session.completed handler error: ${JSON.stringify(error)}\n`,
+						);
+					},
+				);
+			} else if (event.type === "invoice.paid") {
 					handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
 						process.stderr.write(
 							`[Stripe Webhook] invoice.paid handler error: ${JSON.stringify(error)}\n`,
