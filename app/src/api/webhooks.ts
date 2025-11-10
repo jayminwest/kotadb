@@ -74,6 +74,18 @@ export async function handleInvoicePaid(
 		return;
 	}
 
+	// Get billing period from invoice line items (more reliable than subscription.retrieve)
+	const lineItem = invoice.lines.data[0];
+	if (!lineItem?.period) {
+		process.stderr.write(
+			`Invoice ${invoice.id} has no line items with period data, skipping\n`
+		);
+		return;
+	}
+
+	const periodStart = lineItem.period.start;
+	const periodEnd = lineItem.period.end;
+
 	const stripe = getStripeClient();
 	const subscription = (await stripe.subscriptions.retrieve(
 		subscriptionId,
@@ -98,32 +110,13 @@ export async function handleInvoicePaid(
 
 	const supabase = getServiceClient();
 
-	// Access period fields
-	const currentPeriodStart = (subscription as any).current_period_start;
-	const currentPeriodEnd = (subscription as any).current_period_end;
-
-	// Log diagnostic info for invoice.paid
+	// Log diagnostic info
 	process.stdout.write(
 		`[Webhook] invoice.paid for subscription ${subscriptionId} - ` +
-		`status: ${subscription.status}, start: ${currentPeriodStart}, end: ${currentPeriodEnd}\n`
+		`Using line item periods: start=${periodStart}, end=${periodEnd}\n`
 	);
 
-	// Validate period fields exist (invoice.paid should always have these)
-	if (!currentPeriodStart || !currentPeriodEnd) {
-		throw new Error(
-			`invoice.paid event missing billing periods (subscription: ${subscriptionId}, ` +
-			`status: ${subscription.status}, start: ${currentPeriodStart}, end: ${currentPeriodEnd})`
-		);
-	}
-
-	if (typeof currentPeriodStart !== 'number' || typeof currentPeriodEnd !== 'number') {
-		throw new Error(
-			`invoice.paid event has invalid period types (subscription: ${subscriptionId}, ` +
-			`start type: ${typeof currentPeriodStart}, end type: ${typeof currentPeriodEnd})`
-		);
-	}
-
-	// Upsert subscription record
+	// Upsert subscription record using periods from invoice line item
 	const { error: subError } = await supabase
 		.from("subscriptions")
 		.upsert(
@@ -133,8 +126,8 @@ export async function handleInvoicePaid(
 				stripe_subscription_id: subscriptionId,
 				tier,
 				status: "active" as const,
-				current_period_start: new Date(currentPeriodStart * 1000).toISOString(),
-				current_period_end: new Date(currentPeriodEnd * 1000).toISOString(),
+				current_period_start: new Date(periodStart * 1000).toISOString(),
+				current_period_end: new Date(periodEnd * 1000).toISOString(),
 				cancel_at_period_end: subscription.cancel_at_period_end,
 				trial_end: subscription.trial_end
 					? new Date(subscription.trial_end * 1000).toISOString()
