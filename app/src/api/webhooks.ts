@@ -75,16 +75,32 @@ export async function handleInvoicePaid(
 	}
 
 	// Get billing period from invoice line items (more reliable than subscription.retrieve)
-	const lineItem = invoice.lines.data[0];
+	process.stdout.write(
+		`[Webhook] Processing invoice.paid for invoice ${invoice.id}, subscription ${subscriptionId}\n`
+	);
+
+	const invoiceLines = (invoice as any).lines;
+	if (!invoiceLines || !invoiceLines.data || invoiceLines.data.length === 0) {
+		process.stderr.write(
+			`Invoice ${invoice.id} has no line items, skipping\n`
+		);
+		return;
+	}
+
+	const lineItem = invoiceLines.data[0];
 	if (!lineItem?.period) {
 		process.stderr.write(
-			`Invoice ${invoice.id} has no line items with period data, skipping\n`
+			`Invoice ${invoice.id} line item has no period data, skipping\n`
 		);
 		return;
 	}
 
 	const periodStart = lineItem.period.start;
 	const periodEnd = lineItem.period.end;
+
+	process.stdout.write(
+		`[Webhook] invoice.paid - Using line item periods: start=${periodStart}, end=${periodEnd}\n`
+	);
 
 	const stripe = getStripeClient();
 	const subscription = (await stripe.subscriptions.retrieve(
@@ -109,12 +125,6 @@ export async function handleInvoicePaid(
 	const tier = getTierFromPriceId(priceId);
 
 	const supabase = getServiceClient();
-
-	// Log diagnostic info
-	process.stdout.write(
-		`[Webhook] invoice.paid for subscription ${subscriptionId} - ` +
-		`Using line item periods: start=${periodStart}, end=${periodEnd}\n`
-	);
 
 	// Upsert subscription record using periods from invoice line item
 	const { error: subError } = await supabase
