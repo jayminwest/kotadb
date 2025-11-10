@@ -76,6 +76,17 @@ export async function updateJobStatus(
 	// Build update payload with conditional timestamp logic
 	const updates: Record<string, unknown> = { status };
 
+	// Increment retry count when reprocessing a failed job
+	const { data: currentJob } = await client
+		.from("index_jobs")
+		.select("status, retry_count")
+		.eq("id", jobId)
+		.single();
+
+	if (currentJob?.status === "failed" && status === "processing") {
+		updates.retry_count = (currentJob.retry_count || 0) + 1;
+	}
+
 	// Capture started_at when transitioning to processing
 	if (status === "processing") {
 		updates.started_at = new Date().toISOString();

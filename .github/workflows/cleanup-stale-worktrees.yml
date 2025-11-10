@@ -1,0 +1,127 @@
+name: Cleanup Stale Worktrees
+
+on:
+  schedule:
+    # Run weekly on Sunday at 00:00 UTC
+    - cron: '0 0 * * 0'
+  workflow_dispatch:
+    inputs:
+      max_age_days:
+        description: 'Maximum age in days before worktree is stale'
+        required: false
+        default: '7'
+        type: string
+      delete_branches:
+        description: 'Delete associated git branches'
+        required: false
+        default: false
+        type: boolean
+      dry_run:
+        description: 'Preview mode (no actual deletion)'
+        required: false
+        default: false
+        type: boolean
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write  # Required for git worktree and branch operations
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Full git history required for worktree operations
+
+      - name: Install Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Configure git identity
+        run: |
+          git config --global user.name "GitHub Actions"
+          git config --global user.email "actions@github.com"
+
+      - name: Run cleanup script
+        id: cleanup
+        working-directory: automation
+        run: |
+          set -e
+
+          # Determine arguments based on workflow trigger
+          MAX_AGE="${{ github.event.inputs.max_age_days || '7' }}"
+          DELETE_BRANCHES="${{ github.event.inputs.delete_branches || 'false' }}"
+          DRY_RUN="${{ github.event.inputs.dry_run || 'false' }}"
+
+          # Build cleanup command
+          CLEANUP_CMD="uv run adws/scripts/cleanup-stale-worktrees.py --max-age-days $MAX_AGE"
+
+          if [ "$DELETE_BRANCHES" = "true" ]; then
+            CLEANUP_CMD="$CLEANUP_CMD --delete-branches"
+          fi
+
+          if [ "$DRY_RUN" = "false" ]; then
+            CLEANUP_CMD="$CLEANUP_CMD --no-dry-run"
+          fi
+
+          # Execute cleanup and capture output
+          $CLEANUP_CMD | tee cleanup-output.txt
+
+          # Extract summary metrics for GitHub Actions summary
+          STALE_COUNT=$(grep "Found.*stale worktree" cleanup-output.txt | grep -o '[0-9]\+' || echo "0")
+          REMOVED_COUNT=$(grep -E "Successfully Removed|Would Remove" cleanup-output.txt | grep -o '[0-9]\+' || echo "0")
+          FAILED_COUNT=$(grep "Failed:" cleanup-output.txt | grep -o '[0-9]\+' || echo "0")
+
+          # Set outputs for GitHub Actions summary
+          echo "stale_count=$STALE_COUNT" >> $GITHUB_OUTPUT
+          echo "removed_count=$REMOVED_COUNT" >> $GITHUB_OUTPUT
+          echo "failed_count=$FAILED_COUNT" >> $GITHUB_OUTPUT
+          echo "dry_run=$DRY_RUN" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Actions Summary
+        if: always()
+        run: |
+          echo "# Stale Worktree Cleanup Summary" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "**Execution Time:** $(date -u +"%Y-%m-%d %H:%M:%S UTC")" >> $GITHUB_STEP_SUMMARY
+          echo "**Max Age Threshold:** ${{ github.event.inputs.max_age_days || '7' }} days" >> $GITHUB_STEP_SUMMARY
+          echo "**Delete Branches:** ${{ github.event.inputs.delete_branches || 'false' }}" >> $GITHUB_STEP_SUMMARY
+          echo "**Dry Run Mode:** ${{ steps.cleanup.outputs.dry_run }}" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "## Results" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          echo "- **Stale Worktrees Detected:** ${{ steps.cleanup.outputs.stale_count }}" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.cleanup.outputs.dry_run }}" = "true" ]; then
+            echo "- **Would Remove:** ${{ steps.cleanup.outputs.removed_count }}" >> $GITHUB_STEP_SUMMARY
+          else
+            echo "- **Successfully Removed:** ${{ steps.cleanup.outputs.removed_count }}" >> $GITHUB_STEP_SUMMARY
+            echo "- **Failed:** ${{ steps.cleanup.outputs.failed_count }}" >> $GITHUB_STEP_SUMMARY
+          fi
+
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          if [ "${{ steps.cleanup.outputs.stale_count }}" -eq "0" ]; then
+            echo "✅ No stale worktrees found. System is clean." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.cleanup.outputs.dry_run }}" = "true" ]; then
+            echo "ℹ️ Dry run mode: No worktrees were actually removed." >> $GITHUB_STEP_SUMMARY
+          elif [ "${{ steps.cleanup.outputs.failed_count }}" -gt "0" ]; then
+            echo "⚠️ Some worktrees failed to remove. Check logs for details." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "✅ All stale worktrees removed successfully." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload cleanup log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: cleanup-log-${{ github.run_number }}
+          path: automation/cleanup-output.txt
+          retention-days: 30

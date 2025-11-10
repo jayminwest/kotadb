@@ -76,6 +76,17 @@ Use this reference to decide which KotaDB automation layer documentation sources
     - When modifying agent.py environment construction logic (get_claude_env function)
     - When root repository branch changes unexpectedly during ADW execution
 
+- docs/specs/chore-215-stale-worktree-cleanup.md
+  - Conditions:
+    - When working on issue #215 or implementing stale worktree cleanup
+    - When troubleshooting disk space issues caused by orphaned worktrees
+    - When implementing or modifying `automation/adws/scripts/cleanup-stale-worktrees.py`
+    - When debugging staleness detection logic or state file modification time checks
+    - When adding or modifying the weekly cleanup CI workflow (`.github/workflows/cleanup-stale-worktrees.yml`)
+    - When orphaned worktrees accumulate in `automation/trees/` after failed workflows
+    - When configuring staleness thresholds or cleanup safety mechanisms
+    - When understanding worktree naming conventions for ADW ID extraction
+
 - .claude/commands/docs/prompt-code-alignment.md
   - Conditions:
     - When creating or modifying slash command templates in `.claude/commands/`
@@ -185,24 +196,3 @@ Use this reference to decide which KotaDB automation layer documentation sources
     - When debugging orchestrator execution or sub-agent spawning issues
     - When extending orchestrator with new phases or error handling patterns
 
-- .claude/commands/beads/sync-github.md
-  - Conditions:
-    - When needing to synchronize open GitHub issues into local Beads database
-    - When maintaining alignment between GitHub issue tracker and Beads SQLite database
-    - When ADW workflows require fresh issue data from GitHub
-    - When implementing automated GitHub → Beads sync in CI/CD pipelines
-    - When troubleshooting Beads external_ref mappings or dependency synchronization
-    - When understanding label-to-priority/effort/type mapping conventions
-    - When debugging JSONL export conflicts or merge issues
-    - When ensuring issue metadata stays consistent across GitHub and Beads
-
-- .claude/commands/docs/beads-adw-integration.md
-  - Conditions:
-    - When integrating Beads database queries into ADW workflow phases
-    - When implementing atomic "claim work" operations to prevent agent conflicts
-    - When replacing GitHub API queries with local SQLite queries for performance
-    - When understanding dependency graph queries without spec file parsing
-    - When implementing fallback strategies (Beads unavailable → GitHub API)
-    - When updating ADW state schema to include beads_issue_id and beads_sync fields
-    - When troubleshooting Beads MCP tool integration or workspace context issues
-    - When understanding Beads ↔ GitHub field mappings and sync strategies

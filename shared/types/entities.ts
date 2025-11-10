@@ -106,6 +106,9 @@ export interface IndexJob {
 	/** Git commit SHA for job context tracking */
 	commit_sha?: string;
 
+	/** Number of retry attempts for this job */
+	retry_count?: number;
+
 	/** Creation timestamp */
 	created_at?: string;
 }

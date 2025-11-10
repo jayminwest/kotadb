@@ -326,36 +326,12 @@ class WorkflowMetrics(BaseModel):
     workflow_type: str = Field(..., description="Workflow identifier (adw_sdlc, adw_plan_build, etc.)")
 
 
-class BeadsIssue(BaseModel):
-    """Beads issue data model."""
-    id: str = Field(..., description="Beads issue ID (e.g., kota-db-ts-303)")
-    title: str = Field(..., description="Issue title")
-    description: str = Field(default="", description="Issue description")
-    status: str = Field(..., description="Issue status (open, in_progress, blocked, closed)")
-    priority: int = Field(..., description="Issue priority (1-5, where 1=highest)")
-    issue_type: str = Field(default="task", description="Issue type (bug, feature, task, epic, chore)")
-    assignee: Optional[str] = Field(None, description="Assigned user")
-    external_ref: Optional[str] = Field(None, description="External reference (e.g., GitHub issue number)")
-    labels: List[str] = Field(default_factory=list, description="Issue labels")
-    dependencies: List[str] = Field(default_factory=list, description="Issue IDs this depends on")
-    dependents: List[str] = Field(default_factory=list, description="Issue IDs that depend on this")
-
-
-class BeadsSyncMetadata(BaseModel):
-    """Metadata for beads sync state."""
-    last_sync: str = Field(..., description="ISO timestamp of last beads sync")
-    source: str = Field(..., description="Data source (beads or github)")
-    beads_available: bool = Field(default=False, description="Whether beads MCP tools are available")
-
-
 
 
 __all__ = [
     "AgentPromptRequest",
     "AgentPromptResponse",
     "AgentTemplateRequest",
-    "BeadsIssue",
-    "BeadsSyncMetadata",
     "CheckpointData",
     "CheckpointFile",
     "ClaudeCodeResultMessage",

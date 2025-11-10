@@ -1,4 +1,4 @@
-import { authenticateRequest } from "@auth/middleware";
+import { authenticateRequest, requireAdmin } from "@auth/middleware";
 import type { RateLimitResult } from "@shared/types/rate-limit";
 import { buildSnippet } from "@indexer/extractors";
 import { createMcpServer, createMcpTransport } from "@mcp/server";
@@ -31,6 +31,7 @@ import { QUEUE_NAMES } from "@queue/config";
 import type { IndexRepoJobPayload } from "@queue/types";
 import {
 	verifyWebhookSignature as verifyStripeSignature,
+	handleCheckoutSessionCompleted,
 	handleInvoicePaid,
 	handleSubscriptionUpdated,
 	handleSubscriptionDeleted,
@@ -54,8 +55,48 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	}));
 
 	// Health check endpoint (public, no auth)
-	app.get("/health", (req: Request, res: Response) => {
-		res.json({ status: "ok", timestamp: new Date().toISOString() });
+	app.get("/health", async (req: Request, res: Response) => {
+		const queue = getQueue();
+
+		try {
+			// Query pg-boss for queue metrics
+			const queueInfo = await queue.getQueue(QUEUE_NAMES.INDEX_REPO);
+			const failedJobs = await queue.fetch(QUEUE_NAMES.INDEX_REPO, { includeMetadata: true });
+
+			// Calculate failed jobs in last 24 hours
+			const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
+			const recentFailed = failedJobs.filter(j =>
+				j.state === 'failed' && j.completedOn && new Date(j.completedOn) > twentyFourHoursAgo
+			).length;
+
+			// Calculate oldest pending job age (fetch created jobs)
+			const pendingJobs = await queue.fetch(QUEUE_NAMES.INDEX_REPO, { includeMetadata: true });
+			const oldestPending = pendingJobs
+				.filter(j => j.state === 'created')
+				.sort((a, b) => a.createdOn.getTime() - b.createdOn.getTime())[0];
+
+			const oldestAge = oldestPending
+				? Math.floor((Date.now() - oldestPending.createdOn.getTime()) / 1000)
+				: 0;
+
+			res.json({
+				status: "ok",
+				timestamp: new Date().toISOString(),
+				queue: {
+					depth: queueInfo?.queuedCount || 0,
+					workers: 3, // WORKER_TEAM_SIZE from config
+					failed_24h: recentFailed,
+					oldest_pending_age_seconds: oldestAge
+				}
+			});
+		} catch (error) {
+			// If queue not available, return basic health status
+			res.json({
+				status: "ok",
+				timestamp: new Date().toISOString(),
+				queue: null
+			});
+		}
 	});
 
 	// GitHub webhook endpoint (public, signature-verified)
@@ -165,25 +206,57 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				);
 
 				// Route events to handlers asynchronously (don't block webhook response)
-				if (event.type === "invoice.paid") {
-					handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
+			if (event.type === "checkout.session.completed") {
+				handleCheckoutSessionCompleted(event as Stripe.CheckoutSessionCompletedEvent).catch(
+					(error) => {
+						const errorDetails = {
+							message: error?.message || String(error),
+							stack: error?.stack,
+							name: error?.name,
+							cause: error?.cause,
+						};
 						process.stderr.write(
-							`[Stripe Webhook] invoice.paid handler error: ${JSON.stringify(error)}\n`,
+							`[Stripe Webhook] checkout.session.completed handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
+						);
+					},
+				);
+			} else if (event.type === "invoice.paid") {
+					handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
+						const errorDetails = {
+							message: error?.message || String(error),
+							stack: error?.stack,
+							name: error?.name,
+							cause: error?.cause,
+						};
+						process.stderr.write(
+							`[Stripe Webhook] invoice.paid handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
 						);
 					});
 				} else if (event.type === "customer.subscription.updated") {
 					handleSubscriptionUpdated(event as Stripe.CustomerSubscriptionUpdatedEvent).catch(
 						(error) => {
+							const errorDetails = {
+								message: error?.message || String(error),
+								stack: error?.stack,
+								name: error?.name,
+								cause: error?.cause,
+							};
 							process.stderr.write(
-								`[Stripe Webhook] customer.subscription.updated handler error: ${JSON.stringify(error)}\n`,
+								`[Stripe Webhook] customer.subscription.updated handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
 							);
 						},
 					);
 				} else if (event.type === "customer.subscription.deleted") {
 					handleSubscriptionDeleted(event as Stripe.CustomerSubscriptionDeletedEvent).catch(
 						(error) => {
+							const errorDetails = {
+								message: error?.message || String(error),
+								stack: error?.stack,
+								name: error?.name,
+								cause: error?.cause,
+							};
 							process.stderr.write(
-								`[Stripe Webhook] customer.subscription.deleted handler error: ${JSON.stringify(error)}\n`,
+								`[Stripe Webhook] customer.subscription.deleted handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
 							);
 						},
 					);
@@ -214,6 +287,85 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			});
 		}
 		next(err);
+	});
+
+	// Admin endpoints (require service role key authentication)
+	app.get("/admin/jobs/failed", async (req: Request, res: Response) => {
+		const authHeader = req.get("authorization") || null;
+
+		if (!requireAdmin(authHeader)) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
+
+		const queue = getQueue();
+		const limit = parseInt(req.query.limit as string) || 50;
+		const offset = parseInt(req.query.offset as string) || 0;
+
+		try {
+			// Fetch failed jobs from pg-boss archive
+			const jobs = await queue.fetch(QUEUE_NAMES.INDEX_REPO, { includeMetadata: true });
+
+			// Filter to failed jobs only and apply offset
+			const failedJobs = jobs
+				.filter(j => j.state === 'failed')
+				.slice(offset, offset + limit)
+				.map(j => {
+					const data = j.data as { repositoryId?: string; commitSha?: string; ref?: string } | undefined;
+					const output = j.output as { error?: string } | undefined;
+					return {
+						id: j.id || '',
+						repository_id: data?.repositoryId,
+						commit_sha: data?.commitSha,
+						ref: data?.ref,
+						error: output?.error || "Unknown error",
+						failed_at: j.completedOn,
+						retry_count: j.retryCount || 0
+					};
+				});
+
+			res.json({
+				jobs: failedJobs,
+				limit,
+				offset,
+				total: jobs.filter(j => j.state === 'failed').length
+			});
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+			res.status(500).json({ error: `Failed to fetch jobs: ${errorMessage}` });
+		}
+	});
+
+	app.post("/admin/jobs/:jobId/retry", async (req: Request, res: Response) => {
+		const authHeader = req.get("authorization") || null;
+
+		if (!requireAdmin(authHeader)) {
+			return res.status(401).json({ error: "Unauthorized" });
+		}
+
+		const { jobId } = req.params;
+		if (!jobId) {
+			return res.status(400).json({ error: "Missing job ID" });
+		}
+
+		const queue = getQueue();
+
+		try {
+			// Retry job via pg-boss (moves from archive back to active queue)
+			await queue.retry(QUEUE_NAMES.INDEX_REPO, jobId);
+
+			res.json({
+				message: "Job requeued for retry",
+				job_id: jobId
+			});
+		} catch (error) {
+			const errorMessage = error instanceof Error ? error.message : String(error);
+
+			if (errorMessage.includes("not found")) {
+				res.status(404).json({ error: "Job not found or not eligible for retry" });
+			} else {
+				res.status(500).json({ error: `Retry failed: ${errorMessage}` });
+			}
+		}
 	});
 
 	// Authentication middleware for all other routes
@@ -679,6 +831,165 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			process.stderr.write(`[API Keys] Generation error: ${JSON.stringify(error)}\n`);
 			res.status(500).json({ error: "Failed to generate API key" });
 		}
+	});
+
+	// GET /api/keys/current - Get current API key metadata
+	app.get("/api/keys/current", async (req: Request, res: Response) => {
+		try {
+			// Extract JWT token from Authorization header
+			const authHeader = req.get("Authorization");
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).json({ error: "Missing or invalid Authorization header" });
+			}
+
+			const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+			// Verify JWT with Supabase Auth
+			const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+			if (authError || !user) {
+				return res.status(401).json({ error: "Invalid or expired token" });
+			}
+
+			// Query for user's active API key metadata
+			const { data: keyData, error: queryError } = await supabase
+				.from("api_keys")
+				.select("key_id, tier, rate_limit_per_hour, created_at, last_used_at, enabled")
+				.eq("user_id", user.id)
+				.is("revoked_at", null)
+				.maybeSingle();
+
+			if (queryError) {
+				process.stderr.write(`[API Keys] Query error: ${JSON.stringify(queryError)}\n`);
+				return res.status(500).json({ error: "Failed to fetch API key metadata" });
+			}
+
+			if (!keyData) {
+				return res.status(404).json({ error: "No active API key found" });
+			}
+
+			res.json({
+				keyId: keyData.key_id,
+				tier: keyData.tier,
+				rateLimitPerHour: keyData.rate_limit_per_hour,
+				createdAt: keyData.created_at,
+				lastUsedAt: keyData.last_used_at,
+				enabled: keyData.enabled,
+			});
+		} catch (error) {
+			process.stderr.write(`[API Keys] Get current error: ${JSON.stringify(error)}\n`);
+			res.status(500).json({ error: "Failed to fetch API key metadata" });
+		}
+	});
+
+	// POST /api/keys/reset - Reset API key (revoke old + generate new)
+	app.post("/api/keys/reset", async (req: Request, res: Response) => {
+		try {
+			// Extract JWT token from Authorization header
+			const authHeader = req.get("Authorization");
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).json({ error: "Missing or invalid Authorization header" });
+			}
+
+			const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+			// Verify JWT with Supabase Auth
+			const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+			if (authError || !user) {
+				return res.status(401).json({ error: "Invalid or expired token" });
+			}
+
+			// Enforce rate limit for reset endpoint (max 5 per hour)
+			const resetKeyId = `api-key-reset:${user.id}`;
+			const { enforceRateLimit } = await import("@auth/rate-limit");
+			const rateLimit = await enforceRateLimit(resetKeyId, 5);
+
+			if (!rateLimit.allowed) {
+				return res.status(429).json({
+					error: "Rate limit exceeded for API key reset",
+					retryAfter: rateLimit.retryAfter,
+				});
+			}
+
+			// Reset API key (revoke old + generate new)
+			const { resetApiKey } = await import("@auth/keys");
+			const result = await resetApiKey(user.id);
+
+			res.json({
+				apiKey: result.apiKey,
+				keyId: result.keyId,
+				tier: result.tier,
+				rateLimitPerHour: result.rateLimitPerHour,
+				createdAt: result.createdAt,
+				message: "Old API key revoked, new key generated",
+			});
+		} catch (error) {
+			process.stderr.write(`[API Keys] Reset error: ${JSON.stringify(error)}\n`);
+			const errorMessage = error instanceof Error ? error.message : "Failed to reset API key";
+
+			// Return 404 if no active key exists
+			if (errorMessage.includes("No active API key found")) {
+				return res.status(404).json({ error: errorMessage });
+			}
+
+			res.status(500).json({ error: errorMessage });
+		}
+	});
+
+	// DELETE /api/keys/current - Revoke current API key
+	app.delete("/api/keys/current", async (req: Request, res: Response) => {
+		try {
+			// Extract JWT token from Authorization header
+			const authHeader = req.get("Authorization");
+			if (!authHeader || !authHeader.startsWith("Bearer ")) {
+				return res.status(401).json({ error: "Missing or invalid Authorization header" });
+			}
+
+			const token = authHeader.substring(7); // Remove "Bearer " prefix
+
+			// Verify JWT with Supabase Auth
+			const { data: { user }, error: authError } = await supabase.auth.getUser(token);
+			if (authError || !user) {
+				return res.status(401).json({ error: "Invalid or expired token" });
+			}
+
+			// Revoke API key
+			const { revokeApiKey } = await import("@auth/keys");
+			const result = await revokeApiKey(user.id);
+
+			res.json({
+				success: true,
+				message: "API key revoked successfully",
+				keyId: result.keyId,
+				revokedAt: result.revokedAt,
+			});
+		} catch (error) {
+			process.stderr.write(`[API Keys] Revoke error: ${JSON.stringify(error)}\n`);
+			const errorMessage = error instanceof Error ? error.message : "Failed to revoke API key";
+
+			// Return 404 if no active key exists
+			if (errorMessage.includes("No active API key found")) {
+				return res.status(404).json({ error: errorMessage });
+			}
+
+			res.status(500).json({ error: errorMessage });
+		}
+	});
+
+	// GET /api/keys/validate - Validate API key or JWT token
+	app.get("/api/keys/validate", async (req: AuthenticatedRequest, res: Response) => {
+		// Uses existing authenticateRequest middleware (automatically validates)
+		const context = req.authContext!;
+
+		res.json({
+			valid: true,
+			tier: context.tier,
+			userId: context.userId,
+			rateLimitInfo: {
+				limit: context.rateLimitPerHour,
+				remaining: context.rateLimit?.remaining ?? context.rateLimitPerHour,
+				reset: context.rateLimit?.resetAt,
+			},
+		});
 	});
 
 	// 404 handler

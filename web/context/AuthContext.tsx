@@ -25,6 +25,9 @@ interface AuthContextType {
   isAuthenticated: boolean
   signOut: () => Promise<void>
   refreshSubscription: () => Promise<void>
+  refreshApiKey: () => Promise<void>
+  revokeApiKey: () => Promise<void>
+  resetApiKey: (newKey: string) => void
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined)
@@ -55,16 +58,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSubscription(null)
       }
     } catch (error) {
-      console.error('Error fetching subscription:', error)
+      process.stderr.write(`Error fetching subscription: ${error instanceof Error ? error.message : String(error)}\n`)
       setSubscription(null)
     }
   }
 
-  // Load API key from localStorage on mount (for backwards compatibility)
+  // Validate API key against backend
+  const validateApiKey = async (key: string): Promise<boolean> => {
+    try {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+      const response = await fetch(`${apiUrl}/api/keys/validate`, {
+        headers: {
+          'Authorization': `Bearer ${key}`,
+        },
+      })
+      return response.ok
+    } catch (error) {
+      process.stderr.write(`[Auth] API key validation error: ${error instanceof Error ? error.message : String(error)}\n`)
+      return false
+    }
+  }
+
+  // Load API key from localStorage on mount and validate it
   useEffect(() => {
     const stored = localStorage.getItem('kotadb_api_key')
     if (stored) {
-      setApiKeyState(stored)
+      validateApiKey(stored).then(valid => {
+        if (valid) {
+          setApiKeyState(stored)
+        } else {
+          localStorage.removeItem('kotadb_api_key')
+          process.stderr.write('[Auth] Removed invalid API key from localStorage\n')
+        }
+      })
     }
   }, [])
 
@@ -129,6 +155,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  const refreshApiKey = async () => {
+    if (session) {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+        const response = await fetch(`${apiUrl}/api/keys/current`, {
+          headers: {
+            Authorization: `Bearer ${session.access_token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          // Key metadata refresh successful (no secret returned)
+        }
+      } catch (error) {
+        // Error refreshing API key metadata
+      }
+    }
+  }
+
+  const revokeApiKey = async () => {
+    setApiKey(null)
+  }
+
+  const resetApiKey = (newKey: string) => {
+    setApiKey(newKey)
+  }
+
   return (
     <AuthContext.Provider
       value={{
@@ -143,6 +197,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAuthenticated: !!session,
         signOut,
         refreshSubscription,
+        refreshApiKey,
+        revokeApiKey,
+        resetApiKey,
       }}
     >
       {children}

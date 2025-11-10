@@ -115,7 +115,7 @@ export async function validateApiKey(
 	const supabase = getServiceClient();
 	const { data, error } = await supabase
 		.from("api_keys")
-		.select("id, user_id, secret_hash, tier, rate_limit_per_hour, enabled")
+		.select("id, user_id, secret_hash, tier, rate_limit_per_hour, enabled, revoked_at")
 		.eq("key_id", keyId)
 		.single();
 
@@ -131,8 +131,8 @@ export async function validateApiKey(
 		return null;
 	}
 
-	// Check if key is enabled
-	if (!data.enabled) {
+	// Check if key is enabled and not revoked
+	if (!data.enabled || data.revoked_at !== null) {
 		return null;
 	}
 

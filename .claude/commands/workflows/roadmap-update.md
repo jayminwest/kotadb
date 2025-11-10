@@ -165,9 +165,8 @@ Investigate automation/adws/ for Epic 14 (ADW Advanced Features):
 1. Auto-merge system
 2. Observability & metrics (scripts/analyze_logs.py)
 3. Orchestrator command (.claude/commands/workflows/orchestrator.md)
-4. Beads integration (adw_modules/beads_ops.py)
-5. Home server trigger
-6. API-driven phase tasks
+4. Home server trigger
+5. API-driven phase tasks
 
 Return completion assessment (0-100%) with evidence:
 - Features implemented

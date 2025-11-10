@@ -25,7 +25,7 @@ Blockers indicate missing preconditions that must be resolved before the phase c
 | 3 | `EXIT_BLOCKER_MISSING_WORKTREE` | Worktree not found or invalid | Re-run plan phase to create worktree |
 | 4 | `EXIT_BLOCKER_MISSING_SPEC` | Plan/spec file not found | Run planning phase to generate spec |
 | 5 | `EXIT_BLOCKER_INVALID_ARGS` | Invalid command-line arguments | Check usage and provide required arguments |
-| 6 | `EXIT_BLOCKER_DEPENDENCY_UNMET` | Unresolved dependencies | Close blocking issues first (beads integration) |
+| 6 | `EXIT_BLOCKER_DEPENDENCY_UNMET` | Unresolved dependencies | Close blocking issues first |
 | 7 | `EXIT_BLOCKER_RESOURCE_UNAVAILABLE` | Required resource unavailable | Check GitHub API, network connectivity |
 
 ## Validation Failure Exit Codes (10-19)
@@ -165,8 +165,7 @@ Planned improvements to the exit code system:
 1. **Extend to all phases**: Apply distinct exit codes to plan and build phases
 2. **Exit code logging**: Add exit code to structured logs for analytics
 3. **Automatic recovery**: Implement retry logic based on exit code category
-4. **Beads integration**: Sync exit codes to beads issue metadata for tracking
-5. **CI/CD integration**: Use exit codes in GitHub Actions for better error reporting
+4. **CI/CD integration**: Use exit codes in GitHub Actions for better error reporting
 
 ## References
 

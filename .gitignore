@@ -47,6 +47,9 @@ automation/trees/
 # test infrastructure
 .test-project-name
 
+# app data directory
+app/data/
+
 # trees
 automation/trees/
 
@@ -75,11 +78,4 @@ migrations-backup.tar.gz
 # Supabase CLI metadata
 supabase/
 
-# Beads SQLite databases (keep JSONL exports only)
-.beads/*.db
-.beads/*.db-journal
-.beads/*.db-wal
-.beads/*.db-shm
-.beads/daemon.lock
-.beads/daemon.log
-.beads/daemon.pid
+.mcp.json

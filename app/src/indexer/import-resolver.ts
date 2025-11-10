@@ -75,7 +75,8 @@ export function resolveImport(
 	const fromDir = path.dirname(fromFilePath);
 
 	// Resolve the import path relative to the importing file's directory
-	const resolvedPath = path.resolve(fromDir, importSource);
+	// Use path.join + path.normalize to preserve relative paths (not convert to absolute)
+	const resolvedPath = path.normalize(path.join(fromDir, importSource));
 
 	// Create a Set of file paths for O(1) lookups
 	const filePaths = new Set(files.map((f) => f.path));

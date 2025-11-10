@@ -120,5 +120,4 @@ See `automation/adws/README.md` "Resilience & Recovery" section for usage exampl
 
 - [ADW Observability](./.claude/commands/workflows/adw-observability.md)
 - [Orchestrator Command](./.claude/commands/workflows/orchestrator.md)
-- [Beads ADW Integration](./.claude/commands/docs/beads-adw-integration.md)
 - Complete automation architecture: `automation/adws/README.md`

@@ -27,7 +27,7 @@ Quick-reference guide to KotaDB's development priorities and strategic direction
 - ✅ Stripe billing (3-tier pricing, subscription management, webhook handlers, bugs #320/#327 FIXED)
 - ✅ Testing infrastructure (42 test files, Docker Compose, antimocking, Playwright helpers)
 - ✅ CI/CD (GitHub Actions, pre-commit hooks, migration validation, ADW metrics)
-- ✅ ADW automation (auto-merge, observability, orchestrator, Beads integration, home server, API-driven)
+- ✅ ADW automation (auto-merge, observability, orchestrator, home server, API-driven)
 
 **Recent Progress** (Since 2025-10-29):
 - ✅ Bugs #320 and #327 FIXED - JWT validation and payment redirects working (PRs #323, #330)
@@ -36,7 +36,6 @@ Quick-reference guide to KotaDB's development priorities and strategic direction
 - ✅ Playwright authentication helpers for ADW workflows (#318, PR #325)
 - ✅ ADW integration examples (#319, PR #326)
 - ✅ Auto-merge system for ADW PRs after CI validation (#305, PR #312)
-- ✅ Beads database extension for ADW state tracking (#304, PR #309)
 - ✅ Logging standards enforcement across Python codebase (#308, PR #310)
 - ✅ CLAUDE.md refactored into indexed documentation (#311, PR #314)
 - ✅ Test account session token generation (#316, PR #322)
@@ -132,7 +131,7 @@ See [VISION.md](docs/vision/VISION.md) for complete strategic vision.
 **Billing**: Stripe integration with 3-tier pricing ($0/$29.99/$49.99), webhook-based subscription sync ✅
 **Testing**: Antimocking philosophy (real Supabase Local, Docker Compose, 42 test files) ✅
 **Deployment**: Fly.io (API backend), Vercel (web frontend), Docker Compose (local dev) ✅
-**ADW**: 3-phase automation (plan → build → review), auto-merge, observability, Beads integration ✅
+**ADW**: 3-phase automation (plan → build → review), auto-merge, observability ✅
 
 See [CURRENT_STATE.md](docs/vision/CURRENT_STATE.md) "Key Decisions" section for rationale and trade-offs.
 
@@ -209,7 +208,6 @@ See [CURRENT_STATE.md](docs/vision/CURRENT_STATE.md) "Key Decisions" section for
 - Auto-merge system with CI validation (100% - PR #312)
 - Observability & metrics with daily reporting (100% - analyze_logs.py)
 - Orchestrator slash command with state persistence (100% - 47KB spec)
-- Beads integration (95% - PR #309, CLI wrappers, MCP tools)
 - Home server trigger with Tailscale (100% - 859 lines)
 - API-driven phase tasks via MCP (100% - 549 lines)
 - Logging standards enforcement (100% - PR #310)

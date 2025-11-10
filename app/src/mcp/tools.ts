@@ -15,10 +15,15 @@ import {
 	type DependencyResult,
 } from "@api/queries";
 import { buildSnippet } from "@indexer/extractors";
-import type { IndexRequest } from "@shared/types";
+import type {
+	IndexRequest,
+	ChangeImpactRequest,
+	ImplementationSpec,
+} from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { invalidParams } from "./jsonrpc";
-import { executeBridgeCommand } from "./utils/python";
+import { analyzeChangeImpact } from "./impact-analysis";
+import { validateImplementationSpec } from "./spec-validation";
 
 /**
  * MCP Tool Definition
@@ -152,51 +157,131 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
 };
 
 /**
- * Tool: get_adw_state
+ * Tool: analyze_change_impact
  */
-export const GET_ADW_STATE_TOOL: ToolDefinition = {
-	name: "get_adw_state",
+export const ANALYZE_CHANGE_IMPACT_TOOL: ToolDefinition = {
+	name: "analyze_change_impact",
 	description:
-		"Query the state of a specific ADW (AI Developer Workflow) execution. Returns workflow metadata including issue number, branch name, worktree path, PR status, and phase completion status.",
+		"Analyze the impact of proposed code changes by examining dependency graphs, test scope, and potential conflicts. Returns comprehensive analysis including affected files, test recommendations, architectural warnings, and risk assessment. Useful for planning implementations and avoiding breaking changes.",
 	inputSchema: {
 		type: "object",
 		properties: {
-			adw_id: {
+			files_to_modify: {
+				type: "array",
+				items: { type: "string" },
+				description: "List of files to be modified (relative paths)",
+			},
+			files_to_create: {
+				type: "array",
+				items: { type: "string" },
+				description: "List of files to be created (relative paths)",
+			},
+			files_to_delete: {
+				type: "array",
+				items: { type: "string" },
+				description: "List of files to be deleted (relative paths)",
+			},
+			change_type: {
 				type: "string",
-				description:
-					"ADW workflow identifier (e.g., 'abc-123-def456')",
+				enum: ["feature", "refactor", "fix", "chore"],
+				description: "Type of change being made",
+			},
+			description: {
+				type: "string",
+				description: "Brief description of the proposed change",
+			},
+			breaking_changes: {
+				type: "boolean",
+				description: "Whether this change includes breaking changes (default: false)",
+			},
+			repository: {
+				type: "string",
+				description: "Repository ID to analyze (optional, uses first repository if not specified)",
 			},
 		},
-		required: ["adw_id"],
+		required: ["change_type", "description"],
 	},
 };
 
 /**
- * Tool: list_adw_workflows
+ * Tool: validate_implementation_spec
  */
-export const LIST_ADW_WORKFLOWS_TOOL: ToolDefinition = {
-	name: "list_adw_workflows",
+export const VALIDATE_IMPLEMENTATION_SPEC_TOOL: ToolDefinition = {
+	name: "validate_implementation_spec",
 	description:
-		"List all ADW workflow executions with optional filtering by ADW ID prefix, status, or result limit. Useful for discovering active workflows, monitoring completion status, and troubleshooting failed executions.",
+		"Validate an implementation specification against KotaDB conventions and repository state. Checks for file conflicts, naming conventions, path alias usage, test coverage, and dependency compatibility. Returns validation errors, warnings, and approval conditions checklist.",
 	inputSchema: {
 		type: "object",
 		properties: {
-			adw_id_filter: {
+			feature_name: {
 				type: "string",
-				description:
-					"Optional: Filter results by ADW ID prefix (e.g., 'abc-' to find all workflows starting with 'abc-')",
+				description: "Name of the feature or change",
 			},
-			status_filter: {
+			files_to_create: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						path: { type: "string" },
+						purpose: { type: "string" },
+						estimated_lines: { type: "number" },
+					},
+					required: ["path", "purpose"],
+				},
+				description: "Files to create with their purposes",
+			},
+			files_to_modify: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						path: { type: "string" },
+						purpose: { type: "string" },
+						estimated_lines: { type: "number" },
+					},
+					required: ["path", "purpose"],
+				},
+				description: "Files to modify with their purposes",
+			},
+			migrations: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						filename: { type: "string" },
+						description: { type: "string" },
+						tables_affected: {
+							type: "array",
+							items: { type: "string" },
+						},
+					},
+					required: ["filename", "description"],
+				},
+				description: "Database migrations to add",
+			},
+			dependencies_to_add: {
+				type: "array",
+				items: {
+					type: "object",
+					properties: {
+						name: { type: "string" },
+						version: { type: "string" },
+						dev: { type: "boolean" },
+					},
+					required: ["name"],
+				},
+				description: "npm dependencies to add",
+			},
+			breaking_changes: {
+				type: "boolean",
+				description: "Whether this includes breaking changes (default: false)",
+			},
+			repository: {
 				type: "string",
-				description:
-					"Optional: Filter results by workflow status (e.g., 'completed', 'failed', 'in_progress')",
-			},
-			limit: {
-				type: "number",
-				description:
-					"Optional: Maximum number of results to return (default: 50, max: 100)",
+				description: "Repository ID (optional, uses first repository if not specified)",
 			},
 		},
+		required: ["feature_name"],
 	},
 };
 
@@ -209,8 +294,8 @@ export function getToolDefinitions(): ToolDefinition[] {
 		INDEX_REPOSITORY_TOOL,
 		LIST_RECENT_FILES_TOOL,
 		SEARCH_DEPENDENCIES_TOOL,
-		GET_ADW_STATE_TOOL,
-		LIST_ADW_WORKFLOWS_TOOL,
+		ANALYZE_CHANGE_IMPACT_TOOL,
+		VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 	];
 }
 
@@ -583,9 +668,9 @@ export async function executeSearchDependencies(
 }
 
 /**
- * Execute get_adw_state tool
+ * Execute analyze_change_impact tool
  */
-export async function executeGetAdwState(
+export async function executeAnalyzeChangeImpact(
 	supabase: SupabaseClient,
 	params: unknown,
 	requestId: string | number,
@@ -598,73 +683,130 @@ export async function executeGetAdwState(
 
 	const p = params as Record<string, unknown>;
 
-	// Check required parameter: adw_id
-	if (p.adw_id === undefined) {
-		throw new Error("Missing required parameter: adw_id");
+	// Check required parameters
+	if (p.change_type === undefined) {
+		throw new Error("Missing required parameter: change_type");
 	}
-	if (typeof p.adw_id !== "string") {
-		throw new Error("Parameter 'adw_id' must be a string");
+	if (typeof p.change_type !== "string") {
+		throw new Error("Parameter 'change_type' must be a string");
+	}
+	if (!["feature", "refactor", "fix", "chore"].includes(p.change_type)) {
+		throw new Error(
+			"Parameter 'change_type' must be one of: feature, refactor, fix, chore",
+		);
 	}
 
-	const adwId = p.adw_id as string;
+	if (p.description === undefined) {
+		throw new Error("Missing required parameter: description");
+	}
+	if (typeof p.description !== "string") {
+		throw new Error("Parameter 'description' must be a string");
+	}
 
-	// Execute Python bridge command to get state
-	const result = await executeBridgeCommand("get_state", [adwId], {
-		timeout: 30000, // 30s timeout for state queries
-	});
+	// Validate optional parameters
+	if (p.files_to_modify !== undefined && !Array.isArray(p.files_to_modify)) {
+		throw new Error("Parameter 'files_to_modify' must be an array");
+	}
+	if (p.files_to_create !== undefined && !Array.isArray(p.files_to_create)) {
+		throw new Error("Parameter 'files_to_create' must be an array");
+	}
+	if (p.files_to_delete !== undefined && !Array.isArray(p.files_to_delete)) {
+		throw new Error("Parameter 'files_to_delete' must be an array");
+	}
+	if (
+		p.breaking_changes !== undefined &&
+		typeof p.breaking_changes !== "boolean"
+	) {
+		throw new Error("Parameter 'breaking_changes' must be a boolean");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const validatedParams: ChangeImpactRequest = {
+		files_to_modify: p.files_to_modify as string[] | undefined,
+		files_to_create: p.files_to_create as string[] | undefined,
+		files_to_delete: p.files_to_delete as string[] | undefined,
+		change_type: p.change_type as "feature" | "refactor" | "fix" | "chore",
+		description: p.description as string,
+		breaking_changes: p.breaking_changes as boolean | undefined,
+		repository: p.repository as string | undefined,
+	};
+
+	const result = await analyzeChangeImpact(
+		supabase,
+		validatedParams,
+		userId,
+	);
 
 	return result;
 }
 
 /**
- * Execute list_adw_workflows tool
+ * Execute validate_implementation_spec tool
  */
-export async function executeListAdwWorkflows(
+export async function executeValidateImplementationSpec(
 	supabase: SupabaseClient,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
 ): Promise<unknown> {
 	// Validate params structure
-	if (params !== undefined && typeof params !== "object") {
+	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
 	}
 
-	const p = (params as Record<string, unknown> | undefined) || {};
+	const p = params as Record<string, unknown>;
+
+	// Check required parameters
+	if (p.feature_name === undefined) {
+		throw new Error("Missing required parameter: feature_name");
+	}
+	if (typeof p.feature_name !== "string") {
+		throw new Error("Parameter 'feature_name' must be a string");
+	}
 
 	// Validate optional parameters
-	if (p.adw_id_filter !== undefined && typeof p.adw_id_filter !== "string") {
-		throw new Error("Parameter 'adw_id_filter' must be a string");
+	if (p.files_to_create !== undefined && !Array.isArray(p.files_to_create)) {
+		throw new Error("Parameter 'files_to_create' must be an array");
 	}
-	if (p.status_filter !== undefined && typeof p.status_filter !== "string") {
-		throw new Error("Parameter 'status_filter' must be a string");
+	if (p.files_to_modify !== undefined && !Array.isArray(p.files_to_modify)) {
+		throw new Error("Parameter 'files_to_modify' must be an array");
 	}
-	if (p.limit !== undefined) {
-		if (typeof p.limit !== "number") {
-			throw new Error("Parameter 'limit' must be a number");
-		}
-		if (p.limit < 1 || p.limit > 100) {
-			throw new Error("Parameter 'limit' must be between 1 and 100");
-		}
+	if (p.migrations !== undefined && !Array.isArray(p.migrations)) {
+		throw new Error("Parameter 'migrations' must be an array");
 	}
-
-	// Build bridge command arguments
-	const args: string[] = [];
-
-	if (p.adw_id_filter) {
-		args.push("--adw-id", p.adw_id_filter as string);
+	if (
+		p.dependencies_to_add !== undefined &&
+		!Array.isArray(p.dependencies_to_add)
+	) {
+		throw new Error("Parameter 'dependencies_to_add' must be an array");
 	}
-	if (p.status_filter) {
-		args.push("--status", p.status_filter as string);
+	if (
+		p.breaking_changes !== undefined &&
+		typeof p.breaking_changes !== "boolean"
+	) {
+		throw new Error("Parameter 'breaking_changes' must be a boolean");
 	}
-	if (p.limit) {
-		args.push("--limit", (p.limit as number).toString());
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
 	}
 
-	// Execute Python bridge command to list workflows
-	const result = await executeBridgeCommand("list_workflows", args, {
-		timeout: 30000, // 30s timeout for list queries
-	});
+	const validatedParams: ImplementationSpec = {
+		feature_name: p.feature_name as string,
+		files_to_create: p.files_to_create as any,
+		files_to_modify: p.files_to_modify as any,
+		migrations: p.migrations as any,
+		dependencies_to_add: p.dependencies_to_add as any,
+		breaking_changes: p.breaking_changes as boolean | undefined,
+		repository: p.repository as string | undefined,
+	};
+
+	const result = await validateImplementationSpec(
+		supabase,
+		validatedParams,
+		userId,
+	);
 
 	return result;
 }
@@ -693,10 +835,20 @@ export async function handleToolCall(
 				requestId,
 				userId,
 			);
-		case "get_adw_state":
-			return await executeGetAdwState(supabase, params, requestId, userId);
-		case "list_adw_workflows":
-			return await executeListAdwWorkflows(supabase, params, requestId, userId);
+		case "analyze_change_impact":
+			return await executeAnalyzeChangeImpact(
+				supabase,
+				params,
+				requestId,
+				userId,
+			);
+		case "validate_implementation_spec":
+			return await executeValidateImplementationSpec(
+				supabase,
+				params,
+				requestId,
+				userId,
+			);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}

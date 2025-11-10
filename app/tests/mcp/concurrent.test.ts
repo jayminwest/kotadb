@@ -271,14 +271,12 @@ describe("MCP Concurrency", () => {
 			const toolsLists = responses.map((r) => r.data.result);
 
 			for (const toolsList of toolsLists) {
-				expect(toolsList.tools.length).toBe(6);
+				expect(toolsList.tools.length).toBe(4);
 				const names = toolsList.tools.map((t: any) => t.name);
 				expect(names).toContain("search_code");
 				expect(names).toContain("index_repository");
 				expect(names).toContain("list_recent_files");
 				expect(names).toContain("search_dependencies");
-				expect(names).toContain("get_adw_state");
-				expect(names).toContain("list_adw_workflows");
 			}
 		},
 		10000, // Increased timeout to 10s (was hitting 5s default in slow CI environments)

@@ -118,15 +118,11 @@ curl -X POST http://localhost:3001/auth/dev-session \
 
 ### Issue Management
 - [Issue Relationships](./.claude/commands/docs/issue-relationships.md) - Dependency types, prioritization
-- [Beads Workflow](./.claude/commands/beads/) - SQLite-based issue tracker with git sync
-- [Beads ADW Integration](./.claude/commands/docs/beads-adw-integration.md) - Workflow integration, atomic operations
-- [GitHub-Beads Sync](./.claude/commands/beads/sync-github.md) - Maintain GitHub and Beads alignment
 
 ## MCP Server Availability
 
 KotaDB provides MCP servers for programmatic operations:
 - **kotadb**: Code search, indexing, dependency analysis
-- **beads**: Issue tracking, dependency management
 - **playwright**: Browser automation (available via MCP)
 - **sequential-thinking**: Complex reasoning tasks
 
@@ -137,4 +133,3 @@ See [MCP Usage Guidance](./.claude/commands/docs/mcp-usage-guidance.md) for deci
 - Complete automation architecture: `automation/adws/README.md`
 - Testing setup details: `docs/testing-setup.md`
 - MCP Claude Code integration: `docs/guides/mcp-claude-code-integration.md`
-- Beads integration roadmap: Issue #300 (epic)

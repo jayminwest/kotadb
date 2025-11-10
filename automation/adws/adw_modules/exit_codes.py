@@ -22,7 +22,6 @@ EXIT_BLOCKER_MISSING_STATE = 2  # Missing workflow state (run plan/build first)
 EXIT_BLOCKER_MISSING_WORKTREE = 3  # Worktree not found or invalid
 EXIT_BLOCKER_MISSING_SPEC = 4  # Plan/spec file not found
 EXIT_BLOCKER_INVALID_ARGS = 5  # Invalid command-line arguments
-EXIT_BLOCKER_DEPENDENCY_UNMET = 6  # Unresolved dependencies (for beads integration)
 EXIT_BLOCKER_RESOURCE_UNAVAILABLE = 7  # Required resource unavailable (GitHub API, etc.)
 
 # Validation Failures (10-19): Code review or validation failures
@@ -70,7 +69,6 @@ def get_exit_code_description(code: int) -> str:
         EXIT_BLOCKER_MISSING_WORKTREE: "Blocker: Worktree not found or invalid",
         EXIT_BLOCKER_MISSING_SPEC: "Blocker: Plan/spec file not found",
         EXIT_BLOCKER_INVALID_ARGS: "Blocker: Invalid command-line arguments",
-        EXIT_BLOCKER_DEPENDENCY_UNMET: "Blocker: Unresolved dependencies",
         EXIT_BLOCKER_RESOURCE_UNAVAILABLE: "Blocker: Required resource unavailable",
         # Validation Failures
         EXIT_VALIDATION_BLOCKERS_DETECTED: "Validation Failure: Review found blocking issues",

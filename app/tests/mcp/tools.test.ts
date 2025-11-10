@@ -65,8 +65,8 @@ describe("MCP Tools Integration", () => {
 		expect(toolNames).toContain("index_repository");
 		expect(toolNames).toContain("list_recent_files");
 		expect(toolNames).toContain("search_dependencies");
-		expect(toolNames).toContain("get_adw_state");
-		expect(toolNames).toContain("list_adw_workflows");
+		expect(toolNames).toContain("analyze_change_impact");
+		expect(toolNames).toContain("validate_implementation_spec");
 	});
 
 	test("search_code tool finds matching files", async () => {

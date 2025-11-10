@@ -2,6 +2,7 @@ import type { IndexRequest, IndexedFile } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
 import type { Reference } from "@indexer/reference-extractor";
+import { getInstallationForRepository } from "../github/installation-lookup";
 
 export interface SearchOptions {
 	repositoryId?: string;
@@ -390,6 +391,69 @@ export async function listRecentFiles(
 }
 
 /**
+ * Populate installation_id for a repository by querying GitHub App installations
+ * @param client - Supabase client instance
+ * @param repositoryId - Repository UUID
+ * @param fullName - Repository full name (owner/repo)
+ */
+async function populateInstallationId(
+	client: SupabaseClient,
+	repositoryId: string,
+	fullName: string,
+): Promise<void> {
+	try {
+		// Parse owner and repo from full_name
+		const [owner, repo] = fullName.split("/");
+		if (!owner || !repo) {
+			process.stderr.write(
+				`[Installation Lookup] Invalid repository full_name: ${fullName}\n`,
+			);
+			return;
+		}
+
+		// Log before lookup
+		process.stdout.write(
+			`[Installation Lookup] Starting installation_id lookup for ${fullName} (repository_id=${repositoryId})\n`,
+		);
+
+		// Query GitHub App installations to find installation_id
+		const installationId = await getInstallationForRepository(owner, repo);
+
+		// Log result of lookup
+		process.stdout.write(
+			`[Installation Lookup] Lookup result for ${fullName}: installation_id=${installationId ?? "null"}\n`,
+		);
+
+		if (installationId !== null) {
+			// Update repository with installation_id
+			const { error } = await client
+				.from("repositories")
+				.update({ installation_id: installationId })
+				.eq("id", repositoryId);
+
+			if (error) {
+				process.stderr.write(
+					`[Installation Lookup] Failed to update repository ${repositoryId} with installation_id ${installationId}: ${error.message}\n`,
+				);
+			} else {
+				process.stdout.write(
+					`[Installation Lookup] Updated repository ${fullName} with installation_id ${installationId}\n`,
+				);
+			}
+		} else {
+			process.stdout.write(
+				`[Installation Lookup] No installation found for ${fullName}, will attempt unauthenticated clone\n`,
+			);
+		}
+	} catch (error) {
+		// Log error but don't throw - allow repository creation to succeed
+		process.stderr.write(
+			`[Installation Lookup] Error populating installation_id for ${fullName}: ${error instanceof Error ? error.message : String(error)}\n`,
+		);
+	}
+}
+
+/**
  * Ensure repository exists in database, create if not.
  * Returns repository UUID.
  *
@@ -411,12 +475,16 @@ export async function ensureRepository(
 	// Check if repository exists
 	const { data: existing } = await client
 		.from("repositories")
-		.select("id")
+		.select("id, installation_id")
 		.eq("user_id", userId)
 		.eq("full_name", fullName)
 		.maybeSingle();
 
 	if (existing) {
+		// For existing repositories, attempt to populate installation_id if NULL
+		if (existing.installation_id === null && !request.localPath) {
+			await populateInstallationId(client, existing.id, fullName);
+		}
 		return existing.id;
 	}
 
@@ -434,6 +502,11 @@ export async function ensureRepository(
 
 	if (error) {
 		throw new Error(`Failed to create repository: ${error.message}`);
+	}
+
+	// Attempt to populate installation_id for new repository (skip for local paths)
+	if (!request.localPath) {
+		await populateInstallationId(client, newRepo.id, fullName);
 	}
 
 	return newRepo.id;

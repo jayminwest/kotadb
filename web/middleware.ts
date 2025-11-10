@@ -35,13 +35,14 @@ export async function middleware(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser()
 
-  // Protected routes that require authentication
-  const protectedRoutes = ['/dashboard', '/search', '/files', '/repository-index']
-  const isProtectedRoute = protectedRoutes.some((route) =>
+  // Only dashboard and MCP configuration require OAuth session
+  // Other routes work with API key authentication (handled by backend)
+  const oauthOnlyRoutes = ['/dashboard', '/mcp']
+  const requiresOAuth = oauthOnlyRoutes.some((route) =>
     request.nextUrl.pathname.startsWith(route)
   )
 
-  if (isProtectedRoute && !user) {
+  if (requiresOAuth && !user) {
     return NextResponse.redirect(new URL('/login', request.url))
   }
 

@@ -61,9 +61,6 @@ jobs:
       - name: Validate migration sync
         run: bun run test:validate-migrations
 
-      - name: Validate beads JSONL syntax
-        run: bun run test:validate-beads
-
   typecheck:
     runs-on: ubuntu-latest
     needs: setup

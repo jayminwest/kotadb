@@ -364,6 +364,112 @@ export function capitalize(str: string): string {
 		expect(completedJob.stats?.symbols_extracted).toBe(fileCount);
 	}, 80000); // 80 second timeout for large repository test
 
+	it("should handle 500+ files with batched symbol queries", async () => {
+		// Clean up existing test files first
+		await rm(join(testRepoPath, "example.ts"), { force: true });
+		await rm(join(testRepoPath, "utils.ts"), { force: true });
+
+		// Create 500 TypeScript files with 2 exported functions each
+		// Files will import from file0 to create dependencies for Pass 2
+		const fileCount = 500;
+
+		// Create base file that others will depend on
+		await writeFile(
+			join(testRepoPath, "file0.ts"),
+			`export function baseFunc() { return 0; }\nexport const baseConst = 42;`,
+		);
+
+		// Create remaining files that import from file0
+		for (let i = 1; i < fileCount; i++) {
+			await writeFile(
+				join(testRepoPath, `file${i}.ts`),
+				`import { baseFunc } from './file0';\nexport function funcA${i}() { return baseFunc() + ${i}; }\nexport function funcB${i}() { return ${i * 2}; }`,
+			);
+		}
+
+		// Commit files to git
+		const { execSync } = require("node:child_process");
+		execSync("git add .", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git commit -m 'Add 500 files for batch testing'", {
+			cwd: testRepoPath,
+			stdio: "ignore",
+		});
+
+		// Create and enqueue job
+		const indexJob = await createIndexJob(
+			testRepoId,
+			"main",
+			"batch500",
+			TEST_USER_IDS.free,
+		);
+
+		const queue = getQueue();
+		const payload: IndexRepoJobPayload = {
+			indexJobId: indexJob.id,
+			repositoryId: testRepoId,
+			commitSha: "batch500",
+		};
+
+		await queue.send(QUEUE_NAMES.INDEX_REPO, payload);
+
+		// Wait for completion (longer timeout for large repository)
+		let attempts = 0;
+		const maxAttempts = 120; // 60 seconds max wait
+
+		while (attempts < maxAttempts) {
+			const currentJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+
+			if (
+				currentJob.status === "completed" ||
+				currentJob.status === "failed"
+			) {
+				break;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			attempts++;
+		}
+
+		// Verify job completed successfully
+		const completedJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+		expect(completedJob.status).toBe("completed");
+
+		// Verify all 500 files were indexed
+		expect(completedJob.stats?.files_indexed).toBe(fileCount);
+
+		// Verify symbols extracted (2 per file: file0 has 2, file1-499 have 2 each = 1000 total)
+		// Import statements are not extracted as symbols, only exported functions
+		expect(completedJob.stats?.symbols_extracted).toBe(fileCount * 2);
+
+		// Verify dependencies were extracted (Pass 2 completed, file1-499 all depend on file0)
+		expect(completedJob.stats?.dependencies_extracted).toBe(fileCount - 1);
+
+		// Verify database contains all 500 files
+		const client = getSupabaseTestClient();
+		const { data: indexedFiles, error: filesError, count: fileCountDb } = await client
+			.from("indexed_files")
+			.select("id", { count: "exact" })
+			.eq("repository_id", testRepoId);
+
+		expect(filesError).toBeNull();
+		expect(indexedFiles).toBeDefined();
+		expect(fileCountDb).toBe(fileCount);
+
+		// Verify symbol batching worked by checking a sample of symbols
+		// With SYMBOL_QUERY_BATCH_SIZE=100 and 500 files, we expect 5 batches
+		const { data: symbols, error: symbolsError } = await client
+			.from("symbols")
+			.select("id, file_id")
+			.in(
+				"file_id",
+				indexedFiles!.slice(0, 5).map((f: any) => f.id),
+			);
+
+		expect(symbolsError).toBeNull();
+		expect(symbols).toBeDefined();
+		expect(symbols!.length).toBeGreaterThan(0);
+	}, 120000); // 120 second timeout for very large repository test
+
 	it("should pass installation_id to prepareRepository when available", async () => {
 		// Update test repository with installation_id
 		const client = getSupabaseTestClient();

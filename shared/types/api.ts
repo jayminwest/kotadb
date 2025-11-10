@@ -175,3 +175,48 @@ export interface CurrentSubscriptionResponse {
 		cancel_at_period_end: boolean;
 	} | null;
 }
+
+/**
+ * Response from GET /jobs/:jobId endpoint.
+ * Returns status and progress information for an index job.
+ */
+export interface JobStatusResponse {
+	/** Job UUID (primary key) */
+	id: string;
+
+	/** Repository UUID being indexed */
+	repository_id: string;
+
+	/** Git ref being indexed (branch, tag, or commit) */
+	ref?: string;
+
+	/** Job status (pending, processing, completed, failed, skipped) */
+	status: "pending" | "processing" | "completed" | "failed" | "skipped";
+
+	/** Timestamp when job started processing */
+	started_at?: string;
+
+	/** Timestamp when job completed */
+	completed_at?: string;
+
+	/** Error message if job failed */
+	error_message?: string;
+
+	/** Job statistics (files indexed, symbols extracted, etc.) */
+	stats?: {
+		/** Number of files indexed */
+		files_indexed?: number;
+
+		/** Number of code symbols extracted */
+		symbols_extracted?: number;
+
+		/** Number of symbol references found */
+		references_found?: number;
+
+		/** Number of package dependencies extracted */
+		dependencies_extracted?: number;
+	};
+
+	/** Job creation timestamp */
+	created_at?: string;
+}

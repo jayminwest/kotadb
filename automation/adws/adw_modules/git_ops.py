@@ -417,9 +417,34 @@ def worktree_exists(worktree_name: str, base_path: str = "automation/trees") -> 
     return False
 
 
+def branch_differs_from_base(branch: str, base: str = "develop", cwd: Path | None = None) -> bool:
+    """Check if a branch has diverged from its base branch.
+
+    Args:
+        branch: Branch name to check
+        base: Base branch to compare against (default: 'develop')
+        cwd: Working directory for git command
+
+    Returns:
+        True if branch has unique commits not in base, False otherwise
+    """
+    result = _run_git(["rev-list", "--count", f"{base}..{branch}"], cwd=cwd, check=False)
+    if not result.ok:
+        # Invalid branch names or other errors - treat as no divergence
+        return False
+
+    try:
+        commit_count = int(result.stdout.strip())
+        return commit_count > 0
+    except ValueError:
+        # Unable to parse commit count - treat as no divergence
+        return False
+
+
 __all__ = [
     "GitCommandResult",
     "GitError",
+    "branch_differs_from_base",
     "checkout_branch",
     "cleanup_worktree",
     "commit",

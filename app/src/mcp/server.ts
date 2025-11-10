@@ -18,14 +18,14 @@ import {
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_CODE_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
-	GET_ADW_STATE_TOOL,
-	LIST_ADW_WORKFLOWS_TOOL,
+	ANALYZE_CHANGE_IMPACT_TOOL,
+	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearchCode,
 	executeSearchDependencies,
-	executeGetAdwState,
-	executeListAdwWorkflows,
+	executeAnalyzeChangeImpact,
+	executeValidateImplementationSpec,
 } from "./tools";
 
 /**
@@ -60,8 +60,8 @@ export function createMcpServer(context: McpServerContext): Server {
 				INDEX_REPOSITORY_TOOL,
 				LIST_RECENT_FILES_TOOL,
 				SEARCH_DEPENDENCIES_TOOL,
-				GET_ADW_STATE_TOOL,
-				LIST_ADW_WORKFLOWS_TOOL,
+				ANALYZE_CHANGE_IMPACT_TOOL,
+				VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 			],
 		};
 	});
@@ -105,16 +105,16 @@ export function createMcpServer(context: McpServerContext): Server {
 					context.userId,
 				);
 				break;
-			case "get_adw_state":
-				result = await executeGetAdwState(
+			case "analyze_change_impact":
+				result = await executeAnalyzeChangeImpact(
 					context.supabase,
 					toolArgs,
 					"", // requestId not used
 					context.userId,
 				);
 				break;
-			case "list_adw_workflows":
-				result = await executeListAdwWorkflows(
+			case "validate_implementation_spec":
+				result = await executeValidateImplementationSpec(
 					context.supabase,
 					toolArgs,
 					"", // requestId not used
