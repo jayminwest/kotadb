@@ -146,7 +146,7 @@ export default function PricingPage() {
           {tiers.map((tier) => (
             <div
               key={tier.tier}
-              className={`bg-white dark:bg-gray-800 rounded-lg shadow-lg overflow-hidden ${
+              className={`glass-light dark:glass-dark rounded-lg shadow-lg overflow-hidden transition-all duration-200 hover:shadow-xl ${
                 tier.highlighted ? 'ring-2 ring-blue-600 transform scale-105' : ''
               }`}
             >
