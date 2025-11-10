@@ -216,12 +216,6 @@ export default function PricingPage() {
             </div>
           ))}
         </div>
-
-        <div className="mt-12 text-center">
-          <p className="text-gray-600 dark:text-gray-400">
-            All plans include a 14-day free trial. Cancel anytime.
-          </p>
-        </div>
       </div>
     </div>
   )
