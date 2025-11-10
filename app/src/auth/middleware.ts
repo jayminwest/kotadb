@@ -130,16 +130,13 @@ export async function authenticateRequest(
 		);
 	}
 
-	// Enforce rate limit
-	const rateLimit = await enforceRateLimit(
-		context.keyId,
-		context.rateLimitPerHour,
-	);
+	// Enforce rate limit (both hourly and daily)
+	const rateLimit = await enforceRateLimit(context.keyId, context.tier);
 
 	if (!rateLimit.allowed) {
 		if (shouldLog) {
 			process.stderr.write(
-				`[Auth] Rate limit exceeded - keyId: ${context.keyId}, limit: ${context.rateLimitPerHour}`,
+				`[Auth] Rate limit exceeded - keyId: ${context.keyId}, tier: ${context.tier}\n`,
 			);
 		}
 
@@ -153,7 +150,7 @@ export async function authenticateRequest(
 					status: 429,
 					headers: {
 						"Content-Type": "application/json",
-						"X-RateLimit-Limit": String(context.rateLimitPerHour),
+						"X-RateLimit-Limit": String(rateLimit.limit),
 						"X-RateLimit-Remaining": "0",
 						"X-RateLimit-Reset": String(rateLimit.resetAt),
 						"Retry-After": String(rateLimit.retryAfter || 0),

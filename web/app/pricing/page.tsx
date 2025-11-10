@@ -60,7 +60,8 @@ export default function PricingPage() {
       period: 'forever',
       description: 'Perfect for getting started',
       features: [
-        '100 requests per hour',
+        '1,000 requests per hour',
+        '5,000 requests per day',
         'Basic code search',
         'Repository indexing',
         'Community support',
@@ -75,7 +76,8 @@ export default function PricingPage() {
       period: 'per month',
       description: 'For individual developers',
       features: [
-        '1,000 requests per hour',
+        '5,000 requests per hour',
+        '25,000 requests per day',
         'Advanced code search',
         'Unlimited repositories',
         'Priority support',
@@ -91,7 +93,8 @@ export default function PricingPage() {
       period: 'per month',
       description: 'For development teams',
       features: [
-        '10,000 requests per hour',
+        '25,000 requests per hour',
+        '100,000 requests per day',
         'Advanced code search',
         'Unlimited repositories',
         'Priority support',

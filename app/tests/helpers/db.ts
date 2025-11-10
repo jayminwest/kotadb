@@ -177,7 +177,7 @@ export async function createTestRepository(overrides?: {
 }
 
 /**
- * Reset rate limit counters for test isolation
+ * Reset hourly rate limit counters for test isolation
  *
  * Deletes rate limit counter records from the database. Can target a specific API key
  * or reset all counters if no keyId is provided.
@@ -219,6 +219,63 @@ export async function resetRateLimitCounters(
 	}
 
 	return count || 0;
+}
+
+/**
+ * Reset daily rate limit counters for test isolation
+ *
+ * Deletes daily rate limit counter records from the database. Can target a specific API key
+ * or reset all daily counters if no keyId is provided.
+ *
+ * @param keyId - Optional API key ID to reset. If omitted, resets all daily counters.
+ * @returns Count of deleted counter records (0 if none existed)
+ *
+ * @example
+ * // Clean up after individual test
+ * afterEach(async () => {
+ *   await resetDailyRateLimitCounters(testKeyId);
+ * });
+ *
+ * Note: Compatible with CI environment (respects dynamic ports from .env.test)
+ */
+export async function resetDailyRateLimitCounters(
+	keyId?: string,
+): Promise<number> {
+	const client = getSupabaseTestClient();
+
+	let query = client
+		.from("rate_limit_counters_daily")
+		.delete({ count: "exact" });
+
+	if (keyId) {
+		query = query.eq("key_id", keyId);
+	}
+
+	const { error, count } = await query;
+
+	if (error) {
+		throw new Error(
+			`Failed to reset daily rate limit counters: ${error.message || JSON.stringify(error)}`,
+		);
+	}
+
+	return count || 0;
+}
+
+/**
+ * Reset all rate limit counters (both hourly and daily) for test isolation
+ *
+ * Convenience function to reset both hourly and daily rate limit counters.
+ *
+ * @param keyId - Optional API key ID to reset. If omitted, resets all counters.
+ * @returns Total count of deleted counter records
+ */
+export async function resetAllRateLimitCounters(
+	keyId?: string,
+): Promise<number> {
+	const hourlyCount = await resetRateLimitCounters(keyId);
+	const dailyCount = await resetDailyRateLimitCounters(keyId);
+	return hourlyCount + dailyCount;
 }
 
 /**
