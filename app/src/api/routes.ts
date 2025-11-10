@@ -784,6 +784,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				.select("key_id, tier, rate_limit_per_hour, created_at")
 				.eq("user_id", user.id)
 				.eq("enabled", true)
+				.is("revoked_at", null)
 				.maybeSingle();
 
 			if (existingKey) {
