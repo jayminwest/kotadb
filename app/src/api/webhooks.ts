@@ -63,18 +63,6 @@ export async function handleInvoicePaid(
 ): Promise<void> {
 	const invoice = event.data.object as Stripe.Invoice;
 
-	// Log invoice structure to debug extraction issues
-	process.stdout.write(
-		`[Webhook] invoice.paid event received: ${JSON.stringify({
-			invoiceId: invoice.id,
-			hasSubscription: !!(invoice as any).subscription,
-			subscriptionType: typeof (invoice as any).subscription,
-			hasCustomer: !!invoice.customer,
-			customerType: typeof invoice.customer,
-			topLevelKeys: Object.keys(invoice).slice(0, 10)
-		}, null, 2)}\n`
-	);
-
 	// Extract subscription ID from parent.subscription_details or top-level subscription field
 	const invoiceAny = invoice as any;
 	let subscriptionId: string | undefined;
@@ -93,36 +81,12 @@ export async function handleInvoicePaid(
 	const customerId =
 		typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
 
-	process.stdout.write(
-		`[Webhook] Extracted IDs - subscriptionId: ${subscriptionId}, customerId: ${customerId}\n`
-	);
-
 	if (!subscriptionId || !customerId) {
 		process.stderr.write(
-			`Invoice has no subscription or customer ID - subscriptionId: ${subscriptionId}, customerId: ${customerId}\n`
+			`Invoice ${invoice.id} has no subscription or customer ID, skipping\n`
 		);
 		return;
 	}
-
-	// Get billing period from invoice line items (more reliable than subscription.retrieve)
-	process.stdout.write(
-		`[Webhook] Processing invoice.paid for invoice ${invoice.id}, subscription ${subscriptionId}\n`
-	);
-
-	// Log the raw invoice structure to understand what Stripe is returning
-	process.stdout.write(
-		`[Webhook] Raw invoice data: ${JSON.stringify({
-			id: invoice.id,
-			subscription: subscriptionId,
-			hasLines: !!(invoice as any).lines,
-			linesType: typeof (invoice as any).lines,
-			linesKeys: (invoice as any).lines ? Object.keys((invoice as any).lines) : [],
-			firstLineItem: (invoice as any).lines?.data?.[0] ? {
-				hasperiod: !!(invoice as any).lines.data[0].period,
-				period: (invoice as any).lines.data[0].period
-			} : 'no line items'
-		}, null, 2)}\n`
-	);
 
 	const invoiceLines = (invoice as any).lines;
 	if (!invoiceLines || !invoiceLines.data || invoiceLines.data.length === 0) {
@@ -142,10 +106,6 @@ export async function handleInvoicePaid(
 
 	const periodStart = lineItem.period.start;
 	const periodEnd = lineItem.period.end;
-
-	process.stdout.write(
-		`[Webhook] invoice.paid - Using line item periods: start=${periodStart}, end=${periodEnd}\n`
-	);
 
 	const stripe = getStripeClient();
 	const subscription = (await stripe.subscriptions.retrieve(
