@@ -7,7 +7,6 @@ import { useState, useEffect } from 'react'
 export default function LandingHero() {
   const { user } = useAuth()
   const [apiStatus, setApiStatus] = useState<'checking' | 'healthy' | 'error'>('checking')
-  const [apiVersion, setApiVersion] = useState<string>('')
 
   useEffect(() => {
     const checkApiHealth = async () => {
@@ -16,9 +15,7 @@ export default function LandingHero() {
         const response = await fetch(`${apiUrl}/health`)
 
         if (response.ok) {
-          const data = await response.json()
           setApiStatus('healthy')
-          setApiVersion(data.version || 'unknown')
         } else {
           setApiStatus('error')
         }
@@ -66,9 +63,8 @@ export default function LandingHero() {
           )}
         </div>
 
-        {/* API Status and MCP Badge */}
-        <div className="flex flex-col items-center justify-center gap-3 pt-8">
-          {/* API Status Badge */}
+        {/* API Status Badge */}
+        <div className="flex items-center justify-center pt-8">
           <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
             apiStatus === 'healthy'
               ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
@@ -80,18 +76,11 @@ export default function LandingHero() {
               apiStatus === 'healthy' ? 'bg-green-500' : apiStatus === 'error' ? 'bg-red-500' : 'bg-gray-500'
             }`} />
             {apiStatus === 'healthy'
-              ? `API: Healthy ${apiVersion && `(v${apiVersion})`}`
+              ? 'API: Healthy'
               : apiStatus === 'error'
               ? 'API: Unavailable'
               : 'Checking API...'
             }
-          </div>
-
-          {/* MCP Integration badge */}
-          <div className="glass-light dark:glass-dark px-4 py-2 rounded-full text-sm font-medium">
-            <span className="text-gray-700 dark:text-gray-300">
-              🔌 Powered by Model Context Protocol
-            </span>
           </div>
         </div>
       </div>
