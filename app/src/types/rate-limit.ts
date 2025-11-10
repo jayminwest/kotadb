@@ -2,10 +2,10 @@
  * Rate limiting types for KotaDB API.
  *
  * Types for rate limit enforcement and response headers.
- * Used by both backend (enforcement logic) and frontend (displaying limits to users).
+ * Backend-only types (moved from shared/ to resolve Docker build context issue).
  */
 
-import type { Tier } from "./auth";
+import type { Tier } from "@shared/types/auth";
 
 /**
  * Rate limit enforcement result.

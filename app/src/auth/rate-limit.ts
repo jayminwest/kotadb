@@ -14,7 +14,7 @@ import {
 	DAILY_RATE_LIMITS,
 	RATE_LIMITS,
 	type RateLimitResult,
-} from "@shared/types/rate-limit";
+} from "@app-types/rate-limit";
 
 /**
  * Enforce hourly rate limit for API key.

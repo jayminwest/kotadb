@@ -5,7 +5,17 @@
  * that flows through the request lifecycle after successful API key validation.
  */
 
-import type { RateLimitResult } from "./rate-limit";
+/**
+ * Rate limit enforcement result (re-declared to avoid circular dependency).
+ * Full definition lives in app/src/types/rate-limit.ts (backend-only).
+ */
+export interface RateLimitResult {
+	allowed: boolean;
+	remaining: number;
+	retryAfter?: number;
+	resetAt: number;
+	limit: number;
+}
 
 /**
  * User tier levels that determine rate limits and feature access.
