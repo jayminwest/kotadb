@@ -79,6 +79,21 @@ export async function handleInvoicePaid(
 		`[Webhook] Processing invoice.paid for invoice ${invoice.id}, subscription ${subscriptionId}\n`
 	);
 
+	// Log the raw invoice structure to understand what Stripe is returning
+	process.stdout.write(
+		`[Webhook] Raw invoice data: ${JSON.stringify({
+			id: invoice.id,
+			subscription: subscriptionId,
+			hasLines: !!(invoice as any).lines,
+			linesType: typeof (invoice as any).lines,
+			linesKeys: (invoice as any).lines ? Object.keys((invoice as any).lines) : [],
+			firstLineItem: (invoice as any).lines?.data?.[0] ? {
+				hasperiod: !!(invoice as any).lines.data[0].period,
+				period: (invoice as any).lines.data[0].period
+			} : 'no line items'
+		}, null, 2)}\n`
+	);
+
 	const invoiceLines = (invoice as any).lines;
 	if (!invoiceLines || !invoiceLines.data || invoiceLines.data.length === 0) {
 		process.stderr.write(
