@@ -7,6 +7,7 @@ import { useState, useEffect } from 'react'
 export default function LandingHero() {
   const { user } = useAuth()
   const [apiStatus, setApiStatus] = useState<'checking' | 'healthy' | 'error'>('checking')
+  const [apiVersion, setApiVersion] = useState<string>('')
 
   useEffect(() => {
     const checkApiHealth = async () => {
@@ -15,7 +16,9 @@ export default function LandingHero() {
         const response = await fetch(`${apiUrl}/health`)
 
         if (response.ok) {
+          const data = await response.json()
           setApiStatus('healthy')
+          setApiVersion(data.version || 'unknown')
         } else {
           setApiStatus('error')
         }
@@ -76,7 +79,7 @@ export default function LandingHero() {
               apiStatus === 'healthy' ? 'bg-green-500' : apiStatus === 'error' ? 'bg-red-500' : 'bg-gray-500'
             }`} />
             {apiStatus === 'healthy'
-              ? 'API: Healthy'
+              ? `API: Healthy ${apiVersion && `(v${apiVersion})`}`
               : apiStatus === 'error'
               ? 'API: Unavailable'
               : 'Checking API...'
