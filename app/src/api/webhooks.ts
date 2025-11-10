@@ -62,15 +62,30 @@ export async function handleInvoicePaid(
 	event: Stripe.InvoicePaidEvent,
 ): Promise<void> {
 	const invoice = event.data.object as Stripe.Invoice;
+
+	// Log invoice structure to debug extraction issues
+	process.stdout.write(
+		`[Webhook] invoice.paid event received: ${JSON.stringify({
+			invoiceId: invoice.id,
+			hasSubscription: !!(invoice as any).subscription,
+			subscriptionType: typeof (invoice as any).subscription,
+			hasCustomer: !!invoice.customer,
+			customerType: typeof invoice.customer,
+			topLevelKeys: Object.keys(invoice).slice(0, 10)
+		}, null, 2)}\n`
+	);
+
 	// Access subscription field which Stripe SDK types don't fully expose
-	const subscriptionRef = (invoice as unknown as { subscription?: string | Stripe.Subscription | null }).subscription;
+	const subscriptionRef = (invoice as any).subscription;
 	const subscriptionId =
 		typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
 	const customerId =
 		typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
 
 	if (!subscriptionId || !customerId) {
-		process.stderr.write("Invoice has no subscription or customer ID, skipping\n");
+		process.stderr.write(
+			`Invoice has no subscription or customer ID - subscriptionId: ${subscriptionId}, customerId: ${customerId}\n`
+		);
 		return;
 	}
 
