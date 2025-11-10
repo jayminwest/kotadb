@@ -39,17 +39,8 @@ export type {
 	Tier,
 	AuthContext,
 	ApiKey,
-} from "./auth";
-
-// Rate limiting types
-export type {
 	RateLimitResult,
-	RateLimitHeaders,
-	RateLimitConfig,
-} from "./rate-limit";
-
-// Re-export rate limit constants
-export { RATE_LIMITS } from "./rate-limit";
+} from "./auth";
 
 // Validation types
 export type {

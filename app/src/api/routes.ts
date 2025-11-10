@@ -1,5 +1,5 @@
 import { authenticateRequest, requireAdmin } from "@auth/middleware";
-import type { RateLimitResult } from "@shared/types/rate-limit";
+import type { RateLimitResult } from "@app-types/rate-limit";
 import { buildSnippet } from "@indexer/extractors";
 import { createMcpServer, createMcpTransport } from "@mcp/server";
 import type { AuthContext, IndexRequest } from "@shared/types";
