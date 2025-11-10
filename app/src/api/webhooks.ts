@@ -75,12 +75,27 @@ export async function handleInvoicePaid(
 		}, null, 2)}\n`
 	);
 
-	// Access subscription field which Stripe SDK types don't fully expose
-	const subscriptionRef = (invoice as any).subscription;
-	const subscriptionId =
-		typeof subscriptionRef === "string" ? subscriptionRef : subscriptionRef?.id;
+	// Extract subscription ID from parent.subscription_details or top-level subscription field
+	const invoiceAny = invoice as any;
+	let subscriptionId: string | undefined;
+
+	// Try parent.subscription_details.subscription first (newer Stripe API structure)
+	if (invoiceAny.parent?.subscription_details?.subscription) {
+		subscriptionId = invoiceAny.parent.subscription_details.subscription;
+	}
+	// Fallback to top-level subscription field (older structure)
+	else if (invoiceAny.subscription) {
+		subscriptionId = typeof invoiceAny.subscription === "string"
+			? invoiceAny.subscription
+			: invoiceAny.subscription?.id;
+	}
+
 	const customerId =
 		typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
+
+	process.stdout.write(
+		`[Webhook] Extracted IDs - subscriptionId: ${subscriptionId}, customerId: ${customerId}\n`
+	);
 
 	if (!subscriptionId || !customerId) {
 		process.stderr.write(
