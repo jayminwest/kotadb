@@ -29,47 +29,6 @@ export default function Home() {
           </div>
         </div>
       </section>
-
-      {/* Footer Links */}
-      <footer className="border-t border-gray-200 dark:border-gray-800 py-12 px-4">
-        <div className="max-w-6xl mx-auto">
-          <div className="grid md:grid-cols-4 gap-8">
-            <div>
-              <h3 className="font-semibold mb-4">Product</h3>
-              <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                <li><Link href="/pricing" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Pricing</Link></li>
-                <li><Link href="/dashboard" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Dashboard</Link></li>
-                <li><Link href="/mcp" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">MCP Config</Link></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Resources</h3>
-              <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                <li><a href="https://github.com/kotadb/kotadb" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Documentation</a></li>
-                <li><a href="https://github.com/kotadb/kotadb/issues" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Support</a></li>
-                <li><a href="https://github.com/kotadb/kotadb" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">GitHub</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Company</h3>
-              <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                <li><a href="https://github.com/kotadb/kotadb#about" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">About</a></li>
-                <li><a href="https://github.com/kotadb/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">License</a></li>
-              </ul>
-            </div>
-            <div>
-              <h3 className="font-semibold mb-4">Connect</h3>
-              <ul className="space-y-2 text-gray-600 dark:text-gray-400">
-                <li><a href="https://github.com/kotadb/kotadb" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">GitHub</a></li>
-                <li><a href="https://twitter.com/kotadb" target="_blank" rel="noopener noreferrer" className="hover:text-blue-600 dark:hover:text-blue-400 transition-colors">Twitter</a></li>
-              </ul>
-            </div>
-          </div>
-          <div className="mt-12 pt-8 border-t border-gray-200 dark:border-gray-800 text-center text-gray-600 dark:text-gray-400">
-            <p>&copy; 2025 KotaDB. Code Intelligence for AI Agents.</p>
-          </div>
-        </div>
-      </footer>
     </div>
   )
 }

@@ -2,9 +2,33 @@
 
 import Link from 'next/link'
 import { useAuth } from '@/context/AuthContext'
+import { useState, useEffect } from 'react'
 
 export default function LandingHero() {
   const { user } = useAuth()
+  const [apiStatus, setApiStatus] = useState<'checking' | 'healthy' | 'error'>('checking')
+  const [apiVersion, setApiVersion] = useState<string>('')
+
+  useEffect(() => {
+    const checkApiHealth = async () => {
+      try {
+        const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+        const response = await fetch(`${apiUrl}/health`)
+
+        if (response.ok) {
+          const data = await response.json()
+          setApiStatus('healthy')
+          setApiVersion(data.version || 'unknown')
+        } else {
+          setApiStatus('error')
+        }
+      } catch (error) {
+        setApiStatus('error')
+      }
+    }
+
+    checkApiHealth()
+  }, [])
 
   return (
     <section className="relative overflow-hidden py-20 px-4">
@@ -40,19 +64,30 @@ export default function LandingHero() {
               Get Started
             </Link>
           )}
-
-          <a
-            href="https://github.com/kotadb/kotadb"
-            target="_blank"
-            rel="noopener noreferrer"
-            className="px-8 py-4 glass-light dark:glass-dark text-gray-900 dark:text-gray-100 font-semibold rounded-lg transition-all duration-200 hover:shadow-lg"
-          >
-            View on GitHub
-          </a>
         </div>
 
-        {/* MCP Integration badge */}
-        <div className="flex items-center justify-center gap-2 pt-8">
+        {/* API Status and MCP Badge */}
+        <div className="flex flex-col items-center justify-center gap-3 pt-8">
+          {/* API Status Badge */}
+          <div className={`inline-flex items-center px-4 py-2 rounded-full text-sm font-medium ${
+            apiStatus === 'healthy'
+              ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+              : apiStatus === 'error'
+              ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+              : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+          }`}>
+            <span className={`w-2 h-2 rounded-full mr-2 ${
+              apiStatus === 'healthy' ? 'bg-green-500' : apiStatus === 'error' ? 'bg-red-500' : 'bg-gray-500'
+            }`} />
+            {apiStatus === 'healthy'
+              ? `API: Healthy ${apiVersion && `(v${apiVersion})`}`
+              : apiStatus === 'error'
+              ? 'API: Unavailable'
+              : 'Checking API...'
+            }
+          </div>
+
+          {/* MCP Integration badge */}
           <div className="glass-light dark:glass-dark px-4 py-2 rounded-full text-sm font-medium">
             <span className="text-gray-700 dark:text-gray-300">
               🔌 Powered by Model Context Protocol
