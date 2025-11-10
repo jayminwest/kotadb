@@ -66,9 +66,17 @@ All authenticated endpoints include:
 
 ## Rate Limit Tiers
 
-- **free**: 100 requests/hour
-- **solo**: 1000 requests/hour
-- **team**: 10000 requests/hour
+### Hourly Limits
+- **free**: 1,000 requests/hour
+- **solo**: 5,000 requests/hour
+- **team**: 25,000 requests/hour
+
+### Daily Limits
+- **free**: 5,000 requests/day
+- **solo**: 25,000 requests/day
+- **team**: 100,000 requests/day
+
+Both hourly and daily limits are enforced. Whichever limit is reached first will block requests.
 
 ## Related Documentation
 

@@ -901,8 +901,8 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			// Enforce rate limit for reset endpoint (max 5 per hour)
 			const resetKeyId = `api-key-reset:${user.id}`;
-			const { enforceRateLimit } = await import("@auth/rate-limit");
-			const rateLimit = await enforceRateLimit(resetKeyId, 5);
+			const { enforceCustomRateLimit } = await import("@auth/rate-limit");
+			const rateLimit = await enforceCustomRateLimit(resetKeyId, 5);
 
 			if (!rateLimit.allowed) {
 				return res.status(429).json({

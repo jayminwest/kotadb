@@ -59,10 +59,22 @@ export interface RateLimitConfig {
 }
 
 /**
- * Standard rate limit configurations by tier.
+ * Standard hourly rate limit configurations by tier.
+ * Updated in #423 to support realistic development workflows.
  */
 export const RATE_LIMITS: Record<Tier, number> = {
-	free: 100,
-	solo: 1000,
-	team: 10000,
+	free: 1000,
+	solo: 5000,
+	team: 25000,
+};
+
+/**
+ * Daily rate limit configurations by tier.
+ * Provides cost protection while enabling burst usage patterns.
+ * Both hourly and daily limits are enforced; whichever is reached first blocks requests.
+ */
+export const DAILY_RATE_LIMITS: Record<Tier, number> = {
+	free: 5000,
+	solo: 25000,
+	team: 100000,
 };
