@@ -98,6 +98,31 @@ export async function handleInvoicePaid(
 
 	const supabase = getServiceClient();
 
+	// Access period fields
+	const currentPeriodStart = (subscription as any).current_period_start;
+	const currentPeriodEnd = (subscription as any).current_period_end;
+
+	// Log diagnostic info for invoice.paid
+	process.stdout.write(
+		`[Webhook] invoice.paid for subscription ${subscriptionId} - ` +
+		`status: ${subscription.status}, start: ${currentPeriodStart}, end: ${currentPeriodEnd}\n`
+	);
+
+	// Validate period fields exist (invoice.paid should always have these)
+	if (!currentPeriodStart || !currentPeriodEnd) {
+		throw new Error(
+			`invoice.paid event missing billing periods (subscription: ${subscriptionId}, ` +
+			`status: ${subscription.status}, start: ${currentPeriodStart}, end: ${currentPeriodEnd})`
+		);
+	}
+
+	if (typeof currentPeriodStart !== 'number' || typeof currentPeriodEnd !== 'number') {
+		throw new Error(
+			`invoice.paid event has invalid period types (subscription: ${subscriptionId}, ` +
+			`start type: ${typeof currentPeriodStart}, end type: ${typeof currentPeriodEnd})`
+		);
+	}
+
 	// Upsert subscription record
 	const { error: subError } = await supabase
 		.from("subscriptions")
@@ -108,12 +133,8 @@ export async function handleInvoicePaid(
 				stripe_subscription_id: subscriptionId,
 				tier,
 				status: "active" as const,
-				current_period_start: new Date(
-					subscription.current_period_start * 1000,
-				).toISOString(),
-				current_period_end: new Date(
-					subscription.current_period_end * 1000,
-				).toISOString(),
+				current_period_start: new Date(currentPeriodStart * 1000).toISOString(),
+				current_period_end: new Date(currentPeriodEnd * 1000).toISOString(),
 				cancel_at_period_end: subscription.cancel_at_period_end,
 				trial_end: subscription.trial_end
 					? new Date(subscription.trial_end * 1000).toISOString()
