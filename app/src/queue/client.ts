@@ -15,6 +15,9 @@ import {
 	EXPIRE_IN_HOURS,
 	ARCHIVE_COMPLETED_AFTER,
 } from "@queue/config";
+import { createLogger } from "@logging/logger";
+
+const logger = createLogger();
 
 /**
  * Global pg-boss instance (singleton pattern)
@@ -50,9 +53,9 @@ export async function startQueue(): Promise<void> {
 		);
 	}
 
-	process.stdout.write(
-		`[${new Date().toISOString()}] Starting job queue with connection: ${dbUrl.replace(/:[^:@]+@/, ":***@")}\n`,
-	);
+	logger.info("Starting job queue", {
+		connection: dbUrl.replace(/:[^:@]+@/, ":***@"),
+	});
 
 	try {
 		// Initialize pg-boss with connection string and configuration
@@ -62,19 +65,12 @@ export async function startQueue(): Promise<void> {
 		// Start pg-boss (creates pgboss schema and tables)
 		await queueInstance.start();
 
-		process.stdout.write(`[${new Date().toISOString()}] Job queue started successfully\n`);
+		logger.info("Job queue started successfully");
 	} catch (error) {
-		const errorMessage =
-			error instanceof Error ? error.message : String(error);
-		const errorStack = error instanceof Error ? error.stack : undefined;
-
-		process.stderr.write(`[${new Date().toISOString()}] Failed to start job queue\n`);
-		process.stderr.write(`  Connection: ${dbUrl.replace(/:[^:@]+@/, ":***@")}\n`);
-		process.stderr.write(`  Error: ${errorMessage}\n`);
-		if (errorStack) {
-			process.stderr.write(`  Stack:\n${errorStack}\n`);
-		}
-		throw new Error(`Job queue startup failed: ${errorMessage}`);
+		logger.error("Failed to start job queue", error instanceof Error ? error : undefined, {
+			connection: dbUrl.replace(/:[^:@]+@/, ":***@"),
+		});
+		throw new Error(`Job queue startup failed: ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 
@@ -89,21 +85,15 @@ export async function stopQueue(): Promise<void> {
 		throw new Error("Queue not started. Call startQueue() first.");
 	}
 
-	process.stdout.write(
-		`[${new Date().toISOString()}] Stopping job queue (draining in-flight jobs)...\n`,
-	);
+	logger.info("Stopping job queue (draining in-flight jobs)");
 
 	try {
 		await queueInstance.stop();
 		queueInstance = null;
-		process.stdout.write(`[${new Date().toISOString()}] Job queue stopped successfully\n`);
+		logger.info("Job queue stopped successfully");
 	} catch (error) {
-		const errorMessage =
-			error instanceof Error ? error.message : String(error);
-		process.stderr.write(
-			`[${new Date().toISOString()}] Error stopping job queue: ${errorMessage}`,
-		);
-		throw new Error(`Job queue shutdown failed: ${errorMessage}`);
+		logger.error("Error stopping job queue", error instanceof Error ? error : undefined);
+		throw new Error(`Job queue shutdown failed: ${error instanceof Error ? error.message : String(error)}`);
 	}
 }
 
@@ -124,9 +114,7 @@ export async function checkQueueHealth(): Promise<boolean> {
 		await queueInstance.getQueue("index-repo");
 		return true;
 	} catch (error) {
-		process.stderr.write(
-			`[${new Date().toISOString()}] Queue health check failed: ${error instanceof Error ? error.message : String(error)}`,
-		);
+		logger.error("Queue health check failed", error instanceof Error ? error : undefined);
 		return false;
 	}
 }

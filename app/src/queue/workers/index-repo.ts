@@ -43,6 +43,8 @@ import {
 	type ReferenceData,
 	type DependencyGraphEntry,
 } from "@indexer/storage";
+import { createLogger } from "@logging/logger";
+import { createJobContext } from "@logging/context";
 
 /**
  * Start the indexing worker pool
@@ -53,9 +55,8 @@ import {
  * @param queue - pg-boss instance
  */
 export async function startIndexWorker(queue: PgBoss): Promise<void> {
-	process.stdout.write(
-		`[${new Date().toISOString()}] Starting index-repo workers (team_size=${WORKER_TEAM_SIZE})\n`,
-	);
+	const logger = createLogger();
+	logger.info("Starting index-repo workers", { team_size: WORKER_TEAM_SIZE });
 
 	// Register multiple workers by calling work() multiple times
 	// pg-boss work() handler receives array of jobs (batch processing)
@@ -71,9 +72,7 @@ export async function startIndexWorker(queue: PgBoss): Promise<void> {
 		);
 	}
 
-	process.stdout.write(
-		`[${new Date().toISOString()}] Index-repo workers registered successfully\n`,
-	);
+	logger.info("Index-repo workers registered successfully");
 }
 
 /**
@@ -92,9 +91,9 @@ async function processIndexJob(
 	const supabase = getServiceClient();
 	const startTime = Date.now();
 
-	process.stdout.write(
-		`[${new Date().toISOString()}] Processing index job: job_id=${indexJobId}, repository_id=${repositoryId}\n`,
-	);
+	// Create job-scoped logger
+	const logger = createLogger(createJobContext(indexJobId, repositoryId));
+	logger.info("Processing index job", { repository_id: repositoryId });
 
 	// Fetch repository metadata for context (including installation_id for GitHub App auth - Issue #337)
 	const { data: repo, error: repoError } = await supabase
@@ -115,13 +114,13 @@ async function processIndexJob(
 	const repositoryIdentifier = repo.git_url || repo.full_name;
 
 	if (installationId !== null) {
-		process.stdout.write(
-			`[${new Date().toISOString()}] Using installation_id=${installationId} for repository authentication\n`,
-		);
+		logger.info("Using GitHub App installation for repository authentication", {
+			installation_id: installationId,
+		});
 	} else {
-		process.stdout.write(
-			`[${new Date().toISOString()}] No installation_id found, using public clone for ${repo.full_name}\n`,
-		);
+		logger.info("No installation_id found, using public clone", {
+			full_name: repo.full_name,
+		});
 	}
 
 	try {
@@ -129,9 +128,7 @@ async function processIndexJob(
 		await updateJobStatus(indexJobId, "processing", undefined, userId);
 
 		// STEP 1: Clone/fetch repository
-		process.stdout.write(
-			`[${new Date().toISOString()}] [STEP 1/7] Cloning repository: repository_id=${repositoryId}\n`,
-		);
+		logger.info("[STEP 1/7] Cloning repository");
 
 		// Check if repository identifier is a local path (for testing or local repositories)
 		const isLocalPath = repositoryIdentifier.startsWith("/") || repositoryIdentifier.startsWith(".");
@@ -150,19 +147,13 @@ async function processIndexJob(
 		);
 
 		// STEP 2: Discover source files
-		process.stdout.write(
-			`[${new Date().toISOString()}] [STEP 2/7] Discovering source files: path=${repoContext.localPath}\n`,
-		);
+		logger.info("[STEP 2/7] Discovering source files", { path: repoContext.localPath });
 
 		const filePaths = await discoverSources(repoContext.localPath);
-		process.stdout.write(
-			`[${new Date().toISOString()}] Discovered ${filePaths.length} source files\n`,
-		);
+		logger.info("Discovered source files", { count: filePaths.length });
 
 		// STEP 3: Parse files
-		process.stdout.write(
-			`[${new Date().toISOString()}] [STEP 3/7] Parsing source files\n`,
-		);
+		logger.info("[STEP 3/7] Parsing source files");
 
 		const files: FileData[] = [];
 		const fileContentMap = new Map<string, string>();
@@ -185,19 +176,18 @@ async function processIndexJob(
 
 				fileContentMap.set(parsed.path, parsed.content);
 			} catch (error) {
-				process.stderr.write(
-					`[${new Date().toISOString()}] Failed to parse file ${filePath}: ${error instanceof Error ? error.message : String(error)}\n`,
-				);
+				logger.warn("Failed to parse file", {
+					file_path: filePath,
+					error: error instanceof Error ? error.message : String(error),
+				});
 				// Continue processing other files (partial failure tolerance)
 			}
 		}
 
-		process.stdout.write(`[${new Date().toISOString()}] Parsed ${files.length} files successfully\n`);
+		logger.info("Parsed files successfully", { count: files.length });
 
 		// STEP 4: Extract symbols via AST
-		process.stdout.write(
-			`[${new Date().toISOString()}] [STEP 4/7] Extracting symbols\n`,
-		);
+		logger.info("[STEP 4/7] Extracting symbols");
 
 		const symbols: SymbolData[] = [];
 
@@ -223,16 +213,15 @@ async function processIndexJob(
 					});
 				}
 			} catch (error) {
-				process.stderr.write(
-					`[${new Date().toISOString()}] Failed to extract symbols from ${file.path}: ${error instanceof Error ? error.message : String(error)}\n`,
-				);
+				logger.warn("Failed to extract symbols from file", {
+					file_path: file.path,
+					error: error instanceof Error ? error.message : String(error),
+				});
 				// Continue processing other files
 			}
 		}
 
-		process.stdout.write(
-			`[${new Date().toISOString()}] Extracted ${symbols.length} symbols\n`,
-		);
+		logger.info("Extracted symbols", { count: symbols.length });
 
 		// STEP 5-7: Two-pass storage with reference and dependency extraction
 		// Pass 1: Store files/symbols to get database IDs
@@ -486,13 +475,14 @@ async function processIndexJob(
 
 		const duration = Date.now() - startTime;
 
-		process.stdout.write(
-			`[${new Date().toISOString()}] Successfully indexed repository: ` +
-				`job_id=${indexJobId}, repository_id=${repositoryId}, ` +
-				`duration=${duration}ms, files=${totalFilesIndexed}, ` +
-				`symbols=${totalSymbolsExtracted}, references=${totalReferencesFound}, ` +
-				`dependencies=${totalDependenciesExtracted}, chunks=${chunks.length}\n`,
-		);
+		logger.info("Successfully indexed repository", {
+			duration_ms: duration,
+			files_indexed: totalFilesIndexed,
+			symbols_extracted: totalSymbolsExtracted,
+			references_found: totalReferencesFound,
+			dependencies_extracted: totalDependenciesExtracted,
+			chunks: chunks.length,
+		});
 
 		// Update job status to 'completed' with final stats
 		await updateJobStatus(indexJobId, "completed", {
@@ -508,10 +498,9 @@ async function processIndexJob(
 		const errorMessage =
 			error instanceof Error ? error.message : String(error);
 
-		process.stderr.write(
-			`[${new Date().toISOString()}] Index job failed: job_id=${indexJobId}, ` +
-				`repository_id=${repositoryId}, error=${errorMessage}\n`,
-		);
+		logger.error("Index job failed", error instanceof Error ? error : undefined, {
+			error_message: errorMessage,
+		});
 
 		// Update job status to 'failed' with error message
 		await updateJobStatus(indexJobId, "failed", {
