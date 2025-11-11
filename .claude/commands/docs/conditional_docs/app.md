@@ -405,3 +405,16 @@ Use this reference to decide which KotaDB application layer documentation source
     - When enhancing output format specifications or adding CRITICAL output sections
     - When agents add explanatory text despite templates specifying "Return only X"
     - When implementing defensive parsing patterns for agent responses
+
+- .claude/commands/release/release.md
+  - Conditions:
+    - When creating a production release by merging develop → main
+    - When performing version bumping (major/minor/patch)
+    - When generating changelogs from commit history
+    - When validating pre-release checks (CI, migration sync, schema parity, health checks)
+    - When creating release PRs with comprehensive checklists
+    - When tagging releases and creating GitHub releases
+    - When syncing develop with main after release
+    - When handling emergency hotfixes from main branch
+    - When implementing rollback procedures for problematic releases
+    - When understanding semantic versioning strategy for KotaDB
