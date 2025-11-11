@@ -141,7 +141,7 @@ describe("POST /api/keys/generate", () => {
 		expect(body.apiKey).toMatch(/^kota_free_[a-zA-Z0-9]{12}_[0-9a-f]{36}$/);
 		expect(body.keyId).toBeTruthy();
 		expect(body.tier).toBe("free");
-		expect(body.rateLimitPerHour).toBe(100);
+		expect(body.rateLimitPerHour).toBe(1000); // Updated from 100 to 1000 per #423
 		expect(body.createdAt).toBeTruthy();
 
 		// Verify API key was stored in database (use service client to bypass RLS)

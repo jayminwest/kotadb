@@ -212,11 +212,11 @@ export async function validateJwtToken(
 			tier = subData.tier as Tier;
 		}
 
-		// Determine rate limit based on tier
+		// Determine rate limit based on tier (updated in #423)
 		const rateLimitMap: Record<Tier, number> = {
-			free: 100,
-			solo: 1000,
-			team: 10000,
+			free: 1000,
+			solo: 5000,
+			team: 25000,
 		};
 		const rateLimitPerHour = rateLimitMap[tier];
 

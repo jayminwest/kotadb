@@ -37,6 +37,7 @@ import {
 	handleSubscriptionDeleted,
 } from "@api/webhooks";
 import type Stripe from "stripe";
+import { requestLoggingMiddleware, errorLoggingMiddleware } from "@logging/middleware";
 
 /**
  * Extended Express Request with auth context attached
@@ -47,6 +48,9 @@ interface AuthenticatedRequest extends Request {
 
 export function createExpressApp(supabase: SupabaseClient): Express {
 	const app = express();
+
+	// Request logging middleware (before all other middleware)
+	app.use(requestLoggingMiddleware);
 
 	// CORS middleware - allow requests from web app
 	app.use(cors({
@@ -992,6 +996,9 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			},
 		});
 	});
+
+	// Error logging middleware (before 404 handler)
+	app.use(errorLoggingMiddleware);
 
 	// 404 handler
 	app.use((req: Request, res: Response) => {

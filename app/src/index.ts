@@ -3,8 +3,10 @@ import { getServiceClient } from "@db/client";
 import { startQueue, stopQueue, getQueue } from "@queue/client";
 import { startIndexWorker } from "@queue/workers/index-repo";
 import { QUEUE_NAMES } from "@queue/config";
+import { createLogger } from "@logging/logger";
 
 const PORT = Number(process.env.PORT ?? 3000);
+const logger = createLogger();
 
 async function bootstrap() {
 	// Verify Supabase environment variables
@@ -21,13 +23,9 @@ async function bootstrap() {
 	// Check for GitHub webhook secret (warn if missing, not fatal)
 	const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
 	if (!webhookSecret) {
-		process.stderr.write(
-			"[Warning] GITHUB_WEBHOOK_SECRET not configured. Webhook endpoint will reject all requests.\n",
-		);
+		logger.warn("GITHUB_WEBHOOK_SECRET not configured - webhook endpoint will reject all requests");
 	} else if (webhookSecret.length < 16) {
-		process.stderr.write(
-			"[Warning] GITHUB_WEBHOOK_SECRET is too short (minimum 16 characters recommended).\n",
-		);
+		logger.warn("GITHUB_WEBHOOK_SECRET is too short (minimum 16 characters recommended)");
 	}
 
 	// Validate Stripe configuration (optional - warn if incomplete)
@@ -47,17 +45,14 @@ async function bootstrap() {
 		if (!stripeTeamPriceId) missingVars.push("STRIPE_TEAM_PRICE_ID");
 
 		if (missingVars.length > 0) {
-			process.stderr.write(
-				`[Warning] Partial Stripe configuration detected. Missing: ${missingVars.join(", ")}. ` +
-					"Subscription endpoints will fail until all Stripe variables are configured.\n",
-			);
+			logger.warn("Partial Stripe configuration detected", {
+				missing_vars: missingVars,
+			});
 		} else {
-			process.stdout.write("✓ Stripe configuration validated\n");
+			logger.info("Stripe configuration validated");
 		}
 	} else {
-		process.stdout.write(
-			"[Info] Stripe not configured. Subscription features disabled.\n",
-		);
+		logger.info("Stripe not configured - subscription features disabled");
 	}
 
 	// Initialize Supabase client
@@ -71,7 +66,7 @@ async function bootstrap() {
 	if (healthError) {
 		throw new Error(`Supabase connection failed: ${healthError.message}`);
 	}
-	process.stdout.write(`[${new Date().toISOString()}] ✓ Supabase connection successful\n`);
+	logger.info("Supabase connection successful");
 
 	// Start job queue
 	try {
@@ -81,11 +76,9 @@ async function bootstrap() {
 		// pg-boss requires queues to exist before workers can be registered
 		const queue = getQueue();
 		await queue.createQueue(QUEUE_NAMES.INDEX_REPO);
-		process.stdout.write(`[${new Date().toISOString()}] ✓ Job queue started and index-repo queue created\n`);
+		logger.info("Job queue started and index-repo queue created");
 	} catch (error) {
-		const errorMessage =
-			error instanceof Error ? error.message : String(error);
-		process.stderr.write(`Failed to start job queue: ${errorMessage}\n`);
+		logger.error("Failed to start job queue", error instanceof Error ? error : undefined);
 		throw error;
 	}
 
@@ -93,57 +86,45 @@ async function bootstrap() {
 	try {
 		const queue = getQueue();
 		await startIndexWorker(queue);
-		process.stdout.write(`[${new Date().toISOString()}] ✓ Indexing worker registered\n`);
+		logger.info("Indexing worker registered");
 	} catch (error) {
-		const errorMessage =
-			error instanceof Error ? error.message : String(error);
-		process.stderr.write(`Failed to start indexing worker: ${errorMessage}\n`);
+		logger.error("Failed to start indexing worker", error instanceof Error ? error : undefined);
 		throw error;
 	}
 
 	// Create Express app
-	process.stdout.write(`[${new Date().toISOString()}] Creating Express app...\n`);
+	logger.info("Creating Express app");
 	const app = createExpressApp(supabase);
-	process.stdout.write(`[${new Date().toISOString()}] ✓ Express app created\n`);
+	logger.info("Express app created");
 
 	// Start server
 	const server = app.listen(PORT, () => {
-		process.stdout.write(`KotaDB server listening on http://localhost:${PORT}\n`);
-		process.stdout.write(`Connected to Supabase at ${supabaseUrl}\n`);
+		logger.info("Server started", {
+			port: PORT,
+			supabase_url: supabaseUrl,
+		});
 	});
 
 	// Graceful shutdown
 	process.on("SIGTERM", async () => {
-		process.stdout.write("SIGTERM signal received: closing HTTP server\n");
+		logger.info("SIGTERM signal received - closing HTTP server");
 
 		// Stop queue first (drains in-flight jobs)
 		try {
 			await stopQueue();
 		} catch (error) {
-			process.stderr.write(
-				`Error stopping queue: ${error instanceof Error ? error.message : String(error)}\n`,
-			);
+			logger.error("Error stopping queue", error instanceof Error ? error : undefined);
 		}
 
 		// Then close HTTP server
 		server.close(() => {
-			process.stdout.write("HTTP server closed\n");
+			logger.info("HTTP server closed");
 			process.exit(0);
 		});
 	});
 }
 
 bootstrap().catch((error) => {
-	// Extract error details for better diagnostics
-	const errorMessage = error instanceof Error ? error.message : String(error);
-	const errorStack = error instanceof Error ? error.stack : undefined;
-	const errorName = error instanceof Error ? error.name : "Unknown";
-
-	process.stderr.write("Failed to start server:\n");
-	process.stderr.write(`  Error: ${errorName}\n`);
-	process.stderr.write(`  Message: ${errorMessage}\n`);
-	if (errorStack) {
-		process.stderr.write(`  Stack:\n${errorStack}\n`);
-	}
+	logger.error("Failed to start server", error instanceof Error ? error : undefined);
 	process.exit(1);
 });

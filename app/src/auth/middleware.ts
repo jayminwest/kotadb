@@ -8,11 +8,9 @@
 import type { AuthContext } from "@shared/types/auth";
 import { enforceRateLimit } from "@auth/rate-limit";
 import { updateLastUsed, validateApiKey, validateJwtToken } from "@auth/validator";
+import { createLogger } from "@logging/logger";
 
-// Conditional logging for test environment
-const isTestEnv = process.env.NODE_ENV === 'test' || process.env.BUN_ENV === 'test';
-const isDebug = process.env.DEBUG === '1';
-const shouldLog = !isTestEnv || isDebug;
+const logger = createLogger();
 
 /**
  * Result of authentication request.
@@ -93,9 +91,10 @@ export async function authenticateRequest(
 
 	if (!validation) {
 		// Log failed authentication attempt
-		if (shouldLog) {
-			process.stderr.write(`[Auth] Invalid ${authMethod} attempt\n`);
-		}
+		logger.warn("Authentication failed", {
+			auth_method: authMethod,
+			reason: "invalid_credentials",
+		});
 
 		return {
 			response: new Response(
@@ -124,21 +123,23 @@ export async function authenticateRequest(
 	}
 
 	// Log successful authentication
-	if (shouldLog) {
-		process.stdout.write(
-			`[Auth] ${authMethod === "jwt" ? "JWT" : "API key"} auth success - userId: ${context.userId}, keyId: ${context.keyId}, tier: ${context.tier}\n`,
-		);
-	}
+	logger.info("Authentication successful", {
+		auth_method: authMethod,
+		user_id: context.userId,
+		key_id: context.keyId,
+		tier: context.tier,
+	});
 
 	// Enforce rate limit (both hourly and daily)
 	const rateLimit = await enforceRateLimit(context.keyId, context.tier);
 
 	if (!rateLimit.allowed) {
-		if (shouldLog) {
-			process.stderr.write(
-				`[Auth] Rate limit exceeded - keyId: ${context.keyId}, tier: ${context.tier}\n`,
-			);
-		}
+		logger.warn("Rate limit exceeded", {
+			key_id: context.keyId,
+			tier: context.tier,
+			limit: rateLimit.limit,
+			retry_after: rateLimit.retryAfter,
+		});
 
 		return {
 			response: new Response(
@@ -167,7 +168,9 @@ export async function authenticateRequest(
 	if (authMethod === "api_key") {
 		queueMicrotask(() => {
 			updateLastUsed(validation.keyId).catch((err: unknown) => {
-				process.stderr.write(`[Auth] Failed to update last_used_at: ${JSON.stringify(err)}\n`);
+				logger.error("Failed to update last_used_at", err instanceof Error ? err : { error: String(err) }, {
+					key_id: validation.keyId,
+				});
 			});
 		});
 	}

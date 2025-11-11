@@ -34,6 +34,14 @@ Environment variables used by KotaDB. These are typically configured in `app/.en
 - **`PORT`**: Server port (default: 3000)
   - Example: `PORT=4000 bun run src/index.ts`
 
+- **`LOG_LEVEL`**: Logging verbosity level (default: info)
+  - Options: `debug`, `info`, `warn`, `error`
+  - `debug`: All logs including debug messages
+  - `info`: Informational messages, warnings, and errors
+  - `warn`: Warnings and errors only
+  - `error`: Errors only
+  - Example: `LOG_LEVEL=debug bun run src/index.ts`
+
 ### Git Configuration
 
 - **`KOTA_GIT_BASE_URL`**: Git clone base URL (default: https://github.com)
