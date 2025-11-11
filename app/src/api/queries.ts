@@ -540,7 +540,26 @@ export async function runIndexingWorkflow(
 		"@indexer/circular-detector"
 	);
 
-	const repo = await prepareRepository(request);
+	// Fetch repository metadata to get installation_id for GitHub App authentication (Issue #430)
+	const { data: repoData, error: repoError } = await client
+		.from("repositories")
+		.select("installation_id")
+		.eq("id", repositoryId)
+		.single();
+
+	if (repoError) {
+		throw new Error(`Failed to fetch repository metadata: ${repoError.message}`);
+	}
+
+	const installationId = repoData?.installation_id ?? undefined;
+
+	if (installationId !== undefined) {
+		process.stdout.write(
+			`[Indexer] Using installation_id=${installationId} for repository authentication\n`,
+		);
+	}
+
+	const repo = await prepareRepository(request, installationId);
 
 	if (!existsSync(repo.localPath)) {
 		process.stderr.write(`Indexing skipped: path ${repo.localPath} does not exist.\n`);
