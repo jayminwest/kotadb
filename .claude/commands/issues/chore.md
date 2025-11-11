@@ -15,6 +15,7 @@ Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lea
 - Create a markdown plan under `docs/specs/` named `chore-<issue-number>-<slug>.md` (e.g., `docs/specs/chore-1450-refresh-deps.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Use the template exactly as written.
+- **Use KotaDB MCP tools for discovery**: Use `mcp__kotadb__search_code` to find config files, test infrastructure, CI workflows (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
 - Identify impacts across tooling, CI, documentation, and runtime configuration.
 - Keep scope tight; defer unrelated improvements.
 - Call out all affected files (and any new artefacts) in the plan to avoid churn during implementation.

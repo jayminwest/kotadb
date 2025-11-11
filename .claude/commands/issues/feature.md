@@ -16,6 +16,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Reference issue metadata from `$ARGUMENTS` at the top of the plan for traceability.
 - Review `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and read any documentation whose conditions match the feature scope.
+- **Use KotaDB MCP tools for context gathering**: Use `mcp__kotadb__search_code` to find similar implementations, `mcp__kotadb__analyze_change_impact` for large features (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
 - Follow the repo git flow: work from `feat/<issue-number>-<slug>` branching off `develop`, with releases promoted from `develop` to `main`.
 - Populate the exact format below so automation can reference each section without guesswork.
 - Research existing patterns in `src/**`, `tests/**`, and platform docs before proposing changes.

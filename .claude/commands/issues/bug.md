@@ -15,6 +15,7 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 - Create a new markdown plan under `docs/specs/` named `bug-<issue-number>-<slug>.md` (e.g., `docs/specs/bug-2210-missing-search-results.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Follow the format exactly so orchestrators can parse sections reliably.
+- **Use KotaDB MCP tools for discovery**: Use `mcp__kotadb__search_code` to find related error handling code, `mcp__kotadb__search_dependencies` for impact assessment (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
 - Reproduce the bug mentally using the provided context and outline how to confirm both failure and resolution.
 - Investigate impacted modules in `src/**`, `tests/**`, and any infrastructure noted in the issue before proposing changes.
 - Capture all impacted files (and any new assets) in the dedicated section so implementors have clear scope boundaries.

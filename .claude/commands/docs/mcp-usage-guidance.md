@@ -130,8 +130,16 @@ When using MCP tools:
 5. **Monitor rate limits** - track remaining quota
 6. **Graceful degradation** - fall back to direct operations if rate limited
 
+## Agent-Specific Patterns
+
+For detailed agent workflow patterns and KotaDB dogfooding guidance, see:
+- [KotaDB Agent Usage Guide](./.claude/commands/docs/kotadb-agent-usage.md) - Comprehensive patterns for using KotaDB MCP tools in planning, implementation, and refactoring workflows
+
+**Key principle**: PREFER KotaDB MCP tools for discovery (code search, dependency analysis, impact assessment), use direct file operations (Read/Edit/Write) for execution.
+
 ## Related Documentation
 
+- [KotaDB Agent Usage Guide](./.claude/commands/docs/kotadb-agent-usage.md) - Agent-specific KotaDB MCP patterns
 - [MCP Integration](./.claude/commands/docs/mcp-integration.md)
 - [Architecture](./.claude/commands/docs/architecture.md)
 - [API Workflow](./.claude/commands/docs/workflow.md)

@@ -15,7 +15,11 @@ Create a detailed implementation plan for complex tasks before executing changes
 ## Instructions
 
 1. **Analyze the task**: Understand the requirements and scope
-2. **Research the codebase**: Use Glob and Grep to explore relevant files
+2. **Research the codebase**: Use KotaDB MCP tools for code discovery (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
+   - **PREFER**: Use `mcp__kotadb__search_code` to find relevant implementations, patterns, and examples
+   - **PREFER**: Use `mcp__kotadb__search_dependencies` to understand module relationships and impact radius
+   - **PREFER**: Use `mcp__kotadb__analyze_change_impact` to validate approach for large changes
+   - **Fallback**: If MCP tools are unavailable, use Glob for pattern matching (`**/*auth*.ts`) and Grep for content search
 3. **Discover issue relationships**: Check for dependencies and related work
    - Search for related issues: `gh issue list --search "<keywords>"`
    - Review recent spec files in `docs/specs/` for relationship patterns

@@ -82,6 +82,16 @@ Use this reference to decide which KotaDB application layer documentation source
     - When needing decision matrix for task type vs recommended approach
     - When working with kotadb, playwright, or sequential-thinking MCP servers
 
+- .claude/commands/docs/kotadb-agent-usage.md
+  - Conditions:
+    - When performing code discovery, dependency analysis, or impact assessment in any workflow command
+    - When planning features, bugs, chores, or refactors that require codebase exploration
+    - When understanding best practices for using KotaDB MCP tools in agent contexts
+    - When needing concrete examples for authentication, indexing, rate limiting, or validation searches
+    - When performing pre-implementation dependency checks before modifying shared modules
+    - When discovering test scope or analyzing refactor impact with dependency graphs
+    - When validating feature specs or large changes using impact analysis tools
+
 - .claude/commands/docs/workflow.md
   - Conditions:
     - When implementing or troubleshooting authentication and rate limiting flow
