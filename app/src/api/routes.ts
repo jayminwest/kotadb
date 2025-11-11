@@ -636,6 +636,22 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		});
 	});
 
+	// TEMPORARY: Test endpoint to verify Sentry error tracking
+	// TODO: Remove after Sentry verification
+	app.get("/test-sentry-error", (req: Request, res: Response) => {
+		const { Sentry } = require("../instrument.js");
+		try {
+			// Intentionally throw an error to test Sentry
+			throw new Error("Test error for Sentry verification - this is intentional!");
+		} catch (e) {
+			Sentry.captureException(e);
+			res.status(500).json({
+				error: "Test error captured by Sentry",
+				message: "Check your Sentry dashboard for this error"
+			});
+		}
+	});
+
 	// POST /api/subscriptions/create-checkout-session - Create Stripe Checkout session
 	app.post("/api/subscriptions/create-checkout-session", async (req: AuthenticatedRequest, res: Response) => {
 		const context = req.authContext!;
