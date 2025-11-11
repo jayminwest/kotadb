@@ -38,6 +38,7 @@ import {
 } from "@api/webhooks";
 import type Stripe from "stripe";
 import { requestLoggingMiddleware, errorLoggingMiddleware } from "@logging/middleware";
+import { expressErrorHandler } from "../instrument.js";
 
 /**
  * Extended Express Request with auth context attached
@@ -997,7 +998,11 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		});
 	});
 
-	// Error logging middleware (before 404 handler)
+	// Sentry error handler middleware (captures errors for remote monitoring)
+	// Must be placed after all routes but before custom error logging
+	app.use(expressErrorHandler());
+
+	// Error logging middleware (structured logs for local debugging)
 	app.use(errorLoggingMiddleware);
 
 	// 404 handler
