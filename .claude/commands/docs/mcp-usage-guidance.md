@@ -25,14 +25,18 @@ Guidance for AI agents on when and how to use MCP tools versus direct file opera
 
 ## Available MCP Servers
 
-### kotadb MCP (`mcp__kotadb__*`)
+### kotadb-staging MCP (`mcp__kotadb-staging__*`)
 
-Code search, indexing, dependency analysis:
+Code search, indexing, dependency analysis for KotaDB development:
 
 - `search_code`: Full-text search across indexed repositories
 - `index_repository`: Trigger repository indexing
 - `list_recent_files`: List recently indexed files
 - `search_dependencies`: Query dependency graph for impact analysis
+
+### kotadb-production MCP (`mcp__kotadb-production__*` or `mcp__kotadb-api-io__*`)
+
+Code search for external projects (requires explicit repository indexing).
 
 ### playwright MCP (`mcp__playwright__*`)
 
@@ -54,7 +58,7 @@ Complex reasoning tasks requiring multi-step analysis.
 
 ```typescript
 // PREFER: MCP for code search across repository
-const results = await mcp.call("kotadb__search_code", {
+const results = await mcp.call("kotadb-staging__search_code", {
   term: "authenticateRequest",
   limit: 20
 });
@@ -73,7 +77,7 @@ const content = await tools.Read({
 
 ```typescript
 // PREFER: MCP for dependency analysis
-const deps = await mcp.call("kotadb__search_dependencies", {
+const deps = await mcp.call("kotadb-staging__search_dependencies", {
   file_path: "app/src/api/routes.ts",
   direction: "both",
   depth: 2
@@ -102,11 +106,11 @@ await tools.Edit({
 
 | Task Type | Recommended Approach | Rationale |
 |-----------|---------------------|-----------|
-| Find files containing "AuthContext" | MCP `search_code` | Full-text search across repo |
+| Find files containing "AuthContext" | MCP `kotadb-staging__search_code` | Full-text search across repo |
 | Read `app/src/auth/middleware.ts` | Direct `Read` | Known path, faster |
-| Find all files importing middleware.ts | MCP `search_dependencies` | Dependency graph query |
+| Find all files importing middleware.ts | MCP `kotadb-staging__search_dependencies` | Dependency graph query |
 | Update import statement in routes.ts | Direct `Edit` | Precise change |
-| List recently indexed files | MCP `list_recent_files` | Database query |
+| List recently indexed files | MCP `kotadb-staging__list_recent_files` | Database query |
 | Create new file app/src/utils/helper.ts | Direct `Write` | Simple file creation |
 
 ## Rate Limiting Awareness

@@ -5,7 +5,7 @@ Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each 
 ## Instructions
 - Read the entire plan before making changes; clarify assumptions in inline notes if something is ambiguous.
 - Consult `.claude/commands/docs/conditional_docs/app.md` (for backend/API changes) or `.claude/commands/docs/conditional_docs/automation.md` (for ADW/automation changes) for any documentation that matches the implementation scope.
-- **Before modifying shared modules**: Use `mcp__kotadb__search_dependencies` to check dependents and understand impact (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
+- **Before modifying shared modules**: Use `mcp__kotadb-staging__search_dependencies` to check dependents and understand impact (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
 - Execute tasks in the documented order, touching only the files listed unless the plan explicitly allows otherwise.
 - Keep commits incremental and logically grouped. Use Conventional Commit subjects referencing the issue.
   - **CRITICAL**: Avoid meta-commentary patterns in commit messages (e.g., "based on", "the commit should", "here is", "this commit", "i can see", "looking at", "the changes", "let me")
