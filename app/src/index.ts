@@ -1,3 +1,6 @@
+// IMPORTANT: Import instrumentation first before all other imports
+// This ensures Sentry can properly trace and capture errors
+import { Sentry } from "./instrument.js";
 import { createExpressApp } from "@api/routes";
 import { getServiceClient } from "@db/client";
 import { startQueue, stopQueue, getQueue } from "@queue/client";
@@ -103,6 +106,21 @@ async function bootstrap() {
 			port: PORT,
 			supabase_url: supabaseUrl,
 		});
+	});
+
+	// Global error handlers for unhandled errors (after server starts)
+	process.on("unhandledRejection", (reason: unknown, promise: Promise<unknown>) => {
+		logger.error("Unhandled promise rejection", reason instanceof Error ? reason : undefined, {
+			promise: String(promise),
+		});
+		Sentry.captureException(reason);
+	});
+
+	process.on("uncaughtException", (error: Error) => {
+		logger.error("Uncaught exception", error);
+		Sentry.captureException(error);
+		// Exit process after logging - uncaught exceptions leave app in undefined state
+		process.exit(1);
 	});
 
 	// Graceful shutdown
