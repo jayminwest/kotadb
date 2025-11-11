@@ -15,20 +15,20 @@ Agent-specific guidance for using KotaDB MCP tools during code discovery, depend
 - Editing files with exact changes
 - Writing new files
 
-## Local vs Production MCP Server
+## Local vs Staging MCP Server
 
-**Local KotaDB instance** (use for KotaDB development):
-- Available via `mcp__kotadb__*` tools in Claude Code
+**Staging KotaDB instance** (use for KotaDB development):
+- Available via `mcp__kotadb-staging__*` tools in Claude Code
 - Indexes your working directory automatically
 - Real-time code intelligence during development
 - Use when: working on KotaDB features, bugs, chores, or refactors
 
 **Production KotaDB instance** (use for external projects):
-- Available via `mcp__kotadb-production__*` or `mcp__kotadb-staging__*` tools
+- Available via `mcp__kotadb-production__*` or `mcp__kotadb-api-io__*` tools
 - Requires explicit repository indexing
 - Use when: working on projects outside KotaDB codebase
 
-**For KotaDB development, always use the local instance** to dogfood the service and validate improvements.
+**For KotaDB development, always use the staging instance** to dogfood the service and validate improvements.
 
 ## Available MCP Tools
 
@@ -37,7 +37,7 @@ Full-text search across indexed repository files.
 
 **Usage:**
 ```typescript
-const results = await mcp.call("kotadb__search_code", {
+const results = await mcp.call("kotadb-staging__search_code", {
   term: "authenticateRequest",
   limit: 20
 });
@@ -55,7 +55,7 @@ Query dependency graph to find files that depend on (dependents) or are depended
 
 **Usage:**
 ```typescript
-const deps = await mcp.call("kotadb__search_dependencies", {
+const deps = await mcp.call("kotadb-staging__search_dependencies", {
   file_path: "app/src/auth/middleware.ts",
   direction: "both",  // "dependents" | "dependencies" | "both"
   depth: 2,           // 1-5, higher values find indirect relationships
@@ -79,7 +79,7 @@ Analyze the impact of proposed code changes by examining dependency graphs, test
 
 **Usage:**
 ```typescript
-const analysis = await mcp.call("kotadb__analyze_change_impact", {
+const analysis = await mcp.call("kotadb-staging__analyze_change_impact", {
   change_type: "refactor",  // "feature" | "refactor" | "fix" | "chore"
   description: "Extract rate limiting logic to shared middleware",
   files_to_modify: ["app/src/api/routes.ts", "app/src/auth/middleware.ts"],
@@ -99,7 +99,7 @@ Validate implementation specification against KotaDB conventions and repository 
 
 **Usage:**
 ```typescript
-const validation = await mcp.call("kotadb__validate_implementation_spec", {
+const validation = await mcp.call("kotadb-staging__validate_implementation_spec", {
   feature_name: "Event Streaming API",
   files_to_create: [
     { path: "app/src/api/events.ts", purpose: "Event streaming endpoint" }
@@ -123,7 +123,7 @@ List recently indexed files for quick discovery.
 
 **Usage:**
 ```typescript
-const files = await mcp.call("kotadb__list_recent_files", {
+const files = await mcp.call("kotadb-staging__list_recent_files", {
   limit: 10
 });
 ```
@@ -147,20 +147,20 @@ const files = await mcp.call("kotadb__list_recent_files", {
 **Example** (Planning authentication refactor):
 ```typescript
 // Step 1: Find current authentication implementations
-const authCode = await mcp.call("kotadb__search_code", {
+const authCode = await mcp.call("kotadb-staging__search_code", {
   term: "authenticateRequest",
   limit: 10
 });
 
 // Step 2: Check dependencies for middleware.ts
-const middlewareDeps = await mcp.call("kotadb__search_dependencies", {
+const middlewareDeps = await mcp.call("kotadb-staging__search_dependencies", {
   file_path: "app/src/auth/middleware.ts",
   direction: "dependents",
   depth: 2
 });
 
 // Step 3: Analyze refactor impact
-const impact = await mcp.call("kotadb__analyze_change_impact", {
+const impact = await mcp.call("kotadb-staging__analyze_change_impact", {
   change_type: "refactor",
   description: "Extract auth logic to separate service",
   files_to_modify: ["app/src/auth/middleware.ts"],
@@ -180,7 +180,7 @@ const impact = await mcp.call("kotadb__analyze_change_impact", {
 **Example** (Before refactoring shared types):
 ```typescript
 // Check who depends on shared types
-const typeDeps = await mcp.call("kotadb__search_dependencies", {
+const typeDeps = await mcp.call("kotadb-staging__search_dependencies", {
   file_path: "shared/types/index.ts",
   direction: "dependents",
   depth: 2,
@@ -204,7 +204,7 @@ const typeDeps = await mcp.call("kotadb__search_dependencies", {
 
 **Example** (Finding tests for rate limiting):
 ```typescript
-const rateLimitTests = await mcp.call("kotadb__search_dependencies", {
+const rateLimitTests = await mcp.call("kotadb-staging__search_dependencies", {
   file_path: "app/src/middleware/rate-limit.ts",
   direction: "dependents",
   depth: 1,
@@ -229,7 +229,7 @@ const rateLimitTests = await mcp.call("kotadb__search_dependencies", {
 **Example** (Validating event streaming feature):
 ```typescript
 // Step 1: Validate spec
-const specValidation = await mcp.call("kotadb__validate_implementation_spec", {
+const specValidation = await mcp.call("kotadb-staging__validate_implementation_spec", {
   feature_name: "Event Streaming API",
   files_to_create: [
     { path: "app/src/api/events.ts", purpose: "Event streaming endpoint" }
@@ -240,7 +240,7 @@ const specValidation = await mcp.call("kotadb__validate_implementation_spec", {
 });
 
 // Step 2: Analyze impact
-const impact = await mcp.call("kotadb__analyze_change_impact", {
+const impact = await mcp.call("kotadb-staging__analyze_change_impact", {
   change_type: "feature",
   description: "Add WebSocket-based event streaming",
   files_to_create: ["app/src/api/events.ts"],

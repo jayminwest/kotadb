@@ -80,7 +80,7 @@ Use this reference to decide which KotaDB application layer documentation source
     - When performing code search, dependency analysis, or issue tracking
     - When understanding performance implications of MCP calls (rate limiting, authentication overhead)
     - When needing decision matrix for task type vs recommended approach
-    - When working with kotadb, playwright, or sequential-thinking MCP servers
+    - When working with kotadb-staging, kotadb-production, playwright, or sequential-thinking MCP servers
 
 - .claude/commands/docs/kotadb-agent-usage.md
   - Conditions:

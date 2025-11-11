@@ -15,7 +15,7 @@ Author a refactoring plan for the code improvement described in `$ARGUMENTS` (is
 - Create a new markdown plan under `docs/specs/` named `refactor-<issue-number>-<slug>.md` (e.g., `docs/specs/refactor-2350-extract-auth-logic.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Follow the format exactly so orchestrators can parse sections reliably.
-- **MANDATORY: Use KotaDB MCP tools for impact analysis**: Use `mcp__kotadb__search_dependencies` (minimum depth=2) and `mcp__kotadb__analyze_change_impact` before refactoring (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
+- **MANDATORY: Use KotaDB MCP tools for impact analysis**: Use `mcp__kotadb-staging__search_dependencies` (minimum depth=2) and `mcp__kotadb-staging__analyze_change_impact` before refactoring (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
 - Analyze existing code structure to understand current dependencies, interfaces, and behavior before proposing changes.
 - Investigate impacted modules in `src/**`, `tests/**`, and any infrastructure that depends on the code being refactored.
 - Capture all impacted files (and any new assets) in the dedicated section so implementors have clear scope boundaries.
