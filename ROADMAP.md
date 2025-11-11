@@ -1,8 +1,8 @@
 # KotaDB Roadmap
 
-**Last Updated**: 2025-10-29
+**Last Updated**: 2025-11-10
 **Current Phase**: Phase 1 (SaaS Platform MVP)
-**Overall Progress**: ~88-90% complete
+**Overall Progress**: ~90-92% complete
 
 Quick-reference guide to KotaDB's development priorities and strategic direction. For detailed analysis and implementation plans, see the vision documentation.
 
@@ -16,37 +16,38 @@ Quick-reference guide to KotaDB's development priorities and strategic direction
 
 ## Current Status
 
-**Foundation Complete** (~88-90% overall):
+**Foundation Complete** (~90-92% overall):
 - ✅ Database infrastructure (PostgreSQL/Supabase, RLS, 10 tables)
-- ✅ Authentication & rate limiting (API keys, tier-based limits, JWT + GitHub OAuth)
-- ✅ MCP server (6 production tools: search, index, recent files, dependencies, ADW state, ADW workflows)
+- ✅ Authentication & rate limiting (API keys, dual hourly+daily limits, JWT + GitHub OAuth)
+- ✅ MCP server (6 production tools: search, index, recent files, dependencies, impact analysis, spec validation)
 - ✅ AST-based code parsing (symbol extraction, reference tracking, dependency graphs with circular detection)
-- ✅ Job queue infrastructure (pg-boss, worker pipeline, batch processing, 3 concurrent workers)
-- ✅ GitHub webhooks (auto-indexing operational, HMAC verification, installation tokens)
-- ✅ Web frontend (7 pages, GitHub OAuth, Vercel deployment with analytics)
-- ✅ Stripe billing (3-tier pricing, subscription management, webhook handlers, bugs #320/#327 FIXED)
-- ✅ Testing infrastructure (42 test files, Docker Compose, antimocking, Playwright helpers)
-- ✅ CI/CD (GitHub Actions, pre-commit hooks, migration validation, ADW metrics)
-- ✅ ADW automation (auto-merge, observability, orchestrator, home server, API-driven)
+- ✅ Job queue infrastructure (pg-boss, worker pipeline, two-pass storage, batch processing, 3 concurrent workers)
+- ✅ GitHub webhooks (auto-indexing operational, HMAC-SHA256 verification, installation tokens with caching)
+- ✅ Web frontend (7 pages, GitHub OAuth, Vercel deployment, liquid glass design, SF Pro typography)
+- ✅ Stripe billing (3-tier pricing, subscription management, 4 webhook handlers, bugs #320/#327 FIXED)
+- ✅ Testing infrastructure (50+ test files, Docker Compose, antimocking, Playwright helpers, dev-mode sessions)
+- ✅ CI/CD (GitHub Actions, pre-commit hooks, migration validation, ADW daily metrics)
+- ✅ ADW automation (auto-merge at 90%, observability, orchestrator, home server, API-driven phase tasks)
 
 **Recent Progress** (Since 2025-10-29):
-- ✅ Bugs #320 and #327 FIXED - JWT validation and payment redirects working (PRs #323, #330)
-- ✅ Batch processing for large repository indexing (#313, PR #321)
-- ✅ Dev-mode session endpoint for agent testing (#317, PR #324)
-- ✅ Playwright authentication helpers for ADW workflows (#318, PR #325)
-- ✅ ADW integration examples (#319, PR #326)
-- ✅ Auto-merge system for ADW PRs after CI validation (#305, PR #312)
-- ✅ Logging standards enforcement across Python codebase (#308, PR #310)
-- ✅ CLAUDE.md refactored into indexed documentation (#311, PR #314)
-- ✅ Test account session token generation (#316, PR #322)
-- ✅ 11 PRs merged in 1 day (2025-10-29) with comprehensive validation
+- ✅ **MVP LAUNCH** - Production release Nov 9 (PRs #414, #415)
+- ✅ Rate limits increased 10x with daily quotas - Free: 1k/hr+5k/day, Solo: 5k/hr+25k/day, Team: 25k/hr+100k/day (#423, PR #426)
+- ✅ Landing page redesign with SF Pro typography and liquid glass styling (#420, PR #424)
+- ✅ Staging deployment crash fixed - Docker build context for shared types (#428, PR #429)
+- ✅ API key lifecycle management - revocation tracking with `revoked_at` timestamp
+- ✅ Indexer two-pass storage - Symbol extraction with database-driven ID resolution (PRs #377, #379, #382, #383)
+- ✅ Stripe webhook maturity - 4 event handlers with comprehensive logging (PRs #406, #408)
+- ✅ MCP structured analysis tools - Impact analysis and spec validation (#404)
+- ✅ Web frontend simplification - Archived search/indexing/files pages (#399, PR #401)
+- ✅ Queue observability - Real-time job status polling UI (#365, #392, PR #393)
+- ✅ GitHub app authentication - Enhanced logging and error handling (#366, PR #367)
 
-**Remaining Gaps for MVP**:
-- 🟡 Job queue integration - POST /index uses `queueMicrotask()` instead of pg-boss (~4 hours to wire up)
-- 🟡 Reference & dependency extraction - Worker pipeline steps 5-6 deferred (~12 hours for two-phase storage)
-- 🟡 GitHub private repos - Installation tokens exist, Git integration code ready but not activated (~4 hours)
-- 🟡 Repository management endpoints - Missing CRUD operations for repositories (~8 hours)
-- 🟡 Queue monitoring dashboard - CLI monitoring exists, web UI not implemented (~12 hours)
+**Post-MVP Enhancements**:
+- 🟡 Enhanced monitoring - Structured logging, metrics dashboard, alerting (~16 hours)
+- 🟡 Repository management UI - Web interface for repository CRUD operations (~12 hours)
+- 🟡 Queue monitoring dashboard - Web UI for job queue metrics and management (~12 hours)
+- 🟡 E2E test expansion - Comprehensive test coverage for critical user flows (~16 hours)
+- 🟡 Performance optimization - Caching, incremental indexing, query optimization (~24 hours)
 
 See [CURRENT_STATE.md](docs/vision/CURRENT_STATE.md) for detailed gap analysis.
 
@@ -66,43 +67,43 @@ See [CURRENT_STATE.md](docs/vision/CURRENT_STATE.md) for detailed gap analysis.
 
 | Epic | Focus | Status | Gaps | Details |
 |------|-------|--------|------|---------|
-| Epic 4 | Job Queue | 85% ✅ | POST /index pg-boss wiring, reference extraction | [epic-4-job-queue.md](docs/vision/epic-4-job-queue.md) |
-| Epic 6 | REST API | 80% 🟡 | Repository management endpoints, job listing | [epic-6-rest-api.md](docs/vision/epic-6-rest-api.md) |
-| Epic 12 | GitHub Integration | 85% ✅ | Installation events, private repo activation | New epic (webhooks operational) |
+| Epic 4 | Job Queue | 92% ✅ | Worker process lifecycle optimization | [epic-4-job-queue.md](docs/vision/epic-4-job-queue.md) |
+| Epic 6 | REST API | 92% ✅ | Repository management endpoints, pagination | [epic-6-rest-api.md](docs/vision/epic-6-rest-api.md) |
+| Epic 12 | GitHub Integration | 95% ✅ | Installation events, additional webhook types | New epic (webhooks operational) |
 
 **Operations & Deployment**:
 
 | Epic | Focus | Status | Gaps | Details |
 |------|-------|--------|------|---------|
-| Epic 8 | Monitoring | 20% 🟡 | Structured logging, metrics dashboard | [epic-8-monitoring.md](docs/vision/epic-8-monitoring.md) |
-| Epic 9 | CI/CD & Deployment | 70% 🟡 | Fly.io API deployment automation | [epic-9-cicd-deployment.md](docs/vision/epic-9-cicd-deployment.md) |
+| Epic 8 | Monitoring | 25% 🟡 | Structured logging, metrics dashboard, alerting | [epic-8-monitoring.md](docs/vision/epic-8-monitoring.md) |
+| Epic 9 | CI/CD & Deployment | 75% 🟡 | Production Fly.io deployment automation | [epic-9-cicd-deployment.md](docs/vision/epic-9-cicd-deployment.md) |
 
 **Frontend & Billing** (New Epics):
 
 | Epic | Focus | Status | Gaps | Details |
 |------|-------|--------|------|---------|
-| Epic 11 | Web Frontend | 92% ✅ | E2E test coverage, playwright.config.ts | New epic (7 pages, Vercel) |
-| Epic 13 | Billing & Monetization | 85% ✅ | Webhook endpoint mounting, test coverage | New epic (Stripe integration, bugs FIXED) |
+| Epic 11 | Web Frontend | 90% ✅ | E2E test coverage expansion | New epic (7 pages, Vercel, liquid glass) |
+| Epic 13 | Billing & Monetization | 85% ✅ | Invoice history UI, per-seat pricing | New epic (Stripe integration, bugs FIXED) |
 
 **Automation** (New Epic):
 
 | Epic | Focus | Status | Gaps | Details |
 |------|-------|--------|------|---------|
-| Epic 14 | ADW Advanced Features | 90% ✅ | Queue monitoring web dashboard | New epic (auto-merge, observability, orchestrator) |
+| Epic 14 | ADW Advanced Features | 82% ✅ | Agent-level metrics, automatic retry, dashboards | New epic (auto-merge, observability, orchestrator) |
 
-**Immediate Priorities** (Next 1-2 Weeks):
+**Immediate Priorities** (Post-MVP - Next 2-4 Weeks):
 
-1. **Wire POST /index to pg-boss queue** (~4 hours) - Epic 4 gap, highest impact
-2. **Activate GitHub private repo Git operations** (~4 hours) - Epic 12 gap, code ready
-3. **Mount Stripe webhook endpoint** (~2 hours) - Epic 13 gap, handler exists
-4. **Implement two-phase reference extraction** (~12 hours) - Epic 4 architectural task
-5. **Add repository management endpoints** (~8 hours) - Epic 6 user-facing feature
-6. **Build queue monitoring web dashboard** (~12 hours) - Epic 14 polish
-7. **Expand E2E test coverage** (~8 hours) - Epic 11 quality improvement
+1. **Enhanced monitoring & observability** (~16 hours) - Epic 8 - Structured logging, metrics dashboard, alerting
+2. **Production deployment automation** (~12 hours) - Epic 9 - Fly.io production app setup and CI integration
+3. **Queue monitoring web dashboard** (~12 hours) - Epic 14 - Real-time job queue metrics and management UI
+4. **E2E test coverage expansion** (~16 hours) - Epic 11 - OAuth → Checkout → Subscription → Dashboard flows
+5. **Repository management UI** (~12 hours) - Epic 6 - Web interface for repository CRUD operations
+6. **Performance optimization** (~24 hours) - Multiple epics - Caching, incremental indexing, query tuning
+7. **ADW agent-level metrics** (~8 hours) - Epic 14 - Per-agent success tracking and analysis
 
-**Progress Summary**: 88-90% complete, up from 78-80%. All critical bugs resolved (PRs #323, #330). Job queue infrastructure operational, just needs final wiring. GitHub webhooks receiving and processing events successfully. Billing system functional end-to-end.
+**Progress Summary**: 90-92% complete, up from 88-90%. **MVP LAUNCHED Nov 9, 2025** (PRs #414, #415). Post-MVP enhancements include 10x rate limit increases, landing page redesign, and continued infrastructure hardening. 50+ test files with antimocking. All critical user flows operational: authentication, subscription checkout, API key management, repository indexing, code search.
 
-**Dependencies Resolved**: Epic 3 ✅ → Epic 4 ✅ (infra) → Epic 12 ✅ (webhooks) → MVP launch readiness at ~90%
+**Dependencies Resolved**: Epic 3 ✅ → Epic 4 ✅ → Epic 12 ✅ → Epic 11 ✅ → Epic 13 ✅ → **MVP LAUNCHED**
 
 ## Medium-Term Goals
 
@@ -180,22 +181,25 @@ See [CURRENT_STATE.md](docs/vision/CURRENT_STATE.md) "Key Decisions" section for
 
 ## New Epics Summary
 
-**Epic 11: Web Frontend Application** (92% complete)
-- 7 pages: landing, login, dashboard, pricing, search, repository-index, files
+**Epic 11: Web Frontend Application** (90% complete)
+- 7 pages: landing (redesigned with liquid glass), login, dashboard, pricing, MCP, logout, OAuth callback
 - GitHub OAuth via Supabase Auth
 - Stripe checkout integration (fully operational)
-- Deployed to Vercel with analytics
+- SF Pro typography system across all pages
+- Liquid glass design effects (Navigation, Dashboard, Pricing, MCP pages)
+- Deployed to Vercel with analytics and Speed Insights
 - Dev-mode session endpoint for Playwright testing (#317)
 - Authentication helpers for agent workflows (#318)
-- **Gaps**: E2E test coverage expansion, playwright.config.ts
+- **Gaps**: E2E test coverage expansion (only 1 test file), invoice history UI
 
-**Epic 12: GitHub Integration** (85% complete)
-- Webhook receiver with HMAC-SHA256 verification (operational)
+**Epic 12: GitHub Integration** (95% complete)
+- Webhook receiver with HMAC-SHA256 timing-safe verification (operational)
 - Auto-indexing on push events (processing webhooks successfully)
-- GitHub App authentication and installation tokens (fully implemented)
-- Private repo Git integration (code ready, not activated)
-- 45+ tests with 100% pass rate
-- **Gaps**: Installation event handler, activate private repo cloning
+- GitHub App authentication with installation token caching (55-min TTL, auto-eviction)
+- Private repo support fully implemented (installation lookup, authenticated cloning)
+- 1,263 lines of tests (40+ unit, 13+ integration) with antimocking
+- Test-to-code ratio: 1.21:1 (excellent)
+- **Gaps**: Installation/PR webhook events (push only), cache configurability
 
 **Epic 13: Billing & Monetization** (85% complete)
 - 3-tier pricing: Free ($0), Solo ($29.99), Team ($49.99)
@@ -204,14 +208,14 @@ See [CURRENT_STATE.md](docs/vision/CURRENT_STATE.md) "Key Decisions" section for
 - **Bugs FIXED**: #320 (payment redirect) and #327 (JWT middleware) merged and operational
 - **Gaps**: Mount webhook endpoint in routes.ts, expand test coverage, implement missing webhook events
 
-**Epic 14: ADW Advanced Features** (90% complete)
-- Auto-merge system with CI validation (100% - PR #312)
-- Observability & metrics with daily reporting (100% - analyze_logs.py)
-- Orchestrator slash command with state persistence (100% - 47KB spec)
-- Home server trigger with Tailscale (100% - 859 lines)
-- API-driven phase tasks via MCP (100% - 549 lines)
+**Epic 14: ADW Advanced Features** (82% complete)
+- Auto-merge system with CI validation (90% - PR #312, analytics integrated)
+- Observability & metrics with daily CI reporting (95% - analyze_logs.py, 560 lines)
+- Orchestrator slash command with state persistence (100% - 1,500+ line spec)
+- Home server trigger with Tailscale (90% - 700+ lines)
+- API-driven phase tasks via MCP (85% - 400 lines each module)
 - Logging standards enforcement (100% - PR #310)
-- **Gaps**: Queue monitoring web dashboard (CLI monitoring exists)
+- **Gaps**: Agent-level metrics, automatic retry on transient errors, real-time dashboards, task prioritization
 
 ---
 
