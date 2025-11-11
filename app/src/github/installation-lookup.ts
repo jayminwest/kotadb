@@ -9,6 +9,7 @@
 import { App } from "@octokit/app";
 import type { GitHubAppConfig } from "./types";
 import { GitHubAppError } from "./types";
+import { getOctokitForInstallation } from "./client";
 
 // In-memory cache for failed lookups to avoid repeated API calls
 // Map<"owner/repo", timestamp>
@@ -139,16 +140,17 @@ export async function getInstallationForRepository(
 		// Check each installation for repository access
 		for (const installation of installations) {
 			try {
+				// Generate installation token and create authenticated Octokit client
+				const installationOctokit =
+					await getOctokitForInstallation(installation.id);
+
 				// Get repositories accessible by this installation
-				const { data: reposResponse } = await app.octokit.request(
-					"GET /user/installations/{installation_id}/repositories",
-					{
-						installation_id: installation.id,
-					},
+				const { data } = await installationOctokit.request(
+					"GET /installation/repositories",
 				);
 
 				// Check if our repository is in the list
-				const foundRepo = reposResponse.repositories.find(
+				const foundRepo = data.repositories.find(
 					(r) => r.full_name.toLowerCase() === fullName.toLowerCase(),
 				);
 
@@ -159,13 +161,22 @@ export async function getInstallationForRepository(
 					return installation.id;
 				}
 			} catch (installationError: unknown) {
-				// Log and continue to next installation
+				// Handle token generation or API errors
 				const apiError = installationError as {
 					response?: { status: number };
+					message?: string;
 				};
-				process.stderr.write(
-					`[Installation Lookup] Error checking installation ${installation.id}: ${apiError.response?.status ?? "unknown"}\n`,
-				);
+
+				// Log specific error context for debugging
+				if (installationError instanceof GitHubAppError) {
+					process.stderr.write(
+						`[Installation Lookup] Token generation failed for installation ${installation.id}: ${installationError.code}\n`,
+					);
+				} else {
+					process.stderr.write(
+						`[Installation Lookup] Error checking installation ${installation.id}: ${apiError.response?.status ?? apiError.message ?? "unknown"}\n`,
+					);
+				}
 				continue;
 			}
 		}
