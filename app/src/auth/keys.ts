@@ -13,11 +13,12 @@ import bcrypt from "bcryptjs";
 
 /**
  * Rate limit defaults for each tier (requests per hour).
+ * Updated in #423 to support realistic development workflows.
  */
 export const TIER_RATE_LIMITS = {
-	free: 100,
-	solo: 1000,
-	team: 10000,
+	free: 1000,
+	solo: 5000,
+	team: 25000,
 } as const;
 
 /**

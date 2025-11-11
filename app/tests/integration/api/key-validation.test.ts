@@ -157,9 +157,9 @@ describe("GET /api/keys/validate", () => {
 		expect(body.tier).toBe("free");
 		expect(body.userId).toBe(testUserId);
 		expect(body.rateLimitInfo).toBeDefined();
-		expect(body.rateLimitInfo.limit).toBe(100);
+		expect(body.rateLimitInfo.limit).toBe(1000); // Updated from 100 to 1000 per #423
 		expect(body.rateLimitInfo.remaining).toBeGreaterThanOrEqual(0);
-		expect(body.rateLimitInfo.remaining).toBeLessThanOrEqual(100);
+		expect(body.rateLimitInfo.remaining).toBeLessThanOrEqual(1000); // Updated from 100 to 1000 per #423
 		expect(body.rateLimitInfo.reset).toBeGreaterThan(0);
 	});
 
@@ -188,7 +188,7 @@ describe("GET /api/keys/validate", () => {
 		expect(body.tier).toBe("free");
 		expect(body.userId).toBe(testUserId);
 		expect(body.rateLimitInfo).toBeDefined();
-		expect(body.rateLimitInfo.limit).toBe(100);
+		expect(body.rateLimitInfo.limit).toBe(1000); // Updated from 100 to 1000 per #423
 	});
 
 	it("consumes rate limit quota on validation", async () => {
