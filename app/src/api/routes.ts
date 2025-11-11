@@ -104,22 +104,6 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		}
 	});
 
-	// TEMPORARY: Test endpoint to verify Sentry error tracking (public, no auth)
-	// TODO: Remove after Sentry verification
-	app.get("/test-sentry-error", (req: Request, res: Response) => {
-		const { Sentry } = require("../instrument.js");
-		try {
-			// Intentionally throw an error to test Sentry
-			throw new Error("Test error for Sentry verification - this is intentional!");
-		} catch (e) {
-			Sentry.captureException(e);
-			res.status(500).json({
-				error: "Test error captured by Sentry",
-				message: "Check your Sentry dashboard for this error"
-			});
-		}
-	});
-
 	// GitHub webhook endpoint (public, signature-verified)
 	// IMPORTANT: Registered BEFORE express.json() middleware to preserve raw body for HMAC verification
 	app.post(
