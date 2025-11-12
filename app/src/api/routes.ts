@@ -36,6 +36,7 @@ import type {
 	CreateProjectRequest,
 	UpdateProjectRequest,
 } from "@shared/types";
+import { triggerAutoReindex } from "./auto-reindex";
 import { createIndexJob, updateJobStatus, getJobStatus } from "../queue/job-tracker";
 import {
 	verifyWebhookSignature,
@@ -1230,6 +1231,41 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			addRateLimitHeaders(res, context.rateLimit);
 			const err = error as Error;
 			logger.error("Failed to remove repository from project", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// POST /api/auto-reindex - Trigger auto-reindex for user's project repositories
+	app.post("/api/auto-reindex", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+
+		try {
+			const result = await triggerAutoReindex(context);
+
+			if (result.rateLimited) {
+				addRateLimitHeaders(res, context.rateLimit);
+				return res.status(429).json({
+					triggered: false,
+					reason: result.reason,
+				});
+			}
+
+			addRateLimitHeaders(res, context.rateLimit);
+
+			// Add X-Auto-Reindex-Triggered header with job count
+			res.set("X-Auto-Reindex-Triggered", String(result.jobCount));
+
+			res.json({
+				triggered: result.triggered,
+				jobCount: result.jobCount,
+				jobIds: result.jobIds,
+				reason: result.reason,
+			});
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to trigger auto-reindex", err);
 			Sentry.captureException(err);
 			res.status(500).json({ error: err.message });
 		}

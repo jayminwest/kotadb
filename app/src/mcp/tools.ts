@@ -56,6 +56,10 @@ export const SEARCH_CODE_TOOL: ToolDefinition = {
 				type: "string",
 				description: "The search term to find in code files",
 			},
+			project: {
+				type: "string",
+				description: "Optional: Filter results to a specific project (by name or UUID)",
+			},
 			repository: {
 				type: "string",
 				description: "Optional: Filter results to a specific repository ID",
@@ -308,10 +312,12 @@ export function getToolDefinitions(): ToolDefinition[] {
  */
 function isSearchParams(
 	params: unknown,
-): params is { term: string; repository?: string; limit?: number } {
+): params is { term: string; project?: string; repository?: string; limit?: number } {
 	if (typeof params !== "object" || params === null) return false;
 	const p = params as Record<string, unknown>;
 	if (typeof p.term !== "string") return false;
+	if (p.project !== undefined && typeof p.project !== "string")
+		return false;
 	if (p.repository !== undefined && typeof p.repository !== "string")
 		return false;
 	if (p.limit !== undefined && typeof p.limit !== "number") return false;
@@ -365,6 +371,9 @@ export async function executeSearchCode(
 	}
 
 	// Validate optional parameters
+	if (p.project !== undefined && typeof p.project !== "string") {
+		throw new Error("Parameter 'project' must be a string");
+	}
 	if (p.repository !== undefined && typeof p.repository !== "string") {
 		throw new Error("Parameter 'repository' must be a string");
 	}
@@ -374,11 +383,67 @@ export async function executeSearchCode(
 
 	const validatedParams = p as {
 		term: string;
+		project?: string;
 		repository?: string;
 		limit?: number;
 	};
 
+	// Resolve project to project ID if provided
+	let projectId: string | undefined;
+	if (validatedParams.project) {
+		// Try to parse as UUID first
+		const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+		if (uuidRegex.test(validatedParams.project)) {
+			// Direct UUID lookup
+			const { data: project, error } = await supabase
+				.from("projects")
+				.select("id")
+				.eq("id", validatedParams.project)
+				.eq("user_id", userId)
+				.maybeSingle();
+
+			if (error) {
+				logger.error("Failed to fetch project by UUID", {
+					error: error.message,
+					project: validatedParams.project,
+					user_id: userId,
+				});
+				throw new Error(`Failed to fetch project: ${error.message}`);
+			}
+
+			if (!project) {
+				throw new Error(`Project not found: ${validatedParams.project}`);
+			}
+
+			projectId = project.id;
+		} else {
+			// Lookup by name (case-insensitive)
+			const { data: project, error } = await supabase
+				.from("projects")
+				.select("id")
+				.eq("user_id", userId)
+				.ilike("name", validatedParams.project)
+				.maybeSingle();
+
+			if (error) {
+				logger.error("Failed to fetch project by name", {
+					error: error.message,
+					project: validatedParams.project,
+					user_id: userId,
+				});
+				throw new Error(`Failed to fetch project: ${error.message}`);
+			}
+
+			if (!project) {
+				throw new Error(`Project not found: ${validatedParams.project}`);
+			}
+
+			projectId = project.id;
+		}
+	}
+
 	const results = await searchFiles(supabase, validatedParams.term, userId, {
+		projectId,
 		repositoryId: validatedParams.repository,
 		limit: validatedParams.limit,
 	});
