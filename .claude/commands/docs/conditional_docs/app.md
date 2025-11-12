@@ -139,6 +139,17 @@ Use this reference to decide which KotaDB application layer documentation source
     - When debugging test environment variable loading in CI
     - When monitoring CI performance or consumption
 
+- .claude/commands/docs/automated-deployments.md
+  - Conditions:
+    - When understanding how database migrations are automatically applied via Supabase GitHub App
+    - When troubleshooting "Supabase Preview" check failures or migration conflicts
+    - When understanding automatic API deployments to Fly.io staging/production
+    - When debugging "Fly.io" check failures or deployment issues
+    - When needing to override automated deployments for emergency hotfixes
+    - When monitoring deployment history or status via GitHub checks
+    - When understanding the difference between automated and manual deployment procedures
+    - When working with PR preview branches and ephemeral database instances
+
 - app/.dockerignore
   - Conditions:
     - When working on Docker builds, Fly.io deployments, or build optimization

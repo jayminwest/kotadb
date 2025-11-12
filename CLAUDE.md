@@ -54,6 +54,8 @@ Run `cd app && bun run test:validate-migrations` to check for drift.
 
 Migration naming: `YYYYMMDDHHMMSS_description.sql` (generate: `date -u +%Y%m%d%H%M%S`)
 
+**Automated Deployment**: Migrations are automatically applied via the Supabase GitHub App on merges to `develop` (staging) and `main` (production). No manual `supabase db push` required.
+
 ### Logging Standards
 
 - **TypeScript**: Use `process.stdout.write()` / `process.stderr.write()` (NEVER `console.*`)
@@ -112,6 +114,7 @@ curl -X POST http://localhost:3001/auth/dev-session \
 
 ### CI/CD
 - [CI Configuration](./.claude/commands/ci/ci-configuration.md) - GitHub Actions, parallelization, caching, path filtering
+- [Automated Deployments](./.claude/commands/docs/automated-deployments.md) - GitHub App integrations for Supabase and Fly.io
 
 ### Deployment
 - [Staging Environments](./docs/deployment/staging-environments.md) - Vercel preview deployments, backend configuration, environment variables
