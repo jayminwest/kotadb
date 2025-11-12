@@ -3,6 +3,10 @@ import { mkdir } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import type { IndexRequest } from "@shared/types";
 import { getInstallationToken } from "@github/app-auth";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "indexer-repos" });
 
 export interface RepositoryContext {
 	repository: string;
@@ -232,9 +236,32 @@ async function runGit(
 	const [stdout, stderr] = await Promise.all([stdoutPromise, stderrPromise]);
 
 	if (exitCode !== 0 && !options.allowFailure) {
-		throw new Error(
+		const gitError = new Error(
 			`git ${args.join(" ")} failed with code ${exitCode}: ${stderr.trim()}`,
 		);
+
+		logger.error("Git command failed", gitError, {
+			git_command: args.join(" "),
+			exit_code: exitCode,
+			cwd: options.cwd,
+			stderr: stderr.trim(),
+		});
+
+		Sentry.captureException(gitError, {
+			tags: {
+				module: "repos",
+				operation: "git",
+			},
+			contexts: {
+				git: {
+					command: args.join(" "),
+					exit_code: exitCode,
+					cwd: options.cwd,
+				},
+			},
+		});
+
+		throw gitError;
 	}
 
 	return {
@@ -271,12 +298,27 @@ async function injectInstallationToken(
 
 		return url.toString();
 	} catch (error) {
-		process.stderr.write(
-			`[Indexer] Failed to inject installation token for installation ${installationId}: ${error instanceof Error ? error.message : String(error)}\n`,
-		);
-		process.stderr.write(
-			"[Indexer] Falling back to unauthenticated cloning (public repos only)\n",
-		);
+		logger.warn("Failed to inject installation token, falling back to unauthenticated cloning", {
+			installation_id: installationId,
+			remote_url: remoteUrl,
+			error_message: error instanceof Error ? error.message : String(error),
+		});
+
+		if (error instanceof Error) {
+			Sentry.captureException(error, {
+				tags: {
+					module: "repos",
+					operation: "injectInstallationToken",
+				},
+				contexts: {
+					github: {
+						installation_id: installationId,
+						remote_url: remoteUrl,
+					},
+				},
+			});
+		}
+
 		return remoteUrl;
 	}
 }

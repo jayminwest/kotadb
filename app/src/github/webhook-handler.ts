@@ -7,7 +7,11 @@
  */
 
 import { createHmac, timingSafeEqual } from "node:crypto";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
 import type { GitHubPushEvent } from "./types";
+
+const logger = createLogger({ module: "github-webhook-handler" });
 
 /**
  * Verifies GitHub webhook signature using HMAC-SHA256.
@@ -53,6 +57,10 @@ export function verifyWebhookSignature(
 		return timingSafeEqual(signatureBuffer, digestBuffer);
 	} catch (error) {
 		// Buffer conversion or comparison failed
+		logger.error("Webhook signature verification failed", error instanceof Error ? error : undefined, {
+			operation: "verifyWebhookSignature",
+		});
+		Sentry.captureException(error);
 		return false;
 	}
 }
@@ -162,17 +170,12 @@ export function logWebhookRequest(
 	delivery: string,
 	payload?: GitHubPushEvent | null,
 ): void {
-	const timestamp = new Date().toISOString();
-	const logEntry = {
-		timestamp,
-		type: "webhook",
+	logger.info("GitHub webhook received", {
 		event,
 		delivery,
 		repository: payload?.repository?.full_name ?? "unknown",
 		ref: payload?.ref ?? "unknown",
 		commit: payload?.after ?? "unknown",
 		sender: payload?.sender?.login ?? "unknown",
-	};
-
-	process.stdout.write(`[Webhook] ${JSON.stringify(logEntry)}\n`);
+	});
 }

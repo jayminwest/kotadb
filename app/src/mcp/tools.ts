@@ -2,6 +2,8 @@
  * MCP tool definitions and execution adapters
  */
 
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
 import {
 	ensureRepository,
 	listRecentFiles,
@@ -24,6 +26,8 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { invalidParams } from "./jsonrpc";
 import { analyzeChangeImpact } from "./impact-analysis";
 import { validateImplementationSpec } from "./spec-validation";
+
+const logger = createLogger({ module: "mcp-tools" });
 
 /**
  * MCP Tool Definition
@@ -452,9 +456,23 @@ export async function executeIndexRepository(
 			userId,
 			repositoryId,
 		).catch((error) => {
-			process.stderr.write(`Indexing workflow failed: ${JSON.stringify(error)}\n`);
+			logger.error("Indexing workflow failed", error instanceof Error ? error : new Error(String(error)), {
+				run_id: runId,
+				user_id: userId,
+				repository_id: repositoryId,
+			});
+			Sentry.captureException(error, {
+				tags: { run_id: runId, user_id: userId, repository_id: repositoryId },
+			});
 			updateIndexRunStatus(supabase, runId, "failed", error.message).catch(
-				(err) => process.stderr.write(`Failed to update index run status: ${JSON.stringify(err)}\n`),
+				(err) => {
+					logger.error("Failed to update index run status", err instanceof Error ? err : new Error(String(err)), {
+						run_id: runId,
+					});
+					Sentry.captureException(err, {
+						tags: { run_id: runId },
+					});
+				},
 			);
 		}),
 	);

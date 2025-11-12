@@ -15,6 +15,10 @@ import {
 	RATE_LIMITS,
 	type RateLimitResult,
 } from "@app-types/rate-limit";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "auth-rate-limit" });
 
 /**
  * Enforce hourly rate limit for API key.
@@ -40,9 +44,18 @@ async function enforceHourlyRateLimit(
 		});
 
 		if (error) {
-			process.stderr.write(
-				`[RateLimit] Hourly database error: ${JSON.stringify(error)}\n`,
-			);
+			logger.error("Hourly rate limit database error", {
+				keyId,
+				rateLimitPerHour,
+				error,
+			});
+			Sentry.captureException(new Error("Hourly rate limit database error"), {
+				extra: {
+					keyId,
+					rateLimitPerHour,
+					error,
+				},
+			});
 			// Fail closed: deny request on database errors
 			return {
 				allowed: false,
@@ -54,8 +67,18 @@ async function enforceHourlyRateLimit(
 		}
 
 		if (!data) {
-			process.stderr.write(
-				"[RateLimit] No data returned from increment_rate_limit\n",
+			logger.error("No data returned from increment_rate_limit", {
+				keyId,
+				rateLimitPerHour,
+			});
+			Sentry.captureException(
+				new Error("No data returned from increment_rate_limit"),
+				{
+					extra: {
+						keyId,
+						rateLimitPerHour,
+					},
+				},
 			);
 			// Fail closed: deny request if no data
 			return {
@@ -91,9 +114,17 @@ async function enforceHourlyRateLimit(
 			limit: rateLimitPerHour,
 		};
 	} catch (error) {
-		process.stderr.write(
-			`[RateLimit] Unexpected hourly error: ${JSON.stringify(error)}\n`,
-		);
+		logger.error("Unexpected hourly rate limit error", {
+			keyId,
+			rateLimitPerHour,
+			error,
+		});
+		Sentry.captureException(error as Error, {
+			extra: {
+				keyId,
+				rateLimitPerHour,
+			},
+		});
 		// Fail closed: deny request on unexpected errors
 		return {
 			allowed: false,
@@ -129,9 +160,18 @@ async function enforceDailyRateLimit(
 		});
 
 		if (error) {
-			process.stderr.write(
-				`[RateLimit] Daily database error: ${JSON.stringify(error)}\n`,
-			);
+			logger.error("Daily rate limit database error", {
+				keyId,
+				dailyLimit,
+				error,
+			});
+			Sentry.captureException(new Error("Daily rate limit database error"), {
+				extra: {
+					keyId,
+					dailyLimit,
+					error,
+				},
+			});
 			// Fail closed: deny request on database errors
 			return {
 				allowed: false,
@@ -143,8 +183,18 @@ async function enforceDailyRateLimit(
 		}
 
 		if (!data) {
-			process.stderr.write(
-				"[RateLimit] No data returned from increment_rate_limit_daily\n",
+			logger.error("No data returned from increment_rate_limit_daily", {
+				keyId,
+				dailyLimit,
+			});
+			Sentry.captureException(
+				new Error("No data returned from increment_rate_limit_daily"),
+				{
+					extra: {
+						keyId,
+						dailyLimit,
+					},
+				},
 			);
 			// Fail closed: deny request if no data
 			return {
@@ -180,9 +230,17 @@ async function enforceDailyRateLimit(
 			limit: dailyLimit,
 		};
 	} catch (error) {
-		process.stderr.write(
-			`[RateLimit] Unexpected daily error: ${JSON.stringify(error)}\n`,
-		);
+		logger.error("Unexpected daily rate limit error", {
+			keyId,
+			dailyLimit,
+			error,
+		});
+		Sentry.captureException(error as Error, {
+			extra: {
+				keyId,
+				dailyLimit,
+			},
+		});
 		// Fail closed: deny request on unexpected errors
 		return {
 			allowed: false,

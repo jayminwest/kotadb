@@ -9,6 +9,8 @@
  * - Dependency compatibility
  */
 
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
 	ImplementationSpec,
@@ -17,6 +19,8 @@ import type {
 } from "@shared/types";
 import { resolveFilePath } from "@api/queries";
 import { getGitHubClient } from "./github-integration";
+
+const logger = createLogger({ module: "mcp-spec-validation" });
 
 /**
  * Validate implementation spec against KotaDB conventions
@@ -34,28 +38,33 @@ export async function validateImplementationSpec(
 	const errors: ValidationIssue[] = [];
 	const warnings: ValidationIssue[] = [];
 
-	// Resolve repository ID
-	const repositoryId = await resolveRepositoryId(
-		supabase,
-		spec.repository,
-		userId,
-	);
+	try {
+		logger.info("Starting spec validation", { feature_name: spec.feature_name, user_id: userId });
 
-	if (!repositoryId) {
-		errors.push({
-			type: "repository",
-			message: "No repository found. Please index a repository first.",
-		});
+		// Resolve repository ID
+		const repositoryId = await resolveRepositoryId(
+			supabase,
+			spec.repository,
+			userId,
+		);
 
-		return {
-			valid: false,
-			errors,
-			warnings,
-			approval_conditions: [],
-			risk_assessment: "Cannot assess - no repository data",
-			summary: "Validation failed: No repository indexed",
-		};
-	}
+		if (!repositoryId) {
+			errors.push({
+				type: "repository",
+				message: "No repository found. Please index a repository first.",
+			});
+
+			logger.warn("Spec validation failed: no repository", { feature_name: spec.feature_name, user_id: userId });
+
+			return {
+				valid: false,
+				errors,
+				warnings,
+				approval_conditions: [],
+				risk_assessment: "Cannot assess - no repository data",
+				summary: "Validation failed: No repository indexed",
+			};
+		}
 
 	// Validate file conflicts
 	const fileConflicts = await checkFileConflicts(
@@ -95,17 +104,35 @@ export async function validateImplementationSpec(
 	// Calculate risk assessment
 	const riskAssessment = calculateRiskAssessment(spec, errors, warnings);
 
-	// Generate summary
-	const summary = generateSummary(spec, errors, warnings);
+		// Generate summary
+		const summary = generateSummary(spec, errors, warnings);
 
-	return {
-		valid: errors.length === 0,
-		errors,
-		warnings,
-		approval_conditions: approvalConditions,
-		risk_assessment: riskAssessment,
-		summary,
-	};
+		logger.info("Spec validation completed", {
+			feature_name: spec.feature_name,
+			user_id: userId,
+			valid: errors.length === 0,
+			error_count: errors.length,
+			warning_count: warnings.length,
+		});
+
+		return {
+			valid: errors.length === 0,
+			errors,
+			warnings,
+			approval_conditions: approvalConditions,
+			risk_assessment: riskAssessment,
+			summary,
+		};
+	} catch (error) {
+		logger.error("Spec validation error", error instanceof Error ? error : new Error(String(error)), {
+			feature_name: spec.feature_name,
+			user_id: userId,
+		});
+		Sentry.captureException(error, {
+			tags: { feature_name: spec.feature_name, user_id: userId },
+		});
+		throw error;
+	}
 }
 
 /**

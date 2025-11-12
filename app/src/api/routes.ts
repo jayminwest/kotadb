@@ -13,6 +13,10 @@ import express, {
 	type Response,
 	type NextFunction,
 } from "express";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "api-routes" });
 import {
 	ensureRepository,
 	listRecentFiles,
@@ -127,7 +131,9 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Get webhook secret from environment
 				const secret = process.env.GITHUB_WEBHOOK_SECRET;
 				if (!secret) {
-					process.stderr.write("[Webhook] GITHUB_WEBHOOK_SECRET not configured\n");
+					const error = new Error("GITHUB_WEBHOOK_SECRET not configured");
+					logger.error("GitHub webhook secret missing", error);
+					Sentry.captureException(error);
 					return res.status(500).json({ error: "Webhook secret not configured" });
 				}
 
@@ -137,7 +143,10 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Verify signature
 				const isValid = verifyWebhookSignature(rawBody, signature, secret);
 				if (!isValid) {
-					process.stderr.write(`[Webhook] Invalid signature for delivery ${delivery}\n`);
+					logger.warn("GitHub webhook signature invalid", {
+						delivery,
+						event,
+					});
 					return res.status(401).json({ error: "Invalid signature" });
 				}
 
@@ -158,14 +167,21 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Process push event asynchronously (don't block webhook response)
 				if (payload) {
 					processPushEvent(payload).catch((error) => {
-						process.stderr.write(`[Webhook] Processing error: ${JSON.stringify(error)}\n`);
+						const err = error instanceof Error ? error : new Error(String(error));
+						logger.error("GitHub webhook processing error", err, {
+							event,
+							delivery,
+						});
+						Sentry.captureException(err);
 					});
 				}
 
 				// Always return success for valid webhooks (GitHub expects 200 OK)
 				res.status(200).json({ received: true });
 			} catch (error) {
-				process.stderr.write(`[Webhook] Handler error: ${JSON.stringify(error)}\n`);
+				const err = error instanceof Error ? error : new Error(String(error));
+				logger.error("GitHub webhook handler error", err);
+				Sentry.captureException(err);
 				res.status(500).json({ error: "Internal server error" });
 			}
 		},
@@ -188,7 +204,9 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Get webhook secret from environment
 				const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 				if (!webhookSecret) {
-					process.stderr.write("[Stripe Webhook] STRIPE_WEBHOOK_SECRET not configured\n");
+					const error = new Error("STRIPE_WEBHOOK_SECRET not configured");
+					logger.error("Stripe webhook secret missing", error);
+					Sentry.captureException(error);
 					return res.status(500).json({ error: "Webhook secret not configured" });
 				}
 
@@ -201,68 +219,58 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 					event = await verifyStripeSignature(rawBody, signature);
 				} catch (error) {
 					const err = error as Error;
-					process.stderr.write(`[Stripe Webhook] Signature verification failed: ${err.message}\n`);
+					logger.error("Stripe webhook signature verification failed", err);
+					Sentry.captureException(err);
 					return res.status(401).json({ error: "Invalid signature" });
 				}
 
 				// Log webhook event
-				process.stdout.write(
-					`[Stripe Webhook] Received event: type=${event.type}, id=${event.id}\n`,
-				);
+				logger.info("Stripe webhook received", {
+					eventType: event.type,
+					eventId: event.id,
+				});
 
 				// Route events to handlers asynchronously (don't block webhook response)
 			if (event.type === "checkout.session.completed") {
 				handleCheckoutSessionCompleted(event as Stripe.CheckoutSessionCompletedEvent).catch(
 					(error) => {
-						const errorDetails = {
-							message: error?.message || String(error),
-							stack: error?.stack,
-							name: error?.name,
-							cause: error?.cause,
-						};
-						process.stderr.write(
-							`[Stripe Webhook] checkout.session.completed handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
-						);
+						const err = error instanceof Error ? error : new Error(String(error));
+						logger.error("Stripe checkout.session.completed handler error", err, {
+							eventId: event.id,
+							eventType: event.type,
+						});
+						Sentry.captureException(err);
 					},
 				);
 			} else if (event.type === "invoice.paid") {
 					handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
-						const errorDetails = {
-							message: error?.message || String(error),
-							stack: error?.stack,
-							name: error?.name,
-							cause: error?.cause,
-						};
-						process.stderr.write(
-							`[Stripe Webhook] invoice.paid handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
-						);
+						const err = error instanceof Error ? error : new Error(String(error));
+						logger.error("Stripe invoice.paid handler error", err, {
+							eventId: event.id,
+							eventType: event.type,
+						});
+						Sentry.captureException(err);
 					});
 				} else if (event.type === "customer.subscription.updated") {
 					handleSubscriptionUpdated(event as Stripe.CustomerSubscriptionUpdatedEvent).catch(
 						(error) => {
-							const errorDetails = {
-								message: error?.message || String(error),
-								stack: error?.stack,
-								name: error?.name,
-								cause: error?.cause,
-							};
-							process.stderr.write(
-								`[Stripe Webhook] customer.subscription.updated handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
-							);
+							const err = error instanceof Error ? error : new Error(String(error));
+							logger.error("Stripe customer.subscription.updated handler error", err, {
+								eventId: event.id,
+								eventType: event.type,
+							});
+							Sentry.captureException(err);
 						},
 					);
 				} else if (event.type === "customer.subscription.deleted") {
 					handleSubscriptionDeleted(event as Stripe.CustomerSubscriptionDeletedEvent).catch(
 						(error) => {
-							const errorDetails = {
-								message: error?.message || String(error),
-								stack: error?.stack,
-								name: error?.name,
-								cause: error?.cause,
-							};
-							process.stderr.write(
-								`[Stripe Webhook] customer.subscription.deleted handler error: ${JSON.stringify(errorDetails, null, 2)}\n`,
-							);
+							const err = error instanceof Error ? error : new Error(String(error));
+							logger.error("Stripe customer.subscription.deleted handler error", err, {
+								eventId: event.id,
+								eventType: event.type,
+							});
+							Sentry.captureException(err);
 						},
 					);
 				}
@@ -270,7 +278,9 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				// Always return success for valid webhooks (Stripe expects 200 OK)
 				res.status(200).json({ received: true });
 			} catch (error) {
-				process.stderr.write(`[Stripe Webhook] Handler error: ${JSON.stringify(error)}\n`);
+				const err = error instanceof Error ? error : new Error(String(error));
+				logger.error("Stripe webhook handler error", err);
+				Sentry.captureException(err);
 				res.status(500).json({ error: "Internal server error" });
 			}
 		},
@@ -461,20 +471,27 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 					getDefaultSendOptions(),
 				);
 
-				process.stdout.write(
-					`[${new Date().toISOString()}] Enqueued index job ${job.id} for repository ${repositoryId}\n`,
-				);
+				logger.info("Index job enqueued", {
+					jobId: job.id,
+					repositoryId,
+					userId: context.userId,
+				});
 			} catch (error) {
-				const errorMsg = error instanceof Error ? error.message : String(error);
-				process.stderr.write(`Failed to enqueue job: ${errorMsg}\n`);
+				const err = error instanceof Error ? error : new Error(String(error));
+				logger.error("Failed to enqueue job", err, {
+					jobId: job.id,
+					repositoryId,
+					userId: context.userId,
+				});
+				Sentry.captureException(err);
 				// Update job status to failed since we couldn't enqueue it
 				await updateJobStatus(
 					job.id,
 					"failed",
-					{ error: `Queue error: ${errorMsg}` },
+					{ error: `Queue error: ${err.message}` },
 					context.userId,
 				);
-				throw error;
+				throw err;
 			}
 
 			addRateLimitHeaders(res, context.rateLimit);
@@ -617,7 +634,11 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		} catch (error) {
 			// Only send error if headers haven't been sent yet
 			if (!res.headersSent) {
-				process.stderr.write(`MCP handler error: ${JSON.stringify(error)}\n`);
+				const err = error instanceof Error ? error : new Error(String(error));
+				logger.error("MCP handler error", err, {
+					userId: context.userId,
+				});
+				Sentry.captureException(err);
 				res.status(500).json({ error: "Internal server error" });
 			}
 		}
@@ -661,7 +682,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				stripe = getStripeClient();
 				priceId = STRIPE_PRICE_IDS[tier as "solo" | "team"];
 			} catch (configError) {
-				process.stderr.write(`[Stripe] Configuration error: ${JSON.stringify(configError)}\n`);
+				const err = configError instanceof Error ? configError : new Error(String(configError));
+				logger.error("Stripe configuration error in checkout", err, {
+					userId: context.userId,
+					tier,
+				});
+				Sentry.captureException(err);
 				return res.status(500).json({ error: "Stripe is not configured on this server" });
 			}
 
@@ -697,7 +723,11 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			res.json({ url: session.url, sessionId: session.id });
 		} catch (error) {
-			process.stderr.write(`[Stripe] Checkout session error: ${JSON.stringify(error)}\n`);
+			const err = error instanceof Error ? error : new Error(String(error));
+			logger.error("Stripe checkout session creation failed", err, {
+				userId: context.userId,
+			});
+			Sentry.captureException(err);
 			res.status(500).json({ error: "Failed to create checkout session" });
 		}
 	});
@@ -731,7 +761,11 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				const { getStripeClient } = await import("./stripe");
 				stripe = getStripeClient();
 			} catch (configError) {
-				process.stderr.write(`[Stripe] Configuration error: ${JSON.stringify(configError)}\n`);
+				const err = configError instanceof Error ? configError : new Error(String(configError));
+				logger.error("Stripe configuration error in portal", err, {
+					userId: context.userId,
+				});
+				Sentry.captureException(err);
 				return res.status(500).json({ error: "Stripe is not configured on this server" });
 			}
 
@@ -742,7 +776,11 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			res.json({ url: session.url });
 		} catch (error) {
-			process.stderr.write(`[Stripe] Portal session error: ${JSON.stringify(error)}\n`);
+			const err = error instanceof Error ? error : new Error(String(error));
+			logger.error("Stripe portal session creation failed", err, {
+				userId: context.userId,
+			});
+			Sentry.captureException(err);
 			res.status(500).json({ error: "Failed to create portal session" });
 		}
 	});
@@ -761,7 +799,11 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			res.json({ subscription: subscription || null });
 		} catch (error) {
-			process.stderr.write(`[Stripe] Get subscription error: ${JSON.stringify(error)}\n`);
+			const err = error instanceof Error ? error : new Error(String(error));
+			logger.error("Get subscription failed", err, {
+				userId: context.userId,
+			});
+			Sentry.captureException(err);
 			res.status(500).json({ error: "Failed to fetch subscription" });
 		}
 	});
@@ -834,7 +876,9 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				createdAt: result.createdAt,
 			});
 		} catch (error) {
-			process.stderr.write(`[API Keys] Generation error: ${JSON.stringify(error)}\n`);
+			const err = error instanceof Error ? error : new Error(String(error));
+			logger.error("API key generation failed", err);
+			Sentry.captureException(err);
 			res.status(500).json({ error: "Failed to generate API key" });
 		}
 	});
@@ -865,7 +909,10 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				.maybeSingle();
 
 			if (queryError) {
-				process.stderr.write(`[API Keys] Query error: ${JSON.stringify(queryError)}\n`);
+				logger.error("API key query failed", new Error(queryError.message), {
+					userId: user.id,
+				});
+				Sentry.captureException(new Error(queryError.message));
 				return res.status(500).json({ error: "Failed to fetch API key metadata" });
 			}
 
@@ -882,7 +929,9 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				enabled: keyData.enabled,
 			});
 		} catch (error) {
-			process.stderr.write(`[API Keys] Get current error: ${JSON.stringify(error)}\n`);
+			const err = error instanceof Error ? error : new Error(String(error));
+			logger.error("Get API key metadata failed", err);
+			Sentry.captureException(err);
 			res.status(500).json({ error: "Failed to fetch API key metadata" });
 		}
 	});
@@ -929,15 +978,16 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				message: "Old API key revoked, new key generated",
 			});
 		} catch (error) {
-			process.stderr.write(`[API Keys] Reset error: ${JSON.stringify(error)}\n`);
-			const errorMessage = error instanceof Error ? error.message : "Failed to reset API key";
+			const err = error instanceof Error ? error : new Error(String(error));
+			logger.error("API key reset failed", err);
+			Sentry.captureException(err);
 
 			// Return 404 if no active key exists
-			if (errorMessage.includes("No active API key found")) {
-				return res.status(404).json({ error: errorMessage });
+			if (err.message.includes("No active API key found")) {
+				return res.status(404).json({ error: err.message });
 			}
 
-			res.status(500).json({ error: errorMessage });
+			res.status(500).json({ error: err.message });
 		}
 	});
 
@@ -969,15 +1019,16 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				revokedAt: result.revokedAt,
 			});
 		} catch (error) {
-			process.stderr.write(`[API Keys] Revoke error: ${JSON.stringify(error)}\n`);
-			const errorMessage = error instanceof Error ? error.message : "Failed to revoke API key";
+			const err = error instanceof Error ? error : new Error(String(error));
+			logger.error("API key revocation failed", err);
+			Sentry.captureException(err);
 
 			// Return 404 if no active key exists
-			if (errorMessage.includes("No active API key found")) {
-				return res.status(404).json({ error: errorMessage });
+			if (err.message.includes("No active API key found")) {
+				return res.status(404).json({ error: err.message });
 			}
 
-			res.status(500).json({ error: errorMessage });
+			res.status(500).json({ error: err.message });
 		}
 	});
 

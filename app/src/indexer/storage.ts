@@ -6,6 +6,10 @@
  */
 
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "indexer-storage" });
 
 /**
  * File data for storage (matches indexed_files table columns)
@@ -108,12 +112,70 @@ export async function storeIndexedData(
 	});
 
 	if (error) {
+		logger.error("Failed to store indexed data", {
+			repository_id: repositoryId,
+			files_count: files.length,
+			symbols_count: symbols.length,
+			references_count: references.length,
+			dependencies_count: dependencyGraph.length,
+			skip_delete: skipDelete,
+			error_message: error.message,
+			error_code: error.code,
+		});
+
+		Sentry.captureException(new Error(`Failed to store indexed data: ${error.message}`), {
+			tags: {
+				module: "storage",
+				operation: "storeIndexedData",
+			},
+			contexts: {
+				storage: {
+					repository_id: repositoryId,
+					files_count: files.length,
+					symbols_count: symbols.length,
+					references_count: references.length,
+					dependencies_count: dependencyGraph.length,
+					skip_delete: skipDelete,
+					error_code: error.code,
+				},
+			},
+		});
+
 		throw new Error(`Failed to store indexed data: ${error.message}`);
 	}
 
 	if (!data) {
-		throw new Error("store_indexed_data returned null data");
+		const nullDataError = new Error("store_indexed_data returned null data");
+
+		logger.error("Database function returned null data", {
+			repository_id: repositoryId,
+			files_count: files.length,
+			symbols_count: symbols.length,
+		});
+
+		Sentry.captureException(nullDataError, {
+			tags: {
+				module: "storage",
+				operation: "storeIndexedData",
+			},
+			contexts: {
+				storage: {
+					repository_id: repositoryId,
+					files_count: files.length,
+				},
+			},
+		});
+
+		throw nullDataError;
 	}
+
+	logger.info("Successfully stored indexed data", {
+		repository_id: repositoryId,
+		files_indexed: data.files_indexed,
+		symbols_extracted: data.symbols_extracted,
+		references_found: data.references_found,
+		dependencies_extracted: data.dependencies_extracted,
+	});
 
 	return data as StorageResult;
 }

@@ -19,6 +19,10 @@
 
 import path from "node:path";
 import type { IndexedFile } from "@shared/types/entities";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "indexer-import-resolver" });
 
 /**
  * Supported file extensions in priority order.

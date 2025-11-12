@@ -18,6 +18,10 @@
  */
 
 import type { TSESTree } from "@typescript-eslint/types";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "indexer-symbol-extractor" });
 
 /**
  * Symbol metadata extracted from AST nodes.

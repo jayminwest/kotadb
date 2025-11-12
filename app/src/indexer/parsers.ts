@@ -2,6 +2,10 @@ import { readFile, readdir, stat } from "node:fs/promises";
 import { extname, join, resolve } from "node:path";
 import type { IndexedFile } from "@shared/types";
 import { extractDependencies } from "./extractors";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "indexer-parsers" });
 
 const SUPPORTED_EXTENSIONS = new Set<string>([
 	".ts",
@@ -34,9 +38,24 @@ export async function discoverSources(projectRoot: string): Promise<string[]> {
 		try {
 			entries = await readdir(current);
 		} catch (error) {
-			process.stderr.write(
-				`discoverSources: skipping ${current}: ${(error as Error).message}`,
-			);
+			logger.warn("Failed to read directory during source discovery", {
+				directory: current,
+				error_message: error instanceof Error ? error.message : String(error),
+			});
+
+			if (error instanceof Error) {
+				Sentry.captureException(error, {
+					tags: {
+						module: "parsers",
+						operation: "discoverSources",
+					},
+					contexts: {
+						discovery: {
+							directory: current,
+						},
+					},
+				});
+			}
 			continue;
 		}
 
@@ -50,9 +69,24 @@ export async function discoverSources(projectRoot: string): Promise<string[]> {
 			try {
 				stats = await stat(fullPath);
 			} catch (error) {
-				process.stderr.write(
-					`discoverSources: skipping ${fullPath}: ${(error as Error).message}`,
-				);
+				logger.warn("Failed to stat file during source discovery", {
+					file_path: fullPath,
+					error_message: error instanceof Error ? error.message : String(error),
+				});
+
+				if (error instanceof Error) {
+					Sentry.captureException(error, {
+						tags: {
+							module: "parsers",
+							operation: "stat",
+						},
+						contexts: {
+							discovery: {
+								file_path: fullPath,
+							},
+						},
+					});
+				}
 				continue;
 			}
 
@@ -82,9 +116,24 @@ export async function parseSourceFile(
 	try {
 		content = await readFile(path, "utf8");
 	} catch (error) {
-		process.stderr.write(
-			`parseSourceFile: unable to read ${path}: ${(error as Error).message}`,
-		);
+		logger.error("Failed to read source file", error instanceof Error ? error : undefined, {
+			file_path: path,
+			error_message: error instanceof Error ? error.message : String(error),
+		});
+
+		if (error instanceof Error) {
+			Sentry.captureException(error, {
+				tags: {
+					module: "parsers",
+					operation: "readFile",
+				},
+				contexts: {
+					file: {
+						path,
+					},
+				},
+			});
+		}
 		return null;
 	}
 

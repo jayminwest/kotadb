@@ -9,6 +9,8 @@
  * - Conflict detection with open PRs
  */
 
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
 	ChangeImpactRequest,
@@ -24,6 +26,8 @@ import {
 } from "@api/queries";
 import { getGitHubClient } from "./github-integration";
 
+const logger = createLogger({ module: "mcp-impact-analysis" });
+
 /**
  * Analyze change impact for proposed modifications
  *
@@ -37,29 +41,43 @@ export async function analyzeChangeImpact(
 	request: ChangeImpactRequest,
 	userId: string,
 ): Promise<ChangeImpactResponse> {
-	// Resolve repository ID
-	const repositoryId = await resolveRepositoryId(
-		supabase,
-		request.repository,
-		userId,
-	);
+	try {
+		logger.info("Starting change impact analysis", {
+			change_type: request.change_type,
+			user_id: userId,
+			files_to_modify: request.files_to_modify?.length ?? 0,
+			files_to_create: request.files_to_create?.length ?? 0,
+			files_to_delete: request.files_to_delete?.length ?? 0,
+		});
 
-	if (!repositoryId) {
-		return {
-			affected_files: [],
-			test_scope: {
-				test_files: [],
-				recommended_test_files: [],
-				coverage_impact: "No repository indexed. Please index a repository first.",
-			},
-			architectural_warnings: [],
-			conflicts: [],
-			risk_level: "low",
-			deployment_impact: "Cannot assess - no repository data available",
-			last_indexed_at: new Date().toISOString(),
-			summary: "No repository data available for impact analysis",
-		};
-	}
+		// Resolve repository ID
+		const repositoryId = await resolveRepositoryId(
+			supabase,
+			request.repository,
+			userId,
+		);
+
+		if (!repositoryId) {
+			logger.warn("Change impact analysis failed: no repository", {
+				change_type: request.change_type,
+				user_id: userId,
+			});
+
+			return {
+				affected_files: [],
+				test_scope: {
+					test_files: [],
+					recommended_test_files: [],
+					coverage_impact: "No repository indexed. Please index a repository first.",
+				},
+				architectural_warnings: [],
+				conflicts: [],
+				risk_level: "low",
+				deployment_impact: "Cannot assess - no repository data available",
+				last_indexed_at: new Date().toISOString(),
+				summary: "No repository data available for impact analysis",
+			};
+		}
 
 	// Get last indexed timestamp
 	const lastIndexedAt = await getLastIndexedTimestamp(supabase, repositoryId);
@@ -116,25 +134,43 @@ export async function analyzeChangeImpact(
 		riskLevel,
 	);
 
-	// Generate summary
-	const summary = generateSummary(
-		request,
-		affectedFiles,
-		testScope,
-		riskLevel,
-		conflicts,
-	);
+		// Generate summary
+		const summary = generateSummary(
+			request,
+			affectedFiles,
+			testScope,
+			riskLevel,
+			conflicts,
+		);
 
-	return {
-		affected_files: affectedFiles,
-		test_scope: testScope,
-		architectural_warnings: architecturalWarnings,
-		conflicts,
-		risk_level: riskLevel,
-		deployment_impact: deploymentImpact,
-		last_indexed_at: lastIndexedAt,
-		summary,
-	};
+		logger.info("Change impact analysis completed", {
+			change_type: request.change_type,
+			user_id: userId,
+			affected_files_count: affectedFiles.length,
+			risk_level: riskLevel,
+			conflicts_count: conflicts.length,
+		});
+
+		return {
+			affected_files: affectedFiles,
+			test_scope: testScope,
+			architectural_warnings: architecturalWarnings,
+			conflicts,
+			risk_level: riskLevel,
+			deployment_impact: deploymentImpact,
+			last_indexed_at: lastIndexedAt,
+			summary,
+		};
+	} catch (error) {
+		logger.error("Change impact analysis error", error instanceof Error ? error : new Error(String(error)), {
+			change_type: request.change_type,
+			user_id: userId,
+		});
+		Sentry.captureException(error, {
+			tags: { change_type: request.change_type, user_id: userId },
+		});
+		throw error;
+	}
 }
 
 /**

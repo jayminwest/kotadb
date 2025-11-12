@@ -2,6 +2,11 @@
  * MCP HTTP header validation utilities
  */
 
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "mcp-headers" });
+
 const MCP_PROTOCOL_VERSION = "2025-06-18";
 
 // Default allowed origins (localhost variants)
@@ -28,29 +33,41 @@ function getAllowedOrigins(): string[] {
  * Supports origins with ports (e.g., http://localhost:3000)
  */
 export function validateOrigin(origin: string | null): boolean {
-	if (!origin) return false;
+	try {
+		if (!origin) {
+			logger.warn("Origin validation failed: no origin provided");
+			return false;
+		}
 
-	const allowedOrigins = getAllowedOrigins();
+		const allowedOrigins = getAllowedOrigins();
 
-	// Check exact match first
-	if (allowedOrigins.includes(origin)) return true;
+		// Check exact match first
+		if (allowedOrigins.includes(origin)) return true;
 
-	// Check if origin starts with any allowed origin (to support ports)
-	for (const allowed of allowedOrigins) {
-		if (origin.startsWith(allowed)) {
-			// If allowed origin has no port, accept origin with any port
-			const originUrl = new URL(origin);
-			const allowedUrl = new URL(allowed);
-			if (
-				originUrl.protocol === allowedUrl.protocol &&
-				originUrl.hostname === allowedUrl.hostname
-			) {
-				return true;
+		// Check if origin starts with any allowed origin (to support ports)
+		for (const allowed of allowedOrigins) {
+			if (origin.startsWith(allowed)) {
+				// If allowed origin has no port, accept origin with any port
+				const originUrl = new URL(origin);
+				const allowedUrl = new URL(allowed);
+				if (
+					originUrl.protocol === allowedUrl.protocol &&
+					originUrl.hostname === allowedUrl.hostname
+				) {
+					return true;
+				}
 			}
 		}
-	}
 
-	return false;
+		logger.warn("Origin validation failed: not in allowed list", { origin });
+		return false;
+	} catch (error) {
+		logger.error("Origin validation error", error instanceof Error ? error : new Error(String(error)), { origin });
+		Sentry.captureException(error, {
+			tags: { origin: origin ?? "null" },
+		});
+		return false;
+	}
 }
 
 /**
