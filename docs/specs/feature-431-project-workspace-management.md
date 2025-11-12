@@ -292,33 +292,44 @@ This feature introduces two new database tables (`projects`, `project_repositori
 
 ## Implementation Progress
 
-### Completed (Phase 1-3)
+### Completed (Phase 1-2) - PR #446 Merged
 - ✅ Created migration `20251112222109_add_projects_tables.sql` with RLS policies
 - ✅ Synced migration to both `app/src/db/migrations/` and `app/supabase/migrations/`
 - ✅ Removed old non-timestamped migrations (001_, 002_, 003_)
-- ✅ Created TypeScript types in `shared/types/projects.ts`
+- ✅ Created TypeScript types in `shared/types/projects.ts` (103 lines)
 - ✅ Updated `shared/types/entities.ts` and `shared/types/index.ts` to export project types
-- ✅ Implemented project CRUD functions in `app/src/api/projects.ts`
-- ✅ Added project REST endpoints to `app/src/api/routes.ts`
-- ✅ Extended `searchFiles()` to support `projectId` filter parameter
+- ✅ Implemented project CRUD functions in `app/src/api/projects.ts` (367 lines)
+- ✅ Added project REST endpoints to `app/src/api/routes.ts` (+186 lines)
+- ✅ Extended `searchFiles()` in `app/src/api/queries.ts` to support `projectId` filter parameter
 - ✅ Updated `/search` endpoint to accept `?project_id=<uuid>` query param
-- ✅ Created integration tests in `app/tests/integration/projects.test.ts`
+- ✅ Created integration tests in `app/tests/integration/projects.test.ts` (331 lines, 14 tests)
+- ✅ Fixed TypeScript type errors in test file (added type guards for array access)
+- ✅ Fixed `listProjects()` Supabase count aggregation (properly parse nested count structure)
+- ✅ Validation: Level 2 - 75/75 integration tests passed with real Supabase Local
+- ✅ All tests follow anti-mock philosophy (no new mocks introduced)
 
-### In Progress
-- Type errors in `projects.ts:165` - Supabase join query result mapping needs adjustment for nested repository objects
-- This is a minor fix requiring understanding of Supabase's join syntax return structure
+### Not Started (Phase 3-5 - Deferred to Follow-up PRs)
+- ❌ Auto-reindex trigger logic (middleware hook for session detection)
+- ❌ Rate limiting for auto-reindex using `api_keys.metadata` JSONB field
+- ❌ MCP `search_code` tool extension (add optional `project` parameter)
+- ❌ `.mcp.json` configuration parsing on MCP server startup
+- ❌ API documentation (`docs/api/projects.md`)
+- ❌ Conditional documentation updates (`.claude/commands/docs/conditional_docs/app.md`)
+- ❌ MCP integration tests (`app/tests/mcp/project-search.test.ts`)
+- ❌ Auto-reindex integration tests (`app/tests/integration/auto-reindex.test.ts`)
 
-### Not Started (Phase 4-5 - Out of Scope for Current Session)
-- Auto-reindex trigger logic (middleware hook for session detection)
-- MCP tool extension (`.mcp.json` parsing, `search_code` project parameter)
-- API documentation (`docs/api/projects.md`)
-- Conditional documentation updates
-
-### Notes
-- Migration validation passes - directories are in sync
-- All project CRUD logic implemented with proper logging and Sentry integration
-- RLS policies follow established patterns from `repositories` table
-- Test structure follows antimocking philosophy with real Supabase connections
+### Notes for Next Agent
+- **Branch**: `feat/431-project-workspace-management` merged to `develop` via PR #446
+- **Migration Status**: Successfully applied to staging, synced to both directories
+- **Known Issues Fixed**:
+  - Supabase `(count)` aggregation returns nested structure `[{count: N}]`, not array length
+  - Test type errors resolved by adding explicit type guards before array access
+- **API Endpoints Working**: All project CRUD operations tested and functional
+- **RLS Policies Verified**: Cross-user access blocked, join queries respect RLS
+- **Next Steps**: Start with Phase 3 (Auto-Reindex) in new branch from `develop`
+  - Recommended approach: Create `feat/431-auto-reindex` branch
+  - Focus on middleware hook and rate limiting first
+  - MCP integration can be separate PR (less coupled to API changes)
 
 ## Step by Step Tasks
 
