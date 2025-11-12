@@ -20,6 +20,16 @@ const tools = [
     name: 'search_dependencies',
     description: 'Search the dependency graph to find files that depend on or are depended on by a target file. Useful for impact analysis.',
     params: 'file_path (required), repository (optional), direction (optional), depth (optional)'
+  },
+  {
+    name: 'analyze_change_impact',
+    description: 'Analyze the impact of proposed code changes by examining dependency graphs, test scope, and potential conflicts. Returns comprehensive analysis including affected files, test recommendations, architectural warnings, and risk assessment. Useful for planning implementations and avoiding breaking changes.',
+    params: 'files_to_modify (optional), files_to_create (optional), files_to_delete (optional), change_type (required), description (required), breaking_changes (optional), repository (optional)'
+  },
+  {
+    name: 'validate_implementation_spec',
+    description: 'Validate an implementation specification against KotaDB conventions and repository state. Checks for file conflicts, naming conventions, path alias usage, test coverage, and dependency compatibility. Returns validation errors, warnings, and approval conditions checklist.',
+    params: 'feature_name (required), files_to_create (optional), files_to_modify (optional), migrations (optional), dependencies_to_add (optional), breaking_changes (optional), repository (optional)'
   }
 ]
 
@@ -78,7 +88,9 @@ export default function ToolReference() {
 "Search for authentication functions in my codebase"
 "Index this repository: https://github.com/user/repo"
 "Show me recent files that were indexed"
-"Find all files that depend on src/auth/middleware.ts"`}
+"Find all files that depend on src/auth/middleware.ts"
+"Analyze the impact of modifying auth/middleware.ts"
+"Validate my implementation spec for the new feature"`}
         </code>
       </div>
     </div>
