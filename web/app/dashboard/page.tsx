@@ -104,7 +104,17 @@ function DashboardContent() {
           // Auto-refresh metadata to show new key info
           await fetchKeyMetadata()
         } else if (keyData.message?.includes('already exists')) {
-          setKeyGenError('You already have an API key. Please contact support if you need a new one.')
+          // Key already exists - fetch metadata to display it
+          setKeyGenError('You already have an API key. Fetching details...')
+          try {
+            await fetchKeyMetadata()
+            // Clear error and show success message after successful fetch
+            setKeyGenError(null)
+            setKeyGenSuccess('API key already exists and is active')
+          } catch (fetchError) {
+            // If fetch fails, update error message
+            setKeyGenError('You already have an API key. Please refresh the page to view details.')
+          }
         }
       } else {
         const errorData = await response.json() as { error?: string }
@@ -397,7 +407,7 @@ function DashboardContent() {
             )}
 
             {/* Error Message */}
-            {keyGenError && (
+            {keyGenError && !keyMetadata && !apiKey && (
               <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
                 <p className="text-sm text-red-800 dark:text-red-200">
                   {keyGenError}
