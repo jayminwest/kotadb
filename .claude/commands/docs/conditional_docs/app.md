@@ -156,6 +156,14 @@ Use this reference to decide which KotaDB application layer documentation source
     - When troubleshooting Docker build context size or performance issues
     - When adding new files/directories that should be excluded from production builds
 
+- docs/specs/chore-440-sentry-logging-audit.md
+  - Conditions:
+    - When implementing error handling or debugging production issues
+    - When understanding Sentry and structured logging patterns across codebase
+    - When adding new try-catch blocks or error capture logic
+    - When troubleshooting observability infrastructure (Sentry, structured logger)
+    - When needing reference implementations for error context and correlation IDs
+
 - docs/specs/chore-195-dev-start-script.md
   - Conditions:
     - When troubleshooting development environment setup issues

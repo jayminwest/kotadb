@@ -64,7 +64,7 @@ export function isSupportedForAST(filePath: string): boolean {
  * - Comment and token preservation (comment, tokens)
  *
  * On parse error:
- * - Logs error to console.error with file path and message
+ * - Logs error via structured logger with file path and message
  * - Returns null (does not throw)
  * - Allows indexing to continue for other files
  *
