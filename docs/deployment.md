@@ -2,6 +2,16 @@
 
 This guide covers deploying KotaDB to Fly.io for staging and production environments.
 
+## Automated Deployments
+
+**Note**: KotaDB uses GitHub App integrations for automated deployments. Merges to `develop` and `main` automatically trigger:
+- **Database migrations** via Supabase GitHub App
+- **API deployments** via Fly.io GitHub App
+
+See [Automated Deployments](../.claude/commands/docs/automated-deployments.md) for details on how this works.
+
+**This guide documents manual deployment procedures** for initial setup, emergency hotfixes, or troubleshooting.
+
 ## Prerequisites
 
 ### Required Tools
@@ -24,19 +34,9 @@ Before deploying, you must have a Supabase project configured for your target en
 
 **Run Database Migrations:**
 
-From your local development environment:
+**Automated (Recommended)**: Migrations are automatically applied via the Supabase GitHub App on merges to `develop` and `main`. See [Automated Deployments](../.claude/commands/docs/automated-deployments.md).
 
-```bash
-# Set environment variables for your target Supabase project
-export SUPABASE_URL="https://your-project.supabase.co"
-export SUPABASE_SERVICE_KEY="your-service-role-key"
-
-# Apply migrations from app/src/db/migrations/
-cd app
-bun run scripts/apply-migrations.ts
-```
-
-Alternatively, use the Supabase CLI to apply migrations from `app/supabase/migrations/`:
+**Manual (Initial Setup or Emergency)**: Use the Supabase CLI to apply migrations from `app/supabase/migrations/`:
 
 ```bash
 # Link to your remote project
@@ -46,6 +46,8 @@ supabase link --project-ref your-project-id
 # Push migrations
 supabase db push
 ```
+
+**Note**: Manual migrations should only be used for initial project setup or emergency hotfixes outside the normal git flow.
 
 **Verify Migration Status:**
 

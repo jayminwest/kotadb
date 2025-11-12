@@ -4,6 +4,11 @@
  * Reusable schema helpers for frequent validation patterns
  */
 
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "validation-common-schemas" });
+
 /**
  * Validates relative file paths (no leading slash)
  * Optionally validates file extension

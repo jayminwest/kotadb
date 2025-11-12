@@ -8,6 +8,10 @@ import { getCachedValidation, setCachedValidation } from "@auth/cache";
 import type { Tier } from "@shared/types/auth";
 import { getServiceClient } from "@db/client";
 import bcrypt from "bcryptjs";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "auth-validator" });
 
 /**
  * Result of successful API key validation.
@@ -233,9 +237,14 @@ export async function validateJwtToken(
 
 		return result;
 	} catch (error) {
-		process.stderr.write(
-			`[Auth] JWT validation error: ${JSON.stringify(error)}\n`,
-		);
+		logger.error("JWT validation error", {
+			error,
+		});
+		Sentry.captureException(error as Error, {
+			extra: {
+				message: "JWT validation failed",
+			},
+		});
 		return null;
 	}
 }
@@ -255,8 +264,15 @@ export async function updateLastUsed(keyId: string): Promise<void> {
 			.eq("key_id", keyId);
 	} catch (error) {
 		// Non-critical operation - log error but don't throw
-		process.stderr.write(
-			`[Auth] Failed to update last_used_at for key ${keyId}: ${JSON.stringify(error)}\n`,
-		);
+		logger.warn("Failed to update last_used_at timestamp", {
+			keyId,
+			error,
+		});
+		Sentry.captureException(error as Error, {
+			extra: {
+				keyId,
+				message: "Failed to update last_used_at timestamp",
+			},
+		});
 	}
 }

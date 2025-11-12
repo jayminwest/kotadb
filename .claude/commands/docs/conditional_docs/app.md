@@ -139,11 +139,30 @@ Use this reference to decide which KotaDB application layer documentation source
     - When debugging test environment variable loading in CI
     - When monitoring CI performance or consumption
 
+- .claude/commands/docs/automated-deployments.md
+  - Conditions:
+    - When understanding how database migrations are automatically applied via Supabase GitHub App
+    - When troubleshooting "Supabase Preview" check failures or migration conflicts
+    - When understanding automatic API deployments to Fly.io staging/production
+    - When debugging "Fly.io" check failures or deployment issues
+    - When needing to override automated deployments for emergency hotfixes
+    - When monitoring deployment history or status via GitHub checks
+    - When understanding the difference between automated and manual deployment procedures
+    - When working with PR preview branches and ephemeral database instances
+
 - app/.dockerignore
   - Conditions:
     - When working on Docker builds, Fly.io deployments, or build optimization
     - When troubleshooting Docker build context size or performance issues
     - When adding new files/directories that should be excluded from production builds
+
+- docs/specs/chore-440-sentry-logging-audit.md
+  - Conditions:
+    - When implementing error handling or debugging production issues
+    - When understanding Sentry and structured logging patterns across codebase
+    - When adding new try-catch blocks or error capture logic
+    - When troubleshooting observability infrastructure (Sentry, structured logger)
+    - When needing reference implementations for error context and correlation IDs
 
 - docs/specs/chore-195-dev-start-script.md
   - Conditions:

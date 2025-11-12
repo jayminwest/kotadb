@@ -6,6 +6,8 @@
  * simple HTTP transport (no SSE streaming, no npx wrapper needed).
  */
 
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import {
@@ -27,6 +29,8 @@ import {
 	executeAnalyzeChangeImpact,
 	executeValidateImplementationSpec,
 } from "./tools";
+
+const logger = createLogger({ module: "mcp-server" });
 
 /**
  * MCP Server context passed to tool handlers via closure
@@ -70,59 +74,79 @@ export function createMcpServer(context: McpServerContext): Server {
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
 		const { name, arguments: toolArgs } = request.params;
 
+		logger.info("MCP tool call received", { tool_name: name, user_id: context.userId });
+
 		let result: unknown;
 
-		switch (name) {
-			case "search_code":
-				result = await executeSearchCode(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "index_repository":
-				result = await executeIndexRepository(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "list_recent_files":
-				result = await executeListRecentFiles(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "search_dependencies":
-				result = await executeSearchDependencies(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "analyze_change_impact":
-				result = await executeAnalyzeChangeImpact(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "validate_implementation_spec":
-				result = await executeValidateImplementationSpec(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			default:
-				throw new Error(`Unknown tool: ${name}`);
+		try {
+			switch (name) {
+				case "search_code":
+					result = await executeSearchCode(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "index_repository":
+					result = await executeIndexRepository(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "list_recent_files":
+					result = await executeListRecentFiles(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "search_dependencies":
+					result = await executeSearchDependencies(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "analyze_change_impact":
+					result = await executeAnalyzeChangeImpact(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "validate_implementation_spec":
+					result = await executeValidateImplementationSpec(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				default:
+					const error = new Error(`Unknown tool: ${name}`);
+					logger.error("Unknown MCP tool requested", error, { tool_name: name, user_id: context.userId });
+					Sentry.captureException(error, {
+						tags: { tool_name: name, user_id: context.userId },
+					});
+					throw error;
+			}
+
+			logger.debug("MCP tool call succeeded", { tool_name: name, user_id: context.userId });
+		} catch (error) {
+			logger.error("MCP tool call failed", error instanceof Error ? error : new Error(String(error)), {
+				tool_name: name,
+				user_id: context.userId,
+			});
+			Sentry.captureException(error, {
+				tags: { tool_name: name, user_id: context.userId },
+			});
+			throw error;
 		}
 
 		// SDK expects content blocks in response

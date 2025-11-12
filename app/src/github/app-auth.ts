@@ -7,6 +7,8 @@
  */
 
 import { App } from "@octokit/app";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
 import type {
 	CachedToken,
 	GitHubAppConfig,
@@ -14,6 +16,8 @@ import type {
 	TokenGenerationOptions,
 } from "./types";
 import { GitHubAppError } from "./types";
+
+const logger = createLogger({ module: "github-app-auth" });
 
 // In-memory token cache: Map<installationId, CachedToken>
 const tokenCache = new Map<number, CachedToken>();
@@ -39,17 +43,23 @@ function getGitHubAppConfig(): GitHubAppConfig {
 	const privateKey = process.env.GITHUB_APP_PRIVATE_KEY;
 
 	if (!appId) {
-		throw new GitHubAppError(
+		const error = new GitHubAppError(
 			"Missing GITHUB_APP_ID environment variable. Set this to your GitHub App ID from app settings.",
 			"MISSING_APP_ID",
 		);
+		logger.error("Missing GITHUB_APP_ID environment variable", error);
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	if (!privateKey) {
-		throw new GitHubAppError(
+		const error = new GitHubAppError(
 			"Missing GITHUB_APP_PRIVATE_KEY environment variable. Set this to your GitHub App's RSA private key in PEM format.",
 			"MISSING_PRIVATE_KEY",
 		);
+		logger.error("Missing GITHUB_APP_PRIVATE_KEY environment variable", error);
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	return { appId, privateKey };
@@ -68,11 +78,14 @@ function createAppClient(): App {
 			privateKey: config.privateKey,
 		});
 	} catch (error) {
-		throw new GitHubAppError(
+		const appError = new GitHubAppError(
 			"Failed to initialize GitHub App client. Verify GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY are valid.",
 			"INVALID_CREDENTIALS",
 			error,
 		);
+		logger.error("Failed to initialize GitHub App client", appError);
+		Sentry.captureException(appError);
+		throw appError;
 	}
 }
 
@@ -93,9 +106,9 @@ function evictStaleTokens(): void {
 	for (const installationId of staleInstallationIds) {
 		tokenCache.delete(installationId);
 		lastAccessTime.delete(installationId);
-		process.stdout.write(
-			`[GitHub App] Evicted stale token for installation ${installationId}\n`,
-		);
+		logger.info("Evicted stale token for installation", {
+			installation_id: installationId,
+		});
 	}
 }
 
@@ -116,9 +129,9 @@ function enforceCacheSizeLimit(): void {
 	for (const [installationId] of toRemove) {
 		tokenCache.delete(installationId);
 		lastAccessTime.delete(installationId);
-		process.stdout.write(
-			`[GitHub App] Evicted token for installation ${installationId} (cache size limit)\n`,
-		);
+		logger.info("Evicted token for installation (cache size limit)", {
+			installation_id: installationId,
+		});
 	}
 }
 
@@ -136,9 +149,9 @@ async function generateInstallationToken(
 	const app = createAppClient();
 
 	try {
-		process.stdout.write(
-			`[GitHub App] Generating token for installation ${installationId}\n`,
-		);
+		logger.info("Generating installation token", {
+			installation_id: installationId,
+		});
 
 		// Create installation access token using Octokit App SDK
 		const response = await app.octokit.request(
@@ -158,9 +171,10 @@ async function generateInstallationToken(
 				| "selected",
 		};
 
-		process.stdout.write(
-			`[GitHub App] Token generated for installation ${installationId}, expires at ${token.expires_at}\n`,
-		);
+		logger.info("Installation token generated", {
+			installation_id: installationId,
+			expires_at: token.expires_at,
+		});
 
 		return token;
 	} catch (error: unknown) {
@@ -168,26 +182,41 @@ async function generateInstallationToken(
 		const apiError = error as { response?: { status: number; data?: unknown } };
 
 		if (apiError.response?.status === 404) {
-			throw new GitHubAppError(
+			const appError = new GitHubAppError(
 				`Installation ${installationId} not found. Verify the installation ID is correct.`,
 				"INSTALLATION_NOT_FOUND",
 				error,
 			);
+			logger.error("GitHub App installation not found", appError, {
+				installation_id: installationId,
+			});
+			Sentry.captureException(appError);
+			throw appError;
 		}
 
 		if (apiError.response?.status === 401) {
-			throw new GitHubAppError(
+			const appError = new GitHubAppError(
 				"GitHub App authentication failed. Verify GITHUB_APP_ID and GITHUB_APP_PRIVATE_KEY are correct.",
 				"AUTHENTICATION_FAILED",
 				error,
 			);
+			logger.error("GitHub App authentication failed", appError, {
+				installation_id: installationId,
+			});
+			Sentry.captureException(appError);
+			throw appError;
 		}
 
-		throw new GitHubAppError(
+		const appError = new GitHubAppError(
 			`Failed to generate installation token: ${error instanceof Error ? error.message : String(error)}`,
 			"TOKEN_GENERATION_FAILED",
 			error,
 		);
+		logger.error("Failed to generate installation token", appError, {
+			installation_id: installationId,
+		});
+		Sentry.captureException(appError);
+		throw appError;
 	}
 }
 
@@ -218,15 +247,15 @@ export async function getInstallationToken(
 	if (cached) {
 		// Return cached token if it's still valid (more than 5 minutes remaining)
 		if (cached.expiresAt - now > REFRESH_THRESHOLD_MS) {
-			process.stdout.write(
-				`[GitHub App] Using cached token for installation ${installationId}\n`,
-			);
+			logger.info("Using cached installation token", {
+				installation_id: installationId,
+			});
 			return cached.token;
 		}
 
-		process.stdout.write(
-			`[GitHub App] Token for installation ${installationId} is expiring soon, refreshing\n`,
-		);
+		logger.info("Installation token expiring soon, refreshing", {
+			installation_id: installationId,
+		});
 	}
 
 	// Generate new token
@@ -253,13 +282,13 @@ export function clearTokenCache(installationId?: number): void {
 	if (installationId !== undefined) {
 		tokenCache.delete(installationId);
 		lastAccessTime.delete(installationId);
-		process.stdout.write(
-			`[GitHub App] Cleared token cache for installation ${installationId}\n`,
-		);
+		logger.info("Cleared token cache for installation", {
+			installation_id: installationId,
+		});
 	} else {
 		tokenCache.clear();
 		lastAccessTime.clear();
-		process.stdout.write("[GitHub App] Cleared all token cache\n");
+		logger.info("Cleared all token cache");
 	}
 }
 

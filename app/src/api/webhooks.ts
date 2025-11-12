@@ -9,6 +9,10 @@ import type Stripe from "stripe";
 import { getStripeClient } from "./stripe";
 import { getServiceClient } from "@db/client";
 import type { Tier } from "@shared/types/auth";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "api-webhooks" });
 
 /**
  * Helper type for Stripe Subscription with full property access.
@@ -37,17 +41,29 @@ export async function verifyWebhookSignature(
 ): Promise<Stripe.Event> {
 	const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
 	if (!webhookSecret) {
-		throw new Error(
+		const error = new Error(
 			"STRIPE_WEBHOOK_SECRET environment variable is not configured",
 		);
+		logger.error("Webhook secret not configured", error);
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	const stripe = getStripeClient();
 
 	try {
-		return await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
+		const event = await stripe.webhooks.constructEventAsync(rawBody, signature, webhookSecret);
+		logger.info("Webhook signature verified", {
+			eventType: event.type,
+			eventId: event.id,
+		});
+		return event;
 	} catch (err) {
 		const error = err as Error;
+		logger.error("Webhook signature verification failed", error, {
+			signaturePrefix: signature.substring(0, 20),
+		});
+		Sentry.captureException(error);
 		throw new Error(`Webhook signature verification failed: ${error.message}`);
 	}
 }
@@ -82,25 +98,27 @@ export async function handleInvoicePaid(
 		typeof invoice.customer === "string" ? invoice.customer : invoice.customer?.id;
 
 	if (!subscriptionId || !customerId) {
-		process.stderr.write(
-			`Invoice ${invoice.id} has no subscription or customer ID, skipping\n`
-		);
+		logger.warn("Invoice missing subscription or customer ID", {
+			invoiceId: invoice.id,
+			hasSubscriptionId: !!subscriptionId,
+			hasCustomerId: !!customerId,
+		});
 		return;
 	}
 
 	const invoiceLines = (invoice as any).lines;
 	if (!invoiceLines || !invoiceLines.data || invoiceLines.data.length === 0) {
-		process.stderr.write(
-			`Invoice ${invoice.id} has no line items, skipping\n`
-		);
+		logger.warn("Invoice has no line items", {
+			invoiceId: invoice.id,
+		});
 		return;
 	}
 
 	const lineItem = invoiceLines.data[0];
 	if (!lineItem?.period) {
-		process.stderr.write(
-			`Invoice ${invoice.id} line item has no period data, skipping\n`
-		);
+		logger.warn("Invoice line item missing period data", {
+			invoiceId: invoice.id,
+		});
 		return;
 	}
 
@@ -119,9 +137,11 @@ export async function handleInvoicePaid(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		process.stderr.write(
-			`Invoice ${invoice.id} has no user_id in subscription or customer metadata, skipping (subscription: ${subscriptionId})\n`,
-		);
+		logger.warn("Invoice missing user_id in metadata", {
+			invoiceId: invoice.id,
+			subscriptionId,
+			customerId,
+		});
 		return; // Return success to avoid Stripe webhook retries
 	}
 
@@ -153,7 +173,14 @@ export async function handleInvoicePaid(
 		);
 
 	if (subError) {
-		throw new Error(`Failed to upsert subscription: ${subError.message}`);
+		const error = new Error(`Failed to upsert subscription: ${subError.message}`);
+		logger.error("Subscription upsert failed", error, {
+			subscriptionId,
+			userId,
+			tier,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	// Update api_keys tier
@@ -163,12 +190,22 @@ export async function handleInvoicePaid(
 		.eq("user_id", userId);
 
 	if (keyError) {
-		throw new Error(`Failed to update API key tier: ${keyError.message}`);
+		const error = new Error(`Failed to update API key tier: ${keyError.message}`);
+		logger.error("API key tier update failed", error, {
+			userId,
+			tier,
+			subscriptionId,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
-	process.stdout.write(
-		`Subscription ${subscriptionId} activated for user ${userId} (tier: ${tier})\n`,
-	);
+	logger.info("Subscription activated", {
+		subscriptionId,
+		userId,
+		tier,
+		invoiceId: invoice.id,
+	});
 }
 
 /**
@@ -191,39 +228,53 @@ export async function handleCheckoutSessionCompleted(
 			: session.subscription?.id;
 
 	if (!subscriptionId || !customerId) {
-		process.stderr.write(
-			"Checkout session has no subscription or customer ID, skipping\n",
-		);
+		logger.warn("Checkout session missing subscription or customer ID", {
+			sessionId: session.id,
+			hasSubscriptionId: !!subscriptionId,
+			hasCustomerId: !!customerId,
+		});
 		return;
 	}
 
 	const stripe = getStripeClient();
-	process.stdout.write(`[Webhook] Retrieving subscription: ${subscriptionId}\n`);
+	logger.info("Retrieving subscription for checkout", {
+		subscriptionId,
+		sessionId: session.id,
+	});
 	const subscription = (await stripe.subscriptions.retrieve(subscriptionId)) as Stripe.Subscription;
-	process.stdout.write(`[Webhook] Subscription status: ${subscription.status}, current_period_start: ${(subscription as any).current_period_start}, current_period_end: ${(subscription as any).current_period_end}\n`);
+	logger.info("Subscription retrieved", {
+		subscriptionId,
+		status: subscription.status,
+		currentPeriodStart: (subscription as any).current_period_start,
+		currentPeriodEnd: (subscription as any).current_period_end,
+	});
 
 	// Get user_id from subscription metadata or customer metadata
 	const customer = await stripe.customers.retrieve(customerId);
-	process.stdout.write(`[Webhook] Customer retrieved, checking metadata\n`);
 	const userId =
 		subscription.metadata?.user_id ||
 		(customer.deleted ? undefined : customer.metadata?.user_id);
-	process.stdout.write(`[Webhook] user_id extracted: ${userId || 'NOT FOUND'}\n`);
 
 	if (!userId) {
-		process.stderr.write(
-			`Checkout session ${session.id} has no user_id in subscription or customer metadata, skipping (subscription: ${subscriptionId})\n`,
-		);
+		logger.warn("Checkout session missing user_id in metadata", {
+			sessionId: session.id,
+			subscriptionId,
+			customerId,
+		});
 		return; // Return success to avoid Stripe webhook retries
 	}
+
+	logger.info("User ID extracted from checkout", {
+		userId,
+		subscriptionId,
+		sessionId: session.id,
+	});
 
 	// Determine tier from price ID
 	const priceId = subscription.items.data[0]?.price.id;
 	const tier = getTierFromPriceId(priceId);
 
 	const supabase = getServiceClient();
-
-	process.stdout.write(`[Webhook] Upserting subscription for user ${userId}\n`);
 
 	// Access period fields (Stripe SDK types don't include these but they exist at runtime)
 	const currentPeriodStart = (subscription as any).current_period_start;
@@ -234,21 +285,22 @@ export async function handleCheckoutSessionCompleted(
 	// If period fields are undefined, skip checkout handler and rely on invoice.paid event
 	// This happens when checkout.session.completed fires before subscription is fully initialized
 	if (!currentPeriodStart || !currentPeriodEnd) {
-		process.stdout.write(
-			`[Webhook] Subscription ${subscriptionId} (status: ${subscription.status}) missing billing period data. ` +
-			`Skipping checkout handler, will process via invoice.paid event. ` +
-			`(start: ${currentPeriodStart}, end: ${currentPeriodEnd})\n`
-		);
+		logger.info("Subscription missing billing period data, deferring to invoice.paid", {
+			subscriptionId,
+			status: subscription.status,
+			hasPeriodStart: !!currentPeriodStart,
+			hasPeriodEnd: !!currentPeriodEnd,
+		});
 		return; // Return success to avoid Stripe retries
 	}
 
 	// Validate timestamp types
 	if (typeof currentPeriodStart !== 'number' || typeof currentPeriodEnd !== 'number') {
-		process.stdout.write(
-			`[Webhook] Subscription ${subscriptionId} has invalid period types ` +
-			`(start: ${typeof currentPeriodStart}, end: ${typeof currentPeriodEnd}). ` +
-			`Skipping checkout handler, will process via invoice.paid event.\n`
-		);
+		logger.warn("Subscription has invalid period types, deferring to invoice.paid", {
+			subscriptionId,
+			periodStartType: typeof currentPeriodStart,
+			periodEndType: typeof currentPeriodEnd,
+		});
 		return;
 	}
 
@@ -258,10 +310,22 @@ export async function handleCheckoutSessionCompleted(
 
 	// Validate Date objects are valid
 	if (Number.isNaN(periodStart.getTime())) {
-		throw new Error(`Invalid Date created from current_period_start: ${currentPeriodStart}`);
+		const error = new Error(`Invalid Date created from current_period_start: ${currentPeriodStart}`);
+		logger.error("Invalid period start timestamp", error, {
+			subscriptionId,
+			currentPeriodStart,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 	if (Number.isNaN(periodEnd.getTime())) {
-		throw new Error(`Invalid Date created from current_period_end: ${currentPeriodEnd}`);
+		const error = new Error(`Invalid Date created from current_period_end: ${currentPeriodEnd}`);
+		logger.error("Invalid period end timestamp", error, {
+			subscriptionId,
+			currentPeriodEnd,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	// Upsert subscription record (idempotent for duplicate events)
@@ -286,7 +350,15 @@ export async function handleCheckoutSessionCompleted(
 		);
 
 	if (subError) {
-		throw new Error(`Failed to upsert subscription: ${subError.message}`);
+		const error = new Error(`Failed to upsert subscription: ${subError.message}`);
+		logger.error("Subscription upsert failed in checkout handler", error, {
+			subscriptionId,
+			userId,
+			tier,
+			sessionId: session.id,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	// Update ALL api_keys tier for this user (not just primary key)
@@ -296,12 +368,23 @@ export async function handleCheckoutSessionCompleted(
 		.eq("user_id", userId);
 
 	if (keyError) {
-		throw new Error(`Failed to update API key tier: ${keyError.message}`);
+		const error = new Error(`Failed to update API key tier: ${keyError.message}`);
+		logger.error("API key tier update failed in checkout handler", error, {
+			userId,
+			tier,
+			subscriptionId,
+			sessionId: session.id,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
-	process.stdout.write(
-		`Subscription ${subscriptionId} created for user ${userId} (tier: ${tier})\n`,
-	);
+	logger.info("Subscription created from checkout", {
+		subscriptionId,
+		userId,
+		tier,
+		sessionId: session.id,
+	});
 }
 
 /**
@@ -325,9 +408,10 @@ export async function handleSubscriptionUpdated(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		process.stderr.write(
-			`Subscription update event has no user_id in metadata, skipping (subscription: ${subscription.id})\n`,
-		);
+		logger.warn("Subscription update missing user_id in metadata", {
+			subscriptionId: subscription.id,
+			customerId,
+		});
 		return; // Return success to avoid Stripe webhook retries
 	}
 
@@ -362,7 +446,15 @@ export async function handleSubscriptionUpdated(
 		.eq("stripe_subscription_id", subscription.id);
 
 	if (subError) {
-		throw new Error(`Failed to update subscription: ${subError.message}`);
+		const error = new Error(`Failed to update subscription: ${subError.message}`);
+		logger.error("Subscription update failed", error, {
+			subscriptionId: subscription.id,
+			userId,
+			status: subscription.status,
+			tier,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	// Update api_keys tier if status is active
@@ -373,13 +465,24 @@ export async function handleSubscriptionUpdated(
 			.eq("user_id", userId);
 
 		if (keyError) {
-			throw new Error(`Failed to update API key tier: ${keyError.message}`);
+			const error = new Error(`Failed to update API key tier: ${keyError.message}`);
+			logger.error("API key tier update failed in subscription update", error, {
+				userId,
+				tier,
+				subscriptionId: subscription.id,
+			});
+			Sentry.captureException(error);
+			throw error;
 		}
 	}
 
-	process.stdout.write(
-		`Subscription ${subscription.id} updated for user ${userId} (status: ${subscription.status}, tier: ${tier})\n`,
-	);
+	logger.info("Subscription updated", {
+		subscriptionId: subscription.id,
+		userId,
+		status: subscription.status,
+		tier,
+		isActive: subscription.status === "active",
+	});
 }
 
 /**
@@ -403,9 +506,10 @@ export async function handleSubscriptionDeleted(
 		(customer.deleted ? undefined : customer.metadata?.user_id);
 
 	if (!userId) {
-		process.stderr.write(
-			`Subscription deleted event has no user_id in metadata, skipping (subscription: ${subscription.id})\n`,
-		);
+		logger.warn("Subscription deletion missing user_id in metadata", {
+			subscriptionId: subscription.id,
+			customerId,
+		});
 		return; // Return success to avoid Stripe webhook retries
 	}
 
@@ -422,7 +526,13 @@ export async function handleSubscriptionDeleted(
 		.eq("stripe_subscription_id", subscription.id);
 
 	if (subError) {
-		throw new Error(`Failed to update subscription: ${subError.message}`);
+		const error = new Error(`Failed to update subscription: ${subError.message}`);
+		logger.error("Subscription cancellation update failed", error, {
+			subscriptionId: subscription.id,
+			userId,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
 	// Downgrade api_keys tier to free
@@ -432,10 +542,20 @@ export async function handleSubscriptionDeleted(
 		.eq("user_id", userId);
 
 	if (keyError) {
-		throw new Error(`Failed to downgrade API key tier: ${keyError.message}`);
+		const error = new Error(`Failed to downgrade API key tier: ${keyError.message}`);
+		logger.error("API key downgrade failed in subscription deletion", error, {
+			userId,
+			subscriptionId: subscription.id,
+		});
+		Sentry.captureException(error);
+		throw error;
 	}
 
-	process.stdout.write(`Subscription ${subscription.id} canceled for user ${userId}\n`);
+	logger.info("Subscription canceled and tier downgraded", {
+		subscriptionId: subscription.id,
+		userId,
+		newTier: "free",
+	});
 }
 
 /**

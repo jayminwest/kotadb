@@ -6,6 +6,10 @@
 
 import { z } from "zod";
 import type { ValidationResponse, ValidationError } from "@shared/types/validation";
+import { Sentry } from "../instrument.js";
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "validation-schemas" });
 
 /**
  * Converts a JSON schema object to a Zod schema
@@ -107,14 +111,27 @@ export function validateOutput(
     if ((schema as any).type === "object" || (schema as any).type === "array") {
       try {
         parsedOutput = JSON.parse(output);
-      } catch {
+      } catch (parseError) {
         // If JSON parse fails, return error
+        const schemaType = (schema as any).type;
+        logger.error("Failed to parse output as JSON", {
+          schemaType,
+          outputLength: output.length,
+          outputPreview: output.substring(0, 100)
+        });
+        Sentry.captureException(parseError, {
+          extra: {
+            schemaType,
+            outputLength: output.length,
+            outputPreview: output.substring(0, 100)
+          }
+        });
         return {
           valid: false,
           errors: [
             {
               path: "root",
-              message: `Expected JSON ${(schema as any).type}, received non-JSON string`
+              message: `Expected JSON ${schemaType}, received non-JSON string`
             }
           ]
         };
@@ -134,18 +151,35 @@ export function validateOutput(
       message: err.message
     }));
 
+    logger.warn("Validation failed", {
+      schemaType: (schema as any).type,
+      errorCount: errors.length,
+      errors: errors.map(e => ({ path: e.path, message: e.message }))
+    });
+
     return {
       valid: false,
       errors
     };
   } catch (error) {
     // Schema parsing error
+    const errorMessage = error instanceof Error ? error.message : "Invalid schema format";
+    logger.error("Schema parsing error", {
+      schemaType: (schema as any).type,
+      error: errorMessage
+    });
+    Sentry.captureException(error, {
+      extra: {
+        schemaType: (schema as any).type,
+        schemaKeys: Object.keys(schema)
+      }
+    });
     return {
       valid: false,
       errors: [
         {
           path: "schema",
-          message: error instanceof Error ? error.message : "Invalid schema format"
+          message: errorMessage
         }
       ]
     };
