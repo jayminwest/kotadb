@@ -27,6 +27,7 @@ describe("Health Endpoint Queue Metrics", () => {
 		const response = await fetch(`${BASE_URL}/health`);
 		const data = (await response.json()) as {
 			status: string;
+			version: string;
 			timestamp: string;
 			queue: {
 				depth: number;
@@ -38,6 +39,8 @@ describe("Health Endpoint Queue Metrics", () => {
 
 		expect(response.status).toBe(200);
 		expect(data.status).toBe("ok");
+		expect(data.version).toBeDefined();
+		expect(data.version).toMatch(/^\d+\.\d+\.\d+$/);
 		expect(data.timestamp).toBeDefined();
 
 		// Queue metrics should be present
@@ -54,6 +57,7 @@ describe("Health Endpoint Queue Metrics", () => {
 		const response = await fetch(`${BASE_URL}/health`);
 		const data = (await response.json()) as {
 			status: string;
+			version: string;
 			timestamp: string;
 			queue: {
 				depth: number;
@@ -65,6 +69,8 @@ describe("Health Endpoint Queue Metrics", () => {
 
 		expect(response.status).toBe(200);
 		expect(data.status).toBe("ok");
+		expect(data.version).toBeDefined();
+		expect(data.version).toMatch(/^\d+\.\d+\.\d+$/);
 		expect(data.timestamp).toBeDefined();
 		// Queue can be null if not available, but should be defined
 		expect(data).toHaveProperty("queue");
