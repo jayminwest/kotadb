@@ -10,6 +10,7 @@ const logger = createLogger({ module: "api-queries" });
 
 export interface SearchOptions {
 	repositoryId?: string;
+	projectId?: string;
 	limit?: number;
 }
 
@@ -332,6 +333,28 @@ export async function searchFiles(
 ): Promise<IndexedFile[]> {
 	const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
 
+	// If project filter is specified, get repository IDs for that project
+	let repositoryIds: string[] | undefined;
+	if (options.projectId) {
+		const { data: projectRepos, error: projectError } = await client
+			.from("project_repositories")
+			.select("repository_id")
+			.eq("project_id", options.projectId);
+
+		if (projectError) {
+			throw new Error(
+				`Failed to fetch project repositories: ${projectError.message}`,
+			);
+		}
+
+		repositoryIds = projectRepos?.map((pr) => pr.repository_id) ?? [];
+
+		// If project has no repositories, return empty results
+		if (repositoryIds.length === 0) {
+			return [];
+		}
+	}
+
 	let query = client
 		.from("indexed_files")
 		.select("id, repository_id, path, content, metadata, indexed_at")
@@ -339,8 +362,11 @@ export async function searchFiles(
 		.order("indexed_at", { ascending: false })
 		.limit(limit);
 
+	// Apply repository filter (single repo or project's repos)
 	if (options.repositoryId) {
 		query = query.eq("repository_id", options.repositoryId);
+	} else if (repositoryIds) {
+		query = query.in("repository_id", repositoryIds);
 	}
 
 	const { data, error } = await query;

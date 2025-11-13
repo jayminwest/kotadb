@@ -5,6 +5,8 @@
  * for type-safe queries and ORM operations.
  */
 
+export * from "./projects";
+
 /**
  * Repository entity from repositories table.
  * Represents a Git repository indexed by KotaDB.

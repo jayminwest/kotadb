@@ -23,6 +23,20 @@ import {
 	runIndexingWorkflow,
 	searchFiles,
 } from "./queries";
+import {
+	createProject,
+	listProjects,
+	getProject,
+	updateProject,
+	deleteProject,
+	addRepositoryToProject,
+	removeRepositoryFromProject,
+} from "./projects";
+import type {
+	CreateProjectRequest,
+	UpdateProjectRequest,
+} from "@shared/types";
+import { triggerAutoReindex } from "./auto-reindex";
 import { createIndexJob, updateJobStatus, getJobStatus } from "../queue/job-tracker";
 import {
 	verifyWebhookSignature,
@@ -538,11 +552,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		}
 
 		const repositoryId = req.query.repository as string | undefined;
+		const projectId = req.query.project_id as string | undefined;
 		const limit = req.query.limit ? Number(req.query.limit) : undefined;
 
 		try {
 			const results = await searchFiles(supabase, term, context.userId, {
 				repositoryId,
+				projectId,
 				limit,
 			});
 
@@ -1047,6 +1063,212 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				reset: context.rateLimit?.resetAt,
 			},
 		});
+	});
+
+	// ============================================================================
+	// Project Management Endpoints
+	// ============================================================================
+
+	// POST /api/projects - Create a new project
+	app.post("/api/projects", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const payload = req.body as Partial<CreateProjectRequest>;
+
+		if (!payload?.name) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Field 'name' is required" });
+		}
+
+		try {
+			const projectId = await createProject(supabase, context.userId, {
+				name: payload.name,
+				description: payload.description,
+				repository_ids: payload.repository_ids,
+			});
+
+			addRateLimitHeaders(res, context.rateLimit);
+			res.status(201).json({ id: projectId });
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to create project", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// GET /api/projects - List all projects
+	app.get("/api/projects", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+
+		try {
+			const projects = await listProjects(supabase, context.userId);
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json({ projects });
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to list projects", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// GET /api/projects/:id - Get project details
+	app.get("/api/projects/:id", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const projectId = req.params.id;
+
+		if (!projectId) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Project ID is required" });
+		}
+
+		try {
+			const project = await getProject(supabase, context.userId, projectId);
+
+			if (!project) {
+				addRateLimitHeaders(res, context.rateLimit);
+				return res.status(404).json({ error: "Project not found" });
+			}
+
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json(project);
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to get project", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// PATCH /api/projects/:id - Update project
+	app.patch("/api/projects/:id", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const projectId = req.params.id;
+		const payload = req.body as Partial<UpdateProjectRequest>;
+
+		if (!projectId) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Project ID is required" });
+		}
+
+		try {
+			await updateProject(supabase, context.userId, projectId, payload);
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json({ success: true });
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to update project", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// DELETE /api/projects/:id - Delete project
+	app.delete("/api/projects/:id", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const projectId = req.params.id;
+
+		if (!projectId) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Project ID is required" });
+		}
+
+		try {
+			await deleteProject(supabase, context.userId, projectId);
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json({ success: true });
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to delete project", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// POST /api/projects/:id/repositories/:repoId - Add repository to project
+	app.post("/api/projects/:id/repositories/:repoId", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const { id: projectId, repoId } = req.params;
+
+		if (!projectId || !repoId) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Project ID and Repository ID are required" });
+		}
+
+		try {
+			await addRepositoryToProject(supabase, context.userId, projectId, repoId);
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json({ success: true });
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to add repository to project", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// DELETE /api/projects/:id/repositories/:repoId - Remove repository from project
+	app.delete("/api/projects/:id/repositories/:repoId", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+		const { id: projectId, repoId } = req.params;
+
+		if (!projectId || !repoId) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(400).json({ error: "Project ID and Repository ID are required" });
+		}
+
+		try {
+			await removeRepositoryFromProject(supabase, context.userId, projectId, repoId);
+			addRateLimitHeaders(res, context.rateLimit);
+			res.json({ success: true });
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to remove repository from project", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// POST /api/auto-reindex - Trigger auto-reindex for user's project repositories
+	app.post("/api/auto-reindex", async (req: AuthenticatedRequest, res: Response) => {
+		const context = req.authContext!;
+
+		try {
+			const result = await triggerAutoReindex(context);
+
+			if (result.rateLimited) {
+				addRateLimitHeaders(res, context.rateLimit);
+				return res.status(429).json({
+					triggered: false,
+					reason: result.reason,
+				});
+			}
+
+			addRateLimitHeaders(res, context.rateLimit);
+
+			// Add X-Auto-Reindex-Triggered header with job count
+			res.set("X-Auto-Reindex-Triggered", String(result.jobCount));
+
+			res.json({
+				triggered: result.triggered,
+				jobCount: result.jobCount,
+				jobIds: result.jobIds,
+				reason: result.reason,
+			});
+		} catch (error) {
+			addRateLimitHeaders(res, context.rateLimit);
+			const err = error as Error;
+			logger.error("Failed to trigger auto-reindex", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: err.message });
+		}
 	});
 
 	// Sentry error handler middleware (captures errors for remote monitoring)
