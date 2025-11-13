@@ -51,6 +51,37 @@ interface AuthenticatedRequest extends Request {
 	authContext?: AuthContext;
 }
 
+/**
+ * Cached API version from package.json
+ */
+let apiVersion: string | null = null;
+
+/**
+ * Extract version from package.json
+ * Cached at module load to avoid repeated file reads
+ */
+async function loadApiVersion(): Promise<string> {
+	if (apiVersion !== null) {
+		return apiVersion;
+	}
+
+	try {
+		// Dynamic import with path relative to this file
+		const pkg = await import("../../package.json", { with: { type: "json" } });
+		apiVersion = pkg.default?.version || pkg.version || "unknown";
+		return apiVersion;
+	} catch (error) {
+		logger.warn("Failed to load API version from package.json", { error });
+		apiVersion = "unknown";
+		return apiVersion;
+	}
+}
+
+// Load version at module initialization
+loadApiVersion().catch(() => {
+	// Silently fail - version will default to "unknown"
+});
+
 export function createExpressApp(supabase: SupabaseClient): Express {
 	const app = express();
 
@@ -90,6 +121,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 			res.json({
 				status: "ok",
+				version: apiVersion || "unknown",
 				timestamp: new Date().toISOString(),
 				queue: {
 					depth: queueInfo?.queuedCount || 0,
@@ -102,6 +134,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			// If queue not available, return basic health status
 			res.json({
 				status: "ok",
+				version: apiVersion || "unknown",
 				timestamp: new Date().toISOString(),
 				queue: null
 			});
