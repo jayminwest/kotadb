@@ -29,13 +29,75 @@ function DashboardContent() {
   const [metadataError, setMetadataError] = useState<string | null>(null)
   const [showResetModal, setShowResetModal] = useState(false)
   const [showRevokeModal, setShowRevokeModal] = useState(false)
+  const [loadingKey, setLoadingKey] = useState(false)
+  const [keyFetchError, setKeyFetchError] = useState<string | null>(null)
   const router = useRouter()
+
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+
+  // Fetch API key from backend if user is authenticated but context doesn't have key yet
+  useEffect(() => {
+    const fetchApiKeyFromBackend = async () => {
+      if (!user || apiKey || loadingKey || isLoading) {
+        return
+      }
+
+      // Check localStorage first as immediate fallback
+      const storedKey = localStorage.getItem('kotadb_api_key')
+      if (storedKey) {
+        setApiKey(storedKey)
+        return
+      }
+
+      setLoadingKey(true)
+      setKeyFetchError(null)
+
+      try {
+        const { createClient } = await import('@/lib/supabase')
+        const supabase = createClient()
+        const { data: { session }, error: sessionError } = await supabase.auth.getSession()
+
+        if (sessionError || !session) {
+          setKeyFetchError('You must be logged in to view API key')
+          setLoadingKey(false)
+          return
+        }
+
+        const response = await fetch(`${apiUrl}/api/keys/current`, {
+          headers: {
+            'Authorization': `Bearer ${session.access_token}`,
+          },
+        })
+
+        if (response.ok) {
+          const data = await response.json()
+          // API key metadata endpoint doesn't return the secret, so we need to check localStorage
+          // or prompt user to visit dashboard to see their key
+          if (storedKey) {
+            setApiKey(storedKey)
+          }
+        } else if (response.status === 404) {
+          // No key exists - this is expected, not an error
+          setKeyFetchError(null)
+        } else {
+          setKeyFetchError('Failed to load API key. Please try refreshing the page.')
+        }
+      } catch (error) {
+        setKeyFetchError('An unexpected error occurred while loading your API key.')
+      } finally {
+        setLoadingKey(false)
+      }
+    }
+
+    fetchApiKeyFromBackend()
+  }, [user, apiKey, isLoading, loadingKey, apiUrl, setApiKey])
 
   // Fetch key metadata when user is authenticated and has an API key
   useEffect(() => {
     if (user && apiKey) {
       fetchKeyMetadata()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, apiKey])
 
   const handleManageBilling = async () => {
@@ -50,7 +112,6 @@ function DashboardContent() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const response = await fetch(`${apiUrl}/api/subscriptions/create-portal-session`, {
         method: 'POST',
         headers: {
@@ -90,8 +151,6 @@ function DashboardContent() {
     setKeyGenSuccess(null)
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-
       // Get the current session
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
@@ -160,7 +219,6 @@ function DashboardContent() {
     setLoadingMetadata(true)
     setMetadataError(null)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -193,7 +251,6 @@ function DashboardContent() {
 
   const handleResetApiKey = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -228,7 +285,6 @@ function DashboardContent() {
 
   const handleRevokeApiKey = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -498,7 +554,12 @@ function DashboardContent() {
               </div>
             )}
 
-            {apiKey ? (
+            {loadingKey ? (
+              <div className="text-center py-8">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600 mx-auto mb-4"></div>
+                <p className="text-gray-600 dark:text-gray-400">Loading API key...</p>
+              </div>
+            ) : apiKey ? (
               <div className="space-y-3">
                 <div className="flex items-center justify-between p-4 glass-light dark:glass-dark rounded-md">
                   <div className="flex-1 font-mono text-sm text-gray-900 dark:text-gray-100">
@@ -533,6 +594,11 @@ function DashboardContent() {
               </div>
             ) : (
               <div className="text-center py-8">
+                {keyFetchError && (
+                  <div className="mb-4 p-3 bg-yellow-50 dark:bg-yellow-900/20 rounded-md">
+                    <p className="text-sm text-yellow-800 dark:text-yellow-200">{keyFetchError}</p>
+                  </div>
+                )}
                 <p className="text-gray-600 dark:text-gray-400 mb-4">No API key configured</p>
                 <button
                   onClick={handleGenerateApiKey}
