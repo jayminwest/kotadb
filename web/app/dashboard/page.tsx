@@ -17,8 +17,9 @@ interface KeyMetadata {
 }
 
 function DashboardContent() {
-  const { user, subscription, apiKey, setApiKey, isLoading } = useAuth()
+  const { user, subscription, apiKey, setApiKey, isLoading, session } = useAuth()
   const [loadingPortal, setLoadingPortal] = useState(false)
+  const [billingError, setBillingError] = useState<string | null>(null)
   const [loadingKeyGen, setLoadingKeyGen] = useState(false)
   const [copiedKey, setCopiedKey] = useState(false)
   const [keyGenError, setKeyGenError] = useState<string | null>(null)
@@ -38,13 +39,23 @@ function DashboardContent() {
   }, [user, apiKey])
 
   const handleManageBilling = async () => {
+    setBillingError(null)
     setLoadingPortal(true)
+
+    if (!session?.access_token) {
+      setBillingError('Authentication failed. Please refresh and try again.')
+      process.stderr.write('No session available for billing portal request\n')
+      setLoadingPortal(false)
+      return
+    }
+
     try {
       const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const response = await fetch(`${apiUrl}/api/subscriptions/create-portal-session`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`,
         },
         body: JSON.stringify({
           returnUrl: window.location.href,
@@ -54,10 +65,19 @@ function DashboardContent() {
       if (response.ok) {
         const data: CreatePortalSessionResponse = await response.json()
         window.location.href = data.url
+      } else if (response.status === 401) {
+        setBillingError('Authentication failed. Please refresh and try again.')
+        process.stderr.write('Billing portal auth failed: 401 Unauthorized\n')
+      } else if (response.status === 404) {
+        setBillingError('No subscription found. Please contact support.')
+        process.stderr.write('Billing portal failed: No subscription found\n')
       } else {
-        process.stderr.write('Failed to create portal session\n')
+        setBillingError('Failed to open billing portal. Please try again.')
+        const errorData = await response.json().catch(() => ({}))
+        process.stderr.write(`Billing portal error: ${JSON.stringify(errorData)}\n`)
       }
     } catch (error) {
+      setBillingError('Failed to open billing portal. Please try again.')
       process.stderr.write(`Error creating portal session: ${error instanceof Error ? error.message : String(error)}\n`)
     } finally {
       setLoadingPortal(false)
@@ -322,6 +342,12 @@ function DashboardContent() {
                 </button>
               )}
             </div>
+
+            {billingError && (
+              <div className="mb-4 p-3 bg-red-50 dark:bg-red-900/20 rounded-md">
+                <p className="text-sm text-red-800 dark:text-red-200">{billingError}</p>
+              </div>
+            )}
 
             {subscription ? (
               <div className="space-y-3">
