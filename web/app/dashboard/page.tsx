@@ -31,11 +31,33 @@ function DashboardContent() {
   const [showRevokeModal, setShowRevokeModal] = useState(false)
   const router = useRouter()
 
+  const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
+
+  // Fetch API key from localStorage if user is authenticated but context doesn't have key yet
+  useEffect(() => {
+    const fetchApiKeyFromLocalStorage = async () => {
+      if (!user || apiKey || isLoading) {
+        return
+      }
+
+      // Check localStorage for the API key secret
+      // Note: API key secrets are only shown once at generation and stored in localStorage
+      // If localStorage is cleared, users must reset their key to retrieve a new secret
+      const storedKey = localStorage.getItem('kotadb_api_key')
+      if (storedKey) {
+        setApiKey(storedKey)
+      }
+    }
+
+    fetchApiKeyFromLocalStorage()
+  }, [user, apiKey, isLoading, setApiKey])
+
   // Fetch key metadata when user is authenticated and has an API key
   useEffect(() => {
     if (user && apiKey) {
       fetchKeyMetadata()
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user, apiKey])
 
   const handleManageBilling = async () => {
@@ -50,7 +72,6 @@ function DashboardContent() {
     }
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const response = await fetch(`${apiUrl}/api/subscriptions/create-portal-session`, {
         method: 'POST',
         headers: {
@@ -90,8 +111,6 @@ function DashboardContent() {
     setKeyGenSuccess(null)
 
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
-
       // Get the current session
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
@@ -160,7 +179,6 @@ function DashboardContent() {
     setLoadingMetadata(true)
     setMetadataError(null)
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -193,7 +211,6 @@ function DashboardContent() {
 
   const handleResetApiKey = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
@@ -228,7 +245,6 @@ function DashboardContent() {
 
   const handleRevokeApiKey = async () => {
     try {
-      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:3000'
       const { createClient } = await import('@/lib/supabase')
       const supabase = createClient()
       const { data: { session }, error: sessionError } = await supabase.auth.getSession()
