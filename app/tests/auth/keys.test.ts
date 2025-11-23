@@ -224,9 +224,9 @@ describe("API Key Generation", () => {
 				tier: "team",
 			});
 
-			expect(freeKey.rateLimitPerHour).toBe(100);
-			expect(soloKey.rateLimitPerHour).toBe(1000);
-			expect(teamKey.rateLimitPerHour).toBe(10000);
+			expect(freeKey.rateLimitPerHour).toBe(1000);
+			expect(soloKey.rateLimitPerHour).toBe(5000);
+			expect(teamKey.rateLimitPerHour).toBe(25000);
 		});
 
 		it("integrates with validateApiKey successfully", async () => {
