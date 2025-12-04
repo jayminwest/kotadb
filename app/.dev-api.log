@@ -1,215 +1,418 @@
-[Info] Stripe not configured. Subscription features disabled.
-[2025-11-04T02:46:03.368Z] ✓ Supabase connection successful
-[2025-11-04T02:46:03.368Z] Starting job queue with connection: postgresql://postgres:***@localhost:5434/postgres
-[2025-11-04T02:46:03.391Z] Job queue started successfully
-[2025-11-04T02:46:03.400Z] ✓ Job queue started and index-repo queue created
-[2025-11-04T02:46:03.401Z] Starting index-repo workers (team_size=3)
-[2025-11-04T02:46:03.401Z] Index-repo workers registered successfully
-[2025-11-04T02:46:03.401Z] ✓ Indexing worker registered
-[2025-11-04T02:46:03.401Z] Creating Express app...
-[2025-11-04T02:46:03.402Z] ✓ Express app created
-KotaDB server listening on http://localhost:3000
-Connected to Supabase at http://127.0.0.1:54322
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Auth] API key auth success - userId: 00000000-0000-0000-0000-000000000001, keyId: test1234567890ab, tier: free
-[Cache] Evicted 1 expired entries (size: 0)131 |     })
-132 | 
-133 |     this._attachListeners(con)
-134 | 
-135 |     con.once('end', () => {
-136 |       const error = this._ending ? new Error('Connection terminated') : new Error('Connection terminated unexpectedly')
-                                                                              ^
-error: Connection terminated unexpectedly
- client: Client {
-  _events: [Object ...],
-  _eventsCount: 1,
-  _maxListeners: undefined,
-  [Symbol(kCapture)]: false,
-  connectionParameters: [Object ...],
-  user: "postgres",
-  database: "postgres",
-  port: 5434,
-  host: "localhost",
-  password: "postgres",
-  replication: undefined,
-  _Promise: [Function: Promise],
-  _types: [Object ...],
-  _ending: true,
-  _ended: true,
-  _connecting: false,
-  _connected: true,
-  _connectionError: false,
-  _queryable: false,
-  enableChannelBinding: false,
-  connection: [Object ...],
-  queryQueue: [],
-  binary: false,
-  processID: 12047,
-  secretKey: 1313810398,
-  ssl: false,
-  _connectionTimeoutMillis: 0,
-  _connectionCallback: null,
-  saslSession: null,
-  release: [Function],
-  activeQuery: null,
-  readyForQuery: true,
-  hasExecuted: true,
-  _poolUseCount: 700,
-  _errorAllQueries: [Function: _errorAllQueries],
-  _connect: [Function: _connect],
-  connect: [Function: connect],
-  _attachListeners: [Function: _attachListeners],
-  _checkPgPass: [Function: _checkPgPass],
-  _handleAuthCleartextPassword: [Function: _handleAuthCleartextPassword],
-  _handleAuthMD5Password: [Function: _handleAuthMD5Password],
-  _handleAuthSASL: [Function: _handleAuthSASL],
-  _handleAuthSASLContinue: [AsyncFunction: _handleAuthSASLContinue],
-  _handleAuthSASLFinal: [Function: _handleAuthSASLFinal],
-  _handleBackendKeyData: [Function: _handleBackendKeyData],
-  _handleReadyForQuery: [Function: _handleReadyForQuery],
-  _handleErrorWhileConnecting: [Function: _handleErrorWhileConnecting],
-  _handleErrorEvent: [Function: _handleErrorEvent],
-  _handleErrorMessage: [Function: _handleErrorMessage],
-  _handleRowDescription: [Function: _handleRowDescription],
-  _handleDataRow: [Function: _handleDataRow],
-  _handlePortalSuspended: [Function: _handlePortalSuspended],
-  _handleEmptyQuery: [Function: _handleEmptyQuery],
-  _handleCommandComplete: [Function: _handleCommandComplete],
-  _handleParseComplete: [Function: _handleParseComplete],
-  _handleCopyInResponse: [Function: _handleCopyInResponse],
-  _handleCopyData: [Function: _handleCopyData],
-  _handleNotification: [Function: _handleNotification],
-  _handleNotice: [Function: _handleNotice],
-  getStartupConf: [Function: getStartupConf],
-  cancel: [Function: cancel],
-  setTypeParser: [Function: setTypeParser],
-  getTypeParser: [Function: getTypeParser],
-  escapeIdentifier: [Function: escapeIdentifier],
-  escapeLiteral: [Function: escapeLiteral],
-  _pulseQueryQueue: [Function: _pulseQueryQueue],
-  query: [Function: query],
-  ref: [Function: ref],
-  unref: [Function: unref],
-  end: [Function: end],
-  setMaxListeners: [Function: setMaxListeners],
-  getMaxListeners: [Function: getMaxListeners],
-  emit: [Function: emit],
-  addListener: [Function: addListener],
-  on: [Function: addListener],
-  prependListener: [Function: prependListener],
-  once: [Function: once],
-  prependOnceListener: [Function: prependOnceListener],
-  removeListener: [Function: removeListener],
-  off: [Function: removeListener],
-  removeAllListeners: [Function: removeAllListeners],
-  listeners: [Function: listeners],
-  rawListeners: [Function: rawListeners],
-  listenerCount: [Function: listenerCount],
-  eventNames: [Function: eventNames],
-},
-
-      at <anonymous> (/Users/jayminwest/Projects/kota-db-ts/node_modules/pg/lib/client.js:136:73)
-      at emit (node:events:86:22)
-      at <anonymous> (/Users/jayminwest/Projects/kota-db-ts/node_modules/pg/lib/connection.js:62:12)
-      at emit (node:events:86:22)
-      at emitCloseNT (node:net:32:15)
-
-Bun v1.2.9 (macOS arm64)
+Sentry Logger [log]: Initializing Sentry: process: 87245, thread: main.
+Sentry Logger [warn]: No DSN provided, client will not send events.
+Sentry Logger [log]: SDK initialized from ESM
+Sentry Logger [log]: @opentelemetry/api: Registered a global for diag v1.9.0.
+Sentry Logger [log]: @opentelemetry/api: Registered a global for trace v1.9.0.
+Sentry Logger [log]: @opentelemetry/api: Registered a global for propagation v1.9.0.
+Sentry Logger [log]: @opentelemetry/api: Registered a global for context v1.9.0.
+{"timestamp":"2025-12-04T03:26:45.261Z","level":"warn","message":"GITHUB_WEBHOOK_SECRET not configured - webhook endpoint will reject all requests"}
+{"timestamp":"2025-12-04T03:26:45.262Z","level":"info","message":"Billing feature flag","context":{"enabled":false}}
+{"timestamp":"2025-12-04T03:26:45.262Z","level":"info","message":"Billing disabled by feature flag - subscription features unavailable"}
+{"timestamp":"2025-12-04T03:26:45.314Z","level":"info","message":"Supabase connection successful"}
+{"timestamp":"2025-12-04T03:26:45.314Z","level":"info","message":"Starting job queue","context":{"connection":"postgresql://postgres:***@127.0.0.1:5434/postgres"}}
+{"timestamp":"2025-12-04T03:26:45.344Z","level":"info","message":"Job queue started successfully"}
+{"timestamp":"2025-12-04T03:26:45.352Z","level":"info","message":"Job queue started and index-repo queue created"}
+{"timestamp":"2025-12-04T03:26:45.352Z","level":"info","message":"Starting index-repo workers","context":{"team_size":3}}
+{"timestamp":"2025-12-04T03:26:45.353Z","level":"info","message":"Index-repo workers registered successfully"}
+{"timestamp":"2025-12-04T03:26:45.353Z","level":"info","message":"Indexing worker registered"}
+{"timestamp":"2025-12-04T03:26:45.353Z","level":"info","message":"Creating Express app"}
+{"timestamp":"2025-12-04T03:26:45.354Z","level":"info","message":"Express app created"}
+{"timestamp":"2025-12-04T03:26:45.361Z","level":"info","message":"Server started","context":{"port":3000,"supabase_url":"http://127.0.0.1:54322"}}
+{"timestamp":"2025-12-04T03:26:51.728Z","level":"info","message":"Incoming request","context":{"request_id":"5436d604-b0e6-422e-8df4-a8ef2e85892c","method":"GET","url":"/health","path":"/health","ip":"::1","userAgent":"curl/8.4.0"}}
+{"timestamp":"2025-12-04T03:26:51.746Z","level":"info","message":"Request completed","context":{"request_id":"5436d604-b0e6-422e-8df4-a8ef2e85892c","method":"GET","url":"/health","status":200,"duration_ms":19}}
+{"timestamp":"2025-12-04T03:27:18.797Z","level":"info","message":"Incoming request","context":{"request_id":"f3598156-45b1-467d-adc0-6523ea1f6ae8","method":"GET","url":"/search?term=Hello&limit=5","path":"/search","ip":"::1","userAgent":"curl/8.4.0"}}
+{"timestamp":"2025-12-04T03:27:18.885Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:27:19.227Z","level":"info","message":"Request completed","context":{"request_id":"f3598156-45b1-467d-adc0-6523ea1f6ae8","method":"GET","url":"/search?term=Hello&limit=5","status":200,"duration_ms":429}}
+{"timestamp":"2025-12-04T03:27:31.900Z","level":"info","message":"Incoming request","context":{"request_id":"09cd4d9e-e10f-4591-80d7-6709c9f0d666","method":"GET","url":"/search?term=test","path":"/search","ip":"::1","userAgent":"curl/8.4.0"}}
+{"timestamp":"2025-12-04T03:27:31.986Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:27:32.042Z","level":"info","message":"Request completed","context":{"request_id":"09cd4d9e-e10f-4591-80d7-6709c9f0d666","method":"GET","url":"/search?term=test","status":200,"duration_ms":142}}
+{"timestamp":"2025-12-04T03:27:33.469Z","level":"info","message":"Incoming request","context":{"request_id":"855d4649-9f85-4279-8dd1-d377c851d5f8","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"curl/8.4.0"}}
+{"timestamp":"2025-12-04T03:27:33.478Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:27:34.819Z","level":"info","message":"Incoming request","context":{"request_id":"69b55e33-284a-4086-912b-e6ebfce96ed9","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"curl/8.4.0"}}
+{"timestamp":"2025-12-04T03:27:34.821Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+{"timestamp":"2025-12-04T03:27:46.813Z","level":"info","message":"Incoming request","context":{"request_id":"7bbcb3c3-8922-4526-acc0-0d59b1ab210f","method":"POST","url":"/index","path":"/index","ip":"::1","userAgent":"curl/8.4.0"}}
+{"timestamp":"2025-12-04T03:27:46.884Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:27:46.910Z","level":"info","message":"Creating index job","context":{"module":"queue-job-tracker","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","ref":"main","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:27:46.914Z","level":"info","message":"Index job created successfully","context":{"module":"queue-job-tracker","job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","ref":"main"}}
+{"timestamp":"2025-12-04T03:27:46.917Z","level":"info","message":"Index job enqueued","context":{"module":"api-routes","jobId":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","repositoryId":"b9fb534a-8a34-49a8-ba59-525accd8da91","userId":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:27:46.917Z","level":"info","message":"Request completed","context":{"request_id":"7bbcb3c3-8922-4526-acc0-0d59b1ab210f","method":"POST","url":"/index","status":202,"duration_ms":104}}
+{"timestamp":"2025-12-04T03:27:47.382Z","level":"info","message":"Processing index job","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91"}}
+{"timestamp":"2025-12-04T03:27:47.388Z","level":"info","message":"No installation_id found, using public clone","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","full_name":"jayminwest/geo-sync-monorepo"}}
+{"timestamp":"2025-12-04T03:27:47.393Z","level":"info","message":"Updating job status","context":{"module":"queue-job-tracker","job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","new_status":"processing","has_error":false,"has_stats":false,"user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:27:47.403Z","level":"info","message":"Job status updated successfully","context":{"module":"queue-job-tracker","job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","new_status":"processing","previous_status":"pending"}}
+{"timestamp":"2025-12-04T03:27:47.403Z","level":"info","message":"[STEP 1/7] Cloning repository","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91"}}
+{"timestamp":"2025-12-04T03:27:47.403Z","level":"info","message":"[STEP 2/7] Discovering source files","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","path":"/Users/jayminwest/Projects/geo-sync-monorepo"}}
+{"timestamp":"2025-12-04T03:27:47.526Z","level":"info","message":"Discovered source files","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","count":2062}}
+{"timestamp":"2025-12-04T03:27:47.526Z","level":"info","message":"[STEP 3/7] Parsing source files","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91"}}
+{"timestamp":"2025-12-04T03:27:48.023Z","level":"info","message":"Parsed files successfully","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","count":2062}}
+{"timestamp":"2025-12-04T03:27:48.023Z","level":"info","message":"[STEP 4/7] Extracting symbols","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91"}}
+{"timestamp":"2025-12-04T03:29:02.530Z","level":"info","message":"Extracted symbols","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","count":3699}}
+[2025-12-04T03:29:02.531Z] [STEP 5/7] Two-pass storage: Pass 1 - Storing files and symbols (batch_size=50)
+[2025-12-04T03:29:02.531Z] Processing 2062 files in 42 chunks
+[2025-12-04T03:29:02.532Z] [PASS 1] Chunk 1/42: storing files=50, symbols=0
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+{"timestamp":"2025-12-04T03:29:03.474Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:03.475Z] [PASS 1] Chunk 1/42 completed: files=50, symbols=0
+[2025-12-04T03:29:03.475Z] [PASS 1] Chunk 2/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:03.796Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:03.797Z] [PASS 1] Chunk 2/42 completed: files=50, symbols=0
+[2025-12-04T03:29:03.797Z] [PASS 1] Chunk 3/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:04.135Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:04.135Z] [PASS 1] Chunk 3/42 completed: files=50, symbols=0
+[2025-12-04T03:29:04.135Z] [PASS 1] Chunk 4/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:04.482Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:04.482Z] [PASS 1] Chunk 4/42 completed: files=50, symbols=0
+[2025-12-04T03:29:04.482Z] [PASS 1] Chunk 5/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:04.789Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:04.789Z] [PASS 1] Chunk 5/42 completed: files=50, symbols=0
+[2025-12-04T03:29:04.789Z] [PASS 1] Chunk 6/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:04.805Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:04.805Z] [PASS 1] Chunk 6/42 completed: files=50, symbols=0
+[2025-12-04T03:29:04.805Z] [PASS 1] Chunk 7/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:05.154Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:05.154Z] [PASS 1] Chunk 7/42 completed: files=50, symbols=0
+[2025-12-04T03:29:05.154Z] [PASS 1] Chunk 8/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:05.472Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:05.472Z] [PASS 1] Chunk 8/42 completed: files=50, symbols=0
+[2025-12-04T03:29:05.472Z] [PASS 1] Chunk 9/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:05.790Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:05.790Z] [PASS 1] Chunk 9/42 completed: files=50, symbols=0
+[2025-12-04T03:29:05.790Z] [PASS 1] Chunk 10/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:05.809Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:05.809Z] [PASS 1] Chunk 10/42 completed: files=50, symbols=0
+[2025-12-04T03:29:05.809Z] [PASS 1] Chunk 11/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:06.137Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:06.137Z] [PASS 1] Chunk 11/42 completed: files=50, symbols=0
+[2025-12-04T03:29:06.137Z] [PASS 1] Chunk 12/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:06.444Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:06.444Z] [PASS 1] Chunk 12/42 completed: files=50, symbols=0
+[2025-12-04T03:29:06.444Z] [PASS 1] Chunk 13/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:06.789Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:06.789Z] [PASS 1] Chunk 13/42 completed: files=50, symbols=0
+[2025-12-04T03:29:06.789Z] [PASS 1] Chunk 14/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:06.807Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:06.807Z] [PASS 1] Chunk 14/42 completed: files=50, symbols=0
+[2025-12-04T03:29:06.807Z] [PASS 1] Chunk 15/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:07.124Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:07.124Z] [PASS 1] Chunk 15/42 completed: files=50, symbols=0
+[2025-12-04T03:29:07.124Z] [PASS 1] Chunk 16/42: storing files=50, symbols=22
+{"timestamp":"2025-12-04T03:29:07.765Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":22,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:07.765Z] [PASS 1] Chunk 16/42 completed: files=50, symbols=22
+[2025-12-04T03:29:07.766Z] [PASS 1] Chunk 17/42: storing files=50, symbols=133
+{"timestamp":"2025-12-04T03:29:08.110Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":133,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:08.110Z] [PASS 1] Chunk 17/42 completed: files=50, symbols=133
+[2025-12-04T03:29:08.110Z] [PASS 1] Chunk 18/42: storing files=50, symbols=86
+{"timestamp":"2025-12-04T03:29:08.152Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":86,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:08.152Z] [PASS 1] Chunk 18/42 completed: files=50, symbols=86
+[2025-12-04T03:29:08.152Z] [PASS 1] Chunk 19/42: storing files=50, symbols=605
+{"timestamp":"2025-12-04T03:29:08.266Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":605,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:08.266Z] [PASS 1] Chunk 19/42 completed: files=50, symbols=605
+[2025-12-04T03:29:08.266Z] [PASS 1] Chunk 20/42: storing files=50, symbols=486
+{"timestamp":"2025-12-04T03:29:08.339Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":486,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:08.340Z] [PASS 1] Chunk 20/42 completed: files=50, symbols=486
+[2025-12-04T03:29:08.340Z] [PASS 1] Chunk 21/42: storing files=50, symbols=58
+{"timestamp":"2025-12-04T03:29:08.367Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":58,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:08.367Z] [PASS 1] Chunk 21/42 completed: files=50, symbols=58
+[2025-12-04T03:29:08.368Z] [PASS 1] Chunk 22/42: storing files=50, symbols=29
+{"timestamp":"2025-12-04T03:29:08.419Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":29,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:08.419Z] [PASS 1] Chunk 22/42 completed: files=50, symbols=29
+[2025-12-04T03:29:08.419Z] [PASS 1] Chunk 23/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:08.691Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:08.691Z] [PASS 1] Chunk 23/42 completed: files=50, symbols=0
+[2025-12-04T03:29:08.691Z] [PASS 1] Chunk 24/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:09.920Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:09.920Z] [PASS 1] Chunk 24/42 completed: files=50, symbols=0
+[2025-12-04T03:29:09.921Z] [PASS 1] Chunk 25/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:10.479Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:10.479Z] [PASS 1] Chunk 25/42 completed: files=50, symbols=0
+[2025-12-04T03:29:10.479Z] [PASS 1] Chunk 26/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:10.726Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:10.726Z] [PASS 1] Chunk 26/42 completed: files=50, symbols=0
+[2025-12-04T03:29:10.726Z] [PASS 1] Chunk 27/42: storing files=50, symbols=604
+{"timestamp":"2025-12-04T03:29:10.976Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":604,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:10.976Z] [PASS 1] Chunk 27/42 completed: files=50, symbols=604
+[2025-12-04T03:29:10.977Z] [PASS 1] Chunk 28/42: storing files=50, symbols=49
+{"timestamp":"2025-12-04T03:29:13.966Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":49,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:13.966Z] [PASS 1] Chunk 28/42 completed: files=50, symbols=49
+[2025-12-04T03:29:13.966Z] [PASS 1] Chunk 29/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:15.809Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:15.809Z] [PASS 1] Chunk 29/42 completed: files=50, symbols=0
+[2025-12-04T03:29:15.809Z] [PASS 1] Chunk 30/42: storing files=50, symbols=18
+{"timestamp":"2025-12-04T03:29:16.489Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":18,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:16.489Z] [PASS 1] Chunk 30/42 completed: files=50, symbols=18
+[2025-12-04T03:29:16.489Z] [PASS 1] Chunk 31/42: storing files=50, symbols=6
+{"timestamp":"2025-12-04T03:29:19.396Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":6,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:19.396Z] [PASS 1] Chunk 31/42 completed: files=50, symbols=6
+[2025-12-04T03:29:19.396Z] [PASS 1] Chunk 32/42: storing files=50, symbols=12
+{"timestamp":"2025-12-04T03:29:20.119Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":12,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.119Z] [PASS 1] Chunk 32/42 completed: files=50, symbols=12
+[2025-12-04T03:29:20.119Z] [PASS 1] Chunk 33/42: storing files=50, symbols=0
+{"timestamp":"2025-12-04T03:29:20.226Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":0,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.226Z] [PASS 1] Chunk 33/42 completed: files=50, symbols=0
+[2025-12-04T03:29:20.227Z] [PASS 1] Chunk 34/42: storing files=50, symbols=123
+{"timestamp":"2025-12-04T03:29:20.273Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":123,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.273Z] [PASS 1] Chunk 34/42 completed: files=50, symbols=123
+[2025-12-04T03:29:20.273Z] [PASS 1] Chunk 35/42: storing files=50, symbols=100
+{"timestamp":"2025-12-04T03:29:20.306Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":100,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.307Z] [PASS 1] Chunk 35/42 completed: files=50, symbols=100
+[2025-12-04T03:29:20.307Z] [PASS 1] Chunk 36/42: storing files=50, symbols=395
+{"timestamp":"2025-12-04T03:29:20.357Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":395,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.357Z] [PASS 1] Chunk 36/42 completed: files=50, symbols=395
+[2025-12-04T03:29:20.357Z] [PASS 1] Chunk 37/42: storing files=50, symbols=579
+{"timestamp":"2025-12-04T03:29:20.432Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":579,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.432Z] [PASS 1] Chunk 37/42 completed: files=50, symbols=579
+[2025-12-04T03:29:20.432Z] [PASS 1] Chunk 38/42: storing files=50, symbols=172
+{"timestamp":"2025-12-04T03:29:20.597Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":172,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.597Z] [PASS 1] Chunk 38/42 completed: files=50, symbols=172
+[2025-12-04T03:29:20.598Z] [PASS 1] Chunk 39/42: storing files=50, symbols=45
+{"timestamp":"2025-12-04T03:29:20.658Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":45,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.658Z] [PASS 1] Chunk 39/42 completed: files=50, symbols=45
+[2025-12-04T03:29:20.658Z] [PASS 1] Chunk 40/42: storing files=50, symbols=83
+{"timestamp":"2025-12-04T03:29:20.704Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":83,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.704Z] [PASS 1] Chunk 40/42 completed: files=50, symbols=83
+[2025-12-04T03:29:20.704Z] [PASS 1] Chunk 41/42: storing files=50, symbols=50
+{"timestamp":"2025-12-04T03:29:20.740Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":50,"symbols_extracted":50,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.740Z] [PASS 1] Chunk 41/42 completed: files=50, symbols=50
+[2025-12-04T03:29:20.740Z] [PASS 1] Chunk 42/42: storing files=12, symbols=44
+{"timestamp":"2025-12-04T03:29:20.751Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":12,"symbols_extracted":44,"references_found":0,"dependencies_extracted":0}}
+[2025-12-04T03:29:20.751Z] [PASS 1] Chunk 42/42 completed: files=12, symbols=44
+[2025-12-04T03:29:20.751Z] [PASS 1] Complete: files=2062, symbols=3699
+[2025-12-04T03:29:20.751Z] [STEP 6/7] Two-pass storage: Pass 2 - Extracting and storing references and dependencies
+[2025-12-04T03:29:20.802Z] [PASS 2] Batch 1/10: querying symbols for 100 files
+[2025-12-04T03:29:20.807Z] [PASS 2] Batch 2/10: querying symbols for 100 files
+[2025-12-04T03:29:20.813Z] [PASS 2] Batch 3/10: querying symbols for 100 files
+[2025-12-04T03:29:20.819Z] [PASS 2] Batch 4/10: querying symbols for 100 files
+[2025-12-04T03:29:20.826Z] [PASS 2] Batch 5/10: querying symbols for 100 files
+[2025-12-04T03:29:20.830Z] [PASS 2] Batch 6/10: querying symbols for 100 files
+[2025-12-04T03:29:20.834Z] [PASS 2] Batch 7/10: querying symbols for 100 files
+[2025-12-04T03:29:20.837Z] [PASS 2] Batch 8/10: querying symbols for 100 files
+[2025-12-04T03:29:20.841Z] [PASS 2] Batch 9/10: querying symbols for 100 files
+[2025-12-04T03:29:20.845Z] [PASS 2] Batch 10/10: querying symbols for 100 files
+[2025-12-04T03:29:20.851Z] [PASS 2] Queried 1000 files and 1044 symbols with IDs
+[2025-12-04T03:29:23.087Z] [PASS 2] Extracted references from 206 files
+[2025-12-04T03:29:23.102Z] [PASS 2] Built 140008 reference records
+[2025-12-04T03:29:23.483Z] [PASS 2] Extracted 1185 dependency edges
+[2025-12-04T03:29:23.494Z] [PASS 2] Converted 1185 dependency entries
+{"timestamp":"2025-12-04T03:29:31.425Z","level":"info","message":"Successfully stored indexed data","context":{"module":"indexer-storage","repository_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","files_indexed":0,"symbols_extracted":0,"references_found":140008,"dependencies_extracted":116}}
+[2025-12-04T03:29:31.426Z] [PASS 2] Complete: references=140008, dependencies=116
+{"timestamp":"2025-12-04T03:29:31.426Z","level":"info","message":"Successfully indexed repository","context":{"job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","user_id":"b9fb534a-8a34-49a8-ba59-525accd8da91","duration_ms":104044,"files_indexed":2062,"symbols_extracted":3699,"references_found":140008,"dependencies_extracted":116,"chunks":42}}
+{"timestamp":"2025-12-04T03:29:31.442Z","level":"info","message":"Updating job status","context":{"module":"queue-job-tracker","job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","new_status":"completed","has_error":false,"has_stats":true,"user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:29:31.452Z","level":"info","message":"Job status updated successfully","context":{"module":"queue-job-tracker","job_id":"1c7f5b3c-3b61-45e6-a44c-f3895f90828f","new_status":"completed","previous_status":"processing"}}
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+{"timestamp":"2025-12-04T03:34:39.624Z","level":"info","message":"Incoming request","context":{"request_id":"c1cca7b2-9cbf-4c21-aabe-b388ed789152","method":"GET","url":"/search?term=GeoSync&limit=5","path":"/search","ip":"::1","userAgent":"curl/8.4.0"}}
+{"timestamp":"2025-12-04T03:34:39.774Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:34:39.846Z","level":"info","message":"Request completed","context":{"request_id":"c1cca7b2-9cbf-4c21-aabe-b388ed789152","method":"GET","url":"/search?term=GeoSync&limit=5","status":200,"duration_ms":224}}
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+{"timestamp":"2025-12-04T03:36:39.438Z","level":"info","message":"Incoming request","context":{"request_id":"14e70386-a284-4864-9725-c2659f69763f","method":"GET","url":"/.well-known/oauth-authorization-server/mcp","path":"/.well-known/oauth-authorization-server/mcp","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.469Z","level":"warn","message":"Request completed with error","context":{"request_id":"14e70386-a284-4864-9725-c2659f69763f","method":"GET","url":"/.well-known/oauth-authorization-server/mcp","status":401,"duration_ms":7}}
+{"timestamp":"2025-12-04T03:36:39.490Z","level":"info","message":"Incoming request","context":{"request_id":"d0551db2-c10c-48bd-8f15-43f6c030148d","method":"GET","url":"/.well-known/oauth-authorization-server","path":"/.well-known/oauth-authorization-server","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.491Z","level":"warn","message":"Request completed with error","context":{"request_id":"d0551db2-c10c-48bd-8f15-43f6c030148d","method":"GET","url":"/.well-known/oauth-authorization-server","status":401,"duration_ms":1}}
+{"timestamp":"2025-12-04T03:36:39.496Z","level":"info","message":"Incoming request","context":{"request_id":"32bd3b76-b056-4685-8234-7eabb8ab8487","method":"GET","url":"/.well-known/openid-configuration/mcp","path":"/.well-known/openid-configuration/mcp","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.497Z","level":"warn","message":"Request completed with error","context":{"request_id":"32bd3b76-b056-4685-8234-7eabb8ab8487","method":"GET","url":"/.well-known/openid-configuration/mcp","status":401,"duration_ms":1}}
+{"timestamp":"2025-12-04T03:36:39.499Z","level":"info","message":"Incoming request","context":{"request_id":"618abd60-cf40-4716-a422-0b65dad91749","method":"GET","url":"/mcp/.well-known/openid-configuration","path":"/mcp/.well-known/openid-configuration","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.499Z","level":"warn","message":"Request completed with error","context":{"request_id":"618abd60-cf40-4716-a422-0b65dad91749","method":"GET","url":"/mcp/.well-known/openid-configuration","status":401,"duration_ms":0}}
+{"timestamp":"2025-12-04T03:36:39.507Z","level":"info","message":"Incoming request","context":{"request_id":"b9f93fff-2ae6-421e-a67c-08c0928a7bf9","method":"GET","url":"/.well-known/oauth-protected-resource/mcp","path":"/.well-known/oauth-protected-resource/mcp","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.508Z","level":"warn","message":"Request completed with error","context":{"request_id":"b9f93fff-2ae6-421e-a67c-08c0928a7bf9","method":"GET","url":"/.well-known/oauth-protected-resource/mcp","status":401,"duration_ms":1}}
+{"timestamp":"2025-12-04T03:36:39.510Z","level":"info","message":"Incoming request","context":{"request_id":"5000205b-1f3f-489f-82ce-59b95a5fb8d3","method":"GET","url":"/.well-known/oauth-protected-resource","path":"/.well-known/oauth-protected-resource","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.510Z","level":"warn","message":"Request completed with error","context":{"request_id":"5000205b-1f3f-489f-82ce-59b95a5fb8d3","method":"GET","url":"/.well-known/oauth-protected-resource","status":401,"duration_ms":0}}
+{"timestamp":"2025-12-04T03:36:39.512Z","level":"info","message":"Incoming request","context":{"request_id":"0adb4700-b961-47b7-86e9-d798ba7b5d36","method":"GET","url":"/.well-known/oauth-authorization-server/mcp","path":"/.well-known/oauth-authorization-server/mcp","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.513Z","level":"warn","message":"Request completed with error","context":{"request_id":"0adb4700-b961-47b7-86e9-d798ba7b5d36","method":"GET","url":"/.well-known/oauth-authorization-server/mcp","status":401,"duration_ms":0}}
+{"timestamp":"2025-12-04T03:36:39.517Z","level":"info","message":"Incoming request","context":{"request_id":"d1d3de2e-7464-417c-9f0f-6f2606155137","method":"GET","url":"/.well-known/oauth-authorization-server","path":"/.well-known/oauth-authorization-server","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.517Z","level":"warn","message":"Request completed with error","context":{"request_id":"d1d3de2e-7464-417c-9f0f-6f2606155137","method":"GET","url":"/.well-known/oauth-authorization-server","status":401,"duration_ms":0}}
+{"timestamp":"2025-12-04T03:36:39.518Z","level":"info","message":"Incoming request","context":{"request_id":"e2b827dd-f229-4189-a697-a16110067936","method":"GET","url":"/.well-known/openid-configuration/mcp","path":"/.well-known/openid-configuration/mcp","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.518Z","level":"warn","message":"Request completed with error","context":{"request_id":"e2b827dd-f229-4189-a697-a16110067936","method":"GET","url":"/.well-known/openid-configuration/mcp","status":401,"duration_ms":0}}
+{"timestamp":"2025-12-04T03:36:39.519Z","level":"info","message":"Incoming request","context":{"request_id":"f1b176df-1807-4a25-88bb-b299312e05a7","method":"GET","url":"/mcp/.well-known/openid-configuration","path":"/mcp/.well-known/openid-configuration","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.519Z","level":"warn","message":"Request completed with error","context":{"request_id":"f1b176df-1807-4a25-88bb-b299312e05a7","method":"GET","url":"/mcp/.well-known/openid-configuration","status":401,"duration_ms":0}}
+{"timestamp":"2025-12-04T03:36:39.546Z","level":"info","message":"Incoming request","context":{"request_id":"de779296-4344-4578-ac46-988bd9cdb03a","method":"POST","url":"/register","path":"/register","ip":"::1","userAgent":"node"}}
+{"timestamp":"2025-12-04T03:36:39.548Z","level":"warn","message":"Request completed with error","context":{"request_id":"de779296-4344-4578-ac46-988bd9cdb03a","method":"POST","url":"/register","status":401,"duration_ms":2}}
+{"timestamp":"2025-12-04T03:36:40.613Z","level":"info","message":"Incoming request","context":{"request_id":"008f3393-bfda-4fb2-9d80-18e3ca1c4e4e","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:36:40.764Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:36:40.827Z","level":"info","message":"Incoming request","context":{"request_id":"12eae874-97a3-4e65-9eb9-fc3b417f8b21","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:36:40.827Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:36:40.861Z","level":"info","message":"Incoming request","context":{"request_id":"415d5491-d4cb-4856-a548-7bbf10112709","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:36:40.861Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:36:40.869Z","level":"info","message":"Request completed","context":{"request_id":"415d5491-d4cb-4856-a548-7bbf10112709","method":"GET","url":"/mcp","status":200,"duration_ms":9}}
+{"timestamp":"2025-12-04T03:36:40.888Z","level":"info","message":"Incoming request","context":{"request_id":"1b308e3c-4274-40ff-8ce8-8a7013b84fe0","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:36:40.888Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:36:40.927Z","level":"info","message":"Incoming request","context":{"request_id":"10bd8461-4fc2-45be-86fd-f414543237d1","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:36:40.927Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:36:40.960Z","level":"info","message":"Incoming request","context":{"request_id":"6f628897-5fef-4df4-935c-d389330bdd7d","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:36:40.960Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:36:40.966Z","level":"info","message":"Request completed","context":{"request_id":"6f628897-5fef-4df4-935c-d389330bdd7d","method":"GET","url":"/mcp","status":200,"duration_ms":6}}
+{"timestamp":"2025-12-04T03:36:40.982Z","level":"info","message":"Incoming request","context":{"request_id":"e90e4d8d-3d9f-4645-be1b-399c1ee73c5b","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:36:40.982Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+{"timestamp":"2025-12-04T03:38:07.658Z","level":"info","message":"Incoming request","context":{"request_id":"b971446c-dc85-48ee-9524-1d704df70b29","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:07.776Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:07.809Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"list_recent_files","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:38:14.115Z","level":"info","message":"Incoming request","context":{"request_id":"ad99fd4b-f1b4-4f6c-a861-5935762c1658","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:14.213Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:14.242Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_code","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:38:14.363Z","level":"info","message":"Incoming request","context":{"request_id":"7498227d-f119-49d7-adf4-18cc45c90ac5","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:14.364Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:14.379Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_dependencies","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:38:21.612Z","level":"info","message":"Incoming request","context":{"request_id":"f4851721-c839-40e1-a3a4-88e56cb95e18","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:21.718Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:21.728Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_dependencies","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:38:21.823Z","level":"info","message":"Incoming request","context":{"request_id":"cf9adb2b-3845-4115-8ca3-83e238d986aa","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:21.824Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:21.832Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"analyze_change_impact","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:38:21.832Z","level":"info","message":"Starting change impact analysis","context":{"module":"mcp-impact-analysis","change_type":"feature","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","files_to_modify":1,"files_to_create":0,"files_to_delete":0}}
+{"timestamp":"2025-12-04T03:38:21.858Z","level":"info","message":"No GitHub token available, skipping conflict detection","context":{"module":"mcp-github-integration","owner":"jayminwest","repo":"geo-sync-monorepo"}}
+{"timestamp":"2025-12-04T03:38:21.858Z","level":"info","message":"Change impact analysis completed","context":{"module":"mcp-impact-analysis","change_type":"feature","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","affected_files_count":1,"risk_level":"high","conflicts_count":0}}
+{"timestamp":"2025-12-04T03:38:21.910Z","level":"info","message":"Incoming request","context":{"request_id":"037d8eb9-59f0-4a88-ae58-ad0f3174737c","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:21.911Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:21.923Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"validate_implementation_spec","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:38:21.924Z","level":"info","message":"Starting spec validation","context":{"module":"mcp-spec-validation","feature_name":"New API endpoint","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:38:21.936Z","level":"info","message":"Spec validation completed","context":{"module":"mcp-spec-validation","feature_name":"New API endpoint","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","valid":true,"error_count":0,"warning_count":1}}
+{"timestamp":"2025-12-04T03:38:23.121Z","level":"info","message":"Incoming request","context":{"request_id":"5811228d-fcd7-4d2e-bed3-57a226f3ce2d","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:23.123Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:23.166Z","level":"info","message":"Incoming request","context":{"request_id":"82acb960-7bea-4845-a330-aae71a7fc71b","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:23.167Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:23.201Z","level":"info","message":"Incoming request","context":{"request_id":"18bea0ff-133a-4d78-aa12-3f09b6ac984b","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:23.201Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:23.213Z","level":"info","message":"Request completed","context":{"request_id":"18bea0ff-133a-4d78-aa12-3f09b6ac984b","method":"GET","url":"/mcp","status":200,"duration_ms":13}}
+{"timestamp":"2025-12-04T03:38:23.248Z","level":"info","message":"Incoming request","context":{"request_id":"5ccf0f0f-31ef-43f1-9536-5daa91adca36","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:23.249Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:30.428Z","level":"info","message":"Incoming request","context":{"request_id":"16c06113-a4e0-4b56-9179-771b33556f61","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:30.518Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:30.566Z","level":"info","message":"Incoming request","context":{"request_id":"e1d8eee6-e317-43bc-8650-e196605a37d4","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:30.566Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:30.602Z","level":"info","message":"Incoming request","context":{"request_id":"4d32c9c7-d477-49db-b810-f7410b1ccb63","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:30.602Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:38:30.609Z","level":"info","message":"Request completed","context":{"request_id":"4d32c9c7-d477-49db-b810-f7410b1ccb63","method":"GET","url":"/mcp","status":200,"duration_ms":7}}
+{"timestamp":"2025-12-04T03:38:30.629Z","level":"info","message":"Incoming request","context":{"request_id":"1bab51dd-d245-4f70-a64d-f72451dc712b","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:38:30.630Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+{"timestamp":"2025-12-04T03:39:06.472Z","level":"info","message":"Incoming request","context":{"request_id":"330b5479-87fd-4ed3-8e90-4cff084a7dbf","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:06.593Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:06.651Z","level":"info","message":"Incoming request","context":{"request_id":"3ea802f4-7565-4572-bc86-5f158f5121b2","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:06.651Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:06.698Z","level":"info","message":"Incoming request","context":{"request_id":"a49ad8c0-5610-4ae1-914f-fdb3600ffcd6","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:06.698Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:06.710Z","level":"info","message":"Request completed","context":{"request_id":"a49ad8c0-5610-4ae1-914f-fdb3600ffcd6","method":"GET","url":"/mcp","status":200,"duration_ms":12}}
+{"timestamp":"2025-12-04T03:39:06.725Z","level":"info","message":"Incoming request","context":{"request_id":"29a1e513-3b98-41c1-8306-e2b7e96615ff","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:06.726Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:24.450Z","level":"info","message":"Incoming request","context":{"request_id":"daba6cac-bbda-46af-9a49-f526a9bf3009","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:24.546Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:24.583Z","level":"info","message":"Incoming request","context":{"request_id":"8c746084-c817-45ce-bf92-6b849e6289f2","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:24.584Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:24.615Z","level":"info","message":"Incoming request","context":{"request_id":"c5bc016e-b1b8-4e65-a225-4cc5f5454ea7","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:24.616Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:24.624Z","level":"info","message":"Request completed","context":{"request_id":"c5bc016e-b1b8-4e65-a225-4cc5f5454ea7","method":"GET","url":"/mcp","status":200,"duration_ms":9}}
+{"timestamp":"2025-12-04T03:39:24.639Z","level":"info","message":"Incoming request","context":{"request_id":"40335a71-05f4-4498-ba26-a8ba3c52eb48","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:24.639Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:35.056Z","level":"info","message":"Incoming request","context":{"request_id":"a5c82ced-ba4d-4bb9-8227-286535f248af","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:35.150Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:35.167Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"list_recent_files","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:35.290Z","level":"info","message":"Incoming request","context":{"request_id":"afbfc6ed-768e-4b38-83ad-8a0544a0ed2a","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:35.291Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:35.302Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_code","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:35.473Z","level":"info","message":"Incoming request","context":{"request_id":"fef65ff7-9321-449a-81a0-c3c1a64ce511","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:35.473Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:35.479Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_code","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:42.119Z","level":"info","message":"Incoming request","context":{"request_id":"f91f96c7-78e0-4c7f-abe6-7ff39a3dfa84","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:42.213Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:42.222Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_dependencies","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:42.305Z","level":"info","message":"Incoming request","context":{"request_id":"4df43cab-4cd3-40d6-9ea8-de1a35e1c89b","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:42.306Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:42.318Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"analyze_change_impact","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:42.318Z","level":"info","message":"Starting change impact analysis","context":{"module":"mcp-impact-analysis","change_type":"refactor","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","files_to_modify":1,"files_to_create":0,"files_to_delete":0}}
+{"timestamp":"2025-12-04T03:39:42.357Z","level":"info","message":"No GitHub token available, skipping conflict detection","context":{"module":"mcp-github-integration","owner":"jayminwest","repo":"geo-sync-monorepo"}}
+{"timestamp":"2025-12-04T03:39:42.357Z","level":"info","message":"Change impact analysis completed","context":{"module":"mcp-impact-analysis","change_type":"refactor","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","affected_files_count":1,"risk_level":"high","conflicts_count":0}}
+{"timestamp":"2025-12-04T03:39:42.471Z","level":"info","message":"Incoming request","context":{"request_id":"e9edb191-558d-4e82-a48c-8654ce863e7c","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:42.472Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:42.482Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_code","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:48.300Z","level":"info","message":"Incoming request","context":{"request_id":"ee027b6d-9ed0-49d7-b28e-b61701d20ab7","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:48.393Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:48.407Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"validate_implementation_spec","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:48.407Z","level":"info","message":"Starting spec validation","context":{"module":"mcp-spec-validation","feature_name":"KotaDB Workflow Integration","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:48.419Z","level":"info","message":"Spec validation completed","context":{"module":"mcp-spec-validation","feature_name":"KotaDB Workflow Integration","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","valid":true,"error_count":0,"warning_count":1}}
+{"timestamp":"2025-12-04T03:39:48.478Z","level":"info","message":"Incoming request","context":{"request_id":"344dbb5d-81fe-46ef-a15d-047890a520b9","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:48.478Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:48.491Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_code","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+{"timestamp":"2025-12-04T03:39:48.566Z","level":"info","message":"Incoming request","context":{"request_id":"7d942371-9807-4fd6-b415-eaf83c01db95","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:39:48.567Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:39:48.581Z","level":"info","message":"MCP tool call received","context":{"module":"mcp-server","tool_name":"search_code","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab"}}
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+{"timestamp":"2025-12-04T03:42:04.168Z","level":"info","message":"Incoming request","context":{"request_id":"7d19876c-9bd1-4942-891a-f36244decad7","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:04.299Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:42:04.390Z","level":"info","message":"Incoming request","context":{"request_id":"bc9832ba-ff93-4428-b848-112712650870","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:04.391Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:42:04.448Z","level":"info","message":"Incoming request","context":{"request_id":"aeaa3e1a-decb-42f8-9ede-ff2e706d3199","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:04.449Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:42:04.457Z","level":"info","message":"Request completed","context":{"request_id":"aeaa3e1a-decb-42f8-9ede-ff2e706d3199","method":"GET","url":"/mcp","status":200,"duration_ms":9}}
+{"timestamp":"2025-12-04T03:42:04.475Z","level":"info","message":"Incoming request","context":{"request_id":"5a4ca376-a3aa-4203-9464-1d6109c75525","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:04.476Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:42:30.520Z","level":"info","message":"Incoming request","context":{"request_id":"6804aaee-dd53-4d4c-a818-8bb8fe5e4d17","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:30.640Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:42:30.689Z","level":"info","message":"Incoming request","context":{"request_id":"0a25e8df-99a5-47a9-b4c7-0305c23802ad","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:30.689Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:42:30.725Z","level":"info","message":"Incoming request","context":{"request_id":"5a6a4bef-2fa9-4606-b1b9-3e2e951394cb","method":"GET","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:30.725Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+{"timestamp":"2025-12-04T03:42:30.733Z","level":"info","message":"Request completed","context":{"request_id":"5a6a4bef-2fa9-4606-b1b9-3e2e951394cb","method":"GET","url":"/mcp","status":200,"duration_ms":8}}
+{"timestamp":"2025-12-04T03:42:30.753Z","level":"info","message":"Incoming request","context":{"request_id":"921511cf-f2b0-4f1b-b477-bc2b5f4c0594","method":"POST","url":"/mcp","path":"/mcp","ip":"::1","userAgent":"claude-code/2.0.58"}}
+{"timestamp":"2025-12-04T03:42:30.754Z","level":"info","message":"Authentication successful","context":{"auth_method":"api_key","user_id":"a09faf7c-8269-4921-a4fb-7dbba651eeab","key_id":"[REDACTED]","tier":"team"}}
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
+Sentry Logger [log]: Flushing client reports based on interval.
+Sentry Logger [log]: Flushing outcomes...
+Sentry Logger [log]: No outcomes to send
