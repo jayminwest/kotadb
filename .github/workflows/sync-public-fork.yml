@@ -6,6 +6,7 @@ name: Sync Public Fork
 # Replaces README with public version and adds LICENSE/CONTRIBUTING files
 
 on:
+  workflow_dispatch:
   push:
     branches:
       - develop
