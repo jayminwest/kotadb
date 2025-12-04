@@ -37,7 +37,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GITHUB_TOKEN }}
+          persist-credentials: false
 
       - name: Configure Git
         run: |
@@ -100,7 +100,11 @@ jobs:
         run: |
           BRANCH_NAME="${{ github.ref_name }}"
 
-          # Add public repository as remote
+          # Disable any credential helpers to ensure PAT is used
+          git config --unset-all http.https://github.com/.extraheader || true
+          git config --global credential.helper ""
+
+          # Add public repository as remote with PAT
           git remote add public https://x-access-token:${PUBLIC_REPO_TOKEN}@github.com/jayminwest/kotadb.git
 
           # Force push to public repository (overwrites any direct commits)
