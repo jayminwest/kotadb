@@ -589,4 +589,210 @@ export function capitalize(str: string): string {
 		expect(indexedFiles).toBeDefined();
 		expect(indexedFiles!.length).toBeGreaterThan(0);
 	}, 40000);
+
+	it("should handle 1100+ files with paginated Pass 2 query", async () => {
+		// Clean up existing test files first
+		await rm(join(testRepoPath, "example.ts"), { force: true });
+		await rm(join(testRepoPath, "utils.ts"), { force: true });
+
+		// Create 1100 TypeScript files to exceed Supabase's default 1000-row limit
+		// This verifies the pagination fix for Pass 2 file queries
+		const fileCount = 1100;
+
+		// Create base file that others will depend on
+		await writeFile(
+			join(testRepoPath, "file0.ts"),
+			`export function baseFunc() { return 0; }\nexport const baseConst = 42;`,
+		);
+
+		// Create remaining files that import from file0 (creates dependency edges for Pass 2)
+		for (let i = 1; i < fileCount; i++) {
+			await writeFile(
+				join(testRepoPath, `file${i}.ts`),
+				`import { baseFunc } from './file0';\nexport function func${i}() { return baseFunc() + ${i}; }`,
+			);
+		}
+
+		// Commit files to git
+		const { execSync } = require("node:child_process");
+		execSync("git add .", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git commit -m 'Add 1100 files for pagination testing'", {
+			cwd: testRepoPath,
+			stdio: "ignore",
+		});
+
+		// Create and enqueue job
+		const indexJob = await createIndexJob(
+			testRepoId,
+			"main",
+			"pagination1100",
+			TEST_USER_IDS.free,
+		);
+
+		const queue = getQueue();
+		const payload: IndexRepoJobPayload = {
+			indexJobId: indexJob.id,
+			repositoryId: testRepoId,
+			commitSha: "pagination1100",
+		};
+
+		await queue.send(QUEUE_NAMES.INDEX_REPO, payload);
+
+		// Wait for completion (longer timeout for very large repository)
+		let attempts = 0;
+		const maxAttempts = 240; // 120 seconds max wait
+
+		while (attempts < maxAttempts) {
+			const currentJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+
+			if (
+				currentJob.status === "completed" ||
+				currentJob.status === "failed"
+			) {
+				break;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			attempts++;
+		}
+
+		// Verify job completed successfully
+		const completedJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+		expect(completedJob.status).toBe("completed");
+
+		// Verify all 1100 files were indexed (Pass 1 works)
+		expect(completedJob.stats?.files_indexed).toBe(fileCount);
+
+		// Verify dependencies were extracted (Pass 2 pagination works)
+		// file1-1099 all depend on file0, so we should have 1099 dependency edges
+		expect(completedJob.stats?.dependencies_extracted).toBe(fileCount - 1);
+
+		// Verify database contains all 1100 files
+		const client = getSupabaseTestClient();
+		const { count: fileCountDb, error: filesError } = await client
+			.from("indexed_files")
+			.select("id", { count: "exact", head: true })
+			.eq("repository_id", testRepoId);
+
+		expect(filesError).toBeNull();
+		expect(fileCountDb).toBe(fileCount);
+
+		// Verify symbols were extracted (each file has 1-2 exported symbols)
+		// file0 has 2 exports, file1-1099 have 1 each = 2 + 1099 = 1101
+		expect(completedJob.stats?.symbols_extracted).toBe(fileCount + 1);
+	}, 180000); // 180 second timeout for 1100 file test
+
+	it("should exclude build artifact directories from indexing", async () => {
+		// Clean up existing test files first
+		await rm(join(testRepoPath, "example.ts"), { force: true });
+		await rm(join(testRepoPath, "utils.ts"), { force: true });
+
+		// Create source directories
+		await mkdir(join(testRepoPath, "src"), { recursive: true });
+		await mkdir(join(testRepoPath, "lib"), { recursive: true });
+
+		// Create source files that should be indexed
+		await writeFile(
+			join(testRepoPath, "src", "index.ts"),
+			`export function main() { return "app"; }`,
+		);
+		await writeFile(
+			join(testRepoPath, "lib", "helper.ts"),
+			`export function helper() { return "help"; }`,
+		);
+
+		// Create build artifact directories with files that should be IGNORED
+		// These match the IGNORED_DIRECTORIES set in parsers.ts
+		const ignoredDirs = [".next", ".vercel", ".turbo", "dist", "build", "node_modules"];
+
+		for (const dir of ignoredDirs) {
+			await mkdir(join(testRepoPath, dir), { recursive: true });
+			await writeFile(
+				join(testRepoPath, dir, "artifact.ts"),
+				`export const artifact = "should not be indexed";`,
+			);
+		}
+
+		// Also create nested build artifacts
+		await mkdir(join(testRepoPath, ".vercel", "output"), { recursive: true });
+		await writeFile(
+			join(testRepoPath, ".vercel", "output", "nested.ts"),
+			`export const nested = "also should not be indexed";`,
+		);
+
+		// Commit files to git
+		const { execSync } = require("node:child_process");
+		execSync("git add .", { cwd: testRepoPath, stdio: "ignore" });
+		execSync("git commit -m 'Add source and build artifact files'", {
+			cwd: testRepoPath,
+			stdio: "ignore",
+		});
+
+		// Create and enqueue job
+		const indexJob = await createIndexJob(
+			testRepoId,
+			"main",
+			"buildartifacts",
+			TEST_USER_IDS.free,
+		);
+
+		const queue = getQueue();
+		const payload: IndexRepoJobPayload = {
+			indexJobId: indexJob.id,
+			repositoryId: testRepoId,
+			commitSha: "buildartifacts",
+		};
+
+		await queue.send(QUEUE_NAMES.INDEX_REPO, payload);
+
+		// Wait for completion
+		let attempts = 0;
+		const maxAttempts = 60;
+
+		while (attempts < maxAttempts) {
+			const currentJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+
+			if (
+				currentJob.status === "completed" ||
+				currentJob.status === "failed"
+			) {
+				break;
+			}
+
+			await new Promise((resolve) => setTimeout(resolve, 500));
+			attempts++;
+		}
+
+		// Verify job completed successfully
+		const completedJob = await getJobStatus(indexJob.id, TEST_USER_IDS.free);
+		expect(completedJob.status).toBe("completed");
+
+		// Verify only source files were indexed (2 files: src/index.ts, lib/helper.ts)
+		expect(completedJob.stats?.files_indexed).toBe(2);
+
+		// Verify database only contains source files, not build artifacts
+		const client = getSupabaseTestClient();
+		const { data: indexedFiles, error: filesError } = await client
+			.from("indexed_files")
+			.select("path")
+			.eq("repository_id", testRepoId);
+
+		expect(filesError).toBeNull();
+		expect(indexedFiles).toBeDefined();
+		expect(indexedFiles!.length).toBe(2);
+
+		// Verify only source files are indexed
+		const paths = indexedFiles!.map((f: any) => f.path);
+		expect(paths).toContain("src/index.ts");
+		expect(paths).toContain("lib/helper.ts");
+
+		// Verify no build artifacts were indexed
+		for (const path of paths) {
+			expect(path).not.toContain(".next");
+			expect(path).not.toContain(".vercel");
+			expect(path).not.toContain(".turbo");
+			expect(path).not.toContain("dist");
+			expect(path).not.toContain("node_modules");
+		}
+	}, 40000);
 });
