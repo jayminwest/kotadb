@@ -19,9 +19,21 @@ let stripeInstance: Stripe | null = null;
 
 /**
  * Get or create the Stripe client instance.
- * Throws error if STRIPE_SECRET_KEY is not configured.
+ * Throws error if STRIPE_SECRET_KEY is not configured or billing is disabled.
  */
 export function getStripeClient(): Stripe {
+	// Check if billing is enabled
+	if (process.env.ENABLE_BILLING !== "true") {
+		const error = new Error(
+			"Billing is disabled - set ENABLE_BILLING=true to enable Stripe integration",
+		);
+		logger.error("Failed to initialize Stripe client", error, {
+			reason: "billing_disabled",
+		});
+		Sentry.captureException(error);
+		throw error;
+	}
+
 	if (!stripeInstance) {
 		const secretKey = process.env.STRIPE_SECRET_KEY;
 		if (!secretKey) {
@@ -59,9 +71,21 @@ export const STRIPE_PRICE_IDS = {
 
 /**
  * Validate that required Stripe price IDs are configured.
- * Throws error if any price ID is missing.
+ * Throws error if any price ID is missing or billing is disabled.
  */
 export function validateStripePriceIds(): void {
+	// Check if billing is enabled
+	if (process.env.ENABLE_BILLING !== "true") {
+		const error = new Error(
+			"Billing is disabled - set ENABLE_BILLING=true to enable Stripe integration",
+		);
+		logger.error("Stripe price validation failed", error, {
+			reason: "billing_disabled",
+		});
+		Sentry.captureException(error);
+		throw error;
+	}
+
 	if (!STRIPE_PRICE_IDS.solo) {
 		const error = new Error(
 			"STRIPE_SOLO_PRICE_ID environment variable is not configured",

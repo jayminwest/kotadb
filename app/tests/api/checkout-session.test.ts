@@ -330,9 +330,10 @@ describe("POST /api/subscriptions/create-checkout-session", () => {
 	});
 
 	describe("Stripe Integration", () => {
-		it("returns 500 when Stripe is not configured", async () => {
-			// This test assumes Stripe env vars are not set in test environment
-			// If they are set, this test will be skipped (see conditional below)
+		it("returns 501 when billing is disabled", async () => {
+			// This test checks the billing feature flag behavior
+			// If ENABLE_BILLING=true, we expect 500 (Stripe not configured)
+			// If ENABLE_BILLING=false, we expect 501 (billing disabled)
 
 			const response = await fetch(
 				`${BASE_URL}/api/subscriptions/create-checkout-session`,
@@ -352,12 +353,15 @@ describe("POST /api/subscriptions/create-checkout-session", () => {
 
 			const data = (await response.json()) as { error: string };
 
-			// If Stripe is configured, response will be 200 (or possibly other errors)
-			// If not configured, we expect 500 with specific error message
-			if (response.status === 500) {
+			// If billing is disabled, expect 501
+			if (process.env.ENABLE_BILLING !== "true") {
+				expect(response.status).toBe(501);
+				expect(data.error).toContain("Billing is not enabled");
+			} else if (response.status === 500) {
+				// Billing enabled but Stripe not configured
 				expect(data.error).toContain("Stripe is not configured");
 			} else {
-				// Stripe is configured in test environment, verify it returned a valid response
+				// Stripe is fully configured, verify it returned a valid response
 				expect(response.status).not.toBe(401); // Should be authenticated
 				expect(response.status).not.toBe(400); // Request was valid
 			}

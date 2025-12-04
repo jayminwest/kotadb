@@ -235,103 +235,106 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	);
 
 	// Stripe webhook endpoint (must be before express.json() to preserve raw body)
-	app.post(
-		"/webhooks/stripe",
-		express.raw({ type: "application/json" }),
-		async (req: Request, res: Response) => {
-			try {
-				// Extract Stripe webhook signature
-				const signature = req.get("stripe-signature");
-
-				// Validate signature header
-				if (!signature) {
-					return res.status(401).json({ error: "Missing signature header" });
-				}
-
-				// Get webhook secret from environment
-				const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-				if (!webhookSecret) {
-					const error = new Error("STRIPE_WEBHOOK_SECRET not configured");
-					logger.error("Stripe webhook secret missing", error);
-					Sentry.captureException(error);
-					return res.status(500).json({ error: "Webhook secret not configured" });
-				}
-
-				// Convert raw body to string for signature verification
-				const rawBody = req.body.toString("utf-8");
-
-				// Verify signature and construct event
-				let event: Stripe.Event;
+	// Only registered if billing is enabled
+	if (process.env.ENABLE_BILLING === "true") {
+		app.post(
+			"/webhooks/stripe",
+			express.raw({ type: "application/json" }),
+			async (req: Request, res: Response) => {
 				try {
-					event = await verifyStripeSignature(rawBody, signature);
-				} catch (error) {
-					const err = error as Error;
-					logger.error("Stripe webhook signature verification failed", err);
-					Sentry.captureException(err);
-					return res.status(401).json({ error: "Invalid signature" });
-				}
+					// Extract Stripe webhook signature
+					const signature = req.get("stripe-signature");
 
-				// Log webhook event
-				logger.info("Stripe webhook received", {
-					eventType: event.type,
-					eventId: event.id,
-				});
+					// Validate signature header
+					if (!signature) {
+						return res.status(401).json({ error: "Missing signature header" });
+					}
 
-				// Route events to handlers asynchronously (don't block webhook response)
-			if (event.type === "checkout.session.completed") {
-				handleCheckoutSessionCompleted(event as Stripe.CheckoutSessionCompletedEvent).catch(
-					(error) => {
-						const err = error instanceof Error ? error : new Error(String(error));
-						logger.error("Stripe checkout.session.completed handler error", err, {
-							eventId: event.id,
-							eventType: event.type,
-						});
+					// Get webhook secret from environment
+					const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+					if (!webhookSecret) {
+						const error = new Error("STRIPE_WEBHOOK_SECRET not configured");
+						logger.error("Stripe webhook secret missing", error);
+						Sentry.captureException(error);
+						return res.status(500).json({ error: "Webhook secret not configured" });
+					}
+
+					// Convert raw body to string for signature verification
+					const rawBody = req.body.toString("utf-8");
+
+					// Verify signature and construct event
+					let event: Stripe.Event;
+					try {
+						event = await verifyStripeSignature(rawBody, signature);
+					} catch (error) {
+						const err = error as Error;
+						logger.error("Stripe webhook signature verification failed", err);
 						Sentry.captureException(err);
-					},
-				);
-			} else if (event.type === "invoice.paid") {
-					handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
-						const err = error instanceof Error ? error : new Error(String(error));
-						logger.error("Stripe invoice.paid handler error", err, {
-							eventId: event.id,
-							eventType: event.type,
-						});
-						Sentry.captureException(err);
+						return res.status(401).json({ error: "Invalid signature" });
+					}
+
+					// Log webhook event
+					logger.info("Stripe webhook received", {
+						eventType: event.type,
+						eventId: event.id,
 					});
-				} else if (event.type === "customer.subscription.updated") {
-					handleSubscriptionUpdated(event as Stripe.CustomerSubscriptionUpdatedEvent).catch(
-						(error) => {
-							const err = error instanceof Error ? error : new Error(String(error));
-							logger.error("Stripe customer.subscription.updated handler error", err, {
-								eventId: event.id,
-								eventType: event.type,
-							});
-							Sentry.captureException(err);
-						},
-					);
-				} else if (event.type === "customer.subscription.deleted") {
-					handleSubscriptionDeleted(event as Stripe.CustomerSubscriptionDeletedEvent).catch(
-						(error) => {
-							const err = error instanceof Error ? error : new Error(String(error));
-							logger.error("Stripe customer.subscription.deleted handler error", err, {
-								eventId: event.id,
-								eventType: event.type,
-							});
-							Sentry.captureException(err);
-						},
-					);
-				}
 
-				// Always return success for valid webhooks (Stripe expects 200 OK)
-				res.status(200).json({ received: true });
-			} catch (error) {
-				const err = error instanceof Error ? error : new Error(String(error));
-				logger.error("Stripe webhook handler error", err);
-				Sentry.captureException(err);
-				res.status(500).json({ error: "Internal server error" });
-			}
-		},
-	);
+					// Route events to handlers asynchronously (don't block webhook response)
+				if (event.type === "checkout.session.completed") {
+					handleCheckoutSessionCompleted(event as Stripe.CheckoutSessionCompletedEvent).catch(
+						(error) => {
+							const err = error instanceof Error ? error : new Error(String(error));
+							logger.error("Stripe checkout.session.completed handler error", err, {
+								eventId: event.id,
+								eventType: event.type,
+							});
+							Sentry.captureException(err);
+						},
+					);
+				} else if (event.type === "invoice.paid") {
+						handleInvoicePaid(event as Stripe.InvoicePaidEvent).catch((error) => {
+							const err = error instanceof Error ? error : new Error(String(error));
+							logger.error("Stripe invoice.paid handler error", err, {
+								eventId: event.id,
+								eventType: event.type,
+							});
+							Sentry.captureException(err);
+						});
+					} else if (event.type === "customer.subscription.updated") {
+						handleSubscriptionUpdated(event as Stripe.CustomerSubscriptionUpdatedEvent).catch(
+							(error) => {
+								const err = error instanceof Error ? error : new Error(String(error));
+								logger.error("Stripe customer.subscription.updated handler error", err, {
+									eventId: event.id,
+									eventType: event.type,
+								});
+								Sentry.captureException(err);
+							},
+						);
+					} else if (event.type === "customer.subscription.deleted") {
+						handleSubscriptionDeleted(event as Stripe.CustomerSubscriptionDeletedEvent).catch(
+							(error) => {
+								const err = error instanceof Error ? error : new Error(String(error));
+								logger.error("Stripe customer.subscription.deleted handler error", err, {
+									eventId: event.id,
+									eventType: event.type,
+								});
+								Sentry.captureException(err);
+							},
+						);
+					}
+
+					// Always return success for valid webhooks (Stripe expects 200 OK)
+					res.status(200).json({ received: true });
+				} catch (error) {
+					const err = error instanceof Error ? error : new Error(String(error));
+					logger.error("Stripe webhook handler error", err);
+					Sentry.captureException(err);
+					res.status(500).json({ error: "Internal server error" });
+				}
+			},
+		);
+	}
 
 	// Body parser middleware for other routes (after webhook)
 	app.use(express.json());
@@ -707,155 +710,182 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	});
 
 	// POST /api/subscriptions/create-checkout-session - Create Stripe Checkout session
-	app.post("/api/subscriptions/create-checkout-session", async (req: AuthenticatedRequest, res: Response) => {
-		const context = req.authContext!;
-		addRateLimitHeaders(res, context.rateLimit);
+	// Only registered if billing is enabled
+	if (process.env.ENABLE_BILLING === "true") {
+		app.post("/api/subscriptions/create-checkout-session", async (req: AuthenticatedRequest, res: Response) => {
+			const context = req.authContext!;
+			addRateLimitHeaders(res, context.rateLimit);
 
-		try {
-			const { tier, successUrl, cancelUrl } = req.body;
-
-			if (!tier || (tier !== "solo" && tier !== "team")) {
-				return res.status(400).json({ error: "Invalid tier. Must be 'solo' or 'team'" });
-			}
-
-			if (!successUrl || !cancelUrl) {
-				return res.status(400).json({ error: "successUrl and cancelUrl are required" });
-			}
-
-			// Initialize Stripe with configuration validation
-			let stripe;
-			let priceId;
 			try {
-				const { getStripeClient, STRIPE_PRICE_IDS, validateStripePriceIds } = await import("./stripe");
-				validateStripePriceIds();
-				stripe = getStripeClient();
-				priceId = STRIPE_PRICE_IDS[tier as "solo" | "team"];
-			} catch (configError) {
-				const err = configError instanceof Error ? configError : new Error(String(configError));
-				logger.error("Stripe configuration error in checkout", err, {
+				const { tier, successUrl, cancelUrl } = req.body;
+
+				if (!tier || (tier !== "solo" && tier !== "team")) {
+					return res.status(400).json({ error: "Invalid tier. Must be 'solo' or 'team'" });
+				}
+
+				if (!successUrl || !cancelUrl) {
+					return res.status(400).json({ error: "successUrl and cancelUrl are required" });
+				}
+
+				// Initialize Stripe with configuration validation
+				let stripe;
+				let priceId;
+				try {
+					const { getStripeClient, STRIPE_PRICE_IDS, validateStripePriceIds } = await import("./stripe");
+					validateStripePriceIds();
+					stripe = getStripeClient();
+					priceId = STRIPE_PRICE_IDS[tier as "solo" | "team"];
+				} catch (configError) {
+					const err = configError instanceof Error ? configError : new Error(String(configError));
+					logger.error("Stripe configuration error in checkout", err, {
+						userId: context.userId,
+						tier,
+					});
+					Sentry.captureException(err);
+					return res.status(500).json({ error: "Stripe is not configured on this server" });
+				}
+
+				// Get or create Stripe customer
+				const { data: existingSub } = await supabase
+					.from("subscriptions")
+					.select("stripe_customer_id")
+					.eq("user_id", context.userId)
+					.single();
+
+				let customerId: string;
+
+				if (existingSub?.stripe_customer_id) {
+					customerId = existingSub.stripe_customer_id;
+				} else {
+					const customer = await stripe.customers.create({
+						metadata: { user_id: context.userId },
+					});
+					customerId = customer.id;
+				}
+
+				// Create Checkout session
+				const session = await stripe.checkout.sessions.create({
+					customer: customerId,
+					mode: "subscription",
+					line_items: [{ price: priceId, quantity: 1 }],
+					success_url: successUrl,
+					cancel_url: cancelUrl,
+					subscription_data: {
+						metadata: { user_id: context.userId },
+					},
+				});
+
+				res.json({ url: session.url, sessionId: session.id });
+			} catch (error) {
+				const err = error instanceof Error ? error : new Error(String(error));
+				logger.error("Stripe checkout session creation failed", err, {
 					userId: context.userId,
-					tier,
 				});
 				Sentry.captureException(err);
-				return res.status(500).json({ error: "Stripe is not configured on this server" });
+				res.status(500).json({ error: "Failed to create checkout session" });
 			}
-
-			// Get or create Stripe customer
-			const { data: existingSub } = await supabase
-				.from("subscriptions")
-				.select("stripe_customer_id")
-				.eq("user_id", context.userId)
-				.single();
-
-			let customerId: string;
-
-			if (existingSub?.stripe_customer_id) {
-				customerId = existingSub.stripe_customer_id;
-			} else {
-				const customer = await stripe.customers.create({
-					metadata: { user_id: context.userId },
-				});
-				customerId = customer.id;
-			}
-
-			// Create Checkout session
-			const session = await stripe.checkout.sessions.create({
-				customer: customerId,
-				mode: "subscription",
-				line_items: [{ price: priceId, quantity: 1 }],
-				success_url: successUrl,
-				cancel_url: cancelUrl,
-				subscription_data: {
-					metadata: { user_id: context.userId },
-				},
-			});
-
-			res.json({ url: session.url, sessionId: session.id });
-		} catch (error) {
-			const err = error instanceof Error ? error : new Error(String(error));
-			logger.error("Stripe checkout session creation failed", err, {
-				userId: context.userId,
-			});
-			Sentry.captureException(err);
-			res.status(500).json({ error: "Failed to create checkout session" });
-		}
-	});
+		});
+	} else {
+		app.post("/api/subscriptions/create-checkout-session", (req: AuthenticatedRequest, res: Response) => {
+			const context = req.authContext!;
+			addRateLimitHeaders(res, context.rateLimit);
+			res.status(501).json({ error: "Billing is not enabled on this server" });
+		});
+	}
 
 	// POST /api/subscriptions/create-portal-session - Create Stripe billing portal session
-	app.post("/api/subscriptions/create-portal-session", async (req: AuthenticatedRequest, res: Response) => {
-		const context = req.authContext!;
-		addRateLimitHeaders(res, context.rateLimit);
+	// Only registered if billing is enabled
+	if (process.env.ENABLE_BILLING === "true") {
+		app.post("/api/subscriptions/create-portal-session", async (req: AuthenticatedRequest, res: Response) => {
+			const context = req.authContext!;
+			addRateLimitHeaders(res, context.rateLimit);
 
-		try {
-			const { returnUrl } = req.body;
-
-			if (!returnUrl) {
-				return res.status(400).json({ error: "returnUrl is required" });
-			}
-
-			// Get Stripe customer ID from subscription
-			const { data: subscription } = await supabase
-				.from("subscriptions")
-				.select("stripe_customer_id")
-				.eq("user_id", context.userId)
-				.single();
-
-			if (!subscription?.stripe_customer_id) {
-				return res.status(404).json({ error: "No subscription found" });
-			}
-
-			// Initialize Stripe with configuration validation
-			let stripe;
 			try {
-				const { getStripeClient } = await import("./stripe");
-				stripe = getStripeClient();
-			} catch (configError) {
-				const err = configError instanceof Error ? configError : new Error(String(configError));
-				logger.error("Stripe configuration error in portal", err, {
+				const { returnUrl } = req.body;
+
+				if (!returnUrl) {
+					return res.status(400).json({ error: "returnUrl is required" });
+				}
+
+				// Get Stripe customer ID from subscription
+				const { data: subscription } = await supabase
+					.from("subscriptions")
+					.select("stripe_customer_id")
+					.eq("user_id", context.userId)
+					.single();
+
+				if (!subscription?.stripe_customer_id) {
+					return res.status(404).json({ error: "No subscription found" });
+				}
+
+				// Initialize Stripe with configuration validation
+				let stripe;
+				try {
+					const { getStripeClient } = await import("./stripe");
+					stripe = getStripeClient();
+				} catch (configError) {
+					const err = configError instanceof Error ? configError : new Error(String(configError));
+					logger.error("Stripe configuration error in portal", err, {
+						userId: context.userId,
+					});
+					Sentry.captureException(err);
+					return res.status(500).json({ error: "Stripe is not configured on this server" });
+				}
+
+				const session = await stripe.billingPortal.sessions.create({
+					customer: subscription.stripe_customer_id,
+					return_url: returnUrl,
+				});
+
+				res.json({ url: session.url });
+			} catch (error) {
+				const err = error instanceof Error ? error : new Error(String(error));
+				logger.error("Stripe portal session creation failed", err, {
 					userId: context.userId,
 				});
 				Sentry.captureException(err);
-				return res.status(500).json({ error: "Stripe is not configured on this server" });
+				res.status(500).json({ error: "Failed to create portal session" });
 			}
-
-			const session = await stripe.billingPortal.sessions.create({
-				customer: subscription.stripe_customer_id,
-				return_url: returnUrl,
-			});
-
-			res.json({ url: session.url });
-		} catch (error) {
-			const err = error instanceof Error ? error : new Error(String(error));
-			logger.error("Stripe portal session creation failed", err, {
-				userId: context.userId,
-			});
-			Sentry.captureException(err);
-			res.status(500).json({ error: "Failed to create portal session" });
-		}
-	});
+		});
+	} else {
+		app.post("/api/subscriptions/create-portal-session", (req: AuthenticatedRequest, res: Response) => {
+			const context = req.authContext!;
+			addRateLimitHeaders(res, context.rateLimit);
+			res.status(501).json({ error: "Billing is not enabled on this server" });
+		});
+	}
 
 	// GET /api/subscriptions/current - Get current user's subscription
-	app.get("/api/subscriptions/current", async (req: AuthenticatedRequest, res: Response) => {
-		const context = req.authContext!;
-		addRateLimitHeaders(res, context.rateLimit);
+	// Only registered if billing is enabled
+	if (process.env.ENABLE_BILLING === "true") {
+		app.get("/api/subscriptions/current", async (req: AuthenticatedRequest, res: Response) => {
+			const context = req.authContext!;
+			addRateLimitHeaders(res, context.rateLimit);
 
-		try {
-			const { data: subscription } = await supabase
-				.from("subscriptions")
-				.select("id, tier, status, current_period_start, current_period_end, cancel_at_period_end")
-				.eq("user_id", context.userId)
-				.single();
+			try {
+				const { data: subscription } = await supabase
+					.from("subscriptions")
+					.select("id, tier, status, current_period_start, current_period_end, cancel_at_period_end")
+					.eq("user_id", context.userId)
+					.single();
 
-			res.json({ subscription: subscription || null });
-		} catch (error) {
-			const err = error instanceof Error ? error : new Error(String(error));
-			logger.error("Get subscription failed", err, {
-				userId: context.userId,
-			});
-			Sentry.captureException(err);
-			res.status(500).json({ error: "Failed to fetch subscription" });
-		}
-	});
+				res.json({ subscription: subscription || null });
+			} catch (error) {
+				const err = error instanceof Error ? error : new Error(String(error));
+				logger.error("Get subscription failed", err, {
+					userId: context.userId,
+				});
+				Sentry.captureException(err);
+				res.status(500).json({ error: "Failed to fetch subscription" });
+			}
+		});
+	} else {
+		app.get("/api/subscriptions/current", (req: AuthenticatedRequest, res: Response) => {
+			const context = req.authContext!;
+			addRateLimitHeaders(res, context.rateLimit);
+			res.status(501).json({ error: "Billing is not enabled on this server" });
+		});
+	}
 
 	// POST /api/keys/generate - Generate API key for authenticated user
 	app.post("/api/keys/generate", async (req: Request, res: Response) => {

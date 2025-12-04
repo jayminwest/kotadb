@@ -239,6 +239,16 @@ Use this reference to decide which KotaDB application layer documentation source
     - When experiencing merge conflicts in migration directories during concurrent development
     - When Supabase CLI fails to recognize or apply migrations due to naming issues
 
+- docs/specs/chore-471-open-source-core-fork.md
+  - Conditions:
+    - When working on billing features or Stripe integration in open source fork
+    - When implementing or troubleshooting ENABLE_BILLING feature flag behavior
+    - When understanding public vs private repository split and sync strategy
+    - When configuring billing endpoints to return 501 when billing disabled
+    - When setting up self-hosted deployments without billing features
+    - When documenting Stripe integration as educational example code
+    - When working with GitHub Actions sync workflow to public repository
+
 - docs/specs/feature-317-dev-session-endpoint.md
   - Conditions:
     - When working on issue #317 or implementing dev-mode authentication for testing

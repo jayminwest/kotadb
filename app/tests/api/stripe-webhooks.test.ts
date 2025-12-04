@@ -74,6 +74,14 @@ describe("POST /webhooks/stripe - Integration", () => {
 	let testSubscription: Stripe.Subscription;
 
 	beforeAll(async () => {
+		// Check if billing is enabled
+		if (process.env.ENABLE_BILLING !== "true") {
+			process.stdout.write(
+				"[SKIP] Stripe webhook tests require ENABLE_BILLING=true. Billing is disabled in this environment.\n",
+			);
+			process.exit(0);
+		}
+
 		// Check if Stripe credentials are configured
 		if (!process.env.STRIPE_SECRET_KEY) {
 			process.stdout.write(

@@ -32,30 +32,37 @@ async function bootstrap() {
 	}
 
 	// Validate Stripe configuration (optional - warn if incomplete)
-	const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
-	const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
-	const stripeSoloPriceId = process.env.STRIPE_SOLO_PRICE_ID;
-	const stripeTeamPriceId = process.env.STRIPE_TEAM_PRICE_ID;
+	const billingEnabled = process.env.ENABLE_BILLING === "true";
+	logger.info("Billing feature flag", { enabled: billingEnabled });
 
-	const stripeConfigPresent =
-		stripeSecretKey || stripeWebhookSecret || stripeSoloPriceId || stripeTeamPriceId;
+	if (billingEnabled) {
+		const stripeSecretKey = process.env.STRIPE_SECRET_KEY;
+		const stripeWebhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+		const stripeSoloPriceId = process.env.STRIPE_SOLO_PRICE_ID;
+		const stripeTeamPriceId = process.env.STRIPE_TEAM_PRICE_ID;
 
-	if (stripeConfigPresent) {
-		const missingVars: string[] = [];
-		if (!stripeSecretKey) missingVars.push("STRIPE_SECRET_KEY");
-		if (!stripeWebhookSecret) missingVars.push("STRIPE_WEBHOOK_SECRET");
-		if (!stripeSoloPriceId) missingVars.push("STRIPE_SOLO_PRICE_ID");
-		if (!stripeTeamPriceId) missingVars.push("STRIPE_TEAM_PRICE_ID");
+		const stripeConfigPresent =
+			stripeSecretKey || stripeWebhookSecret || stripeSoloPriceId || stripeTeamPriceId;
 
-		if (missingVars.length > 0) {
-			logger.warn("Partial Stripe configuration detected", {
-				missing_vars: missingVars,
-			});
+		if (stripeConfigPresent) {
+			const missingVars: string[] = [];
+			if (!stripeSecretKey) missingVars.push("STRIPE_SECRET_KEY");
+			if (!stripeWebhookSecret) missingVars.push("STRIPE_WEBHOOK_SECRET");
+			if (!stripeSoloPriceId) missingVars.push("STRIPE_SOLO_PRICE_ID");
+			if (!stripeTeamPriceId) missingVars.push("STRIPE_TEAM_PRICE_ID");
+
+			if (missingVars.length > 0) {
+				logger.warn("Partial Stripe configuration detected", {
+					missing_vars: missingVars,
+				});
+			} else {
+				logger.info("Stripe configuration validated");
+			}
 		} else {
-			logger.info("Stripe configuration validated");
+			logger.info("Stripe not configured - subscription features disabled");
 		}
 	} else {
-		logger.info("Stripe not configured - subscription features disabled");
+		logger.info("Billing disabled by feature flag - subscription features unavailable");
 	}
 
 	// Initialize Supabase client
