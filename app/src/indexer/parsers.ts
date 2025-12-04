@@ -18,12 +18,36 @@ const SUPPORTED_EXTENSIONS = new Set<string>([
 ]);
 
 const IGNORED_DIRECTORIES = new Set<string>([
+	// Version control
 	".git",
+	// Package managers
 	"node_modules",
-	"dist",
+	"vendor", // Go, Ruby
+	// Build output
 	"build",
+	"dist",
 	"out",
+	"target", // Rust, Java/Maven
+	// Framework-specific build/cache directories
+	".angular",
+	".cache",
+	".next", // Next.js
+	".nuxt", // Nuxt.js
+	".nx", // Nx monorepo
+	".output", // Nuxt 3
+	".parcel-cache",
+	".svelte-kit", // SvelteKit
+	".turbo", // Turborepo
+	".vercel",
+	".vite",
+	// Test coverage
 	"coverage",
+	// Python
+	"__pycache__",
+	".pytest_cache",
+	"venv",
+	".venv",
+	"env",
 ]);
 
 export async function discoverSources(projectRoot: string): Promise<string[]> {

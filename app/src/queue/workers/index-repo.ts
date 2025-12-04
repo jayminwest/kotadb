@@ -291,17 +291,40 @@ async function processIndexJob(
 			`[${new Date().toISOString()}] [STEP 6/7] Two-pass storage: Pass 2 - Extracting and storing references and dependencies\n`,
 		);
 
-		// Query database to get files with IDs
-		const { data: storedFiles, error: filesError } = await supabase
-			.from("indexed_files")
-			.select("id, path, content, language")
-			.eq("repository_id", repositoryId);
+		// Query database to get files with IDs (paginated to avoid Supabase 1000-row limit)
+		const FILE_QUERY_BATCH_SIZE = 1000;
+		const storedFiles: Array<{ id: string; path: string; content: string; language: string }> = [];
+		let fileOffset = 0;
 
-		if (filesError) {
-			throw new Error(`Failed to query indexed files: ${filesError.message}`);
+		while (true) {
+			const { data: fileBatch, error: filesError } = await supabase
+				.from("indexed_files")
+				.select("id, path, content, language")
+				.eq("repository_id", repositoryId)
+				.range(fileOffset, fileOffset + FILE_QUERY_BATCH_SIZE - 1);
+
+			if (filesError) {
+				throw new Error(`Failed to query indexed files at offset ${fileOffset}: ${filesError.message}`);
+			}
+
+			if (!fileBatch || fileBatch.length === 0) {
+				break;
+			}
+
+			storedFiles.push(...fileBatch);
+
+			// If we got fewer rows than batch size, we've reached the end
+			if (fileBatch.length < FILE_QUERY_BATCH_SIZE) {
+				break;
+			}
+
+			fileOffset += FILE_QUERY_BATCH_SIZE;
+			process.stdout.write(
+				`[${new Date().toISOString()}] [PASS 2] Queried ${storedFiles.length} files so far (offset: ${fileOffset})\n`,
+			);
 		}
 
-		if (!storedFiles || storedFiles.length === 0) {
+		if (storedFiles.length === 0) {
 			process.stdout.write(
 				`[${new Date().toISOString()}] [PASS 2] No files found in database, skipping Pass 2\n`,
 			);
