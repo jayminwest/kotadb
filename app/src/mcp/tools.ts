@@ -16,6 +16,15 @@ import {
 	queryDependencies,
 	type DependencyResult,
 } from "@api/queries";
+import {
+	createProject,
+	listProjects,
+	getProject,
+	updateProject,
+	deleteProject,
+	addRepositoryToProject,
+	removeRepositoryFromProject,
+} from "@api/projects";
 import { buildSnippet } from "@indexer/extractors";
 import type {
 	IndexRequest,
@@ -294,6 +303,168 @@ export const VALIDATE_IMPLEMENTATION_SPEC_TOOL: ToolDefinition = {
 };
 
 /**
+ * Tool: create_project
+ */
+export const CREATE_PROJECT_TOOL: ToolDefinition = {
+	name: "create_project",
+	description:
+		"Create a new project with optional repository associations.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			name: {
+				type: "string",
+				description: "Project name (required)",
+			},
+			description: {
+				type: "string",
+				description: "Project description (optional)",
+			},
+			repository_ids: {
+				type: "array",
+				items: { type: "string" },
+				description: "Optional: Repository UUIDs to associate with project",
+			},
+		},
+		required: ["name"],
+	},
+};
+
+/**
+ * Tool: list_projects
+ */
+export const LIST_PROJECTS_TOOL: ToolDefinition = {
+	name: "list_projects",
+	description:
+		"List all projects for the authenticated user with repository counts.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			limit: {
+				type: "number",
+				description: "Optional: Maximum projects to return (default: unlimited)",
+			},
+		},
+	},
+};
+
+/**
+ * Tool: get_project
+ */
+export const GET_PROJECT_TOOL: ToolDefinition = {
+	name: "get_project",
+	description:
+		"Get project details with full repository list. Accepts project UUID or name.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			project: {
+				type: "string",
+				description: "Project UUID or name (case-insensitive)",
+			},
+		},
+		required: ["project"],
+	},
+};
+
+/**
+ * Tool: update_project
+ */
+export const UPDATE_PROJECT_TOOL: ToolDefinition = {
+	name: "update_project",
+	description:
+		"Update project name, description, and/or repository associations.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			project: {
+				type: "string",
+				description: "Project UUID or name (case-insensitive)",
+			},
+			name: {
+				type: "string",
+				description: "Optional: New project name",
+			},
+			description: {
+				type: "string",
+				description: "Optional: New project description",
+			},
+			repository_ids: {
+				type: "array",
+				items: { type: "string" },
+				description: "Optional: Repository UUIDs (replaces all associations)",
+			},
+		},
+		required: ["project"],
+	},
+};
+
+/**
+ * Tool: delete_project
+ */
+export const DELETE_PROJECT_TOOL: ToolDefinition = {
+	name: "delete_project",
+	description:
+		"Delete project (cascade deletes associations, repositories remain indexed).",
+	inputSchema: {
+		type: "object",
+		properties: {
+			project: {
+				type: "string",
+				description: "Project UUID or name (case-insensitive)",
+			},
+		},
+		required: ["project"],
+	},
+};
+
+/**
+ * Tool: add_repository_to_project
+ */
+export const ADD_REPOSITORY_TO_PROJECT_TOOL: ToolDefinition = {
+	name: "add_repository_to_project",
+	description:
+		"Add a repository to a project (idempotent).",
+	inputSchema: {
+		type: "object",
+		properties: {
+			project: {
+				type: "string",
+				description: "Project UUID or name (case-insensitive)",
+			},
+			repository_id: {
+				type: "string",
+				description: "Repository UUID to add",
+			},
+		},
+		required: ["project", "repository_id"],
+	},
+};
+
+/**
+ * Tool: remove_repository_from_project
+ */
+export const REMOVE_REPOSITORY_FROM_PROJECT_TOOL: ToolDefinition = {
+	name: "remove_repository_from_project",
+	description:
+		"Remove a repository from a project (idempotent).",
+	inputSchema: {
+		type: "object",
+		properties: {
+			project: {
+				type: "string",
+				description: "Project UUID or name (case-insensitive)",
+			},
+			repository_id: {
+				type: "string",
+				description: "Repository UUID to remove",
+			},
+		},
+		required: ["project", "repository_id"],
+	},
+};
+
+/**
  * Get all available tool definitions
  */
 export function getToolDefinitions(): ToolDefinition[] {
@@ -304,6 +475,13 @@ export function getToolDefinitions(): ToolDefinition[] {
 		SEARCH_DEPENDENCIES_TOOL,
 		ANALYZE_CHANGE_IMPACT_TOOL,
 		VALIDATE_IMPLEMENTATION_SPEC_TOOL,
+		CREATE_PROJECT_TOOL,
+		LIST_PROJECTS_TOOL,
+		GET_PROJECT_TOOL,
+		UPDATE_PROJECT_TOOL,
+		DELETE_PROJECT_TOOL,
+		ADD_REPOSITORY_TO_PROJECT_TOOL,
+		REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 	];
 }
 
@@ -344,6 +522,72 @@ function isListRecentParams(
 	const p = params as Record<string, unknown>;
 	if (p.limit !== undefined && typeof p.limit !== "number") return false;
 	return true;
+}
+
+/**
+ * Resolve project identifier (UUID or name) to project UUID.
+ * Supports both UUID and case-insensitive name lookups.
+ *
+ * @param supabase - Supabase client instance
+ * @param userId - User UUID for RLS context
+ * @param projectIdentifier - Project UUID or name
+ * @returns Project UUID or throws "Project not found" error
+ */
+async function resolveProjectId(
+	supabase: SupabaseClient,
+	userId: string,
+	projectIdentifier: string,
+): Promise<string> {
+	// Try UUID regex match first
+	const uuidRegex =
+		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	if (uuidRegex.test(projectIdentifier)) {
+		// Direct UUID lookup
+		const { data: project, error } = await supabase
+			.from("projects")
+			.select("id")
+			.eq("id", projectIdentifier)
+			.eq("user_id", userId)
+			.maybeSingle();
+
+		if (error) {
+			logger.error("Failed to fetch project by UUID", {
+				error: error.message,
+				project: projectIdentifier,
+				user_id: userId,
+			});
+			throw new Error(`Failed to fetch project: ${error.message}`);
+		}
+
+		if (!project) {
+			throw new Error(`Project not found: ${projectIdentifier}`);
+		}
+
+		return project.id;
+	}
+
+	// Lookup by name (case-insensitive)
+	const { data: project, error } = await supabase
+		.from("projects")
+		.select("id")
+		.eq("user_id", userId)
+		.ilike("name", projectIdentifier)
+		.maybeSingle();
+
+	if (error) {
+		logger.error("Failed to fetch project by name", {
+			error: error.message,
+			project: projectIdentifier,
+			user_id: userId,
+		});
+		throw new Error(`Failed to fetch project: ${error.message}`);
+	}
+
+	if (!project) {
+		throw new Error(`Project not found: ${projectIdentifier}`);
+	}
+
+	return project.id;
 }
 
 /**
@@ -895,6 +1139,350 @@ export async function executeValidateImplementationSpec(
 }
 
 /**
+ * Execute create_project tool
+ */
+export async function executeCreateProject(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: name
+	if (p.name === undefined) {
+		throw new Error("Missing required parameter: name");
+	}
+	if (typeof p.name !== "string") {
+		throw new Error("Parameter 'name' must be a string");
+	}
+
+	// Validate optional parameters
+	if (p.description !== undefined && typeof p.description !== "string") {
+		throw new Error("Parameter 'description' must be a string");
+	}
+	if (p.repository_ids !== undefined && !Array.isArray(p.repository_ids)) {
+		throw new Error("Parameter 'repository_ids' must be an array");
+	}
+
+	const projectId = await createProject(supabase, userId, {
+		name: p.name as string,
+		description: p.description as string | undefined,
+		repository_ids: p.repository_ids as string[] | undefined,
+	});
+
+	return {
+		projectId,
+		name: p.name,
+	};
+}
+
+/**
+ * Execute list_projects tool
+ */
+export async function executeListProjects(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure (all params are optional)
+	if (params !== undefined && (typeof params !== "object" || params === null)) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const projects = await listProjects(supabase, userId);
+
+	// Apply limit if provided
+	if (params && typeof params === "object") {
+		const p = params as Record<string, unknown>;
+		if (p.limit !== undefined) {
+			if (typeof p.limit !== "number") {
+				throw new Error("Parameter 'limit' must be a number");
+			}
+			return { projects: projects.slice(0, p.limit) };
+		}
+	}
+
+	return { projects };
+}
+
+/**
+ * Execute get_project tool
+ */
+export async function executeGetProject(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: project
+	if (p.project === undefined) {
+		throw new Error("Missing required parameter: project");
+	}
+	if (typeof p.project !== "string") {
+		throw new Error("Parameter 'project' must be a string");
+	}
+
+	// Resolve project identifier
+	const projectId = await resolveProjectId(
+		supabase,
+		userId,
+		p.project as string,
+	);
+
+	// Get project details
+	const project = await getProject(supabase, userId, projectId);
+
+	if (!project) {
+		throw new Error(`Project not found: ${p.project}`);
+	}
+
+	return project;
+}
+
+/**
+ * Execute update_project tool
+ */
+export async function executeUpdateProject(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: project
+	if (p.project === undefined) {
+		throw new Error("Missing required parameter: project");
+	}
+	if (typeof p.project !== "string") {
+		throw new Error("Parameter 'project' must be a string");
+	}
+
+	// Validate at least one update field is present
+	if (
+		p.name === undefined &&
+		p.description === undefined &&
+		p.repository_ids === undefined
+	) {
+		throw new Error(
+			"At least one update field required: name, description, or repository_ids",
+		);
+	}
+
+	// Validate optional parameters
+	if (p.name !== undefined && typeof p.name !== "string") {
+		throw new Error("Parameter 'name' must be a string");
+	}
+	if (p.description !== undefined && typeof p.description !== "string") {
+		throw new Error("Parameter 'description' must be a string");
+	}
+	if (p.repository_ids !== undefined && !Array.isArray(p.repository_ids)) {
+		throw new Error("Parameter 'repository_ids' must be an array");
+	}
+
+	// Resolve project identifier
+	const projectId = await resolveProjectId(
+		supabase,
+		userId,
+		p.project as string,
+	);
+
+	// Update project
+	await updateProject(supabase, userId, projectId, {
+		name: p.name as string | undefined,
+		description: p.description as string | undefined,
+		repository_ids: p.repository_ids as string[] | undefined,
+	});
+
+	return {
+		success: true,
+		message: "Project updated",
+	};
+}
+
+/**
+ * Execute delete_project tool
+ */
+export async function executeDeleteProject(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: project
+	if (p.project === undefined) {
+		throw new Error("Missing required parameter: project");
+	}
+	if (typeof p.project !== "string") {
+		throw new Error("Parameter 'project' must be a string");
+	}
+
+	// Resolve project identifier
+	const projectId = await resolveProjectId(
+		supabase,
+		userId,
+		p.project as string,
+	);
+
+	// Delete project
+	await deleteProject(supabase, userId, projectId);
+
+	return {
+		success: true,
+		message: "Project deleted",
+	};
+}
+
+/**
+ * Execute add_repository_to_project tool
+ */
+export async function executeAddRepositoryToProject(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameters
+	if (p.project === undefined) {
+		throw new Error("Missing required parameter: project");
+	}
+	if (typeof p.project !== "string") {
+		throw new Error("Parameter 'project' must be a string");
+	}
+	if (p.repository_id === undefined) {
+		throw new Error("Missing required parameter: repository_id");
+	}
+	if (typeof p.repository_id !== "string") {
+		throw new Error("Parameter 'repository_id' must be a string");
+	}
+
+	// Resolve project identifier
+	const projectId = await resolveProjectId(
+		supabase,
+		userId,
+		p.project as string,
+	);
+
+	// Verify repository exists and belongs to user
+	const { data: repository, error: repoError } = await supabase
+		.from("repositories")
+		.select("id")
+		.eq("id", p.repository_id)
+		.eq("user_id", userId)
+		.maybeSingle();
+
+	if (repoError) {
+		logger.error("Failed to fetch repository", {
+			error: repoError.message,
+			repository_id: p.repository_id,
+			user_id: userId,
+		});
+		throw new Error(`Failed to fetch repository: ${repoError.message}`);
+	}
+
+	if (!repository) {
+		throw new Error(`Repository not found: ${p.repository_id}`);
+	}
+
+	// Add repository to project
+	await addRepositoryToProject(
+		supabase,
+		userId,
+		projectId,
+		p.repository_id as string,
+	);
+
+	return {
+		success: true,
+		message: "Repository added to project",
+	};
+}
+
+/**
+ * Execute remove_repository_from_project tool
+ */
+export async function executeRemoveRepositoryFromProject(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameters
+	if (p.project === undefined) {
+		throw new Error("Missing required parameter: project");
+	}
+	if (typeof p.project !== "string") {
+		throw new Error("Parameter 'project' must be a string");
+	}
+	if (p.repository_id === undefined) {
+		throw new Error("Missing required parameter: repository_id");
+	}
+	if (typeof p.repository_id !== "string") {
+		throw new Error("Parameter 'repository_id' must be a string");
+	}
+
+	// Resolve project identifier
+	const projectId = await resolveProjectId(
+		supabase,
+		userId,
+		p.project as string,
+	);
+
+	// Remove repository from project
+	await removeRepositoryFromProject(
+		supabase,
+		userId,
+		projectId,
+		p.repository_id as string,
+	);
+
+	return {
+		success: true,
+		message: "Repository removed from project",
+	};
+}
+
+/**
  * Main tool call dispatcher
  */
 export async function handleToolCall(
@@ -927,6 +1515,30 @@ export async function handleToolCall(
 			);
 		case "validate_implementation_spec":
 			return await executeValidateImplementationSpec(
+				supabase,
+				params,
+				requestId,
+				userId,
+			);
+		case "create_project":
+			return await executeCreateProject(supabase, params, requestId, userId);
+		case "list_projects":
+			return await executeListProjects(supabase, params, requestId, userId);
+		case "get_project":
+			return await executeGetProject(supabase, params, requestId, userId);
+		case "update_project":
+			return await executeUpdateProject(supabase, params, requestId, userId);
+		case "delete_project":
+			return await executeDeleteProject(supabase, params, requestId, userId);
+		case "add_repository_to_project":
+			return await executeAddRepositoryToProject(
+				supabase,
+				params,
+				requestId,
+				userId,
+			);
+		case "remove_repository_from_project":
+			return await executeRemoveRepositoryFromProject(
 				supabase,
 				params,
 				requestId,

@@ -71,8 +71,9 @@ Use this reference to decide which KotaDB application layer documentation source
     - When working with MCP server architecture or tool implementations
     - When understanding MCP SDK behavior (content blocks, error codes, HTTP status codes)
     - When writing MCP tests or troubleshooting MCP tool execution
-    - When implementing new MCP tools (search_code, index_repository, list_recent_files, search_dependencies)
+    - When implementing new MCP tools (search_code, index_repository, list_recent_files, search_dependencies, analyze_change_impact, validate_implementation_spec, create_project, list_projects, get_project, update_project, delete_project, add_repository_to_project, remove_repository_from_project)
     - When debugging SDK error handling or response format issues
+    - When working with project management features via MCP (create, list, get, update, delete projects; add/remove repositories)
 
 - .claude/commands/docs/mcp-usage-guidance.md
   - Conditions:

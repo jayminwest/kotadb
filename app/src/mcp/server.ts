@@ -22,12 +22,26 @@ import {
 	SEARCH_DEPENDENCIES_TOOL,
 	ANALYZE_CHANGE_IMPACT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
+	CREATE_PROJECT_TOOL,
+	LIST_PROJECTS_TOOL,
+	GET_PROJECT_TOOL,
+	UPDATE_PROJECT_TOOL,
+	DELETE_PROJECT_TOOL,
+	ADD_REPOSITORY_TO_PROJECT_TOOL,
+	REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearchCode,
 	executeSearchDependencies,
 	executeAnalyzeChangeImpact,
 	executeValidateImplementationSpec,
+	executeCreateProject,
+	executeListProjects,
+	executeGetProject,
+	executeUpdateProject,
+	executeDeleteProject,
+	executeAddRepositoryToProject,
+	executeRemoveRepositoryFromProject,
 } from "./tools";
 
 const logger = createLogger({ module: "mcp-server" });
@@ -66,6 +80,13 @@ export function createMcpServer(context: McpServerContext): Server {
 				SEARCH_DEPENDENCIES_TOOL,
 				ANALYZE_CHANGE_IMPACT_TOOL,
 				VALIDATE_IMPLEMENTATION_SPEC_TOOL,
+				CREATE_PROJECT_TOOL,
+				LIST_PROJECTS_TOOL,
+				GET_PROJECT_TOOL,
+				UPDATE_PROJECT_TOOL,
+				DELETE_PROJECT_TOOL,
+				ADD_REPOSITORY_TO_PROJECT_TOOL,
+				REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 			],
 		};
 	});
@@ -128,6 +149,62 @@ export function createMcpServer(context: McpServerContext): Server {
 						context.userId,
 					);
 					break;
+			case "create_project":
+				result = await executeCreateProject(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "list_projects":
+				result = await executeListProjects(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "get_project":
+				result = await executeGetProject(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "update_project":
+				result = await executeUpdateProject(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "delete_project":
+				result = await executeDeleteProject(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "add_repository_to_project":
+				result = await executeAddRepositoryToProject(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
+			case "remove_repository_from_project":
+				result = await executeRemoveRepositoryFromProject(
+					context.supabase,
+					toolArgs,
+					"", // requestId not used
+					context.userId,
+				);
+				break;
 				default:
 					const error = new Error(`Unknown tool: ${name}`);
 					logger.error("Unknown MCP tool requested", error, { tool_name: name, user_id: context.userId });

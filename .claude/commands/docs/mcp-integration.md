@@ -11,7 +11,7 @@ Location: `app/src/mcp/`
 MCP server factory using official `@modelcontextprotocol/sdk` (v1.20+):
 
 - Creates per-request Server instances for user isolation (stateless mode)
-- Registers four tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`
+- Registers 13 tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`, `analyze_change_impact`, `validate_implementation_spec`, `create_project`, `list_projects`, `get_project`, `update_project`, `delete_project`, `add_repository_to_project`, `remove_repository_from_project`
 - Uses `StreamableHTTPServerTransport` with `enableJsonResponse: true` for simple JSON-RPC over HTTP
 - No SSE streaming or session management (stateless design)
 
@@ -81,6 +81,154 @@ Search dependency graph to find files that depend on (dependents) or are depende
 - Recursive traversal with configurable depth
 - Detects circular dependencies during graph traversal
 - Optional test file filtering
+
+## Project Management Tools
+
+### create_project
+
+Create a new project with optional repository associations.
+
+**Parameters:**
+- `name` (required): Project name
+- `description` (optional): Project description
+- `repository_ids` (optional): Array of repository UUIDs to associate
+
+**Returns:** Project UUID and name
+
+**Example:**
+```json
+{
+  "name": "create_project",
+  "arguments": {
+    "name": "frontend-repos",
+    "description": "All React and Next.js repositories",
+    "repository_ids": ["550e8400-e29b-41d4-a716-446655440000"]
+  }
+}
+```
+
+### list_projects
+
+List all projects for the authenticated user with repository counts.
+
+**Parameters:**
+- `limit` (optional): Maximum projects to return
+
+**Returns:** Array of projects with metadata
+
+**Example:**
+```json
+{
+  "name": "list_projects",
+  "arguments": {
+    "limit": 20
+  }
+}
+```
+
+### get_project
+
+Get project details with full repository list. Accepts project UUID or name.
+
+**Parameters:**
+- `project` (required): Project UUID or name (case-insensitive)
+
+**Returns:** Project details with repositories array
+
+**Example:**
+```json
+{
+  "name": "get_project",
+  "arguments": {
+    "project": "frontend-repos"
+  }
+}
+```
+
+### update_project
+
+Update project name, description, and/or repository associations.
+
+**Parameters:**
+- `project` (required): Project UUID or name
+- `name` (optional): New project name
+- `description` (optional): New project description
+- `repository_ids` (optional): Repository UUIDs (replaces all associations)
+
+**Returns:** Success status and message
+
+**Example:**
+```json
+{
+  "name": "update_project",
+  "arguments": {
+    "project": "frontend-repos",
+    "name": "frontend-web-apps",
+    "description": "Updated description"
+  }
+}
+```
+
+### delete_project
+
+Delete project (cascade deletes associations, repositories remain indexed).
+
+**Parameters:**
+- `project` (required): Project UUID or name
+
+**Returns:** Success status and message
+
+**Example:**
+```json
+{
+  "name": "delete_project",
+  "arguments": {
+    "project": "old-project"
+  }
+}
+```
+
+### add_repository_to_project
+
+Add a repository to a project (idempotent operation).
+
+**Parameters:**
+- `project` (required): Project UUID or name
+- `repository_id` (required): Repository UUID to add
+
+**Returns:** Success status and message
+
+**Example:**
+```json
+{
+  "name": "add_repository_to_project",
+  "arguments": {
+    "project": "frontend-repos",
+    "repository_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
+
+### remove_repository_from_project
+
+Remove a repository from a project (idempotent operation).
+
+**Parameters:**
+- `project` (required): Project UUID or name
+- `repository_id` (required): Repository UUID to remove
+
+**Returns:** Success status and message
+
+**Example:**
+```json
+{
+  "name": "remove_repository_from_project",
+  "arguments": {
+    "project": "frontend-repos",
+    "repository_id": "550e8400-e29b-41d4-a716-446655440000"
+  }
+}
+```
 
 ## MCP SDK Behavior Notes
 
