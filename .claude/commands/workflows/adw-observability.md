@@ -1,5 +1,8 @@
 # ADW Observability
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 ADW metrics analysis, log analysis, and CI integration for monitoring success rates and failure patterns.
 
 ## Log Analysis Script

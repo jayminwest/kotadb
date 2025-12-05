@@ -1,9 +1,9 @@
 # /resolve_failed_validation
 
-Analyze validation failure output and fix the underlying issues.
+**Template Category**: Action
+**Prompt Level**: 3 (Conditional)
 
-## Category
-Message-Only (per prompt-code-alignment.md) - agent resolves failures using standard tools without executing code in template.
+Analyze validation failure output and fix the underlying issues.
 
 ## Variables
 - failure_context: $1 (JSON string with validation failure details)

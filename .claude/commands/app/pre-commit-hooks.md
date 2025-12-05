@@ -1,5 +1,8 @@
 # Pre-commit Hooks
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Pre-commit hooks automatically run type-check and lint on staged files to prevent TypeScript errors and lint issues from reaching CI.
 
 ## Installation

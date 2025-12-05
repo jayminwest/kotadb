@@ -1,5 +1,7 @@
 # /get_homeserver_tasks
 
+**Template Category**: Structured Data
+
 Fetch eligible tasks from the home server API endpoint.
 
 ## Inputs

@@ -1,5 +1,8 @@
 # /start
 
+**Template Category**: Action
+**Prompt Level**: 1 (Static)
+
 Run before manual QA or end-to-end sessions to ensure local services start cleanly via `./scripts/start.sh`.
 
 ## Checklist

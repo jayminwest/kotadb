@@ -1,5 +1,7 @@
 # /document
 
+**Template Category**: Structured Data
+
 Create or update documentation to reflect implementation changes.
 
 ## Variables

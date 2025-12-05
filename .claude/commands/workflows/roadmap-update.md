@@ -1,5 +1,7 @@
 # /roadmap-update
 
+**Template Category**: Structured Data
+
 Perform comprehensive ROADMAP.md updates by analyzing recent repository changes, validating implementations across all project areas, and synchronizing epic statuses with actual progress.
 
 ## Arguments

@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Claude Code Agent Registry",
+  "description": "Machine-readable registry of available agents with capability and model indexes",
+  "version": "1.0.0",
+  "agents": {
+    "scout-agent": {
+      "name": "scout-agent",
+      "description": "Read-only codebase exploration and research agent",
+      "file": "scout-agent.md",
+      "model": "haiku",
+      "capabilities": ["explore", "search", "analyze", "research"],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "Task",
+        "mcp__kotadb__search_code",
+        "mcp__kotadb__search_dependencies",
+        "mcp__kotadb__list_recent_files"
+      ],
+      "readOnly": true
+    },
+    "build-agent": {
+      "name": "build-agent",
+      "description": "File implementation and modification specialist",
+      "file": "build-agent.md",
+      "model": "sonnet",
+      "capabilities": ["implement", "modify", "execute", "create", "fix"],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "Edit",
+        "Write",
+        "Bash",
+        "NotebookEdit",
+        "Task",
+        "TodoWrite",
+        "mcp__kotadb__search_code",
+        "mcp__kotadb__search_dependencies",
+        "mcp__kotadb__analyze_change_impact"
+      ],
+      "readOnly": false
+    },
+    "review-agent": {
+      "name": "review-agent",
+      "description": "Code review and quality analysis specialist",
+      "file": "review-agent.md",
+      "model": "haiku",
+      "capabilities": ["review", "audit", "quality", "security", "feedback"],
+      "tools": [
+        "Glob",
+        "Grep",
+        "Read",
+        "Task",
+        "mcp__kotadb__search_code",
+        "mcp__kotadb__search_dependencies",
+        "mcp__kotadb__analyze_change_impact",
+        "WebFetch"
+      ],
+      "readOnly": true
+    },
+    "orchestrator-agent": {
+      "name": "orchestrator-agent",
+      "description": "Multi-agent coordination and workflow delegation specialist",
+      "file": "orchestrator-agent.md",
+      "model": "opus",
+      "capabilities": ["orchestrate", "coordinate", "delegate", "plan", "synthesize"],
+      "tools": [
+        "Task",
+        "SlashCommand",
+        "Read",
+        "Glob",
+        "Grep",
+        "TodoWrite",
+        "AskUserQuestion",
+        "mcp__kotadb__search_code",
+        "mcp__kotadb__search_dependencies"
+      ],
+      "readOnly": true
+    }
+  },
+  "capabilityIndex": {
+    "explore": ["scout-agent"],
+    "search": ["scout-agent"],
+    "analyze": ["scout-agent", "review-agent"],
+    "research": ["scout-agent"],
+    "implement": ["build-agent"],
+    "modify": ["build-agent"],
+    "execute": ["build-agent"],
+    "create": ["build-agent"],
+    "fix": ["build-agent"],
+    "review": ["review-agent"],
+    "audit": ["review-agent"],
+    "quality": ["review-agent"],
+    "security": ["review-agent"],
+    "feedback": ["review-agent"],
+    "orchestrate": ["orchestrator-agent"],
+    "coordinate": ["orchestrator-agent"],
+    "delegate": ["orchestrator-agent"],
+    "plan": ["orchestrator-agent"],
+    "synthesize": ["orchestrator-agent"]
+  },
+  "modelIndex": {
+    "haiku": ["scout-agent", "review-agent"],
+    "sonnet": ["build-agent"],
+    "opus": ["orchestrator-agent"]
+  },
+  "toolMatrix": {
+    "Glob": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "Grep": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "Read": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "Edit": ["build-agent"],
+    "Write": ["build-agent"],
+    "Bash": ["build-agent"],
+    "NotebookEdit": ["build-agent"],
+    "Task": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "TodoWrite": ["build-agent", "orchestrator-agent"],
+    "SlashCommand": ["orchestrator-agent"],
+    "AskUserQuestion": ["orchestrator-agent"],
+    "WebFetch": ["review-agent"],
+    "mcp__kotadb__search_code": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "mcp__kotadb__search_dependencies": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "mcp__kotadb__list_recent_files": ["scout-agent"],
+    "mcp__kotadb__analyze_change_impact": ["build-agent", "review-agent"]
+  }
+}

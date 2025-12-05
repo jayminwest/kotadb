@@ -1,5 +1,7 @@
 # /chore
 
+**Template Category**: Action
+
 Produce a maintenance plan for the chore described in `$ARGUMENTS`. Focus on lean, auditable steps that unblock the requested upkeep.
 
 **CRITICAL - Worktree Path Handling:**

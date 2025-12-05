@@ -1,5 +1,7 @@
 # /build
 
+**Template Category**: Action
+
 Direct implementation workflow for simple tasks without a planning phase.
 
 ## Inputs

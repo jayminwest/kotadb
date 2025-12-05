@@ -1,5 +1,8 @@
 # Automated Deployments via GitHub Apps
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 KotaDB uses GitHub App integrations for automated database migrations and application deployments. This document describes how these integrations work and what happens automatically on merges to `develop` and `main`.
 
 ## Overview

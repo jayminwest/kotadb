@@ -1,5 +1,7 @@
 # /bun_install
 
+**Template Category**: Action
+
 Install dependencies deterministically after modifying `package.json` or Bun lockfiles.
 
 ## Relevant files/directories

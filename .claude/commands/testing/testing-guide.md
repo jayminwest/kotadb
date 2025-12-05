@@ -1,5 +1,8 @@
 # Testing Guide
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 Testing philosophy, antimocking principles, migration sync, and test commands for KotaDB.
 
 ## Testing Philosophy

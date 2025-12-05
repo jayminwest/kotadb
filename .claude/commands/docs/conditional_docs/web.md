@@ -1,5 +1,8 @@
 # Conditional Documentation Guide - Web Layer
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Use this reference to decide which KotaDB web frontend documentation sources to consult before you start working on UI components, client-side logic, or web application features. Read only the docs whose conditions match your task so you stay efficient.
 
 ## Instructions

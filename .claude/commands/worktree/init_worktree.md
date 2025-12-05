@@ -1,5 +1,7 @@
 # /init_worktree
 
+**Template Category**: Path Resolution
+
 Create a new git worktree with sparse checkout for isolated task execution.
 
 ## Inputs

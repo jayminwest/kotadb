@@ -1,5 +1,8 @@
 # MCP Usage Guidance
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Guidance for AI agents on when and how to use MCP tools versus direct file operations.
 
 ## When to Use MCP Tools

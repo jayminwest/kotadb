@@ -1,5 +1,7 @@
 # /implement
 
+**Template Category**: Action
+
 Follow the provided plan file (path passed via `$ARGUMENTS`) and implement each step without deviating from scope.
 
 ## Instructions

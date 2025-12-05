@@ -1,5 +1,8 @@
 # /tasks:create
 
+**Template Category**: Action
+**Prompt Level**: 2 (Parameterized)
+
 Create a new phase task in the kota-tasks MCP server for API-driven workflow orchestration.
 
 ## Usage

@@ -1,5 +1,7 @@
 # /prime
 
+**Template Category**: Action
+
 Use this command when first entering the repository to build baseline context.
 
 ## Steps

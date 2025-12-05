@@ -1,5 +1,8 @@
 # CI Configuration
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 GitHub Actions workflows, parallelization, caching strategy, and push trigger patterns for KotaDB.
 
 ## GitHub Actions Workflows

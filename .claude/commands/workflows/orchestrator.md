@@ -1,5 +1,7 @@
 # /orchestrator
 
+**Template Category**: Action
+
 Automate the end-to-end workflow from GitHub issue to reviewed pull request through coordinated phase execution.
 
 ## Arguments

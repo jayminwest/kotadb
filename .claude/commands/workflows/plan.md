@@ -1,5 +1,7 @@
 # /plan
 
+**Template Category**: Path Resolution
+
 Create a detailed implementation plan for complex tasks before executing changes.
 
 ## Inputs

@@ -1,5 +1,7 @@
 # /review
 
+**Template Category**: Structured Data
+
 Review the implementation against the specification and validation results.
 
 ## Variables

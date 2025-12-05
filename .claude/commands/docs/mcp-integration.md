@@ -1,5 +1,8 @@
 # MCP Integration
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 Model Context Protocol (MCP) integration architecture, tools, SDK behavior, and testing guide for KotaDB.
 
 ## MCP Server Architecture

@@ -1,5 +1,7 @@
 # /pull_request
 
+**Template Category**: Path Resolution
+
 Open a GitHub pull request as soon as implementation work is complete and validated.
 
 ## Variables

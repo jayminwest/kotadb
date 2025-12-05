@@ -1,5 +1,8 @@
 # Architecture
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 Overview of KotaDB's architectural patterns, path aliases, shared types, and core components.
 
 ## Path Aliases

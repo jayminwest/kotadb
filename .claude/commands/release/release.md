@@ -1,5 +1,7 @@
 # /release
 
+**Template Category**: Action
+
 Create a production release by merging `develop` → `main` with automated versioning, validation, and GitHub release creation.
 
 ## Pre-Release Validation

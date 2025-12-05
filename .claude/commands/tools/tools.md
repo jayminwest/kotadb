@@ -1,5 +1,8 @@
 # /tools
 
+**Template Category**: Action
+**Prompt Level**: 4 (Contextual)
+
 Catalog repository tooling for quick agent reference. No arguments required.
 
 ## Steps

@@ -1,6 +1,9 @@
 # /anti-mock
 
-Baseline expectations for KotaDB’s anti-mock testing philosophy. Call this command (or link to it from other commands) whenever implementation or planning work might fall back to stubs or hand-rolled doubles.
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
+Baseline expectations for KotaDB's anti-mock testing philosophy. Call this command (or link to it from other commands) whenever implementation or planning work might fall back to stubs or hand-rolled doubles.
 
 ## Core Principles
 - Exercise real integrations (Supabase, background jobs, HTTP boundaries) in tests whenever possible.

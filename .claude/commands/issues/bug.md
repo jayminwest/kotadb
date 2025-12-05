@@ -1,5 +1,7 @@
 # /bug
 
+**Template Category**: Action
+
 Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata JSON). The plan must equip the implementor to fix the defect with minimal churn.
 
 **CRITICAL - Worktree Path Handling:**

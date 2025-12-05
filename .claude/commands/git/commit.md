@@ -1,5 +1,7 @@
 # /commit
 
+**Template Category**: Message-Only
+
 Generate a git commit message for the staged work.
 
 ## Variables

@@ -1,6 +1,9 @@
 # /pr-review
 
-Review another contributor’s pull request. Provide the PR number via `$ARGUMENTS`.
+**Template Category**: Action
+**Prompt Level**: 2 (Parameterized)
+
+Review another contributor's pull request. Provide the PR number via `$ARGUMENTS`.
 
 ## Pre-review Setup
 - `git fetch --all --prune`, `git pull --rebase`, ensure local `develop` is up to date, and start from a clean tree (`git status --short`) while verifying the PR follows the branch flow (`feat/`, `bug/`, `chore/`, etc.) into `develop` before promotion to `main`.

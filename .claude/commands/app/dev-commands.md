@@ -1,5 +1,8 @@
 # Development Commands
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Quick reference for common development commands. All commands should be run from the `app/` directory.
 
 ## Quick Start (Recommended)

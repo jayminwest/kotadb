@@ -1,5 +1,7 @@
 # /patch
 
+**Template Category**: Path Resolution
+
 Create a focused patch plan to address review feedback without deviating from scope.
 
 ## Variables

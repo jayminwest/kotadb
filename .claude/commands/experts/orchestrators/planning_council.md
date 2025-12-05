@@ -1,0 +1,103 @@
+---
+description: Coordinate multiple experts for comprehensive planning analysis
+argument-hint: <issue-context>
+---
+
+# Planning Council
+
+**Template Category**: Structured Data
+**Prompt Level**: 5 (Higher Order)
+
+## Variables
+
+PLANNING_CONTEXT: $ARGUMENTS
+
+## Purpose
+
+Coordinate Architecture, Testing, Security, and Integration experts to provide comprehensive planning analysis. Synthesizes multiple perspectives into a single unified plan contribution.
+
+## Workflow
+
+### Phase 1: Expert Invocation
+
+Invoke all domain experts in parallel using the SlashCommand tool:
+
+```
+/experts:architecture-expert:architecture_expert_plan <PLANNING_CONTEXT>
+/experts:testing-expert:testing_expert_plan <PLANNING_CONTEXT>
+/experts:security-expert:security_expert_plan <PLANNING_CONTEXT>
+/experts:integration-expert:integration_expert_plan <PLANNING_CONTEXT>
+```
+
+### Phase 2: Response Collection
+
+Wait for all expert responses. Each expert will provide:
+- Domain-specific analysis
+- Recommendations with rationale
+- Risks with severity ratings
+
+### Phase 3: Synthesis
+
+Analyze all expert outputs to identify:
+
+**Cross-Cutting Concerns:**
+- Issues flagged by multiple experts
+- Conflicting recommendations requiring resolution
+- Dependencies between expert recommendations
+
+**Priority Ranking:**
+1. Issues flagged as CRITICAL/HIGH by any expert
+2. Issues flagged by multiple experts (consensus)
+3. Domain-specific issues with clear rationale
+
+**Conflict Resolution:**
+- When experts disagree, document both perspectives
+- Recommend based on risk severity
+- Note trade-offs for human decision
+
+### Phase 4: Unified Output
+
+**CRITICAL: Single Output Constraint**
+
+The Planning Council produces ONE synthesized analysis, NOT separate reports per expert. The output format below is the complete deliverable.
+
+## Output Format
+
+### Planning Council Analysis
+
+**Context:**
+[Brief summary of PLANNING_CONTEXT]
+
+**Expert Consensus:**
+- [Items agreed upon by multiple experts]
+
+**Architecture Considerations:**
+- [Key architectural points]
+
+**Testing Requirements:**
+- [Test scope and approach]
+
+**Security Requirements:**
+- [Security controls needed]
+
+**Integration Points:**
+- [External system considerations]
+
+**Cross-Cutting Concerns:**
+- [Issues spanning multiple domains]
+
+**Priority Recommendations:**
+1. [CRITICAL/HIGH: recommendation]
+2. [HIGH: recommendation]
+3. [MEDIUM: recommendation]
+
+**Risks Summary:**
+| Risk | Severity | Domain | Mitigation |
+|------|----------|--------|------------|
+| [risk] | CRITICAL/HIGH/MEDIUM/LOW | [domain] | [mitigation] |
+
+**Open Questions:**
+- [Items requiring human decision due to expert disagreement]
+
+**Implementation Notes:**
+- [Practical guidance for implementation]

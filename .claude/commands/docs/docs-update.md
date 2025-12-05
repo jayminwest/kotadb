@@ -1,5 +1,8 @@
 # /docs-update
 
+**Template Category**: Action
+**Prompt Level**: 3 (Conditional)
+
 Synchronise documentation with recent code changes. Provide related PR/issue identifier via `$ARGUMENTS`.
 
 ## Git Prep

@@ -1,5 +1,7 @@
 # /make_worktree_name
 
+**Template Category**: Message-Only
+
 Generate a valid git worktree name from a task description.
 
 ## Inputs

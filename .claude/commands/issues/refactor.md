@@ -1,5 +1,7 @@
 # /refactor
 
+**Template Category**: Action
+
 Author a refactoring plan for the code improvement described in `$ARGUMENTS` (issue metadata JSON). The plan must guide the implementor through structural changes while preserving existing behavior.
 
 **CRITICAL - Worktree Path Handling:**

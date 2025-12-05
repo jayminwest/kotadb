@@ -1,5 +1,7 @@
 # Audit and Close Stale GitHub Issues
 
+**Template Category**: Structured Data
+
 Systematically audit open GitHub issues to identify candidates for closure. This command helps maintain a clean issue tracker by finding completed, obsolete, or duplicate issues that can be safely closed.
 
 ## Steps

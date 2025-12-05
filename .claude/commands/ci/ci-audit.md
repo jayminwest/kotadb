@@ -1,5 +1,7 @@
 # /ci-audit
 
+**Template Category**: Structured Data
+
 Evaluate CI health. Supply scope/context via `$ARGUMENTS` (e.g., timeframe, failing workflow).
 
 ## Pre-audit Git Prep

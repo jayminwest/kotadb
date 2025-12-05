@@ -1,5 +1,7 @@
 # /find_plan_file
 
+**Template Category**: Path Resolution
+
 Determine the relative path to the plan file created in the previous step.
 
 ## Instructions

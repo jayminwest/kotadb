@@ -1,5 +1,8 @@
 # Test Environment Lifecycle Management
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Standardized patterns for running tests in slash commands to ensure reliable Supabase Local stack integration.
 
 ## Overview

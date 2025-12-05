@@ -1,5 +1,8 @@
 # KotaDB Agent Usage Guide
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Agent-specific guidance for using KotaDB MCP tools during code discovery, dependency analysis, and impact assessment workflows.
 
 ## When to Use KotaDB MCP Tools

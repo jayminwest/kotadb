@@ -1,5 +1,7 @@
 # /dogfood-prime
 
+**Template Category**: Action
+
 Prime the KotaDB development environment for local dogfooding and testing. This command automates the complete setup workflow: starting Supabase, launching the API server, generating test credentials, and validating core functionality.
 
 ## Use Cases

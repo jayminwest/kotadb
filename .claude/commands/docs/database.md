@@ -1,5 +1,8 @@
 # Database
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 Database schema, Supabase configuration, and RLS policies for KotaDB.
 
 ## Supabase Client Initialization

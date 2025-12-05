@@ -1,5 +1,7 @@
 # /generate_branch_name
 
+**Template Category**: Message-Only
+
 Generate a Git branch name following KotaDB conventions. DO NOT execute any git commands.
 
 ## Variables

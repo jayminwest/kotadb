@@ -1,5 +1,8 @@
 # Conditional Documentation Guide - Application Layer
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Use this reference to decide which KotaDB application layer documentation sources to consult before you start working on backend/API features, database schema, testing, or CI infrastructure. Read only the docs whose conditions match your task so you stay efficient.
 
 ## Instructions
@@ -448,3 +451,60 @@ Use this reference to decide which KotaDB application layer documentation source
     - When handling emergency hotfixes from main branch
     - When implementing rollback procedures for problematic releases
     - When understanding semantic versioning strategy for KotaDB
+
+- .claude/commands/experts/ (Expert System)
+  - Conditions:
+    - When needing multi-perspective analysis for feature planning
+    - When performing comprehensive code review across domains
+    - When analyzing architecture, testing, security, or integration concerns
+    - When using Planning Council for synthesized planning recommendations
+    - When using Review Panel for consolidated code review decisions
+    - When running expert self-improvement to update domain knowledge
+  - Available Experts:
+    - architecture-expert: Path aliases, component boundaries, data flow patterns
+    - testing-expert: Antimocking philosophy, test patterns, coverage requirements
+    - security-expert: RLS policies, authentication flow, input validation
+    - integration-expert: MCP server patterns, Supabase integration, external APIs
+  - Orchestrators:
+    - planning_council: Multi-expert planning synthesis
+    - review_panel: Multi-expert code review aggregation
+
+- .claude/hooks/ (Automation Hooks)
+  - Conditions:
+    - When understanding automatic quality enforcement for TypeScript/JavaScript files
+    - When troubleshooting PostToolUse or UserPromptSubmit hook behavior
+    - When modifying or adding new automation hooks
+    - When debugging hook timeout or execution errors
+  - Components:
+    - auto_linter.py: PostToolUse hook for auto-linting after Write/Edit on .ts/.js files
+    - context_builder.py: UserPromptSubmit hook for contextual documentation suggestions
+    - utils/hook_helpers.py: Shared utilities for JSON I/O, file detection, project root
+  - Configuration:
+    - .claude/settings.json: Hook configuration with matchers and timeouts
+    - PostToolUse: Triggers on Write|Edit, runs Biome linter (45s timeout)
+    - UserPromptSubmit: Triggers on all prompts, provides context hints (10s timeout)
+
+- .claude/commands/docs/settings-configuration.md
+  - Conditions:
+    - When configuring Claude Code settings for KotaDB development
+    - When setting up permission patterns for Bash or MCP tools
+    - When creating or customizing settings.local.json for personal preferences
+    - When troubleshooting status line display or permission issues
+    - When understanding the difference between shared and local settings
+    - When auditing or reviewing Claude Code permission security
+  - Components:
+    - settings.json: Shared project settings (statusLine, hooks)
+    - settings.local.json: Personal settings (gitignored)
+    - settings.local.json.template: Template for local settings setup
+    - statusline.py: Status line script showing project and branch
+
+- .claude/docs/prompt-levels.md
+  - Conditions:
+    - When understanding the 7-level prompt maturity model for slash commands
+    - When classifying command complexity or composability
+    - When designing new slash commands and determining appropriate level
+    - When working with expert system commands (Level 5-7)
+    - When implementing self-modifying commands that update their own content
+    - When implementing meta-cognitive commands that improve other commands
+    - When adding Expertise sections to commands
+    - When understanding Template Category requirements by prompt level

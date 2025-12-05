@@ -1,5 +1,8 @@
 # Logging Standards
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Standardized output mechanisms for TypeScript and Python layers to enable structured logging, programmatic parsing, and uniform observability.
 
 ## Overview

@@ -1,5 +1,8 @@
 # Issue Relationship Documentation Standards
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 This document defines the relationship types and documentation standards for tracking issue dependencies, context, and evolution across the KotaDB project.
 
 ## When to Use This Documentation

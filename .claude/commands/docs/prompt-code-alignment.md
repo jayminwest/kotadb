@@ -1,5 +1,7 @@
 # Prompt-Code Alignment Guide for ADW Templates
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
 **Last Updated**: 2025-10-13
 **Related Issues**: #84, #87
 

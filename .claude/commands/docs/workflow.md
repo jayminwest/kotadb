@@ -1,5 +1,8 @@
 # API Workflow
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 API workflows for authentication, rate limiting, indexing, search, and validation.
 
 ## Authentication & Rate Limiting Flow

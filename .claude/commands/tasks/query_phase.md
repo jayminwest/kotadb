@@ -1,5 +1,8 @@
 # /tasks:query_phase
 
+**Template Category**: Structured Data
+**Prompt Level**: 2 (Parameterized)
+
 Query tasks from the kota-tasks MCP server filtered by phase and/or status.
 
 ## Usage

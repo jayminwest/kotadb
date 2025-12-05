@@ -1,5 +1,7 @@
 # Prioritize Open GitHub Issues
 
+**Template Category**: Structured Data
+
 Analyze and prioritize open GitHub issues using relationship-aware dependency management. This command helps identify the highest-value unblocked work based on dependencies, labels, and strategic alignment.
 
 ## Steps

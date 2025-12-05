@@ -1,5 +1,8 @@
 # GitHub Issue Creation
 
+**Template Category**: Action
+**Prompt Level**: 3 (Conditional)
+
 Create a rigorously labeled GitHub issue capturing the upcoming work. Follow this sequence so downstream commands (plan, implement) have complete context.
 
 ## Steps

@@ -1,5 +1,8 @@
 # Conditional Documentation Guide - Automation Layer
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Use this reference to decide which KotaDB automation layer documentation sources to consult before you start working on ADW workflows, agent orchestration, worktree isolation, or log analysis. Read only the docs whose conditions match your task so you stay efficient.
 
 ## Instructions

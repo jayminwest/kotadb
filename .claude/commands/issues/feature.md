@@ -1,5 +1,7 @@
 # /feature
 
+**Template Category**: Action
+
 Draft a KotaDB feature implementation plan using the issue context passed in `$ARGUMENTS` (provide JSON with issue number, title, summary, and constraints).
 
 **CRITICAL - Worktree Path Handling:**

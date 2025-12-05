@@ -1,5 +1,8 @@
 # /schema_plan
 
+**Template Category**: Action
+**Prompt Level**: 4 (Contextual)
+
 ## Scope
 Plan database schema migrations for KotaDB (SQLite) prior to implementation work in `src/db/**` or
 migration scripts under `data/`.

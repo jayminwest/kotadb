@@ -1,5 +1,7 @@
 # /classify_issue
 
+**Template Category**: Message-Only
+
 Based on the GitHub issue payload below, choose the correct slash command. Respond with exactly one token: `/feature`, `/bug`, `/chore`, or `0` if none apply.
 
 ## Guidance

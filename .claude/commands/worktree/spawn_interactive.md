@@ -1,5 +1,7 @@
 # /spawn_interactive
 
+**Template Category**: Action
+
 Create an isolated git worktree in `automation/trees/` for interactive development with ADW-like isolation patterns.
 
 ## Purpose

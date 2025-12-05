@@ -1,5 +1,8 @@
 # Conditional Documentation Guide
 
+**Template Category**: Message-Only
+**Prompt Level**: 1 (Static)
+
 Use this reference to decide which KotaDB documentation sources to consult before you start working. Read only the docs whose conditions match your task so you stay efficient.
 
 ## Instructions

@@ -1,5 +1,8 @@
 # /tasks:update_status
 
+**Template Category**: Action
+**Prompt Level**: 2 (Parameterized)
+
 Update the status of an existing task in the kota-tasks MCP server.
 
 ## Usage

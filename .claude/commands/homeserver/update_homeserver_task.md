@@ -1,5 +1,8 @@
 # /update_homeserver_task
 
+**Template Category**: Action
+**Prompt Level**: 2 (Parameterized)
+
 Update the status of a task on the home server API.
 
 ## Inputs

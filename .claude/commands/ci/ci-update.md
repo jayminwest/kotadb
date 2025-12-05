@@ -1,5 +1,8 @@
 # /ci-update
 
+**Template Category**: Action
+**Prompt Level**: 2 (Parameterized)
+
 Implement approved CI improvements. Provide reference ID via `$ARGUMENTS` (issue/PR).
 
 ## Preflight

@@ -1,5 +1,8 @@
 # /ci:investigate
 
+**Template Category**: Action
+**Prompt Level**: 2 (Parameterized)
+
 Investigate CI failures for a specific pull request and report findings with a remediation plan. Provide the PR number via `$ARGUMENTS`.
 
 ## Pre-investigation Setup

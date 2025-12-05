@@ -1,6 +1,8 @@
 # /validate-implementation
 
-Run repository validation gates after implementation. Choose the correct level based on scope, mirroring GEOsync’s structure but using KotaDB’s Bun tooling.
+**Template Category**: Action
+
+Run repository validation gates after implementation. Choose the correct level based on scope, mirroring GEOsync's structure but using KotaDB's Bun tooling.
 
 ## Quick Reference
 

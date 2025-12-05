@@ -1,5 +1,8 @@
 # ADW Architecture
 
+**Template Category**: Message-Only
+**Prompt Level**: 4 (Contextual)
+
 AI Developer Workflows (ADW) architecture, phases, atomic agents, and resilience patterns.
 
 ## Overview

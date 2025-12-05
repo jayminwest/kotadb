@@ -1,25 +1,167 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+## BLUF (Bottom Line Up Front)
 
-## Project Overview
+New here? Run `/workflows:prime` to build baseline context quickly.
 
-KotaDB is a lightweight HTTP API service for indexing and searching code repositories. Built with Bun + TypeScript and Supabase (PostgreSQL) for multi-tenant data isolation via RLS. Designed to power AI developer workflows through automated code intelligence.
+KotaDB is a code intelligence API (Bun + TypeScript + Supabase) powering AI developer workflows. This file is your navigation gateway—detailed docs live in `.claude/commands/`.
 
-## Branching Strategy
+## Quick Start
 
-**Default Branch**: `develop` (all PRs merge here for continuous integration)
+1. **Prime**: `/workflows:prime` — sync git, review docs, understand architecture
+2. **Plan**: `/workflows:plan` — create spec files for features/bugs/chores
+3. **Implement**: `/workflows:implement <spec-path>` — execute plan step by step
+4. **Validate**: `/workflows:validate-implementation` — lint, typecheck, test
 
-**Git Flow**:
-- Feature branches (`feat/*`, `bug/*`, `chore/*`) merge into `develop`
-- `develop` accumulates tested changes and merges into `main` for production releases
-- Direct commits to `develop` or `main` are discouraged; use feature branches + PRs
-- GitHub auto-close for issues works when PRs merge into `develop` (the default branch)
+## Core Principles
+
+| Principle | Description | Commands |
+|-----------|-------------|----------|
+| **Antimocking** | Real Supabase Local for tests | `/docs:anti-mock`, `/testing:testing-guide` |
+| **Path Aliases** | Use `@api/*`, `@db/*`, etc. | `/docs:architecture` |
+| **Migration Sync** | Two locations, keep in sync | `/docs:database` |
+| **Logging Standards** | `process.stdout.write` only | `/testing:logging-standards` |
+| **Branching Flow** | `feat/*` → `develop` → `main` | `/git:commit`, `/git:pull_request` |
+
+## Command Navigation
+
+### Workflows (SDLC Phases)
+| Command | Purpose |
+|---------|---------|
+| `/workflows:prime` | Onboarding and context building |
+| `/workflows:dogfood-prime` | Local env setup with test credentials |
+| `/workflows:plan` | Create implementation specs |
+| `/workflows:implement` | Execute spec step by step |
+| `/workflows:build` | Build phase of ADW pipeline |
+| `/workflows:review` | Code review phase |
+| `/workflows:document` | Documentation updates |
+| `/workflows:validate-implementation` | Validation levels (1-3) |
+| `/workflows:patch` | Quick fixes without full spec |
+| `/workflows:orchestrator` | ADW orchestration |
+| `/workflows:roadmap-update` | Sync ROADMAP.md with progress |
+
+### Issues
+| Command | Purpose |
+|---------|---------|
+| `/issues:feature` | New feature issue template |
+| `/issues:bug` | Bug report template |
+| `/issues:chore` | Maintenance task template |
+| `/issues:refactor` | Refactoring issue template |
+| `/issues:issue` | Generic issue creation |
+| `/issues:classify_issue` | Determine issue type |
+| `/issues:audit` | Clean up stale/duplicate issues |
+| `/issues:prioritize` | Dependency-aware prioritization |
+
+### Git Operations
+| Command | Purpose |
+|---------|---------|
+| `/git:commit` | Conventional commit creation |
+| `/git:pull_request` | PR with validation checklist |
+
+### Testing
+| Command | Purpose |
+|---------|---------|
+| `/testing:testing-guide` | Antimocking philosophy |
+| `/testing:logging-standards` | Approved logging methods |
+
+### Documentation
+| Command | Purpose |
+|---------|---------|
+| `/docs:architecture` | Path aliases, core components |
+| `/docs:database` | Schema, RLS, migrations |
+| `/docs:workflow` | API auth flow, rate limiting |
+| `/docs:mcp-integration` | MCP server architecture |
+| `/docs:mcp-usage-guidance` | When MCP vs direct ops |
+| `/docs:kotadb-agent-usage` | MCP tools in agent contexts |
+| `/docs:anti-mock` | Testing without mocks |
+| `/docs:test-lifecycle` | Test execution patterns |
+| `/docs:docs-update` | Documentation maintenance |
+| `/docs:issue-relationships` | Dependency types |
+| `/docs:prompt-code-alignment` | Template-parser alignment |
+| `/docs:conditional_docs` | Layer-specific doc routing |
+| `/docs:automated-deployments` | GitHub App integrations |
+
+### CI/CD
+| Command | Purpose |
+|---------|---------|
+| `/ci:ci-configuration` | GitHub Actions setup |
+| `/ci:ci-investigate` | Debug CI failures |
+| `/ci:ci-update` | Modify CI workflows |
+| `/ci:ci-audit` | CI health check |
+
+### Tools
+| Command | Purpose |
+|---------|---------|
+| `/tools:tools` | Available tool inventory |
+| `/tools:pr-review` | PR review checklist |
+| `/tools:install` | Dependency installation |
+| `/tools:bun_install` | Bun-specific install |
+
+### App (Development)
+| Command | Purpose |
+|---------|---------|
+| `/app:start` | Start development server |
+| `/app:dev-commands` | Dev environment commands |
+| `/app:environment` | Env vars and ports |
+| `/app:pre-commit-hooks` | Hook troubleshooting |
+| `/app:schema_plan` | Database schema planning |
+
+### Automation (ADW)
+| Command | Purpose |
+|---------|---------|
+| `/automation:generate_branch_name` | Branch naming from issue |
+| `/automation:find_plan_file` | Locate spec for issue |
+
+### Worktree
+| Command | Purpose |
+|---------|---------|
+| `/worktree:init_worktree` | Initialize isolated worktree |
+| `/worktree:make_worktree_name` | Generate worktree name |
+| `/worktree:spawn_interactive` | Spawn interactive session |
+
+### Release
+| Command | Purpose |
+|---------|---------|
+| `/release:release` | Production release workflow |
+
+### Validation
+| Command | Purpose |
+|---------|---------|
+| `/validation:resolve_failed_validation` | Fix validation failures |
+
+## Common Workflows
+
+**New Feature**:
+`/issues:feature` → `/issues:classify_issue` → `/workflows:plan` → `/workflows:implement` → `/workflows:validate-implementation` → `/git:commit` → `/git:pull_request`
+
+**Bug Fix**:
+`/issues:bug` → `/workflows:plan` → `/workflows:implement` → `/workflows:validate-implementation` → `/git:commit` → `/git:pull_request`
+
+**Code Review**:
+`/tools:pr-review` → `/workflows:validate-implementation` → `/workflows:review`
+
+**Environment Setup**:
+`/workflows:prime` → `/workflows:dogfood-prime` → `/app:start`
+
+**CI Troubleshooting**:
+`/ci:ci-investigate` → `/ci:ci-audit` → `/ci:ci-update`
+
+## When Things Go Wrong
+
+| Problem | Commands |
+|---------|----------|
+| Tests failing | `/testing:testing-guide`, `/docs:test-lifecycle`, `/docs:anti-mock` |
+| Build failing | `/app:dev-commands`, `/app:environment`, `/app:pre-commit-hooks` |
+| CI failing | `/ci:ci-investigate`, `/ci:ci-configuration` |
+| Migration errors | `/docs:database`, `/docs:architecture` |
+| Type errors | `/docs:architecture` (path aliases) |
+| Lint failures | `/testing:logging-standards`, `/app:pre-commit-hooks` |
+| Validation failures | `/validation:resolve_failed_validation` |
 
 ## Quick Reference
 
 ```bash
-# Start development environment
+# Start development
 cd app && ./scripts/dev-start.sh
 
 # Run tests
@@ -28,111 +170,38 @@ cd app && bun test
 # Type-check
 cd app && bunx tsc --noEmit
 
-# Validate migration sync
+# Validate migrations
 cd app && bun run test:validate-migrations
-
-# Configure indexer batch size (optional - defaults to 50)
-# Set INDEXER_BATCH_SIZE=<value> in app/.env to tune for repository size
-# Larger batches = fewer database calls, smaller batches = better progress tracking
 ```
 
 ## Critical Conventions
 
-### Path Aliases
+**Path Aliases**: Use `@api/*`, `@auth/*`, `@db/*`, `@indexer/*`, `@mcp/*`, `@validation/*`, `@queue/*`, `@shared/*`
 
-Always use TypeScript path aliases (defined in `app/tsconfig.json`):
-- `@api/*`, `@auth/*`, `@db/*`, `@indexer/*`, `@mcp/*`, `@validation/*`, `@queue/*`
-- `@shared/*` → `../shared/*` (shared types for monorepo)
+**Migration Sync**: Keep `app/src/db/migrations/` and `app/supabase/migrations/` synchronized
 
-### Migration Sync Requirement
+**Logging**: TypeScript uses `process.stdout.write()` / `process.stderr.write()` (NEVER `console.*`)
 
-Database migrations exist in **two locations** and must stay synchronized:
-1. `app/src/db/migrations/` (source)
-2. `app/supabase/migrations/` (copy for Supabase CLI)
+**Testing**: Antimocking — real Supabase Local connections only
 
-Run `cd app && bun run test:validate-migrations` to check for drift.
+**Branching**: `feat/*`, `bug/*`, `chore/*` → `develop` → `main`
 
-Migration naming: `YYYYMMDDHHMMSS_description.sql` (generate: `date -u +%Y%m%d%H%M%S`)
+## MCP Servers
 
-**Automated Deployment**: Migrations are automatically applied via the Supabase GitHub App on merges to `develop` (staging) and `main` (production). No manual `supabase db push` required.
-
-### Logging Standards
-
-- **TypeScript**: Use `process.stdout.write()` / `process.stderr.write()` (NEVER `console.*`)
-- **Python**: Use `sys.stdout.write()` / `sys.stderr.write()` (NEVER `print()`)
-
-Enforced by pre-commit hooks and CI validation.
-
-### Testing Philosophy
-
-**Antimocking**: All tests use real Supabase Local database connections for production parity.
-
-See `.claude/commands/docs/anti-mock.md` for complete guidelines.
-
-### Dev-Mode Session Endpoint
-
-For **testing and development only**: `/auth/dev-session` generates authenticated Supabase sessions for Playwright agents that cannot complete GitHub OAuth headlessly.
-
-- **Security**: Strict production guard (requires both `NODE_ENV !== 'production'` AND `VERCEL_ENV !== 'production'`)
-- **Location**: `web/app/auth/dev-session/route.ts`
-- **Helper Utilities**: `web/lib/playwright-helpers.ts` (cookie injection, session management)
-- **Requirements**: `SUPABASE_SERVICE_ROLE_KEY` env var (admin API access)
-- **Middleware**: Exempted from auth checks via middleware matcher
-- **Spec**: `docs/specs/feature-317-dev-session-endpoint.md`
-
-```bash
-# Create test session
-curl -X POST http://localhost:3001/auth/dev-session \
-  -H "Content-Type: application/json" \
-  -d '{"email":"test@local.dev","tier":"free"}'
-```
-
-## Documentation Directory
-
-### Development
-- [Development Commands](./.claude/commands/app/dev-commands.md) - Quick start, server startup, testing
-- [Environment Variables](./.claude/commands/app/environment.md) - Supabase config, ports, auto-generated files
-- [Pre-commit Hooks](./.claude/commands/app/pre-commit-hooks.md) - Installation, troubleshooting, bypass
-
-### Architecture
-- [Architecture Overview](./.claude/commands/docs/architecture.md) - Path aliases, shared types, core components
-- [Database Schema](./.claude/commands/docs/database.md) - Tables, RLS policies, migrations, Supabase Local
-- [API Workflow](./.claude/commands/docs/workflow.md) - Auth flow, rate limiting, indexing, search, validation
-
-### MCP Integration
-- [MCP Integration](./.claude/commands/docs/mcp-integration.md) - Server architecture, tools, SDK behavior
-- [MCP Usage Guidance](./.claude/commands/docs/mcp-usage-guidance.md) - When to use MCP vs direct operations
-
-### Testing
-- [Testing Guide](./.claude/commands/testing/testing-guide.md) - Antimocking philosophy, migration sync, commands
-- [Logging Standards](./.claude/commands/testing/logging-standards.md) - TypeScript/Python logging rules
-
-### AI Developer Workflows (ADW)
-- [ADW Architecture](./.claude/commands/workflows/adw-architecture.md) - 3-phase system, atomic agents, resilience
-- [ADW Observability](./.claude/commands/workflows/adw-observability.md) - Metrics analysis, CI integration
-- [ADW Exit Codes](./automation/adws/docs/exit-codes.md) - Standardized exit codes for debugging (blockers, validation, execution, resources)
-
-### CI/CD
-- [CI Configuration](./.claude/commands/ci/ci-configuration.md) - GitHub Actions, parallelization, caching, path filtering
-- [Automated Deployments](./.claude/commands/docs/automated-deployments.md) - GitHub App integrations for Supabase and Fly.io
-
-### Deployment
-- [Staging Environments](./docs/deployment/staging-environments.md) - Vercel preview deployments, backend configuration, environment variables
-
-### Issue Management
-- [Issue Relationships](./.claude/commands/docs/issue-relationships.md) - Dependency types, prioritization
-
-## MCP Server Availability
-
-KotaDB provides MCP servers for programmatic operations:
 - **kotadb**: Code search, indexing, dependency analysis
-- **playwright**: Browser automation (available via MCP)
-- **sequential-thinking**: Complex reasoning tasks
+- **playwright**: Browser automation
+- **sequential-thinking**: Complex reasoning
 
-See [MCP Usage Guidance](./.claude/commands/docs/mcp-usage-guidance.md) for decision matrix on when to use MCP tools vs direct file operations.
+See `/docs:mcp-usage-guidance` for decision matrix.
+
+## Layer-Specific Documentation
+
+- **Backend/API**: `.claude/commands/docs/conditional_docs/app.md`
+- **Automation/ADW**: `.claude/commands/docs/conditional_docs/automation.md`
+- **Web/Frontend**: `.claude/commands/docs/conditional_docs/web.md`
 
 ## Related Resources
 
-- Complete automation architecture: `automation/adws/README.md`
-- Testing setup details: `docs/testing-setup.md`
-- MCP Claude Code integration: `docs/guides/mcp-claude-code-integration.md`
+- ADW architecture: `automation/adws/README.md`
+- Testing setup: `docs/testing-setup.md`
+- MCP integration guide: `docs/guides/mcp-claude-code-integration.md`

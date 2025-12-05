@@ -1,5 +1,7 @@
 # /install
 
+**Template Category**: Action
+
 Use this to provision a fresh environment or verify dependencies remain healthy. No arguments required.
 
 ## Steps
