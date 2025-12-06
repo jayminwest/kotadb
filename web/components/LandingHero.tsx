@@ -38,14 +38,15 @@ export default function LandingHero() {
       {/* Content */}
       <div className="relative max-w-4xl mx-auto text-center space-y-8">
         <h1 className="text-5xl md:text-6xl font-bold tracking-tight">
-          Code Intelligence for{' '}
+          Give Your AI a{' '}
           <span className="bg-gradient-to-r from-blue-600 to-purple-600 dark:from-blue-400 dark:to-purple-400 bg-clip-text text-transparent">
-            AI Agents
+            Searchable Memory
           </span>
+          {' '}of Your Codebase
         </h1>
 
         <p className="text-xl md:text-2xl text-gray-700 dark:text-gray-300 max-w-3xl mx-auto">
-          Make Claude Code smarter about your codebase with semantic search, dependency analysis, and change impact detection via MCP
+          Stop your AI from guessing. KotaDB indexes your repositories so Claude Code can instantly find code, trace dependencies, and understand impact—without reading files one by one.
         </p>
 
         <div className="flex flex-col sm:flex-row items-center justify-center gap-4 pt-4">
