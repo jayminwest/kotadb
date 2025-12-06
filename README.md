@@ -149,18 +149,21 @@ KotaDB supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.
 **Endpoint:** `POST /mcp`
 
 **Required Headers:**
-- `Origin`: Must match allowed origins (default: localhost variants)
+- `Authorization`: Bearer token with valid API key
+- `Accept: application/json, text/event-stream` **(CRITICAL: Both types required)**
 - `MCP-Protocol-Version: 2025-06-18`
-- `Accept: application/json`
+- `Content-Type: application/json`
+
+> **Note**: The Accept header MUST include both `application/json` and `text/event-stream`. Missing either will result in HTTP 406 "Not Acceptable". See [Migration Guide](docs/migration/v0.1.0-to-v0.1.1.md) for details.
 
 **Example: Initialize Handshake**
 
 ```bash
 curl -X POST http://localhost:3000/mcp \
   -H "Content-Type: application/json" \
-  -H "Origin: http://localhost:3000" \
+  -H "Accept: application/json, text/event-stream" \
   -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Accept: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
     "jsonrpc": "2.0",
     "id": 1,
@@ -178,9 +181,9 @@ curl -X POST http://localhost:3000/mcp \
 ```bash
 curl -X POST http://localhost:3000/mcp \
   -H "Content-Type: application/json" \
-  -H "Origin: http://localhost:3000" \
+  -H "Accept: application/json, text/event-stream" \
   -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Accept: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
     "jsonrpc": "2.0",
     "id": 2,
@@ -194,9 +197,9 @@ curl -X POST http://localhost:3000/mcp \
 ```bash
 curl -X POST http://localhost:3000/mcp \
   -H "Content-Type: application/json" \
-  -H "Origin: http://localhost:3000" \
+  -H "Accept: application/json, text/event-stream" \
   -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Accept: application/json" \
+  -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
     "jsonrpc": "2.0",
     "id": 3,
@@ -233,9 +236,8 @@ Find files that depend on (dependents) or are depended on by (dependencies) a ta
 ```bash
 curl -X POST http://localhost:3000/mcp \
   -H "Content-Type: application/json" \
-  -H "Origin: http://localhost:3000" \
+  -H "Accept: application/json, text/event-stream" \
   -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Accept: application/json" \
   -H "Authorization: Bearer YOUR_API_KEY" \
   -d '{
     "jsonrpc": "2.0",

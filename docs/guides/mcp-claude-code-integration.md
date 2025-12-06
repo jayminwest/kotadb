@@ -1,5 +1,7 @@
 # MCP Claude Code Integration Guide
 
+> **BREAKING CHANGE (v0.1.1)**: The MCP endpoint now requires the Accept header to include both `application/json` AND `text/event-stream`. See [Migration Guide](../migration/v0.1.0-to-v0.1.1.md) if you're upgrading from v0.1.0.
+
 This guide explains how to integrate KotaDB with Claude Code using the Model Context Protocol (MCP).
 
 ## Overview
@@ -357,6 +359,6 @@ Errors follow JSON-RPC 2.0 error codes:
 
 ---
 
-**Last Verified**: 2025-10-18
-**KotaDB Version**: 0.1.0
+**Last Verified**: 2025-12-05
+**KotaDB Version**: 0.1.1
 **MCP Protocol Version**: 2025-06-18
