@@ -26,6 +26,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Unbounded database queries without .range() pagination for >1000 rows (added after #473)
 - Missing Sentry.captureException() in try-catch blocks (added after ed4c4f9)
 - Using console.* instead of @logging/logger (added after #436)
+- Missing idempotency in relationship operations (add/remove should succeed if already in desired state) (added after #470)
 
 **Important Concerns (COMMENT level):**
 - Large files (>300 lines) that should be split

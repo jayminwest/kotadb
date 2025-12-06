@@ -23,8 +23,11 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Missing timeout configuration for HTTP calls
 - Direct database queries without using client abstraction
 - Queue jobs without proper error/retry handling
-- Missing Sentry.captureException() in catch blocks (observability requirement since #436)
-- Using console.log/console.error instead of structured logger (violates logging standards)
+- Missing Sentry.captureException() in catch blocks (observability requirement since #436, expanded #ed4c4f9)
+  - Requirement: All 96+ error capture points must include contextual metadata
+  - Include: user_id, repository, operation_type, request_id in Sentry context
+- Using console.log/console.error instead of structured logger (violates logging standards since #b7184bd)
+- Project-scoped operations missing RLS isolation or project ownership validation
 
 **Important Concerns (COMMENT level):**
 - Inconsistent response format across endpoints
@@ -40,13 +43,24 @@ REVIEW_CONTEXT: $ARGUMENTS
 **Response Format Checklist:**
 - [ ] Result wrapped in content block: `{ content: [{ type: "text", text: ... }] }`
 - [ ] JSON stringified in text field
-- [ ] Error responses use standard error format
+- [ ] Error responses use standard error format with code/message
 - [ ] Parameter validation before execution
+- [ ] Sentry.captureException() on errors with tool name/args context
 
 **Error Code Usage:**
 - [ ] `-32603` for tool execution errors
 - [ ] Clear error messages (no stack traces in production)
-- [ ] Proper HTTP status code mapping
+- [ ] Proper HTTP status code mapping to -32700/-32601/-32603
+- [ ] Tool-specific error context in Sentry (tool name, parameter types, operation type)
+
+**Project Management Tool Compliance (added #470):**
+- [ ] `create_project` validates name required, optional description/repository_ids
+- [ ] `list_projects` respects user RLS, supports optional limit parameter
+- [ ] `get_project` accepts UUID or case-insensitive name, returns full repository list
+- [ ] `update_project` validates project exists before modification, supports partial updates
+- [ ] `delete_project` uses cascade delete (associations removed, repos remain indexed)
+- [ ] `add_repository_to_project` is idempotent (no duplicate associations)
+- [ ] `remove_repository_from_project` is idempotent (no error if already absent)
 
 ### Supabase Query Patterns
 
@@ -77,29 +91,47 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Database queries: Rely on connection pool settings
 - Queue jobs: Expiration configured
 
-**Webhook-Specific Patterns (from #406, #408):**
+**Webhook-Specific Patterns (from #406, #408, #27f2f8c):**
 - [ ] Signature verification before processing
-- [ ] Graceful handling of missing metadata (warn + return 200)
-- [ ] Stripe object property fallbacks (e.g., parent.subscription_details)
-- [ ] Idempotency for duplicate webhook deliveries
-- [ ] Proper error vs warning classification (prevent infinite retries)
+- [ ] Graceful handling of missing metadata (warn + return 200 to prevent retries)
+- [ ] Stripe object property fallbacks (e.g., parent.subscription_details.subscription before top-level)
+- [ ] Idempotency for duplicate webhook deliveries (use external_id or similar)
+- [ ] Proper error vs warning classification (prevent infinite retries on unrecoverable errors)
+- [ ] Subscription ID extraction from invoice.parent.subscription_details when direct field unavailable
+- [ ] User ID validation from customer/subscription metadata before database operations
+
+**Health Check Versioning (from #453, #599c780):**
+- [ ] Include `api_version` in health check response
+- [ ] Version information accessible before authentication
+- [ ] Version matches deployment package version
 
 ### Integration Testing Expectations
 
 **New MCP Tools:**
-- Full request/response cycle test
-- Error path testing
-- Parameter validation tests
+- Full request/response cycle test with content block format validation
+- Error path testing with Sentry capture verification
+- Parameter validation tests (required vs optional params)
+- Tool execution with real external systems (antimocking requirement)
+
+**New Project Management Tools (#470):**
+- CRUD operations with RLS isolation tests
+- Repository association idempotency
+- Project ownership validation
+- Cascade delete behavior (repositories remain, associations removed)
+- UUID vs name lookup (case-insensitive)
 
 **New Endpoints:**
-- Authentication integration
-- Rate limiting integration
-- Database query integration
+- Authentication integration (API key validation, rate limiting)
+- Rate limiting integration (hourly + daily dual limits since #423)
+- Database query integration with RLS enforcement
+- Structured logging with correlation IDs
+- Sentry error capture at error boundaries
 
 **Queue Changes:**
-- Job creation tests
-- Job completion tests
-- Retry behavior tests
+- Job creation tests with metadata validation
+- Job completion tests with error handling
+- Retry behavior tests (exponential backoff: 60s, 120s, 180s)
+- Auto-reindex integration with queue lifecycle (#431)
 
 ## Workflow
 

@@ -16,30 +16,38 @@ USER_PROMPT: $ARGUMENTS
 
 ### Claude Configuration Knowledge Areas
 
-**CLAUDE.md Structure:**
-- BLUF section: Quick-start commands and essential context
-- Quick Start: Numbered workflow steps (prime, plan, implement, validate)
-- Core Principles: Table of key conventions with command references
-- Command Navigation: Organized tables by category (workflows, issues, git, testing, docs, ci, tools, app, automation, worktree, release, validation)
-- Common Workflows: End-to-end command sequences for typical tasks
+**CLAUDE.md Structure (Navigation Gateway Pattern):**
+- BLUF section: Quick-start commands and essential context (max 10 lines for scannability)
+- Quick Start: Numbered 4-step workflow (prime, plan, implement, validate)
+- Core Principles: Table mapping principles to commands and descriptions
+- Command Navigation: Organized by category with 60+ commands in tables (workflows, issues, git, testing, docs, ci, tools, app, automation, worktree, release, validation)
+- Common Workflows: End-to-end command sequences for typical tasks (5 main sequences)
+- When Things Go Wrong: Diagnostic mappings from problems to commands
 - Quick Reference: Shell commands for common operations
 - Critical Conventions: Path aliases, migration sync, logging, testing, branching
 - MCP Servers: Available MCP integrations
-- Layer-Specific Documentation: Links to conditional docs
+- Layer-Specific Documentation: Links to conditional docs (Added after #491)
 
-**settings.json Configuration:**
+**settings.json Configuration (Added after #491):**
 ```json
 {
   "statusLine": {
     "type": "command",
-    "command": "python .claude/scripts/statusline.py"
+    "command": "python .claude/statusline.py"
   },
   "hooks": {
-    "PostToolUse": [...],
-    "UserPromptSubmit": [...]
+    "PostToolUse": [
+      {"matcher": ".ts|.js", "command": "python .claude/hooks/auto_linter.py", "timeout": 30}
+    ],
+    "UserPromptSubmit": [
+      {"command": "python .claude/hooks/context_builder.py", "timeout": 15}
+    ]
   }
 }
 ```
+- statusLine: Custom status line script (python)
+- hooks: PostToolUse and UserPromptSubmit automation with matchers and timeouts
+- Hook scripts use shared utilities (hook_helpers.py) for JSON I/O and file detection
 
 **settings.local.json Pattern:**
 - Gitignored file for personal settings
@@ -53,19 +61,57 @@ USER_PROMPT: $ARGUMENTS
 - Connection parameters: stdio vs. HTTP transport
 - Environment variable passthrough
 
-**Slash Command Organization:**
+**Slash Command Organization (Added after #491):**
 - Directory structure: `.claude/commands/<category>/<command>.md`
-- Frontmatter required: `description`, optional `argument-hint`
+- Frontmatter required: `description`, `argument-hint` (if takes arguments)
+- New fields (added #474): `Template Category`, `Prompt Level` (1-7)
 - Naming convention: lowercase with underscores or hyphens
 - Nested commands: `<category>:<subcategory>:<command>`
+- Template Categories: Message-Only, Path Resolution, Action, Structured Data
+- Prompt Levels: 1 (static reference) to 7 (self-modifying with reasoning)
+
+**Expert Triad Pattern (Added after #490):**
+- Three-command expert structure: `*_plan.md`, `*_review.md`, `*_improve.md`
+- Each expert covers a SDLC phase: planning, review, and self-improvement
+- Template Category for plan/review: Structured Data (Level 5 Higher Order)
+- Template Category for improve: Action (Level 6 Self-Modifying)
+- Improve command uses git log analysis to extract patterns and update expertise
+- Experts: architecture, security, testing, integration, ux, cc_hook, claude-config
+
+**Cascading Bulk Update Pattern (Added after #490):**
+- Tier 1: `/tools:all-proj-bulk-update [docs]` - Master orchestrator
+- Tier 2: Per-directory orchestrators spawned in parallel (agents, commands, hooks, docs)
+- Tier 3: Specific subdirectory workers for detailed updates
+- Used for synchronized updates across .claude directory structure
+
+**Multi-Phase Orchestrator Pattern (Added after #490):**
+- Generic orchestrator: `/experts:orchestrators:orchestrator <task> [phases=scout,plan,build]`
+- Phase definitions: scout (exploration), plan (multi-expert analysis), build (implementation), review, validate
+- Scout phase: Haiku model for read-only codebase exploration
+- Plan phase: Sonnet model with multi-expert coordination, creates `docs/specs/` files
+- Build phase: Parallel or sequential implementation based on file dependencies
+- Review phase: Multi-expert code review, creates `docs/reviews/` files
+- Validate phase: Test and quality gate execution
+- Supports custom phase selection via `phases` parameter
+
+**Layer-Specific Documentation Routing (Added after #491):**
+- Backend/API patterns in `.claude/commands/docs/conditional_docs/app.md`
+- Automation/ADW patterns in `.claude/commands/docs/conditional_docs/automation.md`
+- Web/Frontend patterns in `.claude/commands/docs/conditional_docs/web.md`
+- CLAUDE.md references `Layer-Specific Documentation` section
+- Enables conditional guidance based on codebase layer
 
 **Anti-Patterns Discovered:**
-- CLAUDE.md with outdated command references
-- settings.json with invalid JSON syntax
+- CLAUDE.md with outdated command references (discovered #491)
+- settings.json with invalid JSON syntax or commented-out code (discovered #486)
 - Missing MCP server configurations for required tools
 - Duplicate command definitions across directories
-- Overly long CLAUDE.md sections that reduce scannability
+- Overly long CLAUDE.md sections exceeding 50 lines without subsections (discovered #482)
 - Command descriptions that don't match actual behavior
+- Commands missing Template Category or Prompt Level annotations (fixed #487)
+- Hardcoded paths in CLAUDE.md instead of command references (discovered #482)
+- Orchestrator prompts with inconsistent phase definitions (discovered #490)
+- Multi-tier update strategies without clear responsibility boundaries (addressed #491)
 
 ### Command Registration Patterns
 

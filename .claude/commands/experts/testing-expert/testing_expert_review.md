@@ -31,11 +31,13 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Unclear test descriptions
 
 **Anti-Patterns to Flag:**
-- Fixed `setTimeout()` delays instead of `waitForCondition()` polling (causes flaky tests in CI - 55d3018)
+- Fixed `setTimeout()` delays instead of `waitForCondition()` polling (causes flaky tests in CI - 32dcdf7)
 - Missing `afterEach` database cleanup leading to constraint violations (e79c11a)
 - Queue tests without `startQueue()`/`stopQueue()` lifecycle management (#431)
 - Hardcoded UUIDs for foreign keys instead of querying database (#431)
 - Tests that rely on global state without cleanup (rate limits, sessions)
+- Missing `beforeEach` cleanup for test data in projects/metadata (causes isolation failures - #431)
+- Queue workers not registered before enqueuing jobs (causes silent job failures - #431)
 
 **Antimocking Checklist:**
 - [ ] No `jest.mock()` or `bun.mock()` calls
@@ -53,8 +55,10 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Proper setup/teardown isolation
 - Use of test helpers from `app/tests/helpers/`
 - Explicit cleanup of created data
-- **Use `waitForCondition()` for async assertions** instead of fixed `setTimeout()` delays (prevents flaky tests - 55d3018)
+- **Use `waitForCondition()` for async assertions** instead of fixed `setTimeout()` delays (prevents flaky tests - 32dcdf7)
 - **Queue tests include lifecycle hooks**: `startQueue()` in `beforeAll`, `stopQueue()` in `afterAll` (#431)
+- **Queue workers registered in beforeAll**: Call `startIndexWorker(getQueue())` before enqueueing jobs (#431)
+- **Database cleanup in `beforeEach`**: Truncate test projects and metadata for test isolation (#431)
 - **Database cleanup in `afterEach`**: Delete created records to prevent constraint violations between tests (e79c11a)
 - **Real database UUIDs for fixtures**: Query database for foreign key values instead of hardcoding (#431)
 

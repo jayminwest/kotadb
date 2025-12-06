@@ -42,6 +42,7 @@ USER_PROMPT: $ARGUMENTS
 4. Rate limit headers: `X-RateLimit-Limit`, `X-RateLimit-Remaining`, `X-RateLimit-Reset`
 5. Webhook endpoints: `/webhook/stripe` for subscription lifecycle (added after #345)
 6. Feature flags: Billing feature flag for open-source fork (added after #472)
+7. Health check endpoint: `/health` returns API version, queue metrics, job health status (added after #453)
 
 **Anti-Patterns Discovered:**
 - Relative imports instead of path aliases (causes refactoring brittleness)
@@ -117,6 +118,51 @@ USER_PROMPT: $ARGUMENTS
 - Add/remove operations should be idempotent
 - Example: `add_repository_to_project` succeeds if already added
 - Prevents agent retry failures on network issues
+
+### Feature Flags Pattern (added after #472)
+
+**Conditional Feature Toggling:**
+- Use `ENABLE_BILLING` environment variable for self-hosted deployments
+- Feature flags enable open-source self-hosted fork without billing infrastructure
+- Guards Stripe endpoints, webhook handlers, and billing-related middleware
+- Environment variables checked at initialization time for performance
+
+**Self-Hosted Deployment Architecture:**
+- Support both SaaS and self-hosted deployment modes
+- Billing features disabled entirely for self-hosted (no billing UI, webhooks, or rate limits based on tier)
+- Rate limiting simplified for open-source deployments
+- API authentication optional/disabled in self-hosted mode when ENABLE_BILLING=false
+
+### Sentry Error Tracking Pattern (added after #436, 7020d54)
+
+**Sentry Integration Architecture:**
+- Initialize in `app/src/instrument.ts` before all other imports
+- Environment-specific sampling: 1.0 (dev), 0.1 (production) for tracesSampleRate
+- Test environment guard: `NODE_ENV=test` disables Sentry entirely
+- Privacy settings: `sendDefaultPii=false`, scrub sensitive headers (authorization, x-api-key)
+
+**Express Middleware Integration:**
+- `Sentry.Handlers.expressErrorHandler()` in middleware chain before custom error logging
+- Auto-attaches request context to error spans
+- Health check endpoint excluded from transaction tracking to reduce noise
+
+**Error Context Requirements:**
+- Attach user context: `user_id`, `organization_id`, `tier`
+- Attach operation context: repository names, job IDs, operation types
+- Use `Sentry.captureException(error, { contexts: { user, operation } })`
+
+### API Versioning Pattern (added after #453)
+
+**Version Caching and Health Check:**
+- Cache API version at module load from `package.json` to avoid repeated file reads
+- Dynamic import with assertion: `import("../../package.json", { with: { type: "json" } })`
+- Fallback to "unknown" if version cannot be determined
+- Include version in `/health` endpoint response for monitoring and debugging
+- Queue metrics included in health response: queue depth, worker count, recent failures, oldest pending job age
+
+**Version Availability:**
+- Available at module initialization (non-blocking load with silent fallback)
+- Cached value prevents performance impact on repeated health checks
 
 ## Workflow
 

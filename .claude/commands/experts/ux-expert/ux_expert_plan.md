@@ -42,12 +42,47 @@ USER_PROMPT: $ARGUMENTS
 - Keyboard navigation: Support Ctrl+C graceful cancellation
 - Alternative formats: --json flag for all commands producing output
 
+**Structured Logging Patterns (Added after #436):**
+- JSON logging format: Structured for machine parsing with timestamp, level, message, context
+- Sensitive data masking: Automatic redaction of api_keys, tokens, passwords, secrets in logs
+- Correlation IDs: Include request_id, user_id, job_id for tracing across operations
+- Log level configuration: Respect LOG_LEVEL environment variable (debug/info/warn/error)
+- Error context: Include error code, message, and stack (conditionally) in log entries
+- Child logger context: Support creating child loggers with additional context to avoid repetition
+
+**API Response Patterns (Added after #431, #470):**
+- Health check responses: Include API version, status, timestamp, and queue metrics
+- Success responses: Brief confirmation with relevant identifiers and timing for ops >1 second
+- Error responses: Consistent structure with HTTP status code + error message field
+- Entity creation: Return created resource ID for subsequent operations
+- List operations: Include counts for batch operations, order by most recent first
+- Version information: Always include API version in health checks (fixed after #453)
+- Rate limit responses: Include current usage, limit, and reset time headers for transparency
+
+**Error Tracking and Observability (Added after #439, #440):**
+- Sentry integration: Capture all try-catch block errors with rich context for debugging
+- Error context: Include operation type, user ID, resource identifiers for correlation
+- Sensitive data protection: Automatic masking of API keys, tokens, passwords, secrets
+- Error metrics: Track error types, frequency, and user impact for observability
+- User-facing errors: Never expose internal error details; provide actionable guidance instead
+
+**Rate Limiting Messaging (Added after #423):**
+- Quota display: Show current usage and tier limits (free/solo/team) clearly
+- Dual limits: Communicate both hourly and daily quotas to users
+- Limit exceeded: Provide clear error message with reset time and upgrade path
+- Proactive warnings: Consider warning at 80% usage for better UX
+- Tier information: Include which tier user is on for context
+
 **Anti-Patterns Discovered:**
 - Emoji overuse without fallbacks (breaks on some terminals)
 - Silent failures (operations complete without confirmation)
 - Wall of text errors without actionable guidance
 - Inconsistent formatting between similar commands
 - Missing --quiet flag for scripting contexts
+- Logging with process.stdout/stderr without structured format (discovered in #436 fixes)
+- Missing version information in health checks (fixed in #453)
+- Untracked errors in try-catch blocks without Sentry capture (fixed in #439, #440)
+- Internal error details exposed to users (violates error context principle from #440)
 
 ### User Feedback Patterns
 

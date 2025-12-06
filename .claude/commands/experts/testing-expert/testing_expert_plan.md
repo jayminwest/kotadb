@@ -79,6 +79,7 @@ cd app && bun test:teardown   # Cleanup (CI required, local optional)
 - Use migrations for schema
 - Seed scripts for test data in `app/scripts/`
 - Test-specific data via helper functions with cleanup
+- Real database UUID fetching: Query database for FK values instead of hardcoding (prevents constraint violations - #431)
 
 **Cleanup Patterns:**
 - Each test suite responsible for own cleanup
@@ -87,6 +88,7 @@ cd app && bun test:teardown   # Cleanup (CI required, local optional)
 - **Database cleanup in `afterEach`**: Delete created records to prevent constraint violations (discovered in e79c11a)
 - **Global rate limit cleanup**: `tests/setup.ts` includes `afterEach` hook to reset rate limit counters (added in #219)
 - **Queue lifecycle management**: Tests using pg-boss must call `startQueue()`/`stopQueue()` (fixed in #431)
+- **beforeEach project cleanup**: Truncate test projects and metadata for test isolation (#431)
 
 ### MCP Testing Patterns
 
@@ -111,8 +113,15 @@ cd app && bun test:teardown   # Cleanup (CI required, local optional)
 **Queue Testing Patterns (pg-boss):**
 - Call `startQueue()` in `beforeAll` and `stopQueue()` in `afterAll` (required for job enqueueing - #431)
 - Register workers with `startIndexWorker(getQueue())` before enqueueing jobs
-- Fetch real database UUIDs for foreign key fixtures to prevent constraint violations
-- Use `beforeEach` cleanup to delete test data (projects, metadata) for isolation
+- Fetch real database UUIDs for foreign key fixtures to prevent constraint violations (#431)
+- Use `beforeEach` cleanup to delete test data (projects, metadata) for isolation (#431)
+- Test queue lifecycle includes both `startQueue()` and worker registration in correct order
+
+**Async Polling Best Practices:**
+- Use `waitForCondition()` instead of `setTimeout()` for deterministic async testing
+- Prevents flaky tests in CI environments with variable I/O performance (32dcdf7)
+- Supports custom timeout and polling interval options
+- Provides meaningful error messages with elapsed time on timeout
 
 ## Workflow
 

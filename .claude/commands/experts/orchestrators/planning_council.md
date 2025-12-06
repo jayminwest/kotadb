@@ -14,7 +14,7 @@ PLANNING_CONTEXT: $ARGUMENTS
 
 ## Purpose
 
-Coordinate Architecture, Testing, Security, and Integration experts to provide comprehensive planning analysis. Synthesizes multiple perspectives into a single unified plan contribution.
+Coordinate Architecture, Testing, Security, Integration, UX, CC Hook, and Claude Config experts to provide comprehensive planning analysis. Synthesizes multiple perspectives into a single unified plan contribution.
 
 ## Workflow
 
@@ -27,7 +27,15 @@ Invoke all domain experts in parallel using the SlashCommand tool:
 /experts:testing-expert:testing_expert_plan <PLANNING_CONTEXT>
 /experts:security-expert:security_expert_plan <PLANNING_CONTEXT>
 /experts:integration-expert:integration_expert_plan <PLANNING_CONTEXT>
+/experts:ux-expert:ux_expert_plan <PLANNING_CONTEXT>
+/experts:cc_hook_expert:cc_hook_expert_plan <PLANNING_CONTEXT>
+/experts:claude-config:claude_config_plan <PLANNING_CONTEXT>
 ```
+
+**Expert Invocation Strategy (added after #490):**
+- Invoke ALL 7 experts in a single message for true parallelism
+- Use Task tool with `subagent_type: general-purpose` and `model: haiku` for cost efficiency
+- Handle partial failures gracefully - one expert failure shouldn't block others
 
 ### Phase 2: Response Collection
 
@@ -50,10 +58,13 @@ Analyze all expert outputs to identify:
 2. Issues flagged by multiple experts (consensus)
 3. Domain-specific issues with clear rationale
 
-**Conflict Resolution:**
-- When experts disagree, document both perspectives
-- Recommend based on risk severity
-- Note trade-offs for human decision
+**Conflict Resolution (enhanced after #483):**
+- When experts disagree, document both perspectives with supporting evidence
+- Recommend based on risk severity (CRITICAL > HIGH > MEDIUM > LOW)
+- Note trade-offs for human decision with specific questions
+- Architecture + Security conflicts: Security usually takes precedence
+- Testing + Integration conflicts: Favor test isolation over integration complexity
+- UX + Architecture conflicts: Consider user-facing impact first
 
 ### Phase 4: Unified Output
 
@@ -83,6 +94,15 @@ The Planning Council produces ONE synthesized analysis, NOT separate reports per
 **Integration Points:**
 - [External system considerations]
 
+**UX Considerations:**
+- [CLI output and user experience factors]
+
+**Hook/Automation Impacts:**
+- [Pre-commit, automation, or Claude Code hook implications]
+
+**Configuration Changes:**
+- [CLAUDE.md, settings.json, or MCP configuration needs]
+
 **Cross-Cutting Concerns:**
 - [Issues spanning multiple domains]
 
@@ -101,3 +121,11 @@ The Planning Council produces ONE synthesized analysis, NOT separate reports per
 
 **Implementation Notes:**
 - [Practical guidance for implementation]
+
+## Anti-Patterns to Avoid (added after #490)
+
+- **Invoking experts sequentially**: Always invoke all 7 experts in parallel for efficiency
+- **Ignoring partial failures**: If 1-2 experts fail, synthesize from successful ones
+- **Creating multiple output files**: Planning Council produces ONE synthesized analysis
+- **Omitting expert sources**: Always attribute recommendations to specific expert domains
+- **Skipping cross-cutting analysis**: Cross-domain concerns are the primary value-add

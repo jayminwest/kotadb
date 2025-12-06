@@ -38,6 +38,8 @@ KotaDB is a code intelligence API (Bun + TypeScript + Supabase) powering AI deve
 | `/workflows:validate-implementation` | Validation levels (1-3) |
 | `/workflows:patch` | Quick fixes without full spec |
 | `/workflows:orchestrator` | ADW orchestration |
+| `/workflows:adw-architecture` | ADW architecture and phases documentation |
+| `/workflows:adw-observability` | ADW metrics analysis and logging |
 | `/workflows:roadmap-update` | Sync ROADMAP.md with progress |
 
 ### Issues
@@ -96,6 +98,8 @@ KotaDB is a code intelligence API (Bun + TypeScript + Supabase) powering AI deve
 | `/tools:pr-review` | PR review checklist |
 | `/tools:install` | Dependency installation |
 | `/tools:bun_install` | Bun-specific install |
+| `/tools:all-proj-bulk-update` | Cascading bulk-update for .claude directory |
+| `/tools:question` | Answer questions about project structure without coding |
 
 ### App (Development)
 | Command | Purpose |

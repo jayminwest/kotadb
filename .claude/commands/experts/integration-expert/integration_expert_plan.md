@@ -45,10 +45,18 @@ server.setRequestHandler(CallToolRequestSchema, async (request) => {
 - `search_code` - Search indexed files for terms (supports project filtering since #431)
 - `index_repository` - Clone/update and index git repos
 - `list_recent_files` - List recently indexed files
-- `search_dependencies` - Dependency graph traversal
+- `search_dependencies` - Dependency graph traversal (supports dependency_query direction filtering)
 - `analyze_change_impact` - Impact analysis for changes
 - `validate_implementation_spec` - Spec validation
 - Project management: `create_project`, `list_projects`, `get_project`, `update_project`, `delete_project`, `add_repository_to_project`, `remove_repository_from_project` (added #431, refined #470)
+
+**Project Management Patterns (since #431):**
+- Projects provide workspace-level grouping for related repositories
+- Project CRUD via REST endpoints or MCP tools
+- Repository associations via join table (projects_repositories)
+- Project-scoped search filtering in `search_code` tool
+- RLS isolation ensures users only access their own projects
+- Idempotent operations for add/remove repository (no duplicate associations)
 
 ### Supabase Client Patterns
 
@@ -123,12 +131,16 @@ const { data, error } = await client
 - Archive completed: 1 hour
 - HTTP request: Configurable per endpoint
 
-**Observability Integration (since #436):**
-- Sentry error tracking at all boundaries (145 capture points across codebase)
-- Structured logging with correlation IDs (request_id, user_id, job_id)
-- Automatic sensitive data masking in logs (API keys, tokens, passwords)
+**Observability Integration (since #436, expanded #ed4c4f9):**
+- Sentry error tracking at all boundaries (96 total capture points across codebase)
+  - GitHub integration: 24 captures, API endpoints: 39 captures, Indexer: 9 captures
+  - Auth: 11 captures, Queue/DB: 17 captures, MCP: 14 captures, Validation: 2 captures
+- Structured logging with correlation IDs (request_id, user_id, job_id, repository, operation_type)
+- Automatic sensitive data masking in logs (API keys, tokens, passwords, subscription IDs)
 - Log levels: debug, info, warn, error (configurable via LOG_LEVEL env var)
 - Request/response logging middleware with auto-generated request_id
+- Contextual metadata attachment (user IDs, repository names, operation types)
+- Stack traces included for all production errors (previously invisible)
 
 ### Response Format Standards
 
@@ -187,9 +199,22 @@ const { data, error } = await client
 
 **Sentry in Error Handlers:**
 - **Issue**: 97% of try-catch blocks weren't capturing to Sentry (pre-#436)
-- **Trigger**: Production errors invisible in monitoring dashboard
-- **Resolution**: Add Sentry.captureException() to every catch block with contextual metadata
+- **Trigger**: Production errors invisible in monitoring dashboard (57 of 59 blocks missing)
+- **Resolution**: Add Sentry.captureException() to every catch block with contextual metadata (96 total captures added)
 - **Prevention**: Make Sentry capture part of code review checklist
+
+**Project Workspace Scoping:**
+- **Issue**: Multi-repository grouping required namespace isolation (discovered in #431)
+- **Trigger**: Users wanting to organize related repositories into logical projects
+- **Impact**: Single repository shown in multiple contexts if not scoped to project
+- **Resolution**: Implement project CRUD with repository associations via join table and RLS policies
+- **Prevention**: Use project context in search_code tool, validate project ownership before operations
+
+**Health Check Versioning:**
+- **Issue**: Health check endpoint doesn't include API version in response (bug #453)
+- **Trigger**: Clients unable to version-check against API capabilities
+- **Resolution**: Add `api_version` field to health check response (fixed in #599c780)
+- **Prevention**: Include version info in all status/health endpoints
 
 ## Workflow
 
