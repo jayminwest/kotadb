@@ -465,9 +465,13 @@ Use this reference to decide which KotaDB application layer documentation source
     - testing-expert: Antimocking philosophy, test patterns, coverage requirements
     - security-expert: RLS policies, authentication flow, input validation
     - integration-expert: MCP server patterns, Supabase integration, external APIs
+    - ux-expert: CLI output formatting, error messages, progress indicators, accessibility
+    - cc_hook_expert: Claude Code hooks, pre-commit automation, hook configuration patterns
+    - claude-config: CLAUDE.md structure, settings.json, MCP configuration, command organization
   - Orchestrators:
     - planning_council: Multi-expert planning synthesis
     - review_panel: Multi-expert code review aggregation
+    - improve_orchestrators: Self-improvement for orchestrator coordination patterns
 
 - .claude/hooks/ (Automation Hooks)
   - Conditions:
