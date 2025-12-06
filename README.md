@@ -1,368 +1,276 @@
-# KotaDB
+# KotaDB - Self-Hosted Code Intelligence Engine
 
-KotaDB is the indexing and query layer for CLI Agents like Claude Code and Codex. This project exposes a
-lightweight HTTP interface for triggering repository indexing jobs and performing code search backed by
-Supabase (PostgreSQL). Development is done autonomously through AI developer workflows via the `automation/adws/` automation scripts.
+**Lightweight MCP server for code indexing and search, powered by Bun + PostgreSQL**
 
-## Getting Started
+KotaDB is a production-ready code intelligence platform designed for AI developer workflows. It provides fast, semantic code search with dependency graph analysis through a standards-based MCP interface and REST API. Self-host KotaDB to power your own AI coding tools, or use it as a learning resource for building production LLM infrastructure.
+
+## Features
+
+- **Code Indexing**: Automated repository cloning and file extraction with batch processing
+- **Semantic Search**: Fast full-text search with context snippets and project filtering
+- **Dependency Analysis**: Impact analysis, test scope discovery, circular dependency detection
+- **MCP Protocol**: Standards-based interface for Claude Code and other MCP clients
+- **Multi-Tenant**: Row-level security with PostgreSQL RLS for user isolation
+- **Rate Limiting**: Tier-based request limits with sliding window enforcement
+- **Job Queue**: Asynchronous indexing with pg-boss for reliable background processing
+- **AI Developer Workflows**: Autonomous development automation via Python agents
+
+## Quick Start
 
 ### Prerequisites
 
 - [Bun](https://bun.sh) v1.1+
-- [Supabase](https://supabase.com) account with project created (see `docs/supabase-setup.md`)
+- [Docker Desktop](https://www.docker.com/products/docker-desktop) (for local Supabase)
+- [Supabase CLI](https://supabase.com/docs/guides/cli) (optional, for local development)
 
-### Install dependencies
+### Installation
 
 ```bash
+# Clone the repository
+git clone https://github.com/jayminwest/kotadb.git
+cd kotadb
+
+# Install dependencies
 cd app && bun install
+
+# Configure environment
+cp .env.sample .env
+# Edit .env with your Supabase credentials (see Self-Hosting guide below)
+
+# Run database migrations
+cd app && bunx supabase db push
+
+# Start the server
+cd app && bun run src/index.ts
 ```
 
-### Configure Supabase
+The server listens on port `3000` by default. Override with `PORT=4000`.
 
-1. Create a Supabase project at https://supabase.com/dashboard
-2. Copy `.env.sample` to `.env` and add your Supabase credentials:
-   - `SUPABASE_URL` - Your project URL
-   - `SUPABASE_SERVICE_KEY` - Service role key (keep secret)
-   - `SUPABASE_ANON_KEY` - Anonymous/public key
-3. Run database migrations (see `docs/supabase-setup.md` for details)
+## Self-Hosting Guide
 
-For detailed setup instructions, see `docs/supabase-setup.md`.
+KotaDB is designed to be self-hosted with minimal configuration. Follow these steps:
 
-### Start the API server
+### 1. Supabase Setup
+
+**Option A: Supabase Local (Development)**
+
+```bash
+# Start Supabase Local with Docker
+cd app && bunx supabase start
+
+# The CLI will output your local credentials:
+# - API URL: http://localhost:54321
+# - Service Role Key: eyJhbG...
+```
+
+**Option B: Supabase Cloud (Production)**
+
+1. Create a project at [supabase.com/dashboard](https://supabase.com/dashboard)
+2. Go to Project Settings → API to get your credentials:
+   - `SUPABASE_URL`: Your project URL
+   - `SUPABASE_SERVICE_KEY`: Service role key (keep secret)
+   - `SUPABASE_ANON_KEY`: Anonymous/public key
+
+### 2. Environment Configuration
+
+Copy `.env.sample` to `.env` and configure:
+
+```bash
+# Required: Supabase credentials
+SUPABASE_URL=https://your-project-id.supabase.co
+SUPABASE_ANON_KEY=your-anon-key-here
+SUPABASE_SERVICE_KEY=your-service-role-key-here
+SUPABASE_DB_URL=postgresql://postgres:[PASSWORD]@db.[PROJECT_REF].supabase.co:5432/postgres
+
+# Optional: Billing features (disabled by default)
+ENABLE_BILLING=false
+
+# Optional: GitHub integration (for webhook auto-indexing)
+GITHUB_WEBHOOK_SECRET=your-webhook-secret-here
+```
+
+### 3. Database Migrations
+
+Apply migrations to set up tables, RLS policies, and indexes:
+
+```bash
+cd app && bunx supabase db push
+```
+
+Migrations are located in `app/supabase/migrations/`.
+
+### 4. Start the Server
 
 ```bash
 cd app && bun run src/index.ts
 ```
 
-The server listens on port `3000` by default. Override with `PORT=4000 cd app && bun run src/index.ts`.
-
-### Useful scripts
-
-- `cd app && bun --watch src/index.ts` – Start the server in watch mode for local development.
-- `cd app && bun test` – Run the Bun test suite.
-- `cd app && bunx tsc --noEmit` – Type-check the project.
-
-## Web Application
-
-KotaDB includes a Next.js web interface for code search and repository indexing.
-
-### Start the web app
+Verify the server is running:
 
 ```bash
-# Install dependencies (from repository root)
-bun install
-
-# Start development server
-cd web && bun run dev
+curl http://localhost:3000/health
 ```
 
-The web app will be available at `http://localhost:3001`.
+## Billing Features
 
-**Features:**
-- Code search with context snippets
-- Repository indexing interface
-- Rate limit quota tracking
-- Type-safe API integration with shared types
+**Note:** Billing features are **disabled by default** in self-hosted deployments. Set `ENABLE_BILLING=true` in your environment to enable Stripe subscription billing.
 
-See `web/README.md` for detailed documentation.
+When billing is disabled:
+- All billing endpoints return `501 Not Implemented`
+- Rate limits default to free tier (100 requests/hour)
+- Subscription management is unavailable
 
-### Running Tests
+To enable billing, configure Stripe credentials in your `.env`:
 
-KotaDB uses real PostgreSQL database connections for testing (no mocks). The test environment uses **Docker Compose** with isolated services to ensure exact parity between local and CI testing environments, with full project isolation to prevent port conflicts.
-
-**Prerequisites:** Install [Docker Desktop](https://www.docker.com/products/docker-desktop)
 ```bash
-# Verify Docker is installed and running
-docker --version
+ENABLE_BILLING=true
+STRIPE_SECRET_KEY=sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+STRIPE_SOLO_PRICE_ID=price_...
+STRIPE_TEAM_PRICE_ID=price_...
 ```
 
-**Quick Start:**
+See `app/.env.sample` for complete Stripe configuration documentation.
+
+## MCP Integration
+
+KotaDB implements the [Model Context Protocol](https://modelcontextprotocol.io) for seamless integration with AI coding tools like Claude Code.
+
+### Using KotaDB with Claude Code
+
+Add KotaDB as an MCP server in your Claude Code configuration:
+
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "command": "bunx",
+      "args": ["@modelcontextprotocol/server-http", "http://localhost:3000/mcp"],
+      "env": {
+        "KOTADB_API_KEY": "your-api-key-here"
+      }
+    }
+  }
+}
+```
+
+### Available MCP Tools
+
+- `search_code`: Search indexed files for a specific term
+- `index_repository`: Index a git repository by cloning/updating it
+- `list_recent_files`: List recently indexed files, ordered by timestamp
+- `search_dependencies`: Find files that depend on or are depended on by a target file
+
+See `docs/guides/mcp-claude-code-integration.md` for detailed integration instructions.
+
+## Testing
+
+KotaDB follows an **antimocking philosophy** - all tests use real Supabase Local database connections for production parity. No mocks, no stubs.
+
 ```bash
-# First-time setup: Start Docker Compose services and auto-generate .env.test
+# First-time setup: Start Docker Compose services
 cd app && bun run test:setup
 
 # Run tests
 cd app && bun test
 
-# Reset database if needed
-cd app && bun run test:reset
-
 # Stop services when done
 cd app && bun run test:teardown
 ```
 
-**Note:** The `.env.test` file is auto-generated from Docker Compose container ports and should not be committed to git.
+See `docs/testing-setup.md` for detailed testing documentation.
 
-**Project Isolation:** Each test run uses a unique Docker Compose project name (e.g., `kotadb-test-1234567890-98765`), enabling multiple projects or branches to run tests simultaneously without port conflicts.
+## API Endpoints
 
-**CI Testing:** GitHub Actions CI uses the same Docker Compose environment with unique project names, ensuring tests run against identical infrastructure locally and in CI (PostgreSQL + PostgREST + Kong + Auth). See `.github/workflows/app-ci.yml` for details.
+### REST API
 
-For detailed testing setup and troubleshooting, see [`docs/testing-setup.md`](docs/testing-setup.md).
+- `GET /health` - Health check endpoint (includes queue metrics)
+- `POST /index` - Queue a repository for indexing
+- `GET /search?term=<query>` - Search indexed files
+- `GET /files/recent` - List recently indexed files
+- `POST /mcp` - MCP protocol endpoint for tool integration
+- `POST /api/keys/generate` - Generate API key for authenticated user
+- `GET /api/keys/validate` - Validate API key or JWT token
 
-## API Highlights
+### Webhooks
 
-### REST Endpoints
+- `POST /webhooks/github` - GitHub push event webhook (requires `GITHUB_WEBHOOK_SECRET`)
+- `POST /webhooks/stripe` - Stripe subscription webhook (only if `ENABLE_BILLING=true`)
 
-- `GET /health` – Simple heartbeat endpoint.
-- `POST /index` – Queue a repository for indexing (body: `{ "repository": "org/repo", "localPath": "./repo" }`).
-- `GET /search?term=foo` – Search for files containing `foo`. Optional `project` and `limit` parameters.
-- `GET /files/recent` – Recent indexing results.
+### Rate Limits
 
-The indexer clones repositories automatically when a `localPath` is not provided. Override the default GitHub clone source by exporting `KOTA_GIT_BASE_URL` (for example, your self-hosted Git service).
-
-### Rate Limiting
-
-All authenticated endpoints enforce tier-based rate limiting to prevent API abuse:
-
-**Tier Limits** (requests per hour):
 - **Free**: 100 requests/hour
-- **Solo**: 1,000 requests/hour
-- **Team**: 10,000 requests/hour
+- **Solo**: 1,000 requests/hour (requires billing enabled)
+- **Team**: 10,000 requests/hour (requires billing enabled)
 
-**Response Headers** (included in all authenticated responses):
+All authenticated endpoints include rate limit headers:
+
 ```
 X-RateLimit-Limit: 100
 X-RateLimit-Remaining: 95
 X-RateLimit-Reset: 1728475200
 ```
 
-**Rate Limit Exceeded** (429 response):
-```json
-{
-  "error": "Rate limit exceeded",
-  "retryAfter": 3456
-}
-```
-
-Response includes headers:
-- `X-RateLimit-Limit` – Total requests allowed per hour for your tier
-- `X-RateLimit-Remaining` – Requests remaining in current window
-- `X-RateLimit-Reset` – Unix timestamp when the limit resets
-- `Retry-After` – Seconds until you can retry (429 responses only)
-
-Rate limits reset at the top of each hour. The `/health` endpoint is exempt from rate limiting.
-
-### MCP Protocol Endpoint
-
-KotaDB supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) for standardized agent integration. The MCP endpoint enables CLI agents like Claude Code to discover and use KotaDB's capabilities automatically.
-
-**Endpoint:** `POST /mcp`
-
-**Required Headers:**
-- `Authorization`: Bearer token with valid API key
-- `Accept: application/json, text/event-stream` **(CRITICAL: Both types required)**
-- `MCP-Protocol-Version: 2025-06-18`
-- `Content-Type: application/json`
-
-> **Note**: The Accept header MUST include both `application/json` and `text/event-stream`. Missing either will result in HTTP 406 "Not Acceptable". See [Migration Guide](docs/migration/v0.1.0-to-v0.1.1.md) for details.
-
-**Example: Initialize Handshake**
-
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 1,
-    "method": "initialize",
-    "params": {
-      "protocolVersion": "2025-06-18",
-      "capabilities": {},
-      "clientInfo": {"name": "my-client", "version": "1.0"}
-    }
-  }'
-```
-
-**Example: List Available Tools**
-
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 2,
-    "method": "tools/list",
-    "params": {}
-  }'
-```
-
-**Example: Search Code**
-
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 3,
-    "method": "tools/call",
-    "params": {
-      "name": "search_code",
-      "arguments": {"term": "Router"}
-    }
-  }'
-```
-
-**Available MCP Tools:**
-- `search_code`: Search indexed code files for a specific term
-- `index_repository`: Index a git repository by cloning/updating it
-- `list_recent_files`: List recently indexed files
-- `search_dependencies`: Search the dependency graph for impact analysis
-
-**Tool: `search_dependencies`**
-
-Find files that depend on (dependents) or are depended on by (dependencies) a target file. Useful for:
-- **Impact analysis before refactoring**: See what breaks if you change a file
-- **Test scope discovery**: Find relevant test files for implementation changes
-- **Circular dependency detection**: Identify dependency cycles in your codebase
-
-**Parameters:**
-- `file_path` (required): Relative file path within repository (e.g., `"src/auth/context.ts"`)
-- `direction` (optional): Search direction - `"dependents"`, `"dependencies"`, or `"both"` (default: `"both"`)
-- `depth` (optional): Recursion depth for traversal, 1-5 (default: `1`). Higher values find indirect relationships.
-- `include_tests` (optional): Include test files in results (default: `true`)
-- `repository` (optional): Repository ID to search within (auto-detected if omitted)
-
-**Example: Find what breaks if you change a file**
-
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-06-18" \
-  -H "Authorization: Bearer YOUR_API_KEY" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 4,
-    "method": "tools/call",
-    "params": {
-      "name": "search_dependencies",
-      "arguments": {
-        "file_path": "src/auth/context.ts",
-        "direction": "dependents",
-        "depth": 2
-      }
-    }
-  }'
-```
-
-**Response Format:**
-
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 4,
-  "result": {
-    "content": [{
-      "type": "text",
-      "text": "{
-        \"file_path\": \"src/auth/context.ts\",
-        \"direction\": \"dependents\",
-        \"depth\": 2,
-        \"dependents\": {
-          \"direct\": [\"src/auth/middleware.ts\", \"src/api/routes.ts\"],
-          \"indirect\": {
-            \"src/auth/middleware.ts\": [\"src/index.ts\"]
-          },
-          \"cycles\": [],
-          \"count\": 3
-        }
-      }"
-    }]
-  }
-}
-
-**Security & Configuration:**
-
-By default, KotaDB only accepts requests from localhost origins. For production deployments:
-- Set `KOTA_ALLOWED_ORIGINS` environment variable (comma-separated list of allowed origins)
-- Use a reverse proxy with authentication (e.g., nginx with basic auth)
-- Bind to localhost only and use network policies to control access
-
-**Session Management:**
-
-The optional `Mcp-Session-Id` header is validated but not currently used for state management. Future versions may support persistent sessions with server-side storage.
-
-## Docker & Compose
-
-Build and run the service in a container:
-
-```bash
-docker compose up dev
-```
-
-The `dev` and `home` services use the build context from the `app/` directory. A production-flavoured service is available via the `home` target in `docker-compose.yml`.
-
-## Deployment
-
-For deploying KotaDB to Fly.io (staging or production), see the comprehensive guide at [`docs/deployment.md`](docs/deployment.md). The deployment guide covers:
-- Prerequisites and Fly.io authentication
-- Staging and production environment setup
-- Supabase configuration and secret management
-- Health check validation and MCP integration testing
-- Troubleshooting common deployment issues
-
-## Project Layout
+## Project Structure
 
 ```
-app/                   # Application layer (TypeScript/Bun API service)
+app/                   # Bun + TypeScript API service
   src/
-    api/               # HTTP routes and database access
-    auth/              # Authentication middleware and API key validation
-    db/                # Supabase client initialization and helpers
-    indexer/           # Repository crawling, parsing, and extraction utilities
-    mcp/               # Model Context Protocol (MCP) implementation
-    types/             # Shared TypeScript types
-  tests/               # Test suite (133 tests)
-  package.json         # Bun dependencies and scripts
-  tsconfig.json        # TypeScript configuration
-  Dockerfile           # Bun runtime image
+    api/               # HTTP routes and database queries
+    auth/              # Authentication and rate limiting
+    db/                # Supabase client and migrations
+    indexer/           # Repository crawling and code extraction
+    mcp/               # Model Context Protocol implementation
+    queue/             # pg-boss job queue for async indexing
+  tests/               # Integration tests (133 tests)
   supabase/            # Database migrations and configuration
-  scripts/             # Application-specific bash scripts
 
-web/                   # Next.js web application (frontend)
-  src/
-    components/        # React components
-    pages/             # Next.js pages and API routes
-    lib/               # Client utilities and API integration
-  package.json         # Frontend dependencies
-  next.config.js       # Next.js configuration
+automation/            # Python AI developer workflows (ADW)
+  adws/                # Autonomous development agents
 
 shared/                # Shared TypeScript types (monorepo)
-  types/               # API contracts, entities, authentication types
+  types/               # API contracts, entities, auth types
 
-automation/            # Agentic layer (Python AI developer workflows)
-  adws/                # ADW automation scripts and modules
-  docker/              # ADW-specific Docker images
-
-.claude/commands/      # Claude Code slash commands (see .claude/commands/README.md for organization details)
-.github/workflows/     # CI workflows (app-ci.yml for application tests)
-docs/                  # Documentation (schema, specs, setup guides)
+.claude/commands/      # Claude Code slash commands and guides
 ```
 
-See `app/README.md` for application-specific quickstart, `web/README.md` for frontend development, and `automation/adws/README.md` for automation workflows.
+## Documentation
 
-## Project Roadmap
+- **Development**: `.claude/commands/app/dev-commands.md` - Quick start and testing
+- **Architecture**: `.claude/commands/docs/architecture.md` - Path aliases, shared types
+- **Database**: `.claude/commands/docs/database.md` - Schema, RLS policies, migrations
+- **MCP Integration**: `docs/guides/mcp-claude-code-integration.md` - Claude Code setup
+- **Testing**: `docs/testing-setup.md` - Antimocking philosophy and test infrastructure
+- **AI Workflows**: `automation/adws/README.md` - Autonomous development automation
 
-For strategic priorities, planned features, and development timeline, see [ROADMAP.md](ROADMAP.md).
+## Contributing
 
-The roadmap provides:
-- Current state and shipped features
-- Immediate priorities (Phase 1)
-- Medium-term and long-term goals
-- Dependencies and blockers
-- Key architectural decisions
+Contributions are welcome! This repository is maintained as an open source core fork, with changes synced from the private development repository.
 
-## Next Steps
+See [CONTRIBUTING.md](CONTRIBUTING.md) for contribution guidelines, including:
+- Development setup and testing requirements
+- Git flow and branch strategy
+- Code style and commit message conventions
+- Antimocking testing philosophy
 
-- Harden repository checkout logic with retry/backoff and temporary workspace isolation.
-- Expand `automation/adws/` with runnable automation pipelines.
-- Add richer schema migrations for symbols, AST metadata, and search primitives.
+## Consulting & Support
+
+**Need help integrating KotaDB into your AI workflow?**
+
+I provide consulting services for:
+- Custom MCP server development
+- LLM-powered developer tooling
+- Code intelligence infrastructure
+- AI agent automation pipelines
+
+**Contact:** Jaymin West
+- GitHub: [@jayminwest](https://github.com/jayminwest)
+- Email: jaymin@jayminwest.com
+
+**Looking for a hosted solution?** The full-stack web application with authentication, billing, and dashboard is available at [kotadb.com](https://kotadb.com) (private repository).
+
+## License
+
+MIT License - see [LICENSE](LICENSE) for details.
+
+Copyright (c) 2024 Jaymin West
