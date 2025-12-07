@@ -267,7 +267,7 @@ I provide consulting services for:
 - GitHub: [@jayminwest](https://github.com/jayminwest)
 - Email: jaymin@jayminwest.com
 
-**Looking for a hosted solution?** The full-stack web application with authentication, billing, and dashboard is available at [kotadb.com](https://kotadb.com) (private repository).
+**Looking for a hosted solution?** The full-stack web application with authentication, billing, and dashboard is available at [kotadb.io](https://kotadb.io) (private repository).
 
 ## License
 
