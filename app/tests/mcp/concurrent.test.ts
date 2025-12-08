@@ -177,7 +177,7 @@ describe("MCP Concurrency", () => {
 	});
 
 	test("multiple index jobs queue correctly", async () => {
-		// Queue multiple index jobs concurrently
+		// Queue multiple index jobs concurrently (without localPath - see #412)
 		const promises = Array.from({ length: 3 }, (_, i) =>
 			sendMcpRequest(
 				baseUrl,
@@ -186,7 +186,6 @@ describe("MCP Concurrency", () => {
 					name: "index_repository",
 					arguments: {
 						repository: `test/concurrent-repo-${i}`,
-						localPath: ".",
 					},
 				},
 				"free",
@@ -209,7 +208,7 @@ describe("MCP Concurrency", () => {
 	});
 
 	test("search during concurrent indexing returns results", async () => {
-		// Start multiple index jobs
+		// Start multiple index jobs (without localPath - see #412)
 		const indexPromises = Array.from({ length: 2 }, (_, i) =>
 			sendMcpRequest(
 				baseUrl,
@@ -218,7 +217,6 @@ describe("MCP Concurrency", () => {
 					name: "index_repository",
 					arguments: {
 						repository: `test/search-during-index-${i}`,
-						localPath: ".",
 					},
 				},
 				"free",

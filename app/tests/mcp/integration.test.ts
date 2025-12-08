@@ -5,17 +5,19 @@
  * Validates:
  * - Full workflow: index repository → search code → verify results
  * - Multi-tool workflows with state persistence
- * - Local path indexing with test fixtures
+ * - GitHub repository indexing (localPath not supported via MCP - see #412)
  * - Error recovery scenarios
  *
  * Uses real Supabase database (antimocking compliance).
+ *
+ * NOTE: localPath parameter is NOT supported via MCP. For local fixture testing,
+ * use the REST API endpoint directly. See docs/specs/bug-412-remove-localpath-mcp-schema.md
  */
 
 import { afterAll, beforeAll, describe, expect, test } from "bun:test";
 import type { Server } from "node:http";
-import { sendMcpRequest, extractToolResult } from "../helpers/mcp";
+import { sendMcpRequest, extractToolResult, assertJsonRpcError } from "../helpers/mcp";
 import { startTestServer, stopTestServer } from "../helpers/server";
-import path from "node:path";
 
 let server: Server;
 let baseUrl: string;
@@ -32,12 +34,7 @@ afterAll(async () => {
 
 describe("MCP End-to-End Workflows", () => {
 	test("full workflow: index repository → search code → verify results", async () => {
-		// Step 1: Index a local test repository
-		const fixturePath = path.join(
-			process.cwd(),
-			"tests/fixtures/mcp/sample-repository",
-		);
-
+		// Step 1: Index a GitHub repository (localPath not supported via MCP - see #412)
 		const indexResponse = await sendMcpRequest(
 			baseUrl,
 			"tools/call",
@@ -45,7 +42,6 @@ describe("MCP End-to-End Workflows", () => {
 				name: "index_repository",
 				arguments: {
 					repository: "test-integration/sample-repo",
-					localPath: fixturePath,
 				},
 			},
 			"free",
@@ -133,12 +129,9 @@ describe("MCP End-to-End Workflows", () => {
 		expect(list2Result.results.length).toBeGreaterThanOrEqual(0);
 	});
 
-	test("local path indexing with test fixtures", async () => {
-		const fixturePath = path.join(
-			process.cwd(),
-			"tests/fixtures/mcp/sample-repository",
-		);
-
+	test("localPath parameter is rejected via MCP", async () => {
+		// localPath is not supported via MCP (see #412)
+		// This test verifies the explicit rejection with a clear error message
 		const response = await sendMcpRequest(
 			baseUrl,
 			"tools/call",
@@ -146,7 +139,25 @@ describe("MCP End-to-End Workflows", () => {
 				name: "index_repository",
 				arguments: {
 					repository: "test/fixture-repo",
-					localPath: fixturePath,
+					localPath: "/some/local/path",
+				},
+			},
+			"free",
+		);
+
+		expect(response.status).toBe(200);
+		assertJsonRpcError(response.data, -32603, "localPath");
+	});
+
+	test("GitHub repository indexing succeeds via MCP", async () => {
+		// MCP only supports GitHub repository indexing
+		const response = await sendMcpRequest(
+			baseUrl,
+			"tools/call",
+			{
+				name: "index_repository",
+				arguments: {
+					repository: "test/fixture-repo",
 				},
 			},
 			"free",
@@ -158,29 +169,8 @@ describe("MCP End-to-End Workflows", () => {
 		expect(result.status).toBe("pending");
 	});
 
-	test("error recovery: failed indexing job recorded", async () => {
-		const response = await sendMcpRequest(
-			baseUrl,
-			"tools/call",
-			{
-				name: "index_repository",
-				arguments: {
-					repository: "test/nonexistent-repo",
-					localPath: "/nonexistent/path/to/repo",
-				},
-			},
-			"free",
-		);
-
-		// Should still return a runId even if path doesn't exist
-		// Indexing happens asynchronously and failures are recorded
-		expect(response.status).toBe(200);
-		const result = extractToolResult(response.data);
-		expect(result.runId).toBeDefined();
-	});
-
 	test("subsequent requests succeed after indexing error", async () => {
-		// First request with invalid path
+		// First request with localPath (will be rejected)
 		await sendMcpRequest(
 			baseUrl,
 			"tools/call",
@@ -211,12 +201,7 @@ describe("MCP End-to-End Workflows", () => {
 	});
 
 	test("search during indexing returns partial results", async () => {
-		// Start indexing
-		const fixturePath = path.join(
-			process.cwd(),
-			"tests/fixtures/mcp/sample-repository",
-		);
-
+		// Start indexing a GitHub repository (localPath not supported)
 		await sendMcpRequest(
 			baseUrl,
 			"tools/call",
@@ -224,7 +209,6 @@ describe("MCP End-to-End Workflows", () => {
 				name: "index_repository",
 				arguments: {
 					repository: "test/concurrent-index",
-					localPath: fixturePath,
 				},
 			},
 			"free",

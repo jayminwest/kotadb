@@ -17,7 +17,7 @@ export default function Home() {
 						Make Your AI Smarter in 30 Seconds
 					</h2>
 					<p className="text-xl text-gray-600 dark:text-gray-400">
-						Join developers who've given Claude Code a searchable memory of
+						Join developers who&apos;ve given Claude Code a searchable memory of
 						their codebase. Free tier. No credit card. Start now.
 					</p>
 					<div className="pt-4">

@@ -3,7 +3,7 @@
  *
  * Tests parameter validation for all MCP tools:
  * - search_code (term, repository, limit)
- * - index_repository (repository, ref, localPath)
+ * - index_repository (repository, ref) - localPath not supported via MCP (#412)
  * - list_recent_files (limit, repository)
  *
  * Validates type checking, required field enforcement, and boundary conditions.
@@ -255,7 +255,9 @@ describe("index_repository Parameter Validation", () => {
 		expect(data.jsonrpc).toBe("2.0");
 	});
 
-	test("localPath parameter with invalid type returns -32603", async () => {
+	test("localPath parameter is explicitly rejected via MCP", async () => {
+		// localPath is not supported via MCP - see #412
+		// Test verifies explicit rejection with clear error message
 		const response = await fetch(`${baseUrl}/mcp`, {
 			method: "POST",
 			headers: {
@@ -272,7 +274,7 @@ describe("index_repository Parameter Validation", () => {
 					name: "index_repository",
 					arguments: {
 						repository: "test/repo",
-						localPath: 123, // Invalid type: should be string
+						localPath: "/some/local/path",
 					},
 				},
 			}),
@@ -280,11 +282,11 @@ describe("index_repository Parameter Validation", () => {
 
 		expect(response.status).toBe(200);
 		const data = (await response.json()) as any;
-		// Type validation may occur during execution
-		expect(data.jsonrpc).toBe("2.0");
+		assertJsonRpcError(data, -32603, "localPath");
 	});
 
-	test("valid repository parameter succeeds", async () => {
+	test("valid repository parameter succeeds without localPath", async () => {
+		// MCP only supports GitHub repository indexing
 		const response = await sendMcpRequest(
 			baseUrl,
 			"tools/call",
@@ -292,7 +294,6 @@ describe("index_repository Parameter Validation", () => {
 				name: "index_repository",
 				arguments: {
 					repository: "test/repo",
-					localPath: ".",
 				},
 			},
 			"free",

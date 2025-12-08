@@ -150,6 +150,7 @@ describe("MCP Tools Integration", () => {
 	});
 
 	test("index_repository tool queues indexing", async () => {
+		// localPath not supported via MCP - see #412
 		const response = await fetch(`${baseUrl}/mcp`, {
 			method: "POST",
 			headers,
@@ -162,7 +163,6 @@ describe("MCP Tools Integration", () => {
 					arguments: {
 						repository: "test/repo",
 						ref: "main",
-						localPath: ".",
 					},
 				},
 			}),
