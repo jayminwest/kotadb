@@ -1,10 +1,10 @@
+import type { Reference } from "@indexer/reference-extractor";
+import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
+import { createLogger } from "@logging/logger.js";
 import type { IndexRequest, IndexedFile } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
-import type { Reference } from "@indexer/reference-extractor";
 import { getInstallationForRepository } from "../github/installation-lookup";
 import { Sentry } from "../instrument.js";
-import { createLogger } from "@logging/logger.js";
 
 const logger = createLogger({ module: "api-queries" });
 
@@ -92,10 +92,7 @@ export async function updateIndexRunStatus(
 		updateData.stats = stats;
 	}
 
-	const { error } = await client
-		.from("index_jobs")
-		.update(updateData)
-		.eq("id", id);
+	const { error } = await client.from("index_jobs").update(updateData).eq("id", id);
 
 	if (error) {
 		throw new Error(`Failed to update index run status: ${error.message}`);
@@ -342,9 +339,7 @@ export async function searchFiles(
 			.eq("project_id", options.projectId);
 
 		if (projectError) {
-			throw new Error(
-				`Failed to fetch project repositories: ${projectError.message}`,
-			);
+			throw new Error(`Failed to fetch project repositories: ${projectError.message}`);
 		}
 
 		repositoryIds = projectRepos?.map((pr) => pr.repository_id) ?? [];
@@ -380,8 +375,7 @@ export async function searchFiles(
 		projectRoot: row.repository_id, // Keep compatibility with existing API
 		path: row.path,
 		content: row.content,
-		dependencies:
-			(row.metadata as { dependencies?: string[] })?.dependencies ?? [],
+		dependencies: (row.metadata as { dependencies?: string[] })?.dependencies ?? [],
 		indexedAt: new Date(row.indexed_at),
 	}));
 }
@@ -414,8 +408,7 @@ export async function listRecentFiles(
 		projectRoot: row.repository_id, // Keep compatibility with existing API
 		path: row.path,
 		content: row.content,
-		dependencies:
-			(row.metadata as { dependencies?: string[] })?.dependencies ?? [],
+		dependencies: (row.metadata as { dependencies?: string[] })?.dependencies ?? [],
 		indexedAt: new Date(row.indexed_at),
 	}));
 }
@@ -579,9 +572,7 @@ export async function runIndexingWorkflow(
 	const { extractSymbols } = await import("@indexer/symbol-extractor");
 	const { extractReferences } = await import("@indexer/reference-extractor");
 	const { extractDependencies } = await import("@indexer/dependency-extractor");
-	const { detectCircularDependencies } = await import(
-		"@indexer/circular-detector"
-	);
+	const { detectCircularDependencies } = await import("@indexer/circular-detector");
 
 	// Fetch repository metadata to get installation_id for GitHub App authentication (Issue #430)
 	const { data: repoData, error: repoError } = await client
@@ -618,9 +609,7 @@ export async function runIndexingWorkflow(
 
 	const sources = await discoverSources(repo.localPath);
 	const records = (
-		await Promise.all(
-			sources.map((source) => parseSourceFile(source, repo.localPath)),
-		)
+		await Promise.all(sources.map((source) => parseSourceFile(source, repo.localPath)))
 	).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
 
 	await saveIndexedFiles(client, records, userId, repositoryId);
@@ -669,11 +658,7 @@ export async function runIndexingWorkflow(
 			}));
 
 			const symbolCount = await storeSymbols(client, symbols, fileRecord.id);
-			const referenceCount = await storeReferences(
-				client,
-				references,
-				fileRecord.id,
-			);
+			const referenceCount = await storeReferences(client, references, fileRecord.id);
 
 			// Collect for dependency extraction (after storing to get IDs)
 			// Re-fetch stored symbols with their database IDs
@@ -683,19 +668,21 @@ export async function runIndexingWorkflow(
 				.eq("file_id", fileRecord.id);
 
 			if (storedSymbols) {
-				allSymbolsWithFileId.push(...storedSymbols.map((s) => ({
-					id: s.id,
-					file_id: s.file_id,
-					name: s.name,
-					kind: s.kind,
-					lineStart: s.line_start,
-					lineEnd: s.line_end,
-					columnStart: s.metadata?.column_start || 0,
-					columnEnd: s.metadata?.column_end || 0,
-					signature: s.signature,
-					documentation: s.documentation,
-					isExported: s.metadata?.is_exported || false,
-				})));
+				allSymbolsWithFileId.push(
+					...storedSymbols.map((s) => ({
+						id: s.id,
+						file_id: s.file_id,
+						name: s.name,
+						kind: s.kind,
+						lineStart: s.line_start,
+						lineEnd: s.line_end,
+						columnStart: s.metadata?.column_start || 0,
+						columnEnd: s.metadata?.column_end || 0,
+						signature: s.signature,
+						documentation: s.documentation,
+						isExported: s.metadata?.is_exported || false,
+					})),
+				);
 			}
 
 			allReferencesWithFileId.push(...referencesWithFileId);
@@ -704,14 +691,8 @@ export async function runIndexingWorkflow(
 		}),
 	);
 
-	const totalSymbols = extractionStats.reduce(
-		(sum, stat) => sum + stat.symbols,
-		0,
-	);
-	const totalReferences = extractionStats.reduce(
-		(sum, stat) => sum + stat.references,
-		0,
-	);
+	const totalSymbols = extractionStats.reduce((sum, stat) => sum + stat.symbols, 0);
+	const totalReferences = extractionStats.reduce((sum, stat) => sum + stat.references, 0);
 
 	// Extract dependency graph from collected symbols and references
 	logger.info("Extracting dependency graph", {
@@ -727,30 +708,20 @@ export async function runIndexingWorkflow(
 	);
 
 	// Store dependency edges
-	const dependencyCount = await storeDependencies(
-		client,
-		dependencies,
-		repositoryId,
-	);
+	const dependencyCount = await storeDependencies(client, dependencies, repositoryId);
 
 	// Detect circular dependencies and log warnings
 	const filePathById = new Map(filesWithId.map((f) => [f.id!, f.path]));
-	const symbolNameById = new Map(
-		allSymbolsWithFileId.map((s) => [s.id, s.name]),
-	);
+	const symbolNameById = new Map(allSymbolsWithFileId.map((s) => [s.id, s.name]));
 
-	const circularChains = detectCircularDependencies(
-		dependencies,
-		filePathById,
-		symbolNameById,
-	);
+	const circularChains = detectCircularDependencies(dependencies, filePathById, symbolNameById);
 
 	if (circularChains.length > 0) {
 		logger.warn("Circular dependency chains detected", {
 			chainCount: circularChains.length,
 			repositoryId,
 			runId,
-			chains: circularChains.map(c => ({
+			chains: circularChains.map((c) => ({
 				type: c.type,
 				description: c.description,
 			})),
@@ -783,9 +754,7 @@ export async function createDefaultOrganization(
 	userEmail?: string,
 ): Promise<string> {
 	// Generate org slug from user email or use generic slug
-	const slug = userEmail
-		? `${userEmail.split('@')[0]}-org`
-		: `user-${userId.substring(0, 8)}-org`;
+	const slug = userEmail ? `${userEmail.split("@")[0]}-org` : `user-${userId.substring(0, 8)}-org`;
 
 	// Insert organization record
 	const { data: org, error: orgError } = await client
@@ -803,13 +772,11 @@ export async function createDefaultOrganization(
 	}
 
 	// Insert user_organizations record to link user to org
-	const { error: userOrgError } = await client
-		.from("user_organizations")
-		.insert({
-			user_id: userId,
-			org_id: org.id,
-			role: "owner",
-		});
+	const { error: userOrgError } = await client.from("user_organizations").insert({
+		user_id: userId,
+		org_id: org.id,
+		role: "owner",
+	});
 
 	if (userOrgError) {
 		throw new Error(`Failed to link user to organization: ${userOrgError.message}`);
@@ -880,6 +847,56 @@ export interface DependencyResult {
 }
 
 /**
+ * Index job status response structure.
+ * Matches the database schema for index_jobs table.
+ */
+export interface IndexJobStatus {
+	id: string;
+	repository_id: string;
+	ref: string | null;
+	status: "pending" | "running" | "completed" | "failed" | "skipped";
+	started_at: string | null;
+	completed_at: string | null;
+	error_message: string | null;
+	stats: {
+		files_indexed?: number;
+		symbols_extracted?: number;
+		references_extracted?: number;
+		dependencies_extracted?: number;
+		circular_dependencies_detected?: number;
+	} | null;
+	retry_count: number | null;
+	created_at: string;
+}
+
+/**
+ * Query the status of an index job by its ID.
+ * RLS is enforced via the Supabase client context.
+ *
+ * @param client - Supabase client instance
+ * @param jobId - Index job UUID
+ * @returns Index job status or null if not found
+ */
+export async function getIndexJobStatus(
+	client: SupabaseClient,
+	jobId: string,
+): Promise<IndexJobStatus | null> {
+	const { data, error } = await client
+		.from("index_jobs")
+		.select(
+			"id, repository_id, ref, status, started_at, completed_at, error_message, stats, retry_count, created_at",
+		)
+		.eq("id", jobId)
+		.maybeSingle();
+
+	if (error) {
+		throw new Error(`Failed to fetch job status: ${error.message}`);
+	}
+
+	return data as IndexJobStatus | null;
+}
+
+/**
  * Query files that depend on the given file (reverse lookup).
  * Finds files that import or reference the target file.
  *
@@ -912,9 +929,7 @@ export async function queryDependents(
 		// Build query for files that depend on currentFileId
 		const { data, error } = await client
 			.from("dependency_graph")
-			.select(
-				"from_file_id, indexed_files!dependency_graph_from_file_id_fkey(id, path)",
-			)
+			.select("from_file_id, indexed_files!dependency_graph_from_file_id_fkey(id, path)")
 			.eq("to_file_id", currentFileId)
 			.eq("dependency_type", "file_import");
 
@@ -933,10 +948,7 @@ export async function queryDependents(
 			if (!file) continue;
 
 			// Filter test files if requested
-			if (
-				!includeTests &&
-				(file.path.includes("test") || file.path.includes("spec"))
-			) {
+			if (!includeTests && (file.path.includes("test") || file.path.includes("spec"))) {
 				continue;
 			}
 
@@ -1015,9 +1027,7 @@ export async function queryDependencies(
 		// Build query for files that currentFileId depends on
 		const { data, error } = await client
 			.from("dependency_graph")
-			.select(
-				"to_file_id, indexed_files!dependency_graph_to_file_id_fkey(id, path)",
-			)
+			.select("to_file_id, indexed_files!dependency_graph_to_file_id_fkey(id, path)")
 			.eq("from_file_id", currentFileId)
 			.eq("dependency_type", "file_import");
 

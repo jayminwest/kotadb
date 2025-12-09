@@ -6,42 +6,41 @@
  * simple HTTP transport (no SSE streaming, no npx wrapper needed).
  */
 
-import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
-import {
-	CallToolRequestSchema,
-	ListToolsRequestSchema,
-} from "@modelcontextprotocol/sdk/types.js";
+import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
 import type { SupabaseClient } from "@supabase/supabase-js";
+import { Sentry } from "../instrument.js";
 import {
+	ADD_REPOSITORY_TO_PROJECT_TOOL,
+	ANALYZE_CHANGE_IMPACT_TOOL,
+	CREATE_PROJECT_TOOL,
+	DELETE_PROJECT_TOOL,
+	GET_INDEX_JOB_STATUS_TOOL,
+	GET_PROJECT_TOOL,
 	INDEX_REPOSITORY_TOOL,
+	LIST_PROJECTS_TOOL,
 	LIST_RECENT_FILES_TOOL,
+	REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 	SEARCH_CODE_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
-	ANALYZE_CHANGE_IMPACT_TOOL,
-	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
-	CREATE_PROJECT_TOOL,
-	LIST_PROJECTS_TOOL,
-	GET_PROJECT_TOOL,
 	UPDATE_PROJECT_TOOL,
-	DELETE_PROJECT_TOOL,
-	ADD_REPOSITORY_TO_PROJECT_TOOL,
-	REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
+	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
+	executeAddRepositoryToProject,
+	executeAnalyzeChangeImpact,
+	executeCreateProject,
+	executeDeleteProject,
+	executeGetIndexJobStatus,
+	executeGetProject,
 	executeIndexRepository,
+	executeListProjects,
 	executeListRecentFiles,
+	executeRemoveRepositoryFromProject,
 	executeSearchCode,
 	executeSearchDependencies,
-	executeAnalyzeChangeImpact,
-	executeValidateImplementationSpec,
-	executeCreateProject,
-	executeListProjects,
-	executeGetProject,
 	executeUpdateProject,
-	executeDeleteProject,
-	executeAddRepositoryToProject,
-	executeRemoveRepositoryFromProject,
+	executeValidateImplementationSpec,
 } from "./tools";
 
 const logger = createLogger({ module: "mcp-server" });
@@ -87,6 +86,7 @@ export function createMcpServer(context: McpServerContext): Server {
 				DELETE_PROJECT_TOOL,
 				ADD_REPOSITORY_TO_PROJECT_TOOL,
 				REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
+				GET_INDEX_JOB_STATUS_TOOL,
 			],
 		};
 	});
@@ -149,65 +149,76 @@ export function createMcpServer(context: McpServerContext): Server {
 						context.userId,
 					);
 					break;
-			case "create_project":
-				result = await executeCreateProject(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "list_projects":
-				result = await executeListProjects(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "get_project":
-				result = await executeGetProject(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "update_project":
-				result = await executeUpdateProject(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "delete_project":
-				result = await executeDeleteProject(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "add_repository_to_project":
-				result = await executeAddRepositoryToProject(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
-			case "remove_repository_from_project":
-				result = await executeRemoveRepositoryFromProject(
-					context.supabase,
-					toolArgs,
-					"", // requestId not used
-					context.userId,
-				);
-				break;
+				case "create_project":
+					result = await executeCreateProject(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "list_projects":
+					result = await executeListProjects(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "get_project":
+					result = await executeGetProject(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "update_project":
+					result = await executeUpdateProject(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "delete_project":
+					result = await executeDeleteProject(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "add_repository_to_project":
+					result = await executeAddRepositoryToProject(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "remove_repository_from_project":
+					result = await executeRemoveRepositoryFromProject(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "get_index_job_status":
+					result = await executeGetIndexJobStatus(
+						context.supabase,
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
 				default:
 					const error = new Error(`Unknown tool: ${name}`);
-					logger.error("Unknown MCP tool requested", error, { tool_name: name, user_id: context.userId });
+					logger.error("Unknown MCP tool requested", error, {
+						tool_name: name,
+						user_id: context.userId,
+					});
 					Sentry.captureException(error, {
 						tags: { tool_name: name, user_id: context.userId },
 					});
@@ -216,10 +227,14 @@ export function createMcpServer(context: McpServerContext): Server {
 
 			logger.debug("MCP tool call succeeded", { tool_name: name, user_id: context.userId });
 		} catch (error) {
-			logger.error("MCP tool call failed", error instanceof Error ? error : new Error(String(error)), {
-				tool_name: name,
-				user_id: context.userId,
-			});
+			logger.error(
+				"MCP tool call failed",
+				error instanceof Error ? error : new Error(String(error)),
+				{
+					tool_name: name,
+					user_id: context.userId,
+				},
+			);
 			Sentry.captureException(error, {
 				tags: { tool_name: name, user_id: context.userId },
 			});

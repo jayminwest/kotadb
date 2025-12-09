@@ -2,38 +2,35 @@
  * MCP tool definitions and execution adapters
  */
 
-import { Sentry } from "../instrument.js";
-import { createLogger } from "@logging/logger.js";
 import {
+	addRepositoryToProject,
+	createProject,
+	deleteProject,
+	getProject,
+	listProjects,
+	removeRepositoryFromProject,
+	updateProject,
+} from "@api/projects";
+import {
+	type DependencyResult,
 	ensureRepository,
+	getIndexJobStatus,
 	listRecentFiles,
+	queryDependencies,
+	queryDependents,
 	recordIndexRun,
+	resolveFilePath,
 	runIndexingWorkflow,
 	searchFiles,
 	updateIndexRunStatus,
-	resolveFilePath,
-	queryDependents,
-	queryDependencies,
-	type DependencyResult,
 } from "@api/queries";
-import {
-	createProject,
-	listProjects,
-	getProject,
-	updateProject,
-	deleteProject,
-	addRepositoryToProject,
-	removeRepositoryFromProject,
-} from "@api/projects";
 import { buildSnippet } from "@indexer/extractors";
-import type {
-	IndexRequest,
-	ChangeImpactRequest,
-	ImplementationSpec,
-} from "@shared/types";
+import { createLogger } from "@logging/logger.js";
+import type { ChangeImpactRequest, ImplementationSpec, IndexRequest } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
-import { invalidParams } from "./jsonrpc";
+import { Sentry } from "../instrument.js";
 import { analyzeChangeImpact } from "./impact-analysis";
+import { invalidParams } from "./jsonrpc";
 import { validateImplementationSpec } from "./spec-validation";
 
 const logger = createLogger({ module: "mcp-tools" });
@@ -75,8 +72,7 @@ export const SEARCH_CODE_TOOL: ToolDefinition = {
 			},
 			limit: {
 				type: "number",
-				description:
-					"Optional: Maximum number of results (default: 20, max: 100)",
+				description: "Optional: Maximum number of results (default: 20, max: 100)",
 			},
 		},
 		required: ["term"],
@@ -95,18 +91,15 @@ export const INDEX_REPOSITORY_TOOL: ToolDefinition = {
 		properties: {
 			repository: {
 				type: "string",
-				description:
-					"Repository identifier (e.g., 'owner/repo' or full git URL)",
+				description: "Repository identifier (e.g., 'owner/repo' or full git URL)",
 			},
 			ref: {
 				type: "string",
-				description:
-					"Optional: Git ref/branch to checkout (default: main/master)",
+				description: "Optional: Git ref/branch to checkout (default: main/master)",
 			},
 			localPath: {
 				type: "string",
-				description:
-					"Optional: Use a local directory instead of cloning from git",
+				description: "Optional: Use a local directory instead of cloning from git",
 			},
 		},
 		required: ["repository"],
@@ -125,8 +118,7 @@ export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
 		properties: {
 			limit: {
 				type: "number",
-				description:
-					"Optional: Maximum number of files to return (default: 10)",
+				description: "Optional: Maximum number of files to return (default: 10)",
 			},
 		},
 	},
@@ -144,8 +136,7 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
 		properties: {
 			file_path: {
 				type: "string",
-				description:
-					"Relative file path within the repository (e.g., 'src/auth/context.ts')",
+				description: "Relative file path within the repository (e.g., 'src/auth/context.ts')",
 			},
 			direction: {
 				type: "string",
@@ -165,8 +156,7 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
 			},
 			repository: {
 				type: "string",
-				description:
-					"Repository ID to search within. Required for multi-repository workspaces.",
+				description: "Repository ID to search within. Required for multi-repository workspaces.",
 			},
 		},
 		required: ["file_path"],
@@ -307,8 +297,7 @@ export const VALIDATE_IMPLEMENTATION_SPEC_TOOL: ToolDefinition = {
  */
 export const CREATE_PROJECT_TOOL: ToolDefinition = {
 	name: "create_project",
-	description:
-		"Create a new project with optional repository associations.",
+	description: "Create a new project with optional repository associations.",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -335,8 +324,7 @@ export const CREATE_PROJECT_TOOL: ToolDefinition = {
  */
 export const LIST_PROJECTS_TOOL: ToolDefinition = {
 	name: "list_projects",
-	description:
-		"List all projects for the authenticated user with repository counts.",
+	description: "List all projects for the authenticated user with repository counts.",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -353,8 +341,7 @@ export const LIST_PROJECTS_TOOL: ToolDefinition = {
  */
 export const GET_PROJECT_TOOL: ToolDefinition = {
 	name: "get_project",
-	description:
-		"Get project details with full repository list. Accepts project UUID or name.",
+	description: "Get project details with full repository list. Accepts project UUID or name.",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -372,8 +359,7 @@ export const GET_PROJECT_TOOL: ToolDefinition = {
  */
 export const UPDATE_PROJECT_TOOL: ToolDefinition = {
 	name: "update_project",
-	description:
-		"Update project name, description, and/or repository associations.",
+	description: "Update project name, description, and/or repository associations.",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -404,8 +390,7 @@ export const UPDATE_PROJECT_TOOL: ToolDefinition = {
  */
 export const DELETE_PROJECT_TOOL: ToolDefinition = {
 	name: "delete_project",
-	description:
-		"Delete project (cascade deletes associations, repositories remain indexed).",
+	description: "Delete project (cascade deletes associations, repositories remain indexed).",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -423,8 +408,7 @@ export const DELETE_PROJECT_TOOL: ToolDefinition = {
  */
 export const ADD_REPOSITORY_TO_PROJECT_TOOL: ToolDefinition = {
 	name: "add_repository_to_project",
-	description:
-		"Add a repository to a project (idempotent).",
+	description: "Add a repository to a project (idempotent).",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -446,8 +430,7 @@ export const ADD_REPOSITORY_TO_PROJECT_TOOL: ToolDefinition = {
  */
 export const REMOVE_REPOSITORY_FROM_PROJECT_TOOL: ToolDefinition = {
 	name: "remove_repository_from_project",
-	description:
-		"Remove a repository from a project (idempotent).",
+	description: "Remove a repository from a project (idempotent).",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -461,6 +444,33 @@ export const REMOVE_REPOSITORY_FROM_PROJECT_TOOL: ToolDefinition = {
 			},
 		},
 		required: ["project", "repository_id"],
+	},
+};
+
+/**
+ * Tool: get_index_job_status
+ */
+export const GET_INDEX_JOB_STATUS_TOOL: ToolDefinition = {
+	name: "get_index_job_status",
+	description: `Query the status of an indexing job by runId. Returns current status, progress stats, and completion details.
+
+Poll this tool every 5-10 seconds to track job progress. Stop polling when status is 'completed', 'failed', or 'skipped'.
+
+Typical indexing times:
+- Small repos (<100 files): 10-30 seconds
+- Medium repos (100-1000 files): 30-120 seconds
+- Large repos (>1000 files): 2-10 minutes
+
+RLS enforced: You can only query jobs you created.`,
+	inputSchema: {
+		type: "object",
+		properties: {
+			runId: {
+				type: "string",
+				description: "The UUID of the indexing job (returned by index_repository)",
+			},
+		},
+		required: ["runId"],
 	},
 };
 
@@ -482,6 +492,7 @@ export function getToolDefinitions(): ToolDefinition[] {
 		DELETE_PROJECT_TOOL,
 		ADD_REPOSITORY_TO_PROJECT_TOOL,
 		REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
+		GET_INDEX_JOB_STATUS_TOOL,
 	];
 }
 
@@ -494,10 +505,8 @@ function isSearchParams(
 	if (typeof params !== "object" || params === null) return false;
 	const p = params as Record<string, unknown>;
 	if (typeof p.term !== "string") return false;
-	if (p.project !== undefined && typeof p.project !== "string")
-		return false;
-	if (p.repository !== undefined && typeof p.repository !== "string")
-		return false;
+	if (p.project !== undefined && typeof p.project !== "string") return false;
+	if (p.repository !== undefined && typeof p.repository !== "string") return false;
 	if (p.limit !== undefined && typeof p.limit !== "number") return false;
 	return true;
 }
@@ -509,14 +518,11 @@ function isIndexParams(
 	const p = params as Record<string, unknown>;
 	if (typeof p.repository !== "string") return false;
 	if (p.ref !== undefined && typeof p.ref !== "string") return false;
-	if (p.localPath !== undefined && typeof p.localPath !== "string")
-		return false;
+	if (p.localPath !== undefined && typeof p.localPath !== "string") return false;
 	return true;
 }
 
-function isListRecentParams(
-	params: unknown,
-): params is { limit?: number } | undefined {
+function isListRecentParams(params: unknown): params is { limit?: number } | undefined {
 	if (params === undefined) return true;
 	if (typeof params !== "object" || params === null) return false;
 	const p = params as Record<string, unknown>;
@@ -539,8 +545,7 @@ async function resolveProjectId(
 	projectIdentifier: string,
 ): Promise<string> {
 	// Try UUID regex match first
-	const uuidRegex =
-		/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 	if (uuidRegex.test(projectIdentifier)) {
 		// Direct UUID lookup
 		const { data: project, error } = await supabase
@@ -749,40 +754,35 @@ export async function executeIndexRepository(
 
 	// Ensure repository exists in database
 	const repositoryId = await ensureRepository(supabase, userId, indexRequest);
-	const runId = await recordIndexRun(
-		supabase,
-		indexRequest,
-		userId,
-		repositoryId,
-	);
+	const runId = await recordIndexRun(supabase, indexRequest, userId, repositoryId);
 
 	// Queue async indexing workflow
 	queueMicrotask(() =>
-		runIndexingWorkflow(
-			supabase,
-			indexRequest,
-			runId,
-			userId,
-			repositoryId,
-		).catch((error) => {
-			logger.error("Indexing workflow failed", error instanceof Error ? error : new Error(String(error)), {
-				run_id: runId,
-				user_id: userId,
-				repository_id: repositoryId,
-			});
+		runIndexingWorkflow(supabase, indexRequest, runId, userId, repositoryId).catch((error) => {
+			logger.error(
+				"Indexing workflow failed",
+				error instanceof Error ? error : new Error(String(error)),
+				{
+					run_id: runId,
+					user_id: userId,
+					repository_id: repositoryId,
+				},
+			);
 			Sentry.captureException(error, {
 				tags: { run_id: runId, user_id: userId, repository_id: repositoryId },
 			});
-			updateIndexRunStatus(supabase, runId, "failed", error.message).catch(
-				(err) => {
-					logger.error("Failed to update index run status", err instanceof Error ? err : new Error(String(err)), {
+			updateIndexRunStatus(supabase, runId, "failed", error.message).catch((err) => {
+				logger.error(
+					"Failed to update index run status",
+					err instanceof Error ? err : new Error(String(err)),
+					{
 						run_id: runId,
-					});
-					Sentry.captureException(err, {
-						tags: { run_id: runId },
-					});
-				},
-			);
+					},
+				);
+				Sentry.captureException(err, {
+					tags: { run_id: runId },
+				});
+			});
 		}),
 	);
 
@@ -803,16 +803,11 @@ export async function executeListRecentFiles(
 	userId: string,
 ): Promise<unknown> {
 	if (!isListRecentParams(params)) {
-		throw invalidParams(
-			requestId,
-			"Invalid parameters for list_recent_files tool",
-		);
+		throw invalidParams(requestId, "Invalid parameters for list_recent_files tool");
 	}
 
 	const limit =
-		params && typeof params === "object" && "limit" in params
-			? (params.limit as number)
-			: 10;
+		params && typeof params === "object" && "limit" in params ? (params.limit as number) : 10;
 	const files = await listRecentFiles(supabase, limit, userId);
 
 	return {
@@ -855,9 +850,7 @@ export async function executeSearchDependencies(
 		typeof p.direction === "string" &&
 		!["dependents", "dependencies", "both"].includes(p.direction)
 	) {
-		throw new Error(
-			"Parameter 'direction' must be one of: dependents, dependencies, both",
-		);
+		throw new Error("Parameter 'direction' must be one of: dependents, dependencies, both");
 	}
 
 	if (p.depth !== undefined) {
@@ -911,12 +904,7 @@ export async function executeSearchDependencies(
 	}
 
 	// Resolve file path to file ID
-	const fileId = await resolveFilePath(
-		supabase,
-		validatedParams.file_path,
-		repositoryId,
-		userId,
-	);
+	const fileId = await resolveFilePath(supabase, validatedParams.file_path, repositoryId, userId);
 
 	if (!fileId) {
 		return {
@@ -931,10 +919,7 @@ export async function executeSearchDependencies(
 	let dependents: DependencyResult | null = null;
 	let dependencies: DependencyResult | null = null;
 
-	if (
-		validatedParams.direction === "dependents" ||
-		validatedParams.direction === "both"
-	) {
+	if (validatedParams.direction === "dependents" || validatedParams.direction === "both") {
 		dependents = await queryDependents(
 			supabase,
 			fileId,
@@ -944,16 +929,8 @@ export async function executeSearchDependencies(
 		);
 	}
 
-	if (
-		validatedParams.direction === "dependencies" ||
-		validatedParams.direction === "both"
-	) {
-		dependencies = await queryDependencies(
-			supabase,
-			fileId,
-			validatedParams.depth,
-			userId,
-		);
+	if (validatedParams.direction === "dependencies" || validatedParams.direction === "both") {
+		dependencies = await queryDependencies(supabase, fileId, validatedParams.depth, userId);
 	}
 
 	// Build response
@@ -970,10 +947,7 @@ export async function executeSearchDependencies(
 			cycles: dependents.cycles,
 			count:
 				dependents.direct.length +
-				Object.values(dependents.indirect).reduce(
-					(sum, arr) => sum + arr.length,
-					0,
-				),
+				Object.values(dependents.indirect).reduce((sum, arr) => sum + arr.length, 0),
 		};
 	}
 
@@ -984,10 +958,7 @@ export async function executeSearchDependencies(
 			cycles: dependencies.cycles,
 			count:
 				dependencies.direct.length +
-				Object.values(dependencies.indirect).reduce(
-					(sum, arr) => sum + arr.length,
-					0,
-				),
+				Object.values(dependencies.indirect).reduce((sum, arr) => sum + arr.length, 0),
 		};
 	}
 
@@ -1018,9 +989,7 @@ export async function executeAnalyzeChangeImpact(
 		throw new Error("Parameter 'change_type' must be a string");
 	}
 	if (!["feature", "refactor", "fix", "chore"].includes(p.change_type)) {
-		throw new Error(
-			"Parameter 'change_type' must be one of: feature, refactor, fix, chore",
-		);
+		throw new Error("Parameter 'change_type' must be one of: feature, refactor, fix, chore");
 	}
 
 	if (p.description === undefined) {
@@ -1040,10 +1009,7 @@ export async function executeAnalyzeChangeImpact(
 	if (p.files_to_delete !== undefined && !Array.isArray(p.files_to_delete)) {
 		throw new Error("Parameter 'files_to_delete' must be an array");
 	}
-	if (
-		p.breaking_changes !== undefined &&
-		typeof p.breaking_changes !== "boolean"
-	) {
+	if (p.breaking_changes !== undefined && typeof p.breaking_changes !== "boolean") {
 		throw new Error("Parameter 'breaking_changes' must be a boolean");
 	}
 	if (p.repository !== undefined && typeof p.repository !== "string") {
@@ -1060,11 +1026,7 @@ export async function executeAnalyzeChangeImpact(
 		repository: p.repository as string | undefined,
 	};
 
-	const result = await analyzeChangeImpact(
-		supabase,
-		validatedParams,
-		userId,
-	);
+	const result = await analyzeChangeImpact(supabase, validatedParams, userId);
 
 	return result;
 }
@@ -1103,16 +1065,10 @@ export async function executeValidateImplementationSpec(
 	if (p.migrations !== undefined && !Array.isArray(p.migrations)) {
 		throw new Error("Parameter 'migrations' must be an array");
 	}
-	if (
-		p.dependencies_to_add !== undefined &&
-		!Array.isArray(p.dependencies_to_add)
-	) {
+	if (p.dependencies_to_add !== undefined && !Array.isArray(p.dependencies_to_add)) {
 		throw new Error("Parameter 'dependencies_to_add' must be an array");
 	}
-	if (
-		p.breaking_changes !== undefined &&
-		typeof p.breaking_changes !== "boolean"
-	) {
+	if (p.breaking_changes !== undefined && typeof p.breaking_changes !== "boolean") {
 		throw new Error("Parameter 'breaking_changes' must be a boolean");
 	}
 	if (p.repository !== undefined && typeof p.repository !== "string") {
@@ -1129,11 +1085,7 @@ export async function executeValidateImplementationSpec(
 		repository: p.repository as string | undefined,
 	};
 
-	const result = await validateImplementationSpec(
-		supabase,
-		validatedParams,
-		userId,
-	);
+	const result = await validateImplementationSpec(supabase, validatedParams, userId);
 
 	return result;
 }
@@ -1237,11 +1189,7 @@ export async function executeGetProject(
 	}
 
 	// Resolve project identifier
-	const projectId = await resolveProjectId(
-		supabase,
-		userId,
-		p.project as string,
-	);
+	const projectId = await resolveProjectId(supabase, userId, p.project as string);
 
 	// Get project details
 	const project = await getProject(supabase, userId, projectId);
@@ -1278,14 +1226,8 @@ export async function executeUpdateProject(
 	}
 
 	// Validate at least one update field is present
-	if (
-		p.name === undefined &&
-		p.description === undefined &&
-		p.repository_ids === undefined
-	) {
-		throw new Error(
-			"At least one update field required: name, description, or repository_ids",
-		);
+	if (p.name === undefined && p.description === undefined && p.repository_ids === undefined) {
+		throw new Error("At least one update field required: name, description, or repository_ids");
 	}
 
 	// Validate optional parameters
@@ -1300,11 +1242,7 @@ export async function executeUpdateProject(
 	}
 
 	// Resolve project identifier
-	const projectId = await resolveProjectId(
-		supabase,
-		userId,
-		p.project as string,
-	);
+	const projectId = await resolveProjectId(supabase, userId, p.project as string);
 
 	// Update project
 	await updateProject(supabase, userId, projectId, {
@@ -1344,11 +1282,7 @@ export async function executeDeleteProject(
 	}
 
 	// Resolve project identifier
-	const projectId = await resolveProjectId(
-		supabase,
-		userId,
-		p.project as string,
-	);
+	const projectId = await resolveProjectId(supabase, userId, p.project as string);
 
 	// Delete project
 	await deleteProject(supabase, userId, projectId);
@@ -1390,11 +1324,7 @@ export async function executeAddRepositoryToProject(
 	}
 
 	// Resolve project identifier
-	const projectId = await resolveProjectId(
-		supabase,
-		userId,
-		p.project as string,
-	);
+	const projectId = await resolveProjectId(supabase, userId, p.project as string);
 
 	// Verify repository exists and belongs to user
 	const { data: repository, error: repoError } = await supabase
@@ -1418,12 +1348,7 @@ export async function executeAddRepositoryToProject(
 	}
 
 	// Add repository to project
-	await addRepositoryToProject(
-		supabase,
-		userId,
-		projectId,
-		p.repository_id as string,
-	);
+	await addRepositoryToProject(supabase, userId, projectId, p.repository_id as string);
 
 	return {
 		success: true,
@@ -1462,23 +1387,65 @@ export async function executeRemoveRepositoryFromProject(
 	}
 
 	// Resolve project identifier
-	const projectId = await resolveProjectId(
-		supabase,
-		userId,
-		p.project as string,
-	);
+	const projectId = await resolveProjectId(supabase, userId, p.project as string);
 
 	// Remove repository from project
-	await removeRepositoryFromProject(
-		supabase,
-		userId,
-		projectId,
-		p.repository_id as string,
-	);
+	await removeRepositoryFromProject(supabase, userId, projectId, p.repository_id as string);
 
 	return {
 		success: true,
 		message: "Repository removed from project",
+	};
+}
+
+/**
+ * Execute get_index_job_status tool
+ */
+export async function executeGetIndexJobStatus(
+	supabase: SupabaseClient,
+	params: unknown,
+	_requestId: string | number,
+	_userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: runId
+	if (p.runId === undefined) {
+		throw new Error("Missing required parameter: runId");
+	}
+	if (typeof p.runId !== "string") {
+		throw new Error("Parameter 'runId' must be a string");
+	}
+
+	// Validate UUID format
+	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+	if (!uuidRegex.test(p.runId)) {
+		throw new Error("Parameter 'runId' must be a valid UUID");
+	}
+
+	// Query job status (RLS enforced via supabase client)
+	const job = await getIndexJobStatus(supabase, p.runId);
+
+	if (!job) {
+		throw new Error("Job not found or access denied");
+	}
+
+	return {
+		runId: job.id,
+		status: job.status,
+		repository_id: job.repository_id,
+		ref: job.ref,
+		started_at: job.started_at,
+		completed_at: job.completed_at,
+		error_message: job.error_message,
+		stats: job.stats,
+		retry_count: job.retry_count,
+		created_at: job.created_at,
 	};
 }
 
@@ -1500,26 +1467,11 @@ export async function handleToolCall(
 		case "list_recent_files":
 			return await executeListRecentFiles(supabase, params, requestId, userId);
 		case "search_dependencies":
-			return await executeSearchDependencies(
-				supabase,
-				params,
-				requestId,
-				userId,
-			);
+			return await executeSearchDependencies(supabase, params, requestId, userId);
 		case "analyze_change_impact":
-			return await executeAnalyzeChangeImpact(
-				supabase,
-				params,
-				requestId,
-				userId,
-			);
+			return await executeAnalyzeChangeImpact(supabase, params, requestId, userId);
 		case "validate_implementation_spec":
-			return await executeValidateImplementationSpec(
-				supabase,
-				params,
-				requestId,
-				userId,
-			);
+			return await executeValidateImplementationSpec(supabase, params, requestId, userId);
 		case "create_project":
 			return await executeCreateProject(supabase, params, requestId, userId);
 		case "list_projects":
@@ -1531,19 +1483,11 @@ export async function handleToolCall(
 		case "delete_project":
 			return await executeDeleteProject(supabase, params, requestId, userId);
 		case "add_repository_to_project":
-			return await executeAddRepositoryToProject(
-				supabase,
-				params,
-				requestId,
-				userId,
-			);
+			return await executeAddRepositoryToProject(supabase, params, requestId, userId);
 		case "remove_repository_from_project":
-			return await executeRemoveRepositoryFromProject(
-				supabase,
-				params,
-				requestId,
-				userId,
-			);
+			return await executeRemoveRepositoryFromProject(supabase, params, requestId, userId);
+		case "get_index_job_status":
+			return await executeGetIndexJobStatus(supabase, params, requestId, userId);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}

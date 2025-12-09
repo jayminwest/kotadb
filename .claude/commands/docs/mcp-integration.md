@@ -14,7 +14,7 @@ Location: `app/src/mcp/`
 MCP server factory using official `@modelcontextprotocol/sdk` (v1.20+):
 
 - Creates per-request Server instances for user isolation (stateless mode)
-- Registers 13 tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`, `analyze_change_impact`, `validate_implementation_spec`, `create_project`, `list_projects`, `get_project`, `update_project`, `delete_project`, `add_repository_to_project`, `remove_repository_from_project`
+- Registers 14 tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`, `analyze_change_impact`, `validate_implementation_spec`, `create_project`, `list_projects`, `get_project`, `update_project`, `delete_project`, `add_repository_to_project`, `remove_repository_from_project`, `get_index_job_status`
 - Uses `StreamableHTTPServerTransport` with `enableJsonResponse: true` for simple JSON-RPC over HTTP
 - No SSE streaming or session management (stateless design)
 
@@ -56,6 +56,60 @@ Index a git repository by cloning/updating and extracting code files.
 - `localPath` (optional): Use local directory instead of cloning
 
 **Returns:** Run ID to track progress
+
+### get_index_job_status
+
+Query the status of an indexing job by runId. Use this to poll progress after calling `index_repository`.
+
+**Parameters:**
+- `runId` (required): The UUID of the indexing job (returned by `index_repository`)
+
+**Returns:** Job status with progress details:
+- `runId`: Job UUID
+- `status`: Current status ('pending' | 'running' | 'completed' | 'failed' | 'skipped')
+- `repository_id`: Repository UUID being indexed
+- `ref`: Git ref being indexed
+- `started_at`: ISO timestamp when job started (null if pending)
+- `completed_at`: ISO timestamp when job finished (null if still running)
+- `error_message`: Error details if status is 'failed'
+- `stats`: Indexing statistics object:
+  - `files_indexed`: Number of files processed
+  - `symbols_extracted`: Number of symbols extracted
+  - `references_extracted`: Number of references found
+  - `dependencies_extracted`: Number of dependencies mapped
+  - `circular_dependencies_detected`: Number of circular dependencies found
+- `retry_count`: Number of retry attempts
+- `created_at`: ISO timestamp when job was created
+
+**Polling Best Practices:**
+- Poll every 5-10 seconds to track job progress
+- Stop polling when status is 'completed', 'failed', or 'skipped'
+- Typical indexing times:
+  - Small repos (<100 files): 10-30 seconds
+  - Medium repos (100-1000 files): 30-120 seconds
+  - Large repos (>1000 files): 2-10 minutes
+
+**Example Workflow:**
+```json
+// 1. Start indexing
+{
+  "name": "index_repository",
+  "arguments": { "repository": "owner/repo" }
+}
+// Returns: { "runId": "550e8400-...", "status": "pending" }
+
+// 2. Poll for status
+{
+  "name": "get_index_job_status",
+  "arguments": { "runId": "550e8400-..." }
+}
+// Returns: { "runId": "...", "status": "running", "stats": {...} }
+
+// 3. Continue polling until completed/failed/skipped
+// 4. Once completed, use search_code to query the indexed repository
+```
+
+**RLS enforced:** Users can only query jobs for repositories they own.
 
 ### list_recent_files
 
