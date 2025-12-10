@@ -133,6 +133,13 @@ KotaDB is a code intelligence API (Bun + TypeScript + Supabase) powering AI deve
 |---------|---------|
 | `/validation:resolve_failed_validation` | Fix validation failures |
 
+### Expert Orchestrators
+| Command | Purpose |
+|---------|---------|
+| `/experts:orchestrators:orchestrator` | Multi-phase workflow (scout, plan, build, review, validate) |
+| `/experts:orchestrators:planning_council` | Multi-expert planning analysis |
+| `/experts:orchestrators:review_panel` | Multi-expert code review |
+
 ## Common Workflows
 
 **New Feature**:

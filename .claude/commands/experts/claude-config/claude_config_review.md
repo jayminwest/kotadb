@@ -36,6 +36,9 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Orchestrator phase parameters not documented in argument-hint (discovered #490)
 - Tier 2 orchestrators without consistent response format (discovered #491)
 - Layer-specific docs not referenced in CLAUDE.md when added (discovered #491)
+- Hook timeout values inconsistent between PostToolUse and UserPromptSubmit (discovered #508)
+- Hook matcher patterns not using pipe operator for multiple tool names (discovered #508)
+- settings.json environment variable format inconsistency (discovered #508)
 
 **Pattern Violations to Flag:**
 - Command files without required frontmatter (description, Template Category, Prompt Level)
@@ -66,13 +69,15 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Template Category: Message-Only, Path Resolution, Action, or Structured Data (required, added #474)
 - Prompt Level: 1-7 based on complexity (1=static, 7=self-modifying with reasoning, required, added #474)
 
-**settings.json Validation (Added #485, #486):**
+**settings.json Validation (Updated #508, added #485, #486):**
 - Valid JSON syntax (no trailing commas, discovered #486)
 - Hook commands reference existing scripts in .claude/hooks/
-- Timeout values are reasonable (10-120 seconds, discovered #485)
-- Matcher patterns are correctly formatted as regex (discovered #485)
+- Timeout values in milliseconds (45000-10000 range, discovered #508)
+- Matcher patterns using pipe operator for multiple tools (Write|Edit, discovered #508)
+- Environment variables use $CLAUDE_PROJECT_DIR format (discovered #508)
 - statusLine configuration points to valid python script (discovered #486)
 - Hooks include PostToolUse and UserPromptSubmit sections (discovered #485)
+- Multiple hooks per hook type allowed with sequential execution (discovered #508)
 
 **Orchestrator Command Configuration (Added #490, #491):**
 - Multi-phase orchestrators have clear phase definitions in output documentation

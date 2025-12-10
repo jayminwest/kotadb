@@ -27,6 +27,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Missing Sentry.captureException() in try-catch blocks (added after ed4c4f9)
 - Using console.* instead of @logging/logger (added after #436)
 - Missing idempotency in relationship operations (add/remove should succeed if already in desired state) (added after #470)
+- MCP tool handlers missing setUserContext() call for RLS enforcement (added after #508)
 
 **Important Concerns (COMMENT level):**
 - Large files (>300 lines) that should be split

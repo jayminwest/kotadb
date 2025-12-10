@@ -98,8 +98,26 @@ USER_PROMPT: $ARGUMENTS
 **Pagination for Large Datasets:**
 - Use `.range(start, end)` for queries >1000 rows (Supabase default limit)
 - Process in batches (1000-row chunks recommended)
-- Log pagination progress for observability
-- Pattern used in: Pass 2 file queries in indexer (#473)
+
+### MCP RLS Context Pattern (added after #508)
+
+**User Context Enforcement in MCP Tools:**
+- Each MCP tool handler must call `setUserContext(supabase, userId)` before operations
+- Ensures RLS policies apply correctly to all database queries
+- Pattern: `await setUserContext(supabase, userId);` at start of execute function
+- Applied to all 7 project CRUD tools: create, list, get, update, delete, add_repository, remove_repository
+- Provides RLS boundary enforcement for multi-tenant operations
+
+### Job Status Polling Pattern (added after #502)
+
+**Asynchronous Indexing Job Tracking:**
+- `index_repository` tool returns `run_id` for tracking long-running operations
+- New `get_index_job_status` MCP tool enables polling job progress without blocking
+- Tool queries `index_runs` table for status: pending, in_progress, completed, failed
+- Returns: `{ run_id, status, progress: { pass, files_processed, files_total }, created_at, updated_at }`
+- Polling pattern: Agents call get_index_job_status every 5-10 seconds with run_id
+- Supports event-driven workflows where agents monitor job lifecycle
+- Applied in test suite: `get-index-job-status.test.ts` (271 lines, full RLS coverage)
 
 ### MCP Tool Architecture (added after #470)
 

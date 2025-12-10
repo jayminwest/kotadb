@@ -129,3 +129,9 @@ The Planning Council produces ONE synthesized analysis, NOT separate reports per
 - **Creating multiple output files**: Planning Council produces ONE synthesized analysis
 - **Omitting expert sources**: Always attribute recommendations to specific expert domains
 - **Skipping cross-cutting analysis**: Cross-domain concerns are the primary value-add
+
+## References
+
+- **Orchestrator**: `.claude/commands/experts/orchestrators/orchestrator.md`
+- **Implementation Guide**: `docs/implementation-guides/orchestrator-implementation.md`
+- **Review Panel**: `.claude/commands/experts/orchestrators/review_panel.md`

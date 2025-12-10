@@ -101,6 +101,15 @@ USER_PROMPT: $ARGUMENTS
 - CLAUDE.md references `Layer-Specific Documentation` section
 - Enables conditional guidance based on codebase layer
 
+**settings.json Hook Configuration Pattern (Updated after #508):**
+- Hook structure: PostToolUse and UserPromptSubmit with matcher patterns
+- Matcher types: tool names (Write|Edit), empty string for all prompts, regex patterns
+- Timeout values: milliseconds (45000 for PostToolUse, 10000 for UserPromptSubmit)
+- Hook commands use environment variable: `$CLAUDE_PROJECT_DIR` for path resolution
+- Multiple hooks per hook type with sequential execution
+- PostToolUse: Triggered after Write/Edit operations for linting
+- UserPromptSubmit: Triggered before processing user input for context building
+
 **Anti-Patterns Discovered:**
 - CLAUDE.md with outdated command references (discovered #491)
 - settings.json with invalid JSON syntax or commented-out code (discovered #486)
@@ -112,6 +121,8 @@ USER_PROMPT: $ARGUMENTS
 - Hardcoded paths in CLAUDE.md instead of command references (discovered #482)
 - Orchestrator prompts with inconsistent phase definitions (discovered #490)
 - Multi-tier update strategies without clear responsibility boundaries (addressed #491)
+- Hook timeout values as raw seconds instead of milliseconds (discovered #508)
+- Hook matcher patterns without pipe operator for multiple tool names (discovered #508)
 
 ### Command Registration Patterns
 

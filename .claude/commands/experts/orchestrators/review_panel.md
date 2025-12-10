@@ -144,3 +144,9 @@ The Review Panel produces ONE consolidated review, NOT separate reviews per expe
 **With bulk-update.md:**
 - Review Panel patterns improve through `improve_orchestrators` command
 - Cross-cutting findings inform expert knowledge base updates
+
+## References
+
+- **Orchestrator**: `.claude/commands/experts/orchestrators/orchestrator.md`
+- **Implementation Guide**: `docs/implementation-guides/orchestrator-implementation.md`
+- **Planning Council**: `.claude/commands/experts/orchestrators/planning_council.md`
