@@ -229,6 +229,39 @@ class ADWState:
         """
         return self.auto_merge_enabled is True
 
+    @classmethod
+    def find_by_issue(cls, issue_number: str) -> Optional["ADWState"]:
+        """Find latest ADW state for given issue number.
+
+        Args:
+            issue_number: GitHub issue number to search for
+
+        Returns:
+            Most recent ADWState matching the issue number, or None if not found
+
+        Note:
+            Returns the most recently modified state file when multiple matches exist.
+        """
+        agents_dir = agents_root()
+        matching_states: list[tuple[ADWState, float]] = []
+
+        for state_file in agents_dir.glob("*/adw_state.json"):
+            try:
+                adw_id = state_file.parent.name
+                state = cls.load(adw_id)
+                if state.issue_number == issue_number:
+                    mtime = state_file.stat().st_mtime
+                    matching_states.append((state, mtime))
+            except (StateNotFoundError, json.JSONDecodeError, OSError) as exc:
+                logger.debug(f"Skipping invalid state file {state_file}: {exc}")
+                continue
+
+        if not matching_states:
+            return None
+
+        # Return most recent state
+        return max(matching_states, key=lambda x: x[1])[0]
+
 
 def ensure_adw_id(existing: str | None = None) -> str:
     """Return an existing ADW id or generate a new one."""
