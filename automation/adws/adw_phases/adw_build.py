@@ -84,28 +84,67 @@ def check_env(logger: logging.Logger) -> None:
         sys.exit(1)
 
 
-def parse_args(argv: list[str]) -> tuple[str, str]:
-    if len(argv) < 3:
-        sys.stderr.write("Usage: uv run adws/adw_build.py <issue-number> <adw-id>" + "\n")
+def parse_args(argv: list[str]) -> tuple[str, str | None]:
+    if len(argv) < 2:
+        sys.stderr.write("Usage: uv run adws/adw_build.py <issue-number> [adw-id]" + "\n")
         sys.exit(1)
-    return argv[1], argv[2]
+    issue_number = argv[1]
+    adw_id = argv[2] if len(argv) > 2 else None
+    return issue_number, adw_id
 
 
-def load_state(adw_id: str, logger: logging.Logger) -> ADWState:
-    try:
-        return ADWState.load(adw_id)
-    except StateNotFoundError:
-        logger.error(f"No state found for ADW ID {adw_id}. Run adws/adw_plan.py first.")
-        sys.exit(1)
+def load_state(issue_number: str, adw_id: str | None, logger: logging.Logger) -> ADWState:
+    """Load ADW state by explicit ID or auto-discover from issue number.
+
+    Args:
+        issue_number: GitHub issue number
+        adw_id: Explicit ADW ID (takes precedence) or None for auto-discovery
+        logger: Logger instance
+
+    Returns:
+        ADWState instance
+
+    Raises:
+        SystemExit: If state cannot be found or loaded
+    """
+    if adw_id:
+        # Explicit adw_id provided - use it directly
+        try:
+            state = ADWState.load(adw_id)
+            logger.info(f"Loaded state for explicit adw_id: {adw_id}")
+            return state
+        except StateNotFoundError:
+            logger.error(f"No state found for ADW ID {adw_id}. Run adws/adw_plan.py first.")
+            sys.exit(1)
+    else:
+        # Auto-discover adw_id from issue number
+        found_state = ADWState.find_by_issue(issue_number)
+        if not found_state:
+            logger.error(f"No ADW state found for issue #{issue_number}. Run adws/adw_plan.py first or provide explicit adw_id.")
+            sys.exit(1)
+        logger.info(f"Auto-discovered adw_id: {found_state.adw_id} for issue #{issue_number}")
+        return found_state
 
 
 def main() -> None:
     load_adw_env()
-    issue_number, adw_id = parse_args(sys.argv)
+    issue_number, parsed_adw_id = parse_args(sys.argv)
+
+    # Load state (auto-discover if adw_id not provided)
+    # Create temporary logger for state loading
+    temp_logger = logging.getLogger('temp_state_loader')
+    temp_logger.setLevel(logging.INFO)
+    handler = logging.StreamHandler(sys.stdout)
+    temp_logger.addHandler(handler)
+
+    state = load_state(issue_number, parsed_adw_id, temp_logger)
+
+    # Extract adw_id from state (guaranteed to exist)
+    adw_id = state.adw_id
+
+    # Now create the proper logger with the discovered/provided adw_id
     logger = start_logger(adw_id, "adw_build")
     logger.info(f"Build phase start | issue #{issue_number} | adw_id={adw_id}")
-
-    state = load_state(adw_id, logger)
     if state.issue_number:
         issue_number = state.issue_number
 
