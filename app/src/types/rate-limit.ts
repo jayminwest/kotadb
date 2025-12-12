@@ -59,22 +59,30 @@ export interface RateLimitConfig {
 }
 
 /**
+ * Import centralized rate limit configuration.
+ * Re-exported for backward compatibility.
+ */
+import { RATE_LIMITS as CONFIG_RATE_LIMITS } from "@config/constants";
+
+/**
  * Standard hourly rate limit configurations by tier.
  * Updated in #423 to support realistic development workflows.
+ * Re-exported from @config/constants for convenience.
  */
 export const RATE_LIMITS: Record<Tier, number> = {
-	free: 1000,
-	solo: 5000,
-	team: 25000,
+	free: CONFIG_RATE_LIMITS.FREE.HOURLY,
+	solo: CONFIG_RATE_LIMITS.SOLO.HOURLY,
+	team: CONFIG_RATE_LIMITS.TEAM.HOURLY,
 };
 
 /**
  * Daily rate limit configurations by tier.
  * Provides cost protection while enabling burst usage patterns.
  * Both hourly and daily limits are enforced; whichever is reached first blocks requests.
+ * Re-exported from @config/constants for convenience.
  */
 export const DAILY_RATE_LIMITS: Record<Tier, number> = {
-	free: 5000,
-	solo: 25000,
-	team: 100000,
+	free: CONFIG_RATE_LIMITS.FREE.DAILY,
+	solo: CONFIG_RATE_LIMITS.SOLO.DAILY,
+	team: CONFIG_RATE_LIMITS.TEAM.DAILY,
 };

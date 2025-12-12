@@ -16,7 +16,6 @@
 import { describe, expect, it } from "bun:test";
 import { clearCache } from "@auth/cache";
 import {
-	TIER_RATE_LIMITS,
 	generateApiKey,
 	generateKeyId,
 	generateSecret,
@@ -24,6 +23,7 @@ import {
 import { parseApiKey, validateApiKey } from "@auth/validator";
 import { getServiceClient } from "@db/client";
 import { TEST_USER_IDS } from "../helpers/db";
+import { RATE_LIMITS, RETRY_CONFIG } from "@config/constants";
 
 describe("API Key Generation", () => {
 	describe("generateKeyId", () => {
@@ -116,7 +116,7 @@ describe("API Key Generation", () => {
 			expect(result.apiKey).toMatch(/^kota_free_[A-Za-z0-9]{12}_[0-9a-f]{36}$/);
 			expect(result.keyId).toHaveLength(12);
 			expect(result.tier).toBe("free");
-			expect(result.rateLimitPerHour).toBe(TIER_RATE_LIMITS.free);
+			expect(result.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 			expect(result.createdAt).toBeInstanceOf(Date);
 		});
 
@@ -129,7 +129,7 @@ describe("API Key Generation", () => {
 			expect(result).toBeDefined();
 			expect(result.apiKey).toMatch(/^kota_solo_[A-Za-z0-9]{12}_[0-9a-f]{36}$/);
 			expect(result.tier).toBe("solo");
-			expect(result.rateLimitPerHour).toBe(TIER_RATE_LIMITS.solo);
+			expect(result.rateLimitPerHour).toBe(RATE_LIMITS.SOLO.HOURLY);
 		});
 
 		it("generates valid team tier key", async () => {
@@ -141,7 +141,7 @@ describe("API Key Generation", () => {
 			expect(result).toBeDefined();
 			expect(result.apiKey).toMatch(/^kota_team_[A-Za-z0-9]{12}_[0-9a-f]{36}$/);
 			expect(result.tier).toBe("team");
-			expect(result.rateLimitPerHour).toBe(TIER_RATE_LIMITS.team);
+			expect(result.rateLimitPerHour).toBe(RATE_LIMITS.TEAM.HOURLY);
 		});
 
 		it("generates unique keys on repeated calls", async () => {
@@ -177,9 +177,9 @@ describe("API Key Generation", () => {
 			expect(data).toBeDefined();
 			expect(data?.secret_hash).toBeDefined();
 
-			// Bcrypt hashes start with $2a$10$ or $2b$10$ (algorithm identifier + cost)
+			// Bcrypt hashes start with $2a$ or $2b$ followed by the cost parameter
 			// bcryptjs library uses $2b$ variant
-			expect(data?.secret_hash).toMatch(/^\$2[ab]\$10\$/);
+			expect(data?.secret_hash).toMatch(new RegExp(`^\\$2[ab]\\$${RETRY_CONFIG.BCRYPT_ROUNDS}\\$`));
 
 			// Hash should NOT match plaintext secret
 			const secret = result.apiKey.split("_")[3];
@@ -205,7 +205,7 @@ describe("API Key Generation", () => {
 			expect(data?.user_id).toBe(TEST_USER_IDS.solo);
 			expect(data?.key_id).toBe(result.keyId);
 			expect(data?.tier).toBe("solo");
-			expect(data?.rate_limit_per_hour).toBe(TIER_RATE_LIMITS.solo);
+			expect(data?.rate_limit_per_hour).toBe(RATE_LIMITS.SOLO.HOURLY);
 			expect(data?.enabled).toBe(true);
 			expect(data?.created_at).toBeDefined();
 		});
@@ -224,9 +224,9 @@ describe("API Key Generation", () => {
 				tier: "team",
 			});
 
-			expect(freeKey.rateLimitPerHour).toBe(1000);
-			expect(soloKey.rateLimitPerHour).toBe(5000);
-			expect(teamKey.rateLimitPerHour).toBe(25000);
+			expect(freeKey.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
+			expect(soloKey.rateLimitPerHour).toBe(RATE_LIMITS.SOLO.HOURLY);
+			expect(teamKey.rateLimitPerHour).toBe(RATE_LIMITS.TEAM.HOURLY);
 		});
 
 		it("integrates with validateApiKey successfully", async () => {
@@ -255,7 +255,7 @@ describe("API Key Generation", () => {
 			expect(validated?.userId).toBe(TEST_USER_IDS.free);
 			expect(validated?.tier).toBe("free");
 			expect(validated?.keyId).toBe(generated.keyId);
-			expect(validated?.rateLimitPerHour).toBe(TIER_RATE_LIMITS.free);
+			expect(validated?.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 		});
 
 		it("generated keys parse correctly", () => {

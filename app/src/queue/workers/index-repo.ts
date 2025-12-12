@@ -45,6 +45,7 @@ import {
 } from "@indexer/storage";
 import { createLogger } from "@logging/logger";
 import { createJobContext } from "@logging/context";
+import { INDEXER_CONFIG } from "@config/constants";
 
 /**
  * Start the indexing worker pool
@@ -292,7 +293,7 @@ async function processIndexJob(
 		);
 
 		// Query database to get files with IDs (paginated to avoid Supabase 1000-row limit)
-		const FILE_QUERY_BATCH_SIZE = 1000;
+		const FILE_QUERY_BATCH_SIZE = INDEXER_CONFIG.FILE_QUERY_BATCH_SIZE;
 		const storedFiles: Array<{ id: string; path: string; content: string; language: string }> = [];
 		let fileOffset = 0;
 

@@ -9,6 +9,7 @@
 import { App } from "@octokit/app";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { CACHE_CONFIG } from "@config/constants";
 import type {
 	CachedToken,
 	GitHubAppConfig,
@@ -24,9 +25,6 @@ const tokenCache = new Map<number, CachedToken>();
 
 // Token refresh threshold: 5 minutes before expiry (in milliseconds)
 const REFRESH_THRESHOLD_MS = 5 * 60 * 1000;
-
-// Cache size limit to prevent memory leaks
-const MAX_CACHE_SIZE = 1000;
 
 // Cache eviction age: 24 hours of inactivity
 const CACHE_EVICTION_AGE_MS = 24 * 60 * 60 * 1000;
@@ -116,7 +114,7 @@ function evictStaleTokens(): void {
  * Enforce cache size limit by removing oldest entries
  */
 function enforceCacheSizeLimit(): void {
-	if (tokenCache.size <= MAX_CACHE_SIZE) {
+	if (tokenCache.size <= CACHE_CONFIG.MAX_SIZE) {
 		return;
 	}
 
@@ -124,7 +122,7 @@ function enforceCacheSizeLimit(): void {
 	const sorted = Array.from(lastAccessTime.entries()).sort(
 		(a, b) => a[1] - b[1],
 	);
-	const toRemove = sorted.slice(0, tokenCache.size - MAX_CACHE_SIZE);
+	const toRemove = sorted.slice(0, tokenCache.size - CACHE_CONFIG.MAX_SIZE);
 
 	for (const [installationId] of toRemove) {
 		tokenCache.delete(installationId);
