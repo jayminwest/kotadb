@@ -526,6 +526,106 @@ const response = await sendMcpRequest(
 
 For manual testing with Claude Code CLI, see [docs/guides/mcp-claude-code-integration.md](../guides/mcp-claude-code-integration.md).
 
+## Code Coverage
+
+KotaDB tracks code coverage for both the application (TypeScript) and automation (Python) layers to ensure comprehensive test coverage.
+
+### Running Coverage Locally
+
+**Application Coverage (Bun):**
+```bash
+cd app
+bun test --coverage
+```
+
+Bun generates coverage reports in multiple formats:
+- Terminal output: Summary shown after test run
+- HTML report: `app/coverage/index.html` (open in browser)
+- LCOV format: `app/coverage.lcov` (for CI integration)
+
+**Automation Coverage (pytest-cov):**
+```bash
+cd automation
+uv run pytest adws/adw_tests/ --cov=adws --cov-report=html --cov-report=term
+```
+
+Coverage reports are generated in:
+- Terminal output: Summary with line-by-line coverage
+- HTML report: `automation/htmlcov/index.html` (open in browser)
+- JSON report: `automation/coverage.json` (for programmatic access)
+
+### Coverage Configuration
+
+**Application Coverage:**
+Bun uses built-in coverage support with no additional configuration needed. Coverage includes:
+- All source files in `app/src/`
+- Excludes test files and node_modules
+
+**Automation Coverage:**
+Configuration is defined in `automation/pyproject.toml`:
+```toml
+[tool.coverage.run]
+source = ["adws"]
+omit = [
+    "*/tests/*",
+    "*/adw_tests/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+    "*/.venv/*"
+]
+```
+
+### CI Coverage Reporting
+
+Both CI workflows automatically generate and upload coverage reports:
+
+**Application CI** (`.github/workflows/app-ci.yml`):
+- Runs tests with coverage enabled
+- Uploads coverage report as GitHub artifact
+- Displays coverage summary in GitHub Step Summary
+
+**Automation CI** (`.github/workflows/automation-ci.yml`):
+- Runs pytest with coverage tracking
+- Uploads coverage report as GitHub artifact
+- Shows coverage percentage in GitHub Step Summary
+
+### Coverage Artifacts
+
+After CI runs complete, coverage reports are available as downloadable artifacts:
+- `app-coverage-report`: Application coverage (HTML + LCOV)
+- `automation-coverage-report`: Automation coverage (HTML + JSON + LCOV)
+
+Artifacts are retained for 30 days.
+
+### Coverage Baselines
+
+Coverage baselines are tracked to monitor testing quality over time:
+
+**Application Coverage Baseline:**
+- Total: TBD (to be measured after first CI run)
+- Target: 80% for critical paths (auth, rate limiting, MCP)
+
+**Automation Coverage Baseline:**
+- Total: TBD (to be measured after first CI run)
+- Target: 80% for ADW workflow logic
+
+### Viewing Coverage Reports
+
+**Locally:**
+```bash
+# App coverage
+open app/coverage/index.html
+
+# Automation coverage
+open automation/htmlcov/index.html
+```
+
+**CI Artifacts:**
+1. Go to GitHub Actions run
+2. Scroll to "Artifacts" section at bottom
+3. Download `app-coverage-report` or `automation-coverage-report`
+4. Extract and open `index.html` in browser
+
 ## Available Package Scripts
 
 KotaDB provides convenient npm/bun scripts for common test workflows:

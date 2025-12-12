@@ -53,5 +53,39 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
-      - name: Run pytest suite
-        run: uv run pytest adws/adw_tests/ -v --tb=short
+      - name: Run pytest suite with coverage
+        run: |
+          uv run pytest adws/adw_tests/ -v --tb=short \
+            --cov=adws \
+            --cov-report=term \
+            --cov-report=json \
+            --cov-report=html \
+            --cov-report=lcov
+
+      - name: Generate coverage summary
+        if: always()
+        working-directory: automation
+        run: |
+          echo "## Automation Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage.json ]; then
+            # Extract coverage percentage from coverage.json
+            COVERAGE=$(python3 -c "import json; data=json.load(open('coverage.json')); print(f\"{data['totals']['percent_covered']:.2f}%\")" 2>/dev/null || echo "N/A")
+            echo "**Total Coverage:** $COVERAGE" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Full coverage details available in artifacts." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage report not found." >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload automation coverage report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-coverage-report
+          path: |
+            automation/.coverage
+            automation/coverage.json
+            automation/htmlcov/
+            automation/coverage.lcov
+          retention-days: 30

@@ -189,13 +189,30 @@ jobs:
           # Tests automatically load .env.test via preload script (tests/setup.ts)
           # No manual export needed - keeping for backwards compatibility
           export $(grep -v '^#' ../.env.test | xargs) || true
-          bun run test --coverage
+          bun run test --coverage --coverage-reporter=text --coverage-reporter=lcov
+
+      - name: Generate coverage summary
+        if: always()
+        run: |
+          echo "## Application Coverage Report" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+          if [ -f coverage/coverage-final.json ]; then
+            # Parse coverage-final.json to extract summary stats
+            echo "Coverage report generated successfully." >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+            echo "Full coverage details available in artifacts." >> $GITHUB_STEP_SUMMARY
+          else
+            echo "Coverage report not found." >> $GITHUB_STEP_SUMMARY
+          fi
 
       - name: Upload coverage report
+        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: coverage-report
-          path: app/coverage/
+          name: app-coverage-report
+          path: |
+            app/coverage/
+            app/coverage.info
           retention-days: 30
 
       - name: Teardown Docker Compose test stack

@@ -14,6 +14,10 @@ web/out
 # code coverage
 coverage
 *.lcov
+htmlcov/
+.coverage
+coverage.json
+coverage.info
 
 # logs
 logs

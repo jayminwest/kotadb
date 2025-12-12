@@ -6,6 +6,7 @@ requires-python = ">=3.12"
 dependencies = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.23.0",
+    "pytest-cov>=6.0.0",
     "pydantic>=2.0.0",
     "python-dotenv>=1.0.0",
     "httpx>=0.27.0",
@@ -30,6 +31,27 @@ markers = [
 
 [tool.uv]
 dev-dependencies = []
+
+[tool.coverage.run]
+source = ["adws"]
+omit = [
+    "*/tests/*",
+    "*/adw_tests/*",
+    "*/__pycache__/*",
+    "*/site-packages/*",
+    "*/.venv/*"
+]
+
+[tool.coverage.report]
+precision = 2
+show_missing = true
+skip_covered = false
+
+[tool.coverage.html]
+directory = "htmlcov"
+
+[tool.coverage.json]
+output = "coverage.json"
 
 [tool.ruff]
 # Enforce stdout/stderr standards by blocking print() usage
