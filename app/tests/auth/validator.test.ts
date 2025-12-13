@@ -18,6 +18,7 @@ import { clearCache } from "@auth/cache";
 import { parseApiKey, validateApiKey, validateJwtToken } from "@auth/validator";
 import { getTestApiKey, TEST_USER_IDS } from "../helpers/db";
 import { getServiceClient } from "@db/client";
+import { RATE_LIMITS } from "@config/constants";
 
 describe("API Key Validator", () => {
 	beforeEach(() => {
@@ -133,7 +134,7 @@ describe("API Key Validator", () => {
 			expect(result?.userId).toBeDefined();
 			expect(result?.tier).toBe("free");
 			expect(result?.keyId).toBe("test1234567890ab");
-			expect(result?.rateLimitPerHour).toBe(100);
+			expect(result?.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 		});
 
 		it("uses cache for repeated validations", async () => {
@@ -250,7 +251,7 @@ describe("API Key Validator", () => {
 			expect(result?.userId).toBe(testUserId);
 			expect(result?.tier).toBe("free");
 			expect(result?.keyId).toBe(`jwt_${testUserId}`);
-			expect(result?.rateLimitPerHour).toBe(100);
+			expect(result?.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 		});
 
 		it("returns null for invalid JWT token", async () => {
@@ -297,7 +298,7 @@ describe("API Key Validator", () => {
 
 			expect(result).not.toBeNull();
 			expect(result?.tier).toBe("free");
-			expect(result?.rateLimitPerHour).toBe(100);
+			expect(result?.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 		});
 
 		it("uses cache for repeated JWT validations", async () => {
@@ -341,7 +342,7 @@ describe("API Key Validator", () => {
 
 			expect(result).not.toBeNull();
 			expect(result?.tier).toBe("solo");
-			expect(result?.rateLimitPerHour).toBe(1000);
+			expect(result?.rateLimitPerHour).toBe(RATE_LIMITS.SOLO.HOURLY);
 		});
 
 		it("defaults to free tier for canceled subscription", async () => {
@@ -363,7 +364,7 @@ describe("API Key Validator", () => {
 
 			expect(result).not.toBeNull();
 			expect(result?.tier).toBe("free");
-			expect(result?.rateLimitPerHour).toBe(100);
+			expect(result?.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 		});
 
 		it("generates synthetic keyId for JWT auth", async () => {

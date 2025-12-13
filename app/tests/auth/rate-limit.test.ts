@@ -14,6 +14,7 @@
 import { describe, expect, it } from "bun:test";
 import { enforceRateLimit } from "@auth/rate-limit";
 import { resetAllRateLimitCounters } from "../helpers/db";
+import { RATE_LIMITS } from "@config/constants";
 
 describe("Rate Limiting", () => {
 	// Use unique key IDs per test to avoid interference
@@ -28,8 +29,8 @@ describe("Rate Limiting", () => {
 			const result = await enforceRateLimit(keyId, "free");
 
 			expect(result.allowed).toBe(true);
-			expect(result.remaining).toBe(999); // Min of hourly (999) and daily (4999)
-			expect(result.limit).toBe(1000); // Free tier hourly limit
+			expect(result.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 1); // Min of hourly (999) and daily (4999)
+			expect(result.limit).toBe(RATE_LIMITS.FREE.HOURLY); // Free tier hourly limit
 			expect(result.resetAt).toBeGreaterThan(Math.floor(Date.now() / 1000));
 			expect(result.retryAfter).toBeUndefined();
 
@@ -41,15 +42,15 @@ describe("Rate Limiting", () => {
 
 			const result1 = await enforceRateLimit(keyId, "free");
 			expect(result1.allowed).toBe(true);
-			expect(result1.remaining).toBe(999);
+			expect(result1.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 1);
 
 			const result2 = await enforceRateLimit(keyId, "free");
 			expect(result2.allowed).toBe(true);
-			expect(result2.remaining).toBe(998);
+			expect(result2.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 2);
 
 			const result3 = await enforceRateLimit(keyId, "free");
 			expect(result3.allowed).toBe(true);
-			expect(result3.remaining).toBe(997);
+			expect(result3.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 3);
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -57,15 +58,15 @@ describe("Rate Limiting", () => {
 		it("allows request at exact hourly limit (1000th request for free tier)", async () => {
 			const keyId = generateTestKeyId();
 
-			// Make 999 requests
-			for (let i = 0; i < 999; i++) {
+			// Make RATE_LIMITS.FREE.HOURLY - 1 requests
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY - 1; i++) {
 				await enforceRateLimit(keyId, "free");
 			}
 
-			// 1000th request should be allowed (at the limit)
+			// Final request should be allowed (at the limit)
 			const result = await enforceRateLimit(keyId, "free");
 			expect(result.allowed).toBe(true);
-			expect(result.remaining).toBe(0); // At hourly limit (1000/1000)
+			expect(result.remaining).toBe(0); // At hourly limit
 			expect(result.retryAfter).toBeUndefined();
 
 			await resetAllRateLimitCounters(keyId);
@@ -74,8 +75,8 @@ describe("Rate Limiting", () => {
 		it("denies request when hourly limit exceeded", async () => {
 			const keyId = generateTestKeyId();
 
-			// Make requests up to hourly limit (1000 for free tier)
-			for (let i = 0; i < 1000; i++) {
+			// Make requests up to hourly limit
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY; i++) {
 				const result = await enforceRateLimit(keyId, "free");
 				expect(result.allowed).toBe(true);
 			}
@@ -96,16 +97,16 @@ describe("Rate Limiting", () => {
 			const teamKeyId = generateTestKeyId();
 
 			const freeResult = await enforceRateLimit(freeKeyId, "free");
-			expect(freeResult.limit).toBe(1000);
-			expect(freeResult.remaining).toBe(999);
+			expect(freeResult.limit).toBe(RATE_LIMITS.FREE.HOURLY);
+			expect(freeResult.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 1);
 
 			const soloResult = await enforceRateLimit(soloKeyId, "solo");
-			expect(soloResult.limit).toBe(5000);
-			expect(soloResult.remaining).toBe(4999);
+			expect(soloResult.limit).toBe(RATE_LIMITS.SOLO.HOURLY);
+			expect(soloResult.remaining).toBe(RATE_LIMITS.SOLO.HOURLY - 1);
 
 			const teamResult = await enforceRateLimit(teamKeyId, "team");
-			expect(teamResult.limit).toBe(25000);
-			expect(teamResult.remaining).toBe(24999);
+			expect(teamResult.limit).toBe(RATE_LIMITS.TEAM.HOURLY);
+			expect(teamResult.remaining).toBe(RATE_LIMITS.TEAM.HOURLY - 1);
 
 			await resetAllRateLimitCounters(freeKeyId);
 			await resetAllRateLimitCounters(soloKeyId);
@@ -128,10 +129,10 @@ describe("Rate Limiting", () => {
 
 			// Verify counters are independent
 			const result1 = await enforceRateLimit(keyId1, "free");
-			expect(result1.remaining).toBe(996); // 4th request
+			expect(result1.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 4); // 4th request
 
 			const result2 = await enforceRateLimit(keyId2, "free");
-			expect(result2.remaining).toBe(994); // 6th request
+			expect(result2.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 6); // 6th request
 
 			await resetAllRateLimitCounters(keyId1);
 			await resetAllRateLimitCounters(keyId2);
@@ -170,7 +171,7 @@ describe("Rate Limiting", () => {
 
 			// Verify final counter state
 			const finalResult = await enforceRateLimit(keyId, "free");
-			expect(finalResult.remaining).toBe(1000 - concurrentRequests - 1);
+			expect(finalResult.remaining).toBe(RATE_LIMITS.FREE.HOURLY - concurrentRequests - 1);
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -192,8 +193,8 @@ describe("Rate Limiting", () => {
 		it("calculates retryAfter correctly when hourly limit exceeded", async () => {
 			const keyId = generateTestKeyId();
 
-			// Exhaust hourly limit (1000 for free tier)
-			for (let i = 0; i < 1000; i++) {
+			// Exhaust hourly limit
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY; i++) {
 				await enforceRateLimit(keyId, "free");
 			}
 
@@ -213,8 +214,8 @@ describe("Rate Limiting", () => {
 		it("enforces limit correctly near boundary (998, 999, 1000, 1001 requests)", async () => {
 			const keyId = generateTestKeyId();
 
-			// Make 997 requests
-			for (let i = 0; i < 997; i++) {
+			// Make RATE_LIMITS.FREE.HOURLY - 3 requests
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY - 3; i++) {
 				await enforceRateLimit(keyId, "free");
 			}
 
@@ -231,7 +232,7 @@ describe("Rate Limiting", () => {
 			// 1000th request (at the limit)
 			const result1000 = await enforceRateLimit(keyId, "free");
 			expect(result1000.allowed).toBe(true);
-			expect(result1000.remaining).toBe(0); // At hourly limit (1000/1000)
+			expect(result1000.remaining).toBe(0); // At hourly limit
 
 			// 1001st request (exceeds hourly limit)
 			const result1001 = await enforceRateLimit(keyId, "free");
@@ -250,7 +251,7 @@ describe("Rate Limiting", () => {
 			const result = await enforceRateLimit(keyId, "free");
 
 			expect(result.allowed).toBe(true);
-			expect(result.remaining).toBe(999); // Min of hourly (999) and daily (4999)
+			expect(result.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 1); // Min of hourly (999) and daily (4999)
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -267,7 +268,7 @@ describe("Rate Limiting", () => {
 			// 11th request should show both counters incremented
 			const result = await enforceRateLimit(keyId, "free");
 			expect(result.allowed).toBe(true);
-			expect(result.remaining).toBe(989); // Min of hourly (989) and daily (4989)
+			expect(result.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 11); // Min of hourly (989) and daily (4989)
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -275,10 +276,10 @@ describe("Rate Limiting", () => {
 		it("allows request at exact daily limit (5000th request for free tier)", async () => {
 			const keyId = generateTestKeyId();
 
-			// Make 4999 requests (simulating requests across multiple hours)
+			// Make RATE_LIMITS.FREE.HOURLY - 1 requests (simulating requests across multiple hours)
 			// This would normally span multiple hours, but for testing we simulate
 			// by incrementing both hourly and daily counters
-			for (let i = 0; i < 999; i++) {
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY - 1; i++) {
 				await enforceRateLimit(keyId, "free");
 			}
 
@@ -286,7 +287,7 @@ describe("Rate Limiting", () => {
 			// We can't easily test crossing into a new hour without time manipulation,
 			// so this test verifies the daily counter increments correctly
 			const result = await enforceRateLimit(keyId, "free");
-			expect(result.allowed).toBe(true); // 1000th request still allowed hourly
+			expect(result.allowed).toBe(true); // Final request still allowed hourly
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -294,21 +295,21 @@ describe("Rate Limiting", () => {
 		it("denies request when daily limit would be exceeded", async () => {
 			const keyId = generateTestKeyId();
 
-			// To properly test daily limit blocking, we'd need to make 5000 requests
+			// To properly test daily limit blocking, we'd need to make RATE_LIMITS.FREE.DAILY requests
 			// across multiple hours. For unit test speed, we verify the logic with
 			// smaller numbers and trust the database function handles larger counts.
-			// Make 1000 requests (hits hourly limit first)
-			for (let i = 0; i < 1000; i++) {
+			// Make RATE_LIMITS.FREE.HOURLY requests (hits hourly limit first)
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY; i++) {
 				await enforceRateLimit(keyId, "free");
 			}
 
-			// 1001st request blocked by hourly limit
+			// Next request blocked by hourly limit
 			const result = await enforceRateLimit(keyId, "free");
 			expect(result.allowed).toBe(false);
 
-			// Both counters incremented to 1001
+			// Both counters incremented to RATE_LIMITS.FREE.HOURLY + 1
 			// If hourly window reset but daily stayed, next request would pass hourly
-			// but eventually hit daily limit at 5001
+			// but eventually hit daily limit at RATE_LIMITS.FREE.DAILY + 1
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -329,10 +330,10 @@ describe("Rate Limiting", () => {
 
 			// Verify daily counters are independent
 			const result1 = await enforceRateLimit(keyId1, "free");
-			expect(result1.remaining).toBe(994); // Min of hourly (994) and daily (4994)
+			expect(result1.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 6); // Min of hourly (994) and daily (4994)
 
 			const result2 = await enforceRateLimit(keyId2, "free");
-			expect(result2.remaining).toBe(989); // Min of hourly (989) and daily (4989)
+			expect(result2.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 11); // Min of hourly (989) and daily (4989)
 
 			await resetAllRateLimitCounters(keyId1);
 			await resetAllRateLimitCounters(keyId2);
@@ -355,7 +356,7 @@ describe("Rate Limiting", () => {
 
 			// Verify final counter state (both hourly and daily should be accurate)
 			const finalResult = await enforceRateLimit(keyId, "free");
-			expect(finalResult.remaining).toBe(1000 - concurrentRequests - 1);
+			expect(finalResult.remaining).toBe(RATE_LIMITS.FREE.HOURLY - concurrentRequests - 1);
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -367,7 +368,7 @@ describe("Rate Limiting", () => {
 
 			// First request: hourly = 999, daily = 4999
 			const result1 = await enforceRateLimit(keyId, "free");
-			expect(result1.remaining).toBe(999); // Hourly is more restrictive
+			expect(result1.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 1); // Hourly is more restrictive
 
 			// After 100 requests total: hourly = 900, daily = 4900
 			for (let i = 0; i < 99; i++) {
@@ -376,7 +377,7 @@ describe("Rate Limiting", () => {
 
 			// 100th request: hourly = 899, daily = 4899
 			const result2 = await enforceRateLimit(keyId, "free");
-			expect(result2.remaining).toBe(899); // Still hourly
+			expect(result2.remaining).toBe(RATE_LIMITS.FREE.HOURLY - 100); // Still hourly
 
 			await resetAllRateLimitCounters(keyId);
 		});
@@ -384,12 +385,12 @@ describe("Rate Limiting", () => {
 		it("hourly limit blocks before daily limit", async () => {
 			const keyId = generateTestKeyId();
 
-			// Exhaust hourly limit (1000 requests)
-			for (let i = 0; i < 1000; i++) {
+			// Exhaust hourly limit
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY; i++) {
 				await enforceRateLimit(keyId, "free");
 			}
 
-			// 1001st request blocked by hourly (daily still has 4000 remaining)
+			// Next request blocked by hourly (daily still has RATE_LIMITS.FREE.DAILY - RATE_LIMITS.FREE.HOURLY remaining)
 			const result = await enforceRateLimit(keyId, "free");
 			expect(result.allowed).toBe(false);
 			expect(result.retryAfter).toBeLessThanOrEqual(3600); // Hourly reset

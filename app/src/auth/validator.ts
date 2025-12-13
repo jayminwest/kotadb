@@ -10,6 +10,7 @@ import { getServiceClient } from "@db/client";
 import bcrypt from "bcryptjs";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { RATE_LIMITS } from "@config/constants";
 
 const logger = createLogger({ module: "auth-validator" });
 
@@ -216,13 +217,8 @@ export async function validateJwtToken(
 			tier = subData.tier as Tier;
 		}
 
-		// Determine rate limit based on tier (updated in #423)
-		const rateLimitMap: Record<Tier, number> = {
-			free: 1000,
-			solo: 5000,
-			team: 25000,
-		};
-		const rateLimitPerHour = rateLimitMap[tier];
+		// Determine rate limit based on tier from centralized config
+		const rateLimitPerHour = RATE_LIMITS[tier.toUpperCase() as keyof typeof RATE_LIMITS].HOURLY;
 
 		// Build validation result
 		const result: ValidateApiKeyResult = {

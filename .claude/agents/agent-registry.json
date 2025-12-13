@@ -79,19 +79,106 @@
         "mcp__kotadb__search_dependencies"
       ],
       "readOnly": true
+    },
+    "branch-plan": {
+      "name": "branch-plan",
+      "description": "Planning coordinator via retrieval agents",
+      "file": "branch/plan.md",
+      "model": "sonnet",
+      "capabilities": ["plan", "research", "investigate", "find"],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "WebFetch",
+        "Task",
+        "mcp__leaf_spawner__spawn_leaf_agent",
+        "mcp__leaf_spawner__get_agent_result",
+        "mcp__leaf_spawner__list_agents"
+      ],
+      "readOnly": true
+    },
+    "branch-build": {
+      "name": "branch-build",
+      "description": "Build coordinator via build agents",
+      "file": "branch/build.md",
+      "model": "sonnet",
+      "capabilities": ["implement", "build", "create", "fix"],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Task",
+        "mcp__leaf_spawner__spawn_leaf_agent",
+        "mcp__leaf_spawner__get_agent_result",
+        "mcp__leaf_spawner__list_agents"
+      ],
+      "readOnly": true
+    },
+    "branch-review": {
+      "name": "branch-review",
+      "description": "Review coordinator via review agents",
+      "file": "branch/review.md",
+      "model": "sonnet",
+      "capabilities": ["review", "verify", "check", "test"],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Task",
+        "mcp__leaf_spawner__spawn_leaf_agent",
+        "mcp__leaf_spawner__get_agent_result",
+        "mcp__leaf_spawner__list_agents"
+      ],
+      "readOnly": true
+    },
+    "branch-meta": {
+      "name": "branch-meta",
+      "description": "Meta coordinator for system updates",
+      "file": "branch/meta.md",
+      "model": "sonnet",
+      "capabilities": ["update", "improve", "configure"],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Task",
+        "mcp__leaf_spawner__spawn_leaf_agent",
+        "mcp__leaf_spawner__get_agent_result",
+        "mcp__leaf_spawner__list_agents"
+      ],
+      "readOnly": true
+    },
+    "leaf-retrieval": {
+      "name": "leaf-retrieval",
+      "description": "Leaf agent for search and retrieval tasks",
+      "file": "leaf/retrieval.md",
+      "model": "haiku",
+      "capabilities": ["search", "read", "find"],
+      "tools": ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
+      "readOnly": true
+    },
+    "leaf-build": {
+      "name": "leaf-build",
+      "description": "Leaf agent for code implementation",
+      "file": "leaf/build.md",
+      "model": "sonnet",
+      "capabilities": ["implement", "write", "edit", "execute"],
+      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
+      "readOnly": false
     }
   },
   "capabilityIndex": {
     "explore": ["scout-agent"],
-    "search": ["scout-agent"],
+    "search": ["scout-agent", "leaf-retrieval"],
     "analyze": ["scout-agent", "review-agent"],
-    "research": ["scout-agent"],
-    "implement": ["build-agent"],
+    "research": ["scout-agent", "branch-plan"],
+    "implement": ["build-agent", "branch-build", "leaf-build"],
     "modify": ["build-agent"],
-    "execute": ["build-agent"],
-    "create": ["build-agent"],
-    "fix": ["build-agent"],
-    "review": ["review-agent"],
+    "execute": ["build-agent", "leaf-build"],
+    "create": ["build-agent", "branch-build"],
+    "fix": ["build-agent", "branch-build"],
+    "review": ["review-agent", "branch-review"],
     "audit": ["review-agent"],
     "quality": ["review-agent"],
     "security": ["review-agent"],
@@ -99,30 +186,46 @@
     "orchestrate": ["orchestrator-agent"],
     "coordinate": ["orchestrator-agent"],
     "delegate": ["orchestrator-agent"],
-    "plan": ["orchestrator-agent"],
-    "synthesize": ["orchestrator-agent"]
+    "plan": ["orchestrator-agent", "branch-plan"],
+    "synthesize": ["orchestrator-agent"],
+    "investigate": ["branch-plan"],
+    "find": ["branch-plan", "leaf-retrieval"],
+    "build": ["branch-build"],
+    "verify": ["branch-review"],
+    "check": ["branch-review"],
+    "test": ["branch-review"],
+    "update": ["branch-meta"],
+    "improve": ["branch-meta"],
+    "configure": ["branch-meta"],
+    "read": ["leaf-retrieval"],
+    "write": ["leaf-build"],
+    "edit": ["leaf-build"]
   },
   "modelIndex": {
-    "haiku": ["scout-agent", "review-agent"],
-    "sonnet": ["build-agent"],
+    "haiku": ["scout-agent", "review-agent", "leaf-retrieval"],
+    "sonnet": ["build-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-build"],
     "opus": ["orchestrator-agent"]
   },
   "toolMatrix": {
-    "Glob": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
-    "Grep": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
-    "Read": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
-    "Edit": ["build-agent"],
-    "Write": ["build-agent"],
-    "Bash": ["build-agent"],
+    "Glob": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build"],
+    "Grep": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build"],
+    "Read": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build"],
+    "Edit": ["build-agent", "leaf-build"],
+    "Write": ["build-agent", "leaf-build"],
+    "Bash": ["build-agent", "leaf-build"],
     "NotebookEdit": ["build-agent"],
-    "Task": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "Task": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta"],
     "TodoWrite": ["build-agent", "orchestrator-agent"],
     "SlashCommand": ["orchestrator-agent"],
     "AskUserQuestion": ["orchestrator-agent"],
-    "WebFetch": ["review-agent"],
+    "WebFetch": ["review-agent", "branch-plan", "leaf-retrieval"],
+    "WebSearch": ["leaf-retrieval"],
     "mcp__kotadb__search_code": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
     "mcp__kotadb__search_dependencies": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
     "mcp__kotadb__list_recent_files": ["scout-agent"],
-    "mcp__kotadb__analyze_change_impact": ["build-agent", "review-agent"]
+    "mcp__kotadb__analyze_change_impact": ["build-agent", "review-agent"],
+    "mcp__leaf_spawner__spawn_leaf_agent": ["branch-plan", "branch-build", "branch-review", "branch-meta"],
+    "mcp__leaf_spawner__get_agent_result": ["branch-plan", "branch-build", "branch-review", "branch-meta"],
+    "mcp__leaf_spawner__list_agents": ["branch-plan", "branch-build", "branch-review", "branch-meta"]
   }
 }

@@ -16,6 +16,7 @@
 		"paths": {
 			"@api/*": ["src/api/*"],
 			"@auth/*": ["src/auth/*"],
+			"@config/*": ["src/config/*"],
 			"@db/*": ["src/db/*"],
 			"@indexer/*": ["src/indexer/*"],
 			"@shared/*": ["../shared/*"],

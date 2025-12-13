@@ -12,18 +12,9 @@ import { getServiceClient } from "@db/client";
 import bcrypt from "bcryptjs";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { RATE_LIMITS, RETRY_CONFIG } from "@config/constants";
 
 const logger = createLogger({ module: "auth-keys" });
-
-/**
- * Rate limit defaults for each tier (requests per hour).
- * Updated in #423 to support realistic development workflows.
- */
-export const TIER_RATE_LIMITS = {
-	free: 1000,
-	solo: 5000,
-	team: 25000,
-} as const;
 
 /**
  * Input parameters for API key generation.
@@ -103,7 +94,7 @@ export function generateSecret(): string {
  * Maximum number of retry attempts for key_id collision handling.
  * With 12-char base64url keyId (~72 bits entropy), collisions are astronomically rare.
  */
-const MAX_COLLISION_RETRIES = 3;
+const MAX_COLLISION_RETRIES = RETRY_CONFIG.MAX_COLLISION_RETRIES;
 
 /**
  * Generate a new API key with database persistence.
@@ -158,8 +149,8 @@ export async function generateApiKey(
 		throw new Error("userId is required and must be a string");
 	}
 
-	// Get rate limit for tier
-	const rateLimitPerHour = TIER_RATE_LIMITS[tier];
+	// Get rate limit for tier from centralized config
+	const rateLimitPerHour = RATE_LIMITS[tier.toUpperCase() as keyof typeof RATE_LIMITS].HOURLY;
 
 	// Retry loop for collision handling
 	let lastError: Error | null = null;
@@ -171,7 +162,7 @@ export async function generateApiKey(
 
 			// Hash secret with bcrypt (10 rounds)
 			// This matches the validator's expectations
-			const secretHash = await bcrypt.hash(secret, 10);
+			const secretHash = await bcrypt.hash(secret, RETRY_CONFIG.BCRYPT_ROUNDS);
 
 			// Construct full key string (format: kota_<tier>_<keyId>_<secret>)
 			const apiKey = `kota_${tier}_${keyId}_${secret}`;

@@ -6,6 +6,7 @@ import {
 	getCachedValidation,
 	setCachedValidation,
 } from "@auth/cache";
+import { CACHE_CONFIG } from "@config/constants";
 
 describe("Auth Cache", () => {
 	beforeEach(() => {
@@ -61,8 +62,8 @@ describe("Auth Cache", () => {
 
 			setCachedValidation("key-abc", entry);
 
-			// Wait for entry to expire (5 seconds + buffer)
-			await new Promise((resolve) => setTimeout(resolve, 5200));
+			// Wait for entry to expire (TTL + buffer)
+			await new Promise((resolve) => setTimeout(resolve, CACHE_CONFIG.TTL_MS + 200));
 
 			const result = getCachedValidation("key-abc");
 			expect(result).toBeNull();
@@ -80,7 +81,7 @@ describe("Auth Cache", () => {
 			expect(getCacheSize()).toBe(1);
 
 			// Wait for expiry
-			await new Promise((resolve) => setTimeout(resolve, 5200));
+			await new Promise((resolve) => setTimeout(resolve, CACHE_CONFIG.TTL_MS + 200));
 
 			getCachedValidation("key-abc");
 			expect(getCacheSize()).toBe(0);
@@ -103,7 +104,7 @@ describe("Auth Cache", () => {
 
 			expect(result).not.toBeNull();
 			expect(result!.expiresAt).toBeGreaterThan(beforeSet);
-			expect(result!.expiresAt).toBeLessThanOrEqual(Date.now() + 5000);
+			expect(result!.expiresAt).toBeLessThanOrEqual(Date.now() + CACHE_CONFIG.TTL_MS);
 		});
 
 		it("handles multiple keys concurrently", () => {
@@ -125,8 +126,8 @@ describe("Auth Cache", () => {
 		});
 
 		it("enforces max cache size limit", () => {
-			// Cache max is 1000, but we'll test eviction logic with smaller set
-			for (let i = 0; i < 1001; i++) {
+			// Cache max is CACHE_CONFIG.MAX_SIZE, but we'll test eviction logic with smaller set
+			for (let i = 0; i < CACHE_CONFIG.MAX_SIZE + 1; i++) {
 				setCachedValidation(`key-${i}`, {
 					userId: `user-${i}`,
 					tier: "free",
@@ -135,11 +136,11 @@ describe("Auth Cache", () => {
 				});
 			}
 
-			// Cache should not exceed 1000
-			expect(getCacheSize()).toBeLessThanOrEqual(1000);
+			// Cache should not exceed CACHE_CONFIG.MAX_SIZE
+			expect(getCacheSize()).toBeLessThanOrEqual(CACHE_CONFIG.MAX_SIZE);
 
 			// Most recent entry should exist
-			const lastEntry = getCachedValidation("key-1000");
+			const lastEntry = getCachedValidation(`key-${CACHE_CONFIG.MAX_SIZE}`);
 			expect(lastEntry).not.toBeNull();
 		});
 

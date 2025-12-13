@@ -14,6 +14,7 @@ import { QUEUE_NAMES } from "@queue/config";
 import type { IndexRepoJobPayload } from "@queue/types";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { THRESHOLDS } from "@config/constants";
 
 const logger = createLogger({ module: "api-auto-reindex" });
 
@@ -21,13 +22,13 @@ const logger = createLogger({ module: "api-auto-reindex" });
  * Default reindex threshold in minutes.
  * Repositories older than this will be reindexed.
  */
-const DEFAULT_REINDEX_THRESHOLD_MINUTES = 60;
+const DEFAULT_REINDEX_THRESHOLD_MINUTES = THRESHOLDS.DEFAULT_REINDEX_THRESHOLD_MINUTES;
 
 /**
  * Rate limit threshold in minutes.
  * Auto-reindex will not trigger again within this window.
  */
-const RATE_LIMIT_THRESHOLD_MINUTES = 30;
+const RATE_LIMIT_THRESHOLD_MINUTES = THRESHOLDS.RATE_LIMIT_THRESHOLD_MINUTES;
 
 /**
  * Auto-reindex result containing triggered job information.

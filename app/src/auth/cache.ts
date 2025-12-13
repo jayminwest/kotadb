@@ -8,6 +8,7 @@
 import type { Tier } from "@shared/types/auth";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { CACHE_CONFIG } from "@config/constants";
 
 const logger = createLogger({ module: "auth-cache" });
 
@@ -23,15 +24,6 @@ export interface CacheEntry {
 	expiresAt: number;
 }
 
-/**
- * Cache TTL in milliseconds (5 seconds)
- */
-const CACHE_TTL_MS = 5000;
-
-/**
- * Maximum cache size (prevents memory exhaustion)
- */
-const MAX_CACHE_SIZE = 1000;
 
 /**
  * In-memory cache storage
@@ -72,7 +64,7 @@ export function setCachedValidation(
 	entry: Omit<CacheEntry, "expiresAt">,
 ): void {
 	// Enforce max cache size by evicting oldest entry
-	if (cache.size >= MAX_CACHE_SIZE) {
+	if (cache.size >= CACHE_CONFIG.MAX_SIZE) {
 		const firstKey = cache.keys().next().value;
 		if (firstKey) {
 			cache.delete(firstKey);
@@ -81,7 +73,7 @@ export function setCachedValidation(
 
 	cache.set(keyId, {
 		...entry,
-		expiresAt: Date.now() + CACHE_TTL_MS,
+		expiresAt: Date.now() + CACHE_CONFIG.TTL_MS,
 	});
 }
 

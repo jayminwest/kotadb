@@ -16,6 +16,7 @@ import type { Server } from "node:http";
 import { sendMcpRequest } from "../helpers/mcp";
 import { startTestServer, stopTestServer } from "../helpers/server";
 import { getSupabaseTestClient } from "../helpers/db";
+import { RATE_LIMITS } from "@config/constants";
 
 let server: Server;
 let baseUrl: string;
@@ -128,9 +129,9 @@ describe("MCP Rate Limiting", () => {
 		expect(response.headers.get("X-RateLimit-Remaining")).toBeDefined();
 		expect(response.headers.get("X-RateLimit-Reset")).toBeDefined();
 
-		// Free tier limit should be 100
+		// Free tier limit should match configured value
 		const limit = response.headers.get("X-RateLimit-Limit");
-		expect(limit).toBe("100");
+		expect(limit).toBe(String(RATE_LIMITS.FREE.HOURLY));
 	});
 
 	test("rate limit counter increments per request", async () => {
@@ -196,7 +197,7 @@ describe("MCP Rate Limiting", () => {
 		});
 
 		const limit = response.headers.get("X-RateLimit-Limit");
-		expect(limit).toBe("1000");
+		expect(limit).toBe(String(RATE_LIMITS.SOLO.HOURLY));
 	});
 
 	test("team tier has 10000 requests per hour limit", async () => {
@@ -217,7 +218,7 @@ describe("MCP Rate Limiting", () => {
 		});
 
 		const limit = response.headers.get("X-RateLimit-Limit");
-		expect(limit).toBe("10000");
+		expect(limit).toBe(String(RATE_LIMITS.TEAM.HOURLY));
 	});
 
 	test("rate limit headers present on error response", async () => {

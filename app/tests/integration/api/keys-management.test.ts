@@ -19,6 +19,7 @@ import { getServiceClient } from "@db/client";
 import { generateApiKey } from "@auth/keys";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import type { Server } from "node:http";
+import { RATE_LIMITS } from "@config/constants";
 
 describe("API Key Management Endpoints", () => {
 	let supabase: SupabaseClient;
@@ -153,7 +154,7 @@ describe("API Key Management Endpoints", () => {
 			// Validate response structure
 			expect(body.keyId).toBe(keyResult.keyId);
 			expect(body.tier).toBe("free");
-			expect(body.rateLimitPerHour).toBe(1000); // Updated from 100 to 1000 per #423
+			expect(body.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 			expect(body.createdAt).toBeTruthy();
 			expect(body.enabled).toBe(true);
 			// lastUsedAt can be null for new keys
@@ -256,7 +257,7 @@ describe("API Key Management Endpoints", () => {
 			expect(body.apiKey).toMatch(/^kota_free_[a-zA-Z0-9]{12}_[0-9a-f]{36}$/);
 			expect(body.keyId).not.toBe(oldKey.keyId); // New key ID
 			expect(body.tier).toBe("free");
-			expect(body.rateLimitPerHour).toBe(1000); // Updated from 100 to 1000 per #423
+			expect(body.rateLimitPerHour).toBe(RATE_LIMITS.FREE.HOURLY);
 			expect(body.message).toContain("revoked");
 
 			// Verify old key is revoked in database
@@ -301,7 +302,7 @@ describe("API Key Management Endpoints", () => {
 
 			// New key should have same tier
 			expect(body.tier).toBe("solo");
-			expect(body.rateLimitPerHour).toBe(5000); // Updated from 1000 to 5000 per #423
+			expect(body.rateLimitPerHour).toBe(RATE_LIMITS.SOLO.HOURLY);
 		});
 
 		it("old key immediately returns 401 after reset", async () => {
