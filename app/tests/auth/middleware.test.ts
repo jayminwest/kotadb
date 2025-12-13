@@ -16,6 +16,7 @@ import { clearCache } from "@auth/cache";
 import { authenticateRequest, createForbiddenResponse } from "@auth/middleware";
 import { getServiceClient } from "@db/client";
 import { getTestApiKey, resetRateLimitCounters } from "../helpers/db";
+import { RATE_LIMITS } from "@config/constants";
 
 describe("Authentication Middleware", () => {
 	beforeEach(async () => {
@@ -234,8 +235,8 @@ describe("Authentication Middleware", () => {
 			expect(result.context).toBeDefined();
 			expect(result.context?.rateLimit).toBeDefined();
 			expect(result.context?.rateLimit?.allowed).toBe(true);
-			expect(result.context?.rateLimit?.limit).toBe(100);
-			expect(result.context?.rateLimit?.remaining).toBeLessThanOrEqual(100);
+			expect(result.context?.rateLimit?.limit).toBe(RATE_LIMITS.FREE.HOURLY);
+			expect(result.context?.rateLimit?.remaining).toBeLessThanOrEqual(RATE_LIMITS.FREE.HOURLY);
 			expect(result.context?.rateLimit?.resetAt).toBeGreaterThan(0);
 
 			if (result.context?.keyId) {
@@ -250,9 +251,9 @@ describe("Authentication Middleware", () => {
 
 			const testApiKey = getTestApiKey("free");
 
-			// Make 100 requests to exhaust the free tier limit
+			// Make requests to exhaust the free tier limit
 			let lastKeyId: string | undefined;
-			for (let i = 0; i < 100; i++) {
+			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY; i++) {
 				const request = new Request("http://localhost:3000/search", {
 					headers: {
 						Authorization: `Bearer ${testApiKey}`,
@@ -279,7 +280,7 @@ describe("Authentication Middleware", () => {
 			expect(result.response?.status).toBe(429);
 
 			// Check response headers
-			expect(result.response?.headers.get("X-RateLimit-Limit")).toBe("100");
+			expect(result.response?.headers.get("X-RateLimit-Limit")).toBe(String(RATE_LIMITS.FREE.HOURLY));
 			expect(result.response?.headers.get("X-RateLimit-Remaining")).toBe("0");
 			expect(result.response?.headers.get("X-RateLimit-Reset")).toBeDefined();
 			expect(result.response?.headers.get("Retry-After")).toBeDefined();
@@ -317,8 +318,8 @@ describe("Authentication Middleware", () => {
 			const freeResult = await authenticateRequest(freeRequest);
 			const soloResult = await authenticateRequest(soloRequest);
 
-			expect(freeResult.context?.rateLimit?.limit).toBe(100);
-			expect(soloResult.context?.rateLimit?.limit).toBe(1000);
+			expect(freeResult.context?.rateLimit?.limit).toBe(RATE_LIMITS.FREE.HOURLY);
+			expect(soloResult.context?.rateLimit?.limit).toBe(RATE_LIMITS.SOLO.HOURLY);
 
 			if (freeResult.context?.keyId) {
 				await cleanupRateLimitCounter(freeResult.context.keyId);

@@ -13,6 +13,7 @@ import { triggerAutoReindex } from "@api/auto-reindex";
 import type { AuthContext } from "@shared/types";
 import { startQueue, stopQueue, getQueue } from "@queue/client";
 import { startIndexWorker } from "@queue/workers/index-repo";
+import { RATE_LIMITS } from "@config/constants";
 
 describe("Auto-Reindex Integration Tests", () => {
 	const supabase = getSupabaseTestClient();
@@ -78,7 +79,7 @@ describe("Auto-Reindex Integration Tests", () => {
 			userId: TEST_USER_IDS.free,
 			tier: "free",
 			keyId: testApiKeyId,
-			rateLimitPerHour: 100,
+			rateLimitPerHour: RATE_LIMITS.FREE.HOURLY,
 		};
 
 		const result = await triggerAutoReindex(context);
@@ -111,7 +112,7 @@ describe("Auto-Reindex Integration Tests", () => {
 			userId: TEST_USER_IDS.free,
 			tier: "free",
 			keyId: testApiKeyId,
-			rateLimitPerHour: 100,
+			rateLimitPerHour: RATE_LIMITS.FREE.HOURLY,
 		};
 
 		const result = await triggerAutoReindex(context);
@@ -158,7 +159,7 @@ describe("Auto-Reindex Integration Tests", () => {
 			userId: TEST_USER_IDS.free,
 			tier: "free",
 			keyId: testApiKeyId,
-			rateLimitPerHour: 100,
+			rateLimitPerHour: RATE_LIMITS.FREE.HOURLY,
 		};
 
 		const result = await triggerAutoReindex(context);
@@ -205,7 +206,7 @@ describe("Auto-Reindex Integration Tests", () => {
 			userId: TEST_USER_IDS.free,
 			tier: "free",
 			keyId: testApiKeyId,
-			rateLimitPerHour: 100,
+			rateLimitPerHour: RATE_LIMITS.FREE.HOURLY,
 		};
 
 		// First trigger should succeed
