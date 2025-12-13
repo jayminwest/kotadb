@@ -234,3 +234,233 @@ def test_execute_parallel_agents_with_retry():
     assert results["agent_b"] == ("success_agent_b", None)
     assert attempt_counts["agent_a"][0] == 2
     assert attempt_counts["agent_b"][0] == 2
+
+
+# ============================================================================
+# Issue #517: Signature Verification Tests
+# ============================================================================
+# These tests verify that all 7 agent invocations in orchestrator.py
+# use correct function signatures matching the actual agent implementations.
+
+
+class TestPushBranchSignature:
+    """Tests for push_branch agent invocation signature."""
+
+    def test_push_branch_no_adw_id_parameter(self):
+        """Verify push_branch signature does not include adw_id (fix for #517)."""
+        from adws.adw_agents.agent_push_branch import push_branch
+        import inspect
+        
+        # Get the function signature
+        sig = inspect.signature(push_branch)
+        param_names = list(sig.parameters.keys())
+        
+        # Verify adw_id is NOT in the signature
+        assert "adw_id" not in param_names
+        # Verify expected parameters
+        assert param_names == ["branch_name", "logger", "cwd"]
+
+    def test_push_branch_returns_dict(self):
+        """Verify push_branch return type is Dict (not tuple) - fix for #517."""
+        from adws.adw_agents.agent_push_branch import push_branch
+        import inspect
+        
+        # Get return annotation
+        sig = inspect.signature(push_branch)
+        return_annotation = sig.return_annotation
+        
+        # Should be Dict, not Tuple
+        assert "Dict" in str(return_annotation) or "dict" in str(return_annotation)
+
+
+class TestCleanupWorktreeSignature:
+    """Tests for cleanup_worktree agent invocation signature."""
+
+    def test_cleanup_worktree_no_adw_id_parameter(self):
+        """Verify cleanup_worktree signature does not include adw_id (fix for #517)."""
+        from adws.adw_agents.agent_cleanup_worktree import cleanup_worktree
+        import inspect
+        
+        sig = inspect.signature(cleanup_worktree)
+        param_names = list(sig.parameters.keys())
+        
+        # Verify adw_id is NOT in the signature
+        assert "adw_id" not in param_names
+        # Verify expected parameters
+        assert "worktree_name" in param_names
+        assert "logger" in param_names
+        assert "base_path" in param_names
+
+    def test_cleanup_worktree_returns_bool(self):
+        """Verify cleanup_worktree return type is bool (not tuple) - fix for #517."""
+        from adws.adw_agents.agent_cleanup_worktree import cleanup_worktree
+        import inspect
+        
+        sig = inspect.signature(cleanup_worktree)
+        return_annotation = sig.return_annotation
+        
+        # Should be bool, not Tuple
+        assert return_annotation is bool or return_annotation == "bool"
+
+
+class TestCreatePullRequestSignature:
+    """Tests for create_pull_request agent invocation signature."""
+
+    def test_create_pr_requires_branch_name_and_plan_file(self):
+        """Verify create_pull_request requires branch_name and plan_file (fix for #517)."""
+        from adws.adw_agents.agent_create_pr import create_pull_request
+        import inspect
+        
+        sig = inspect.signature(create_pull_request)
+        param_names = list(sig.parameters.keys())
+        
+        # Verify correct parameter order
+        assert param_names[0] == "branch_name"  # First parameter
+        assert param_names[1] == "issue"        # Second parameter
+        assert param_names[2] == "plan_file"    # Third parameter
+        assert param_names[3] == "adw_id"       # Fourth parameter
+
+
+class TestRunReviewSignature:
+    """Tests for run_review agent invocation signature."""
+
+    def test_run_review_requires_spec_file(self):
+        """Verify run_review requires spec_file (not issue) as first param (fix for #517)."""
+        from adws.adw_agents.agent_review_code import run_review
+        import inspect
+        
+        sig = inspect.signature(run_review)
+        param_names = list(sig.parameters.keys())
+        
+        # First parameter should be spec_file, not issue
+        assert param_names[0] == "spec_file"
+        assert "issue" not in param_names  # No issue parameter at all
+
+
+class TestCommitImplementationSignature:
+    """Tests for commit_implementation agent invocation signature."""
+
+    def test_commit_implementation_requires_issue_class(self):
+        """Verify commit_implementation requires issue_class (fix for #517)."""
+        from adws.adw_agents.agent_commit_implementation import commit_implementation
+        import inspect
+        
+        sig = inspect.signature(commit_implementation)
+        param_names = list(sig.parameters.keys())
+        
+        # Verify issue_class is second parameter
+        assert param_names[0] == "issue"
+        assert param_names[1] == "issue_class"  # Required!
+        assert param_names[2] == "adw_id"
+
+
+class TestCommitPlanAgentSignature:
+    """Tests for commit_plan agent signature itself."""
+
+    def test_commit_plan_requires_issue_class(self):
+        """Verify commit_plan requires issue_class (fix for #517)."""
+        from adws.adw_agents.agent_commit_plan import commit_plan
+        import inspect
+        
+        sig = inspect.signature(commit_plan)
+        param_names = list(sig.parameters.keys())
+        
+        # Verify issue_class is second parameter
+        assert param_names[0] == "issue"
+        assert param_names[1] == "issue_class"  # Required!
+        assert param_names[2] == "adw_id"
+
+
+class TestImplementPlanAgentSignature:
+    """Tests for implement_plan agent signature."""
+
+    def test_implement_plan_plan_file_is_first(self):
+        """Verify implement_plan has plan_file as first parameter (fix for #517)."""
+        from adws.adw_agents.agent_implement_plan import implement_plan
+        import inspect
+        
+        sig = inspect.signature(implement_plan)
+        param_names = list(sig.parameters.keys())
+        
+        # First parameter should be plan_file, not issue
+        assert param_names[0] == "plan_file"
+        assert "issue" not in param_names  # No issue parameter
+
+
+class TestOrchestratorSignatureIntegration:
+    """Integration tests verifying orchestrator calls match agent signatures."""
+
+    def test_orchestrator_source_has_correct_commit_plan_call(self):
+        """Verify orchestrator source has correct commit_plan invocation."""
+        import inspect
+        from adws.adw_agents import orchestrator
+        
+        source = inspect.getsource(orchestrator.run_adw_workflow)
+        
+        # Should have state.issue_class in commit_plan call
+        assert "commit_plan(issue, state.issue_class," in source
+        
+    def test_orchestrator_source_has_correct_implement_plan_call(self):
+        """Verify orchestrator source has correct implement_plan invocation."""
+        import inspect
+        from adws.adw_agents import orchestrator
+        
+        source = inspect.getsource(orchestrator.run_adw_workflow)
+        
+        # Should NOT pass issue to implement_plan
+        # Should pass state.plan_file as first argument
+        assert 'implement_plan(state.plan_file or "",' in source
+        
+    def test_orchestrator_source_has_correct_commit_implementation_call(self):
+        """Verify orchestrator source has correct commit_implementation invocation."""
+        import inspect
+        from adws.adw_agents import orchestrator
+        
+        source = inspect.getsource(orchestrator.run_adw_workflow)
+        
+        # Should have state.issue_class in commit_implementation call
+        assert "commit_implementation(issue, state.issue_class," in source
+        
+    def test_orchestrator_source_has_correct_create_pr_call(self):
+        """Verify orchestrator source has correct create_pull_request invocation."""
+        import inspect
+        from adws.adw_agents import orchestrator
+        
+        source = inspect.getsource(orchestrator.run_adw_workflow)
+        
+        # Should have branch_name first, then issue, then plan_file
+        assert 'create_pull_request(\n                state.branch_name or "", issue, state.plan_file or "",' in source
+        
+    def test_orchestrator_source_has_correct_run_review_call(self):
+        """Verify orchestrator source has correct run_review invocation."""
+        import inspect
+        from adws.adw_agents import orchestrator
+        
+        source = inspect.getsource(orchestrator.run_adw_workflow)
+        
+        # Should have spec_file (plan_file) first, not issue
+        assert 'run_review(state.plan_file or "",' in source
+        
+    def test_orchestrator_source_has_correct_push_branch_call(self):
+        """Verify orchestrator source has correct push_branch invocation."""
+        import inspect
+        from adws.adw_agents import orchestrator
+        
+        source = inspect.getsource(orchestrator.run_adw_workflow)
+        
+        # Should NOT have adw_id parameter
+        assert 'push_branch(state.branch_name or "", logger,' in source
+        # Should NOT have adw_id between branch_name and logger
+        assert "push_branch(state.branch_name or \"\", adw_id" not in source
+        
+    def test_orchestrator_source_has_correct_cleanup_worktree_call(self):
+        """Verify orchestrator source has correct cleanup_worktree invocation."""
+        import inspect
+        from adws.adw_agents import orchestrator
+        
+        source = inspect.getsource(orchestrator.run_adw_workflow)
+        
+        # Should use worktree_name, not worktree_path
+        assert 'cleanup_worktree(state.worktree_name or "",' in source
+        # Should NOT have adw_id parameter
+        assert "cleanup_worktree(state.worktree_path" not in source

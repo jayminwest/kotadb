@@ -306,8 +306,8 @@ def run_adw_workflow(
         # Step 4: Commit plan (with retry)
         logger.info("Step 4: Committing plan")
         def commit_plan_with_state():
-            response = commit_plan(issue, adw_id, logger, cwd=state.worktree_path)
-            return (response, None) if response.success else (None, response.output)
+            commit_message, error = commit_plan(issue, state.issue_class, adw_id, logger, cwd=state.worktree_path)
+            return (commit_message, error)
 
         commit_response, error = _retry_with_backoff(commit_plan_with_state, logger=logger)
         if error:
@@ -325,7 +325,7 @@ def run_adw_workflow(
         # Step 5: Implement plan (with retry)
         logger.info("Step 5: Implementing plan")
         def implement_with_state():
-            response = implement_plan(issue, state.plan_file or "", adw_id, logger, cwd=state.worktree_path)
+            response = implement_plan(state.plan_file or "", adw_id, logger, cwd=state.worktree_path)
             return (response, None) if response.success else (None, response.output)
 
         impl_response, error = _retry_with_backoff(implement_with_state, logger=logger)
@@ -344,8 +344,8 @@ def run_adw_workflow(
         # Step 6: Commit implementation (with retry)
         logger.info("Step 6: Committing implementation")
         def commit_impl_with_state():
-            response = commit_implementation(issue, adw_id, logger, cwd=state.worktree_path)
-            return (response, None) if response.success else (None, response.output)
+            commit_message, error = commit_implementation(issue, state.issue_class, adw_id, logger, cwd=state.worktree_path)
+            return (commit_message, error)
 
         commit_impl_response, error = _retry_with_backoff(commit_impl_with_state, logger=logger)
         if error:
@@ -363,8 +363,10 @@ def run_adw_workflow(
         # Step 7: Create PR (with retry)
         logger.info("Step 7: Creating pull request")
         def create_pr_with_state():
-            response = create_pull_request(issue, adw_id, logger, cwd=state.worktree_path)
-            return (response, None) if response.success else (None, response.output)
+            pr_url, error = create_pull_request(
+                state.branch_name or "", issue, state.plan_file or "", adw_id, logger, cwd=state.worktree_path
+            )
+            return (pr_url, error)
 
         pr_response, error = _retry_with_backoff(create_pr_with_state, logger=logger)
         if error:
@@ -384,8 +386,8 @@ def run_adw_workflow(
         # Step 8: Review code (with retry)
         logger.info("Step 8: Running code review")
         def review_with_state():
-            response = run_review(issue, adw_id, logger, cwd=state.worktree_path)
-            return (response, None) if response.success else (None, response.output)
+            review_result, error = run_review(state.plan_file or "", adw_id, logger, cwd=state.worktree_path)
+            return (review_result, error)
 
         review_response, error = _retry_with_backoff(review_with_state, logger=logger)
         if error:
@@ -398,7 +400,10 @@ def run_adw_workflow(
         # Step 9: Push branch (with retry)
         logger.info("Step 9: Pushing branch to remote")
         def push_with_state():
-            return push_branch(state.branch_name or "", adw_id, logger, cwd=state.worktree_path)
+            result = push_branch(state.branch_name or "", logger, cwd=state.worktree_path)
+            if not result["success"]:
+                return (None, result.get("error_message", "Push failed"))
+            return (result, None)
 
         push_result, error = _retry_with_backoff(push_with_state, logger=logger)
         if error:
@@ -416,7 +421,10 @@ def run_adw_workflow(
         # Step 10: Cleanup worktree (with retry)
         logger.info("Step 10: Cleaning up worktree")
         def cleanup_with_state():
-            return cleanup_worktree(state.worktree_path or "", adw_id, logger)
+            success = cleanup_worktree(state.worktree_name or "", logger)
+            if not success:
+                return (None, "Worktree cleanup failed")
+            return (True, None)
 
         cleanup_result, error = _retry_with_backoff(cleanup_with_state, logger=logger)
         if error:
