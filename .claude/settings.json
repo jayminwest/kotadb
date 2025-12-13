@@ -1,24 +1,24 @@
 {
   "permissions": {
-    // "allow": [
-    //   "Read",
-    //   "Glob",
-    //   "Grep",
-    //   "WebFetch",
-    //   "WebSearch",
-    //   "Task",
-    //   "TodoWrite",
-    //   "AskUserQuestion",
-    //   "mcp__leaf_spawner__spawn_leaf_agent",
-    //   "mcp__leaf_spawner__get_agent_result",
-    //   "mcp__leaf_spawner__list_agents",
-    //   "mcp__leaf_spawner__get_diagnostics"
-    // ],
-    // "deny": [
-    //   "Write",
-    //   "Edit",
-    //   "Bash"
-    // ]
+    "allow": [
+      "Read",
+      "Glob",
+      "Grep",
+      "WebFetch",
+      "WebSearch",
+      "Task",
+      "TodoWrite",
+      "AskUserQuestion",
+      "mcp__leaf_spawner__spawn_leaf_agent",
+      "mcp__leaf_spawner__get_agent_result",
+      "mcp__leaf_spawner__list_agents",
+      "mcp__leaf_spawner__get_diagnostics",
+      "Bash"
+    ],
+    "deny": [
+      "Write",
+      "Edit"
+    ]
   },
   "statusLine": {
     "type": "command",
