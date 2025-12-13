@@ -291,7 +291,10 @@ def prompt_claude_code_with_retry(
 
 
 def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
-    """Execute Claude Code with the configured prompt."""
+    """Execute Claude Code with the configured prompt.
+    
+    Automatically enables token streaming if ADW_STREAM_TOKENS environment variable is set.
+    """
 
     error_msg = check_claude_installed()
     if error_msg:
@@ -341,6 +344,27 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
     messages, result_message = parse_jsonl_output(str(output_path))
     convert_jsonl_to_json(str(output_path))
 
+    # Check if token streaming is enabled via environment variable
+    stream_tokens = os.getenv("ADW_STREAM_TOKENS", "false").lower() == "true"
+    if stream_tokens and result_message:
+        try:
+            from .token_streaming import emit_token_event, parse_token_usage_from_result
+            
+            token_usage = parse_token_usage_from_result(result_message)
+            if token_usage:
+                # Extract phase from agent name (e.g., "classify_issue" -> "classify")
+                phase = request.agent_name.split("_")[0] if "_" in request.agent_name else request.agent_name
+                
+                emit_token_event(
+                    adw_id=request.adw_id,
+                    phase=phase,
+                    agent=request.agent_name,
+                    **token_usage,
+                )
+        except Exception as exc:  # noqa: BLE001
+            # Don't fail the entire request if token streaming fails
+            sys.stderr.write(f"Warning: Failed to emit token event: {exc}\n")
+
     if result_message:
         message = ClaudeCodeResultMessage(**result_message)
         # Detect agent execution errors from result message
@@ -354,6 +378,38 @@ def prompt_claude_code(request: AgentPromptRequest) -> AgentPromptResponse:
 
     raw_output = "".join(json.dumps(entry) + "\n" for entry in messages)
     return AgentPromptResponse(output=raw_output, success=True, session_id=None, retry_code=RetryCode.NONE)
+
+
+def prompt_claude_code_streaming(
+    request: AgentPromptRequest,
+    stream_tokens: bool = False,
+) -> AgentPromptResponse:
+    """Execute Claude Code with optional real-time token streaming.
+    
+    Args:
+        request: Prompt request configuration
+        stream_tokens: If True, emit TokenEvent JSON lines to stdout
+        
+    Returns:
+        AgentPromptResponse with output and token usage
+        
+    Note:
+        This function is provided for backward compatibility.
+        The main prompt_claude_code() function now checks ADW_STREAM_TOKENS
+        environment variable automatically.
+    """
+    # Set environment variable for this execution
+    original_value = os.environ.get("ADW_STREAM_TOKENS")
+    try:
+        if stream_tokens:
+            os.environ["ADW_STREAM_TOKENS"] = "true"
+        return prompt_claude_code(request)
+    finally:
+        # Restore original value
+        if original_value is not None:
+            os.environ["ADW_STREAM_TOKENS"] = original_value
+        elif "ADW_STREAM_TOKENS" in os.environ:
+            del os.environ["ADW_STREAM_TOKENS"]
 
 
 def execute_template(request: AgentTemplateRequest) -> AgentPromptResponse:
@@ -396,6 +452,7 @@ __all__ = [
     "get_claude_env",
     "parse_jsonl_output",
     "prompt_claude_code",
+    "prompt_claude_code_streaming",
     "prompt_claude_code_with_retry",
     "render_slash_command_prompt",
     "save_prompt",

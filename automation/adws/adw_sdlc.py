@@ -29,20 +29,39 @@ from adws.adw_modules.utils import load_adw_env
 from adws.adw_modules.workflow_ops import ensure_state, start_logger
 
 
-def parse_args(argv: list[str]) -> tuple[str, Optional[str]]:
+def parse_args(argv: list[str]) -> tuple[str, Optional[str], bool]:
+    """Parse command line arguments.
+    
+    Args:
+        argv: Command line arguments
+        
+    Returns:
+        Tuple of (issue_number, adw_id, stream_tokens)
+    """
     if len(argv) < 2:
-        sys.stderr.write("Usage: uv run adws/adw_sdlc.py <issue-number> [adw-id]" + "\n")
+        sys.stderr.write("Usage: uv run adws/adw_sdlc.py <issue-number> [adw-id] [--stream-tokens]" + "\n")
         sys.exit(1)
+    
+    # Parse positional args
     issue_number = argv[1]
-    adw_id = argv[2] if len(argv) > 2 else None
-    return issue_number, adw_id
+    adw_id = None
+    stream_tokens = False
+    
+    # Parse remaining args
+    for arg in argv[2:]:
+        if arg == "--stream-tokens":
+            stream_tokens = True
+        elif adw_id is None and not arg.startswith("--"):
+            adw_id = arg
+    
+    return issue_number, adw_id, stream_tokens
 
 
 def main() -> None:
     import os
 
     load_adw_env()
-    issue_number, provided_adw_id = parse_args(sys.argv)
+    issue_number, provided_adw_id, stream_tokens = parse_args(sys.argv)
     adw_id, _ = ensure_state(provided_adw_id, issue_number)
     logger = start_logger(adw_id, "adw_sdlc")
     logger.info(f"Starting simplified SDLC workflow | issue #{issue_number} | adw_id={adw_id}")
@@ -54,7 +73,7 @@ def main() -> None:
         logger.info("Using atomic agent orchestrator (ADW_USE_ATOMIC_AGENTS=true)")
         from adws.adw_agents.orchestrator import run_adw_workflow
 
-        result = run_adw_workflow(issue_number, logger, adw_id=adw_id)
+        result = run_adw_workflow(issue_number, logger, adw_id=adw_id, stream_tokens=stream_tokens)
 
         if not result.success:
             logger.error(f"Atomic agent workflow failed at {result.failed_agent}: {result.error_message}")
