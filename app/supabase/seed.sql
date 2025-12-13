@@ -38,6 +38,7 @@ ON CONFLICT (user_id, org_id) DO NOTHING;
 -- Bcrypt hash: $2b$10$qCub8ulq0BnDmxMUhfwbWOCrWmFUKVFWn2.18eOSgPWdlaHCaZ9ve
 
 -- Free tier test key: kota_free_test1234567890ab_0123456789abcdef0123456789abcdef
+-- Updated to new rate limits from #423
 INSERT INTO api_keys (user_id, key_id, secret_hash, tier, rate_limit_per_hour, enabled, created_at)
 VALUES
     (
@@ -45,13 +46,14 @@ VALUES
         'test1234567890ab',
         '$2b$10$qCub8ulq0BnDmxMUhfwbWOCrWmFUKVFWn2.18eOSgPWdlaHCaZ9ve',
         'free',
-        100,
+        1000,  -- Updated from 100 to 1000
         true,
         now()
     )
 ON CONFLICT (key_id) DO NOTHING;
 
 -- Solo tier test key: kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef
+-- Updated to new rate limits from #423
 INSERT INTO api_keys (user_id, key_id, secret_hash, tier, rate_limit_per_hour, enabled, created_at)
 VALUES
     (
@@ -59,7 +61,7 @@ VALUES
         'solo1234567890ab',
         '$2b$10$qCub8ulq0BnDmxMUhfwbWOCrWmFUKVFWn2.18eOSgPWdlaHCaZ9ve',
         'solo',
-        1000,
+        5000,  -- Updated from 1000 to 5000
         true,
         now()
     )
@@ -67,6 +69,7 @@ ON CONFLICT (key_id) DO NOTHING;
 
 -- Team tier test key: kota_team_team1234567890ab_0123456789abcdef0123456789abcdef
 -- Note: For now using user_id until schema is migrated to support org-level keys
+-- Updated to new rate limits from #423
 INSERT INTO api_keys (user_id, key_id, secret_hash, tier, rate_limit_per_hour, enabled, created_at)
 VALUES
     (
@@ -74,13 +77,14 @@ VALUES
         'team1234567890ab',
         '$2b$10$qCub8ulq0BnDmxMUhfwbWOCrWmFUKVFWn2.18eOSgPWdlaHCaZ9ve',
         'team',
-        10000,
+        25000,  -- Updated from 10000 to 25000
         true,
         now()
     )
 ON CONFLICT (key_id) DO NOTHING;
 
 -- Disabled test key for testing disabled key handling
+-- Updated to new rate limits from #423
 INSERT INTO api_keys (user_id, key_id, secret_hash, tier, rate_limit_per_hour, enabled, created_at)
 VALUES
     (
@@ -88,7 +92,7 @@ VALUES
         'disabled12345678',
         '$2b$10$qCub8ulq0BnDmxMUhfwbWOCrWmFUKVFWn2.18eOSgPWdlaHCaZ9ve',
         'free',
-        100,
+        1000,  -- Updated from 100 to 1000
         false,
         now()
     )
