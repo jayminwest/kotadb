@@ -33,21 +33,40 @@ USER_PROMPT: $ARGUMENTS
 {
   "statusLine": {
     "type": "command",
-    "command": "python .claude/statusline.py"
+    "command": "python3 $CLAUDE_PROJECT_DIR/.claude/statusline.py"
   },
   "hooks": {
     "PostToolUse": [
-      {"matcher": ".ts|.js", "command": "python .claude/hooks/auto_linter.py", "timeout": 30}
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/auto_linter.py",
+            "timeout": 45000
+          }
+        ]
+      }
     ],
     "UserPromptSubmit": [
-      {"command": "python .claude/hooks/context_builder.py", "timeout": 15}
+      {
+        "matcher": "",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 $CLAUDE_PROJECT_DIR/.claude/hooks/context_builder.py",
+            "timeout": 10000
+          }
+        ]
+      }
     ]
   }
 }
 ```
-- statusLine: Custom status line script (python)
+- statusLine: Custom status line script (python3)
 - hooks: PostToolUse and UserPromptSubmit automation with matchers and timeouts
 - Hook scripts use shared utilities (hook_helpers.py) for JSON I/O and file detection
+- Hooks include PreToolUse for tool blocking enforcement (Added after #214)
 
 **settings.local.json Pattern:**
 - Gitignored file for personal settings
@@ -102,13 +121,58 @@ USER_PROMPT: $ARGUMENTS
 - Enables conditional guidance based on codebase layer
 
 **settings.json Hook Configuration Pattern (Updated after #508):**
-- Hook structure: PostToolUse and UserPromptSubmit with matcher patterns
+- Hook structure: PostToolUse, UserPromptSubmit, and PreToolUse with matcher patterns
 - Matcher types: tool names (Write|Edit), empty string for all prompts, regex patterns
-- Timeout values: milliseconds (45000 for PostToolUse, 10000 for UserPromptSubmit)
+- Timeout values: milliseconds (45000 for PostToolUse, 10000 for UserPromptSubmit, 30000 for PreToolUse)
 - Hook commands use environment variable: `$CLAUDE_PROJECT_DIR` for path resolution
 - Multiple hooks per hook type with sequential execution
 - PostToolUse: Triggered after Write/Edit operations for linting
 - UserPromptSubmit: Triggered before processing user input for context building
+- PreToolUse: Triggered before tool execution for tool blocking and enforcement (Added after #214)
+
+**Hook Hook Nested Structure (Added after #214):**
+- Hook configuration uses nested "hooks" array for multiple hook scripts
+- Matcher field determines which tools/prompts trigger the hooks
+- Each hook in the array gets matcher-level timeout
+- Order matters: hooks execute sequentially
+
+**Agent Registry Pattern (Added after #214):**
+- JSON schema with capability and model indexes
+- Agent definitions include name, description, file path, model, capabilities, tools
+- Capability index maps capabilities to available agents
+- Model index maps models (haiku, sonnet, opus) to agents
+- Tool matrix maps tools to agents that can use them
+- readOnly field indicates if agent can modify files
+- Coordinator agents use leaf_spawner tools for delegation
+
+**Agent Coordinator Pattern (Added after #214):**
+- Branch coordinator agents (plan, build, review, meta) use leaf_spawner tools
+- Leaf spawner tool for spawning agents: `mcp__leaf_spawner__spawn_leaf_agent`
+- Agent types supported: retrieval, build, review, custom template names
+- Timeout specification: up to 600000ms (10 minutes)
+- Coordinator agents spawn leaf agents in parallel or sequence based on dependencies
+
+**Universal Entry Point Pattern (Added after #214):**
+- `/do` command for end-to-end issue resolution
+- Auto-discover ADW state by issue number
+- Support multiple input formats: issue number, GitHub URL, free-form text
+- Autonomous workflow: scout → plan → build → review → validate
+- Auto-fix loops for validation failures
+- No user checkpoints, commit on success
+
+**Orchestrator Context Detection Hook (Added after #214):**
+- UserPromptSubmit hook: `orchestrator_context.py` detects orchestrator commands
+- Patterns: `/do`, `/workflows/orchestrator`, `/experts/orchestrators/`, command-orchestrator
+- Persists context to state file: `.claude/data/orchestrator_context.json`
+- Sets environment variable: `CLAUDE_ORCHESTRATOR_CONTEXT`
+- Enables downstream enforcement (PreToolUse guard hook)
+
+**Orchestrator Guard Hook Pattern (Added after #214):**
+- PreToolUse hook: `orchestrator_guard.py` enforces orchestrator pattern
+- Blocks file modification tools (Write, Edit, MultiEdit, NotebookEdit) in orchestrator context
+- Allows specific tools: Read, Grep, Glob, Bash, Task, SlashCommand, etc.
+- Reads context from state file for cross-process enforcement
+- Provides helpful error message directing to Task delegation
 
 **Anti-Patterns Discovered:**
 - CLAUDE.md with outdated command references (discovered #491)
@@ -123,6 +187,10 @@ USER_PROMPT: $ARGUMENTS
 - Multi-tier update strategies without clear responsibility boundaries (addressed #491)
 - Hook timeout values as raw seconds instead of milliseconds (discovered #508)
 - Hook matcher patterns without pipe operator for multiple tool names (discovered #508)
+- Hook configuration without nested "hooks" array structure (discovered #214)
+- Agent registry missing capability or model indexes (discovered #214)
+- ADW commands not supporting issue auto-discovery (discovered #214)
+- Missing orchestrator context detection and guard hooks (discovered #214)
 
 ### Command Registration Patterns
 
@@ -147,7 +215,7 @@ argument-hint: <optional-argument-hint>
 ## Workflow
 
 1. **Parse Context**: Extract configuration-relevant requirements from USER_PROMPT
-2. **Identify Scope**: Determine affected config areas (CLAUDE.md, settings, commands)
+2. **Identify Scope**: Determine affected config areas (CLAUDE.md, settings, commands, hooks, agents)
 3. **Check Consistency**: Verify changes align with existing patterns
 4. **Assess Documentation**: Evaluate documentation update needs
 5. **Pattern Match**: Compare against known patterns in Expertise

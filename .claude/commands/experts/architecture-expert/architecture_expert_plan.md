@@ -27,6 +27,7 @@ USER_PROMPT: $ARGUMENTS
 - `@shared/*` → `../shared/*` - Cross-project types (auth, entities, api contracts, projects)
 - `@github/*` → `src/github/*` - GitHub integration (workflows, installations) (added after #472)
 - `@logging/*` → `src/logging/*` - Structured logging (logger, context, middleware) (added after #436)
+- `@config/*` → `src/config/*` - Centralized configuration (constants for rates, cache, retry, thresholds) (added after #438)
 - `@app-types/*` → `src/types/*` - App-specific types with runtime dependencies
 
 **Component Boundaries:**
@@ -53,6 +54,7 @@ USER_PROMPT: $ARGUMENTS
 - Unbounded database queries without pagination (discovered in #473) — Use .range() for queries >1000 rows
 - Missing error telemetry in try-catch blocks (discovered in ed4c4f9) — All errors must call Sentry.captureException()
 - Insufficient ignored directories in indexer (discovered in #473) — Maintain comprehensive IGNORED_DIRECTORIES list
+- Hardcoded magic numbers scattered across modules (discovered in #438) — Use @config/* for all constants
 
 ### Shared Types Strategy
 
@@ -181,6 +183,42 @@ USER_PROMPT: $ARGUMENTS
 **Version Availability:**
 - Available at module initialization (non-blocking load with silent fallback)
 - Cached value prevents performance impact on repeated health checks
+
+### Centralized Configuration Pattern (added after #438)
+
+**Configuration Module Architecture:**
+- Central `@config/*` module with all application constants to prevent magic numbers
+- Configuration organized by concern: rate limits, cache, retry, thresholds, indexer settings
+- Path alias `@config/*` → `src/config/*` for consistent access across codebase
+- Exports through barrel file `index.ts` for clean imports: `import { RATE_LIMITS } from '@config'`
+
+**Rate Limit Configuration:**
+- Centralized `RATE_LIMITS` object keyed by subscription tier (FREE, SOLO, TEAM)
+- Each tier defines hourly and daily limits: `{ HOURLY, DAILY }`
+- Replaces scattered `TIER_RATE_LIMITS` constants across auth module
+- Used in `@auth/validator.ts` for request limiting validation
+- Enables self-hosted deployments to disable tier-based limits by modifying single constant
+
+**Cache Configuration:**
+- Centralized `CACHE_CONFIG` with `TTL_MS` (5000ms) and `MAX_SIZE` (1000 entries)
+- Used across: `@auth/cache.ts` for API key caching, `@github/app-auth.ts` for GitHub token caching
+- Consistent behavior across modules that implement caching strategies
+
+**Retry and Security Configuration:**
+- `RETRY_CONFIG`: `MAX_COLLISION_RETRIES`, bcrypt rounds for password hashing
+- Provides single source of truth for resilience patterns
+- Reduces security-critical configuration spread across codebase
+
+**Indexer and Processing Configuration:**
+- `INDEXER_CONFIG`: File query batch size and processing thresholds
+- `THRESHOLDS`: Auto-reindex triggers, rate-limit boundaries
+- Enables tuning of indexer behavior without code changes
+
+**Benefits:**
+- Single location for all magic numbers enables rapid tuning for different deployment targets
+- Self-hosted deployments can override constants without forking codebase
+- Refactoring safety: changing constant applies across all usages automatically
+- Configuration as code: version controlled, reviewable, testable
 
 ## Workflow
 

@@ -65,6 +65,7 @@ cd app && bun test:teardown   # Cleanup (CI required, local optional)
 - `app/tests/indexer/` - Git indexer tests
 - `app/tests/validation/` - Schema validation tests
 - `app/tests/queue/` - Job queue tests
+- `app/tests/integration/` - Integration tests spanning multiple subsystems
 - `app/tests/helpers/` - Test utilities (NOT mocks)
 - `app/tests/fixtures/` - Test data and sample repositories
 
@@ -89,6 +90,7 @@ cd app && bun test:teardown   # Cleanup (CI required, local optional)
 - **Global rate limit cleanup**: `tests/setup.ts` includes `afterEach` hook to reset rate limit counters (added in #219)
 - **Queue lifecycle management**: Tests using pg-boss must call `startQueue()`/`stopQueue()` (fixed in #431)
 - **beforeEach project cleanup**: Truncate test projects and metadata for test isolation (#431)
+- **Centralized configuration pattern**: Import constants from `@config/constants` instead of hardcoding values (0b37190) - ensures tests stay in sync when configuration changes
 
 ### MCP Testing Patterns
 
@@ -97,6 +99,11 @@ cd app && bun test:teardown   # Cleanup (CI required, local optional)
 - `extractToolResult()` - Parse content block responses
 - `assertToolResult()` - Validate successful responses
 - `assertJsonRpcError()` - Validate error responses
+
+**Database Helpers (`app/tests/helpers/db.ts`):**
+- `getSupabaseTestClient()` - Get test Supabase client with proper auth
+- `TEST_USER_IDS` - Predefined test user IDs for consistent fixtures
+- `TEST_REPO_IDS` - Predefined test repository IDs for consistent fixtures
 
 **Async Assertion Helpers (`app/tests/helpers/async-assertions.ts`):**
 - `waitForCondition()` - Poll for expected conditions instead of fixed delays (added in 55d3018)
@@ -122,6 +129,12 @@ cd app && bun test:teardown   # Cleanup (CI required, local optional)
 - Prevents flaky tests in CI environments with variable I/O performance (32dcdf7)
 - Supports custom timeout and polling interval options
 - Provides meaningful error messages with elapsed time on timeout
+
+**Configuration Pattern:**
+- Import rate limits and constants from `@config/constants` (0b37190)
+- Never hardcode configuration values in tests
+- Ensures test values stay synchronized with production config
+- Example: `import { RATE_LIMITS } from "@config/constants"`
 
 ## Workflow
 
