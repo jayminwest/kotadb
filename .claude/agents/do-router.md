@@ -17,7 +17,7 @@ The do-router agent classifies user requirements and routes them to appropriate 
 
 ## Capabilities
 
-- **intent-classification**: Classify user requirements into 7 workflow categories
+- **intent-classification**: Classify user requirements into 8 workflow categories
 - **workflow-routing**: Route to appropriate slash commands based on intent
 - **requirement-analysis**: Parse and understand user requirements
 - **ambiguity-detection**: Identify unclear requirements and request clarification
@@ -60,6 +60,7 @@ The do-router classifies requirements into these categories:
 | `documentation` | `document`, `docs`, `readme` | `/workflows/document` |
 | `ci_cd` | `ci`, `deploy`, `release` | `/ci/*` or `/release/release` |
 | `expert_analysis` | `expert`, `security review` | Expert triad commands |
+| `adw_workflow` | `workflow`, `adw`, `#\d+.*full`, `orchestrate` | `/do/adw` |
 
 ## Usage Pattern
 
@@ -79,8 +80,9 @@ For each category:
   base_score = 0.5 if any pattern matches
 
   Boosts:
-    +0.3 for issue/PR numbers (#\d+)
-    +0.2 for action verbs (implement, build, fix)
+    +0.3 for issue/PR numbers (#\d+) OR "workflow" keyword
+    +0.25 for "full" + issue number
+    +0.2 for action verbs (implement, build, fix) OR "adw" OR "orchestrate"
     +0.15 for domain keywords (security, architecture)
 
   confidence = base_score + boosts
@@ -141,6 +143,16 @@ On routing failure:
 /do plan user authentication
 → Classifies as spec_planning (confidence: 0.85)
 → Routes to: /workflows/plan user authentication
+
+# ADW workflow routing
+/do #518 workflow
+→ Classifies as adw_workflow (confidence: 0.95)
+→ Routes to: /do/adw 518
+
+# Full workflow routing
+/do run full workflow for #123
+→ Classifies as adw_workflow (confidence: 0.95)
+→ Routes to: /do/adw 123
 
 # Ambiguous requirement
 /do something

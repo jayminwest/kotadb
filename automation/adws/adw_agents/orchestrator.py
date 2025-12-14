@@ -166,6 +166,7 @@ def run_adw_workflow(
     issue_number: str,
     logger: logging.Logger,
     adw_id: Optional[str] = None,
+    stream_tokens: bool = False,
 ) -> WorkflowResult:
     """Run the full ADW workflow using atomic agents.
 
@@ -176,6 +177,7 @@ def run_adw_workflow(
         issue_number: GitHub issue number to process
         logger: Logger instance for tracking
         adw_id: Optional ADW execution ID (will be generated if not provided)
+        stream_tokens: If True, emit TokenEvent JSON lines to stdout during execution
 
     Returns:
         WorkflowResult with execution outcome
@@ -196,6 +198,10 @@ def run_adw_workflow(
     - Parallel agent execution isolated via ThreadPoolExecutor
     - No shared mutable state between concurrent agents
     """
+    # Set token streaming environment variable if enabled
+    if stream_tokens:
+        os.environ["ADW_STREAM_TOKENS"] = "true"
+
     # Import all atomic agents
     from .agent_classify_issue import classify_issue
     from .agent_generate_branch import generate_branch_name

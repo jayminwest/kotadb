@@ -218,3 +218,197 @@ If any phase fails unrecoverably:
 3. **Commit only** - Do not push or create PR
 4. **Unlimited fix attempts** - Keep fixing until validation passes
 5. **Convention enforcement** - Fail review if conventions violated
+
+## ADW Integration
+
+The `/do` command integrates with the Python ADW orchestration layer for multi-phase workflow execution.
+
+### Commands
+
+#### `/do/adw` - Full ADW Workflow Execution
+
+Execute complete ADW workflow (scout → plan → build → review → validate) for a GitHub issue using Python orchestration.
+
+**Usage**:
+```
+/do #123 workflow
+/do/adw 456
+```
+
+**Execution Flow**:
+1. Extract issue number from input (supports `#123`, `123`, or GitHub URL)
+2. Invoke Python orchestrator: `uv run automation/adws/adw_sdlc.py {issue_number} --stream-tokens`
+3. Parse real-time TokenEvent JSON lines from stdout
+4. Monitor progress via `automation/agents/{adw_id}/adw_state.json`
+5. Report completion with token usage and artifacts
+
+**Output**:
+```markdown
+## ADW Workflow Complete
+
+**Issue**: #518
+**ADW ID**: adw_20251213_142600_518
+**Phases**: scout ✓ → plan ✓ → build ✓ → review ✓
+
+### Token Usage
+- Total Input: 125,430
+- Total Output: 18,920
+- Total Cost: $0.6592
+
+### Artifacts
+- Spec: docs/specs/feature-518-do-adw-integration.md
+- Branch: feat/518-do-adw-integration
+- Worktree: /tmp/worktrees/feat-518-do-adw-integration
+```
+
+#### `/do/status` - Query ADW Workflow State
+
+Query current state of an ADW workflow execution.
+
+**Usage**:
+```
+/do/status adw_20251213_142600_518
+```
+
+**Output**:
+```markdown
+## ADW Status: adw_20251213_142600_518
+
+**Issue**: #518 - feat(adw): integrate /do paradigm with Python ADW orchestration layer
+**Branch**: feat/518-do-adw-integration
+**Worktree**: /tmp/worktrees/feat-518-do-adw-integration
+**PR Created**: No
+
+### Phase Status
+- Scout: completed
+- Plan: completed
+- Build: in_progress
+- Review: pending
+
+### Files
+- Spec: docs/specs/feature-518-do-adw-integration.md
+```
+
+### TokenEvent Schema
+
+Real-time token usage events emitted during workflow execution:
+
+```typescript
+interface TokenEvent {
+  adw_id: string;              // ADW execution ID
+  phase: string;               // Phase name (plan, build, review)
+  agent: string;               // Agent name (classify_issue, generate_branch, etc.)
+  input_tokens: number;        // Prompt tokens consumed
+  output_tokens: number;       // Completion tokens generated
+  cache_read_tokens: number;   // Cached tokens read (prompt caching)
+  cache_creation_tokens: number; // Tokens written to cache
+  cost_usd: number;            // Calculated cost in USD
+  timestamp: string;           // ISO 8601 timestamp
+}
+```
+
+**Pricing (as of 2025-12-13)**:
+- Input tokens: $3.00 per million tokens
+- Output tokens: $15.00 per million tokens
+- Cache write: $3.75 per million tokens
+- Cache read: $0.30 per million tokens
+
+### State Files
+
+ADW state is stored in `automation/agents/{adw_id}/adw_state.json`:
+
+```json
+{
+  "adw_id": "adw_20251213_142600_518",
+  "issue_number": "518",
+  "branch_name": "feat/518-do-adw-integration",
+  "plan_file": "docs/specs/feature-518-do-adw-integration.md",
+  "issue_class": "feature",
+  "worktree_name": "feat-518-do-adw-integration",
+  "worktree_path": "/tmp/worktrees/feat-518-do-adw-integration",
+  "worktree_created_at": "2025-12-13T14:26:00Z",
+  "pr_created": false,
+  "extra": {
+    "metrics": {
+      "total_input_tokens": 125430,
+      "total_output_tokens": 18920,
+      "total_cost_usd": 0.6592
+    }
+  }
+}
+```
+
+## Observability
+
+ADW logs are accessible via symlink for easy discovery:
+
+**Paths**:
+- Symlink: `.claude/data/adw_logs/`
+- Actual: `automation/logs/kota-db-ts/`
+
+**Structure**:
+```
+.claude/data/adw_logs/
+  {env}/                          # Environment (local, ci, prod)
+    {adw_id}/                     # ADW execution ID
+      {agent_name}/               # Agent name (classify_issue, generate_branch, etc.)
+        raw_output.jsonl          # Streaming JSONL output
+        raw_output.json           # Parsed final output
+        prompts/                  # Generated prompts
+          {command_name}.txt      # Prompt text for command
+```
+
+**Example**:
+```
+.claude/data/adw_logs/
+  local/
+    adw_20251213_142600_518/
+      classify_issue/
+        raw_output.jsonl
+        raw_output.json
+        prompts/
+          classify_issue.txt
+      generate_branch/
+        raw_output.jsonl
+        raw_output.json
+        prompts/
+          generate_branch.txt
+```
+
+**Log Format** (JSONL):
+```json
+{"type": "message", "content": "Starting phase: scout"}
+{"type": "token_event", "data": {"input_tokens": 1250, "output_tokens": 320, "cost_usd": 0.0087}}
+{"type": "result", "status": "success", "output": "..."}
+```
+
+**Reading Logs**:
+```bash
+# View latest execution
+ls -t .claude/data/adw_logs/local/ | head -1
+
+# View agent output
+cat .claude/data/adw_logs/local/{adw_id}/{agent_name}/raw_output.json | jq
+
+# Stream real-time output
+tail -f .claude/data/adw_logs/local/{adw_id}/{agent_name}/raw_output.jsonl
+```
+
+**TypeScript State Reader**:
+```typescript
+import { readADWState, listADWWorkflows } from '@claude/utils/adw-state-reader';
+
+// Read specific workflow
+const state = readADWState('adw_20251213_142600_518');
+if (state) {
+  console.log(`Branch: ${state.branch_name}`);
+  console.log(`Spec: ${state.plan_file}`);
+}
+
+// List all workflows
+const workflows = listADWWorkflows();
+workflows.forEach(id => {
+  const state = readADWState(id);
+  // ... process state
+});
+```
