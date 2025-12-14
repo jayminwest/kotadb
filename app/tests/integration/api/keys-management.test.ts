@@ -478,3 +478,56 @@ describe("API Key Management Endpoints", () => {
 		});
 	});
 });
+
+describe("Rate Limit Configuration", () => {
+	it("verifies all tiers use correct rate limits from constants", async () => {
+		const tiers: Array<"free" | "solo" | "team"> = ["free", "solo", "team"];
+		
+		for (const tier of tiers) {
+			// Create a test user for this tier
+			const timestamp = Date.now();
+			const testEmail = `test-${tier}-${timestamp}@example.com`;
+			const testPassword = "test-password-123";
+			
+			const { data: authData, error: signUpError } = await getSupabaseTestClient().auth.signUp({
+				email: testEmail,
+				password: testPassword,
+			});
+			
+			if (signUpError || !authData.user) {
+				throw new Error(`Failed to create test user for ${tier}: ${signUpError?.message}`);
+			}
+			
+			const userId = authData.user.id;
+			
+			// Generate API key for this tier
+			const keyResult = await generateApiKey({
+				userId,
+				tier,
+			});
+			
+			// Verify rate_limit_per_hour matches RATE_LIMITS constant
+			const serviceClient = getServiceClient();
+			const { data: keyData } = await serviceClient
+				.from("api_keys")
+				.select("rate_limit_per_hour, tier")
+				.eq("key_id", keyResult.keyId)
+				.single();
+			
+			const expectedLimit = tier === "free" 
+				? RATE_LIMITS.FREE.HOURLY 
+				: tier === "solo" 
+					? RATE_LIMITS.SOLO.HOURLY 
+					: RATE_LIMITS.TEAM.HOURLY;
+			
+			expect(keyData?.rate_limit_per_hour).toBe(expectedLimit);
+			expect(keyData?.tier).toBe(tier);
+			
+			// Cleanup
+			await serviceClient.from("api_keys").delete().eq("user_id", userId);
+			await serviceClient.from("user_organizations").delete().eq("user_id", userId);
+			await serviceClient.from("organizations").delete().eq("owner_id", userId);
+			await getSupabaseTestClient().auth.admin.deleteUser(userId);
+		}
+	});
+});

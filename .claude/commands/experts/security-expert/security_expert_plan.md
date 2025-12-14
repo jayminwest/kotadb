@@ -102,6 +102,13 @@ FOR SELECT USING (
 - Revoked keys rejected before rate limit consumption (#385)
 - Invalid keys return 401 before consuming quota
 
+**Centralized Configuration (added after commit bf76afb):**
+- Rate limit constants centralized in @config/constants.ts
+- Prevents hardcoded magic numbers across codebase
+- Single source of truth for security thresholds (RATE_LIMITS, RETRY_CONFIG, THRESHOLDS)
+- Bcrypt rounds centralized: RETRY_CONFIG.BCRYPT_ROUNDS = 10
+- All security-critical values defined as constants for easy auditing
+
 ### Input Validation Patterns
 
 **Required Validations:**
@@ -139,7 +146,7 @@ FOR SELECT USING (
 2. **Cryptographic Failures**: bcrypt for key hashing, HTTPS only
 3. **Injection**: Parameterized queries, input validation
 4. **Insecure Design**: Auth context isolation, rate limiting
-5. **Security Misconfiguration**: Environment variable management
+5. **Security Misconfiguration**: Environment variable management, centralized config (bf76afb)
 6. **Identification Failures**: Strong API key format, secure generation
 7. **Security Logging Failures**: Sentry integration, structured logging (commit ed4c4f9)
 

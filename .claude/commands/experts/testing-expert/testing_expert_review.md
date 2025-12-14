@@ -22,6 +22,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Missing tests for new endpoints or tools
 - Tests that skip Supabase setup (`bun test:setup`)
 - Direct database manipulation without cleanup
+- Hardcoded configuration values instead of using `@config/constants` (0b37190)
 
 **Important Concerns (COMMENT level):**
 - Missing error path coverage
@@ -38,6 +39,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Tests that rely on global state without cleanup (rate limits, sessions)
 - Missing `beforeEach` cleanup for test data in projects/metadata (causes isolation failures - #431)
 - Queue workers not registered before enqueuing jobs (causes silent job failures - #431)
+- Hardcoded configuration values instead of importing from `@config/constants` (0b37190)
 
 **Antimocking Checklist:**
 - [ ] No `jest.mock()` or `bun.mock()` calls
@@ -61,12 +63,15 @@ REVIEW_CONTEXT: $ARGUMENTS
 - **Database cleanup in `beforeEach`**: Truncate test projects and metadata for test isolation (#431)
 - **Database cleanup in `afterEach`**: Delete created records to prevent constraint violations between tests (e79c11a)
 - **Real database UUIDs for fixtures**: Query database for foreign key values instead of hardcoding (#431)
+- **Import constants from `@config/constants`**: Never hardcode configuration values like rate limits (0b37190)
+- **Use test helper constants**: `TEST_USER_IDS` and `TEST_REPO_IDS` from `app/tests/helpers/db.ts` for consistent fixtures
 
 **Test Coverage Expectations:**
 - New endpoints: 100% integration test coverage
 - New MCP tools: Full request/response cycle tests
 - Auth changes: Token validation and rate limit tests
 - Database changes: Migration + query tests
+- Configuration changes: Tests using actual constant imports instead of hardcoded values
 
 **Timeout Management:**
 - Default Bun test timeout: 5000ms
@@ -80,6 +85,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Tests must show Supabase query logs when relevant
 - Rate limit tests must show counter increments in database
 - Auth tests must validate against real key storage
+- Configuration values must match constants imported from `@config/constants`
 
 ## Workflow
 

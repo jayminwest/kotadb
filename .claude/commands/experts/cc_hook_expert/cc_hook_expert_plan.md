@@ -63,6 +63,8 @@ USER_PROMPT: $ARGUMENTS
 **KotaDB Hook Implementations:**
 - `auto_linter.py`: PostToolUse hook for Biome linting after Write/Edit (30s timeout, uses bunx, searches for biome.json)
 - `context_builder.py`: UserPromptSubmit hook for contextual documentation (keyword matching with word boundaries, suggests /docs commands)
+- `orchestrator_context.py`: UserPromptSubmit hook for orchestrator pattern detection (detects /do, /workflows/orchestrator, /experts/orchestrators commands, persists state to JSON file) — Added after #214
+- `orchestrator_guard.py`: PreToolUse hook for enforcing orchestrator constraints (blocks Write/Edit in orchestrator context, delegates to build agents) — Added after #214
 - `utils/hook_helpers.py`: Shared utilities for JSON I/O and file detection (CLAUDE_PROJECT_DIR aware, always "continue" decision)
 
 **Anti-Patterns Discovered:**
@@ -73,6 +75,7 @@ USER_PROMPT: $ARGUMENTS
 - Blocking hooks for non-critical operations
 - Using print() instead of sys.stdout.write() with JSON output (after #485)
 - Biome config discovery: must search upward from file directory (pattern from #485)
+- Missing state file management for cross-process hook coordination (pattern from #214)
 
 ### Successful Patterns from #485 (Automation Hooks)
 
@@ -85,6 +88,7 @@ USER_PROMPT: $ARGUMENTS
 **Timeout Configurations:**
 - PostToolUse hooks (auto_linter): 45000ms (45s) in settings.json
 - UserPromptSubmit hooks (context_builder): 10000ms (10s) in settings.json
+- PreToolUse hooks (orchestrator_guard): 10000ms (10s) for fast decision making
 - Subprocess timeouts inside hook: 30s for Biome (prevents hanging)
 - Always nest subprocess timeouts inside overall hook timeout (Added after #485)
 
@@ -107,6 +111,32 @@ USER_PROMPT: $ARGUMENTS
   }
 }
 ```
+
+### Orchestrator Pattern (New from #214)
+
+**Orchestrator Context Detection:**
+- Pattern matching for /do, /workflows/orchestrator, /experts/orchestrators commands
+- Case-insensitive pattern matching with regex
+- Context persisted to `.claude/data/orchestrator_context.json` for cross-process coordination
+- State file includes: context_name, prompt_preview, timestamp, active boolean
+
+**State File Format:**
+```json
+{
+  "context_name": "do-router",
+  "prompt_preview": "first 200 chars of prompt",
+  "timestamp": "2025-12-11T10:07:13+00:00",
+  "active": true
+}
+```
+
+**Tool Blocking Pattern:**
+- PreToolUse hook reads context state from JSON file
+- Blocks modification tools: Write, Edit, MultiEdit, NotebookEdit
+- Allows delegation tools: Task, SlashCommand, Bash
+- Allows analysis tools: Read, Grep, Glob
+- Allows MCP tools: kotadb search, supabase operations
+- Decision: "block" with helpful message pointing to Task delegation pattern
 
 ### Integration Patterns
 
@@ -142,6 +172,41 @@ def output_result(decision: str, message: str = "") -> None:
 - Flush stdout after write to ensure immediate delivery
 - Include "additionalContext" key for feedback messages
 - Return empty dict on parse errors, don't crash (Added after #485)
+
+**State File Management (from #214):**
+```python
+from pathlib import Path
+import json
+from datetime import datetime, timezone
+
+STATE_FILE = Path(".claude/data/orchestrator_context.json")
+
+def persist_context(context_name: str, prompt: str) -> None:
+    STATE_FILE.parent.mkdir(parents=True, exist_ok=True)
+    state = {
+        "context_name": context_name,
+        "prompt_preview": prompt[:200] if prompt else "",
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+        "active": True,
+    }
+    # Atomic write: write to temp file then rename
+    temp_file = STATE_FILE.with_suffix(".tmp")
+    temp_file.write_text(json.dumps(state, indent=2))
+    temp_file.rename(STATE_FILE)
+
+def read_state() -> tuple[bool, str]:
+    if not STATE_FILE.exists():
+        return False, ""
+    try:
+        state = json.loads(STATE_FILE.read_text())
+        return state.get("active", False), state.get("context_name", "")
+    except (json.JSONDecodeError, OSError):
+        return False, ""
+```
+- Use atomic write with temp file + rename for safety
+- Always check parent directory and create if needed
+- Check environment variable first (same process), then state file (cross-process)
+- Handle JSON parse errors gracefully (Added after #214)
 
 **Error Handling (from #485):**
 ```python

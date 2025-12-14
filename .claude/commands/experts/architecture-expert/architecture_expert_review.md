@@ -28,6 +28,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Using console.* instead of @logging/logger (added after #436)
 - Missing idempotency in relationship operations (add/remove should succeed if already in desired state) (added after #470)
 - MCP tool handlers missing setUserContext() call for RLS enforcement (added after #508)
+- Hardcoded magic numbers (rates, cache TTL, batch sizes) instead of using @config/* constants (added after #438)
 
 **Important Concerns (COMMENT level):**
 - Large files (>300 lines) that should be split
@@ -45,28 +46,31 @@ REVIEW_CONTEXT: $ARGUMENTS
 ### Boundary Rules
 
 **@api/* can import:**
-- `@auth/*`, `@db/*`, `@indexer/*`, `@mcp/*`, `@validation/*`, `@queue/*`, `@shared/*`, `@logging/*`, `@github/*`
+- `@auth/*`, `@config/*`, `@db/*`, `@indexer/*`, `@mcp/*`, `@validation/*`, `@queue/*`, `@shared/*`, `@logging/*`, `@github/*`
 
 **@auth/* can import:**
-- `@db/*`, `@shared/*`, `@logging/*`
+- `@config/*`, `@db/*`, `@shared/*`, `@logging/*`
+
+**@config/* can import:**
+- Nothing (leaf module, configuration constants only, no dependencies)
 
 **@db/* can import:**
-- `@shared/*`, `@logging/*` only
+- `@config/*`, `@shared/*`, `@logging/*` only
 
 **@indexer/* can import:**
-- `@db/*`, `@shared/*`, `@logging/*`
+- `@config/*`, `@db/*`, `@shared/*`, `@logging/*`
 
 **@mcp/* can import:**
-- `@db/*`, `@indexer/*`, `@validation/*`, `@shared/*`, `@logging/*`, `@api/*` (added after #470 for project CRUD)
+- `@config/*`, `@db/*`, `@indexer/*`, `@validation/*`, `@shared/*`, `@logging/*`, `@api/*` (added after #470 for project CRUD)
 
 **@validation/* can import:**
-- `@shared/*`, `@logging/*` only
+- `@config/*`, `@shared/*`, `@logging/*` only
 
 **@queue/* can import:**
-- `@db/*`, `@shared/*`, `@logging/*`, `@indexer/*`
+- `@config/*`, `@db/*`, `@shared/*`, `@logging/*`, `@indexer/*`
 
 **@github/* can import:**
-- `@db/*`, `@shared/*`, `@logging/*`, `@queue/*` (added after #472)
+- `@config/*`, `@db/*`, `@shared/*`, `@logging/*`, `@queue/*` (added after #472)
 
 **@logging/* can import:**
 - Nothing (leaf module, no dependencies)

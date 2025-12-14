@@ -27,6 +27,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - bcrypt work factor below 10
 - Sensitive data in error responses
 - Missing revoked_at check in key validation (found in #385)
+- Hardcoded magic numbers in security-critical code (should use @config constants - bf76afb)
 
 **Important Concerns (COMMENT level):**
 - Missing input validation on user-supplied data
@@ -70,6 +71,13 @@ REVIEW_CONTEXT: $ARGUMENTS
 - [ ] SQL reserved keywords quoted (commit b1f0074)
 - [ ] ON CONFLICT for idempotent operations (commit c499925)
 
+**Configuration Management (added after bf76afb):**
+- [ ] Security constants use @config module (RATE_LIMITS, RETRY_CONFIG, THRESHOLDS)
+- [ ] No hardcoded magic numbers in security-critical code
+- [ ] Bcrypt rounds sourced from RETRY_CONFIG.BCRYPT_ROUNDS
+- [ ] Rate limits sourced from RATE_LIMITS constant
+- [ ] All security thresholds centralized and auditable
+
 ### Vulnerability Patterns Discovered
 
 **Missing RLS UPDATE Policy (discovered in #271):**
@@ -96,6 +104,12 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Remediation: Quote all reserved keywords in SQL
 - Prevention: Review SQL against PostgreSQL reserved keyword list
 
+**Hardcoded Security Constants (mitigated in bf76afb):**
+- Attack vector: Scattered magic numbers for rate limits, bcrypt rounds, retry counts
+- Impact: Difficult to audit security configuration, inconsistency across codebase
+- Remediation: Centralize all security constants in @config/constants.ts
+- Prevention: Use @config module for all security-critical values (RATE_LIMITS, RETRY_CONFIG, THRESHOLDS)
+
 ### Severity Ratings
 
 **CRITICAL (immediate fix required):**
@@ -110,6 +124,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Weak input validation
 - Service role misuse
 - Rate limit bypass (check both hourly and daily limits - #423)
+- Hardcoded security constants (should use @config - bf76afb)
 
 **MEDIUM (fix in follow-up):**
 - Overly verbose error messages
