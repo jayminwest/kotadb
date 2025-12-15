@@ -107,7 +107,7 @@ export function storeSymbolsLocal(
 	);
 
 	if (!fileResult) {
-		throw new Error(`File not found: ${'${fileId}'}`);
+		throw new Error(`File not found: ${fileId}`);
 	}
 
 	const repositoryId = fileResult.repository_id;
@@ -170,7 +170,7 @@ export function storeReferencesLocal(
 	);
 
 	if (!fileResult) {
-		throw new Error(`File not found: ${'${fileId}'}`);
+		throw new Error(`File not found: ${fileId}`);
 	}
 
 	const repositoryId = fileResult.repository_id;
@@ -237,7 +237,7 @@ export function searchFilesLocal(
 		FROM indexed_files_fts fts
 		JOIN indexed_files f ON fts.rowid = f.rowid
 		WHERE indexed_files_fts MATCH ?
-		${'${hasRepoFilter ? \'AND f.repository_id = ?\'  : \'\'}'}
+		${hasRepoFilter ? 'AND f.repository_id = ?' : ''}
 		ORDER BY bm25(indexed_files_fts)
 		LIMIT ?
 	`;

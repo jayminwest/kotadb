@@ -306,6 +306,8 @@ export async function storeReferences(
  * @param repositoryId - Repository UUID
  * @returns Number of dependencies stored
  */
+// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function storeDependencies(
 	client: SupabaseClient,
 	dependencies: Array<{
@@ -933,6 +935,8 @@ export interface IndexJobStatus {
  * @param jobId - Index job UUID
  * @returns Index job status or null if not found
  */
+// TODO(Phase 2B): index_jobs table is cloud-only, no local implementation needed
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function getIndexJobStatus(
 	client: SupabaseClient,
 	jobId: string,
@@ -963,6 +967,8 @@ export async function getIndexJobStatus(
  * @param userId - User UUID for RLS context
  * @returns Dependency result with direct/indirect relationships and cycles
  */
+// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function queryDependents(
 	client: SupabaseClient,
 	fileId: string,
@@ -1062,6 +1068,8 @@ export async function queryDependents(
  * @param userId - User UUID for RLS context
  * @returns Dependency result with direct/indirect relationships and cycles
  */
+// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function queryDependencies(
 	client: SupabaseClient,
 	fileId: string,
