@@ -25,6 +25,9 @@ import {
 	searchFilesLocal,
 	listRecentFilesLocal,
 	resolveFilePathLocal,
+	storeDependenciesLocal,
+	queryDependentsLocal,
+	queryDependenciesLocal,
 } from "@api/queries-local.js";
 import { storeIndexedDataLocal } from "@indexer/storage-local.js";
 import type { IndexedFile } from "@shared/types";
@@ -1011,6 +1014,486 @@ describe("SQLite Query Layer - queries-local.ts", () => {
 			);
 			expect(result?.signature).toBeNull();
 			expect(result?.documentation).toBeNull();
+		});
+	});
+});
+
+describe("Dependency Graph - Local Mode", () => {
+	let db: KotaDatabase;
+	const testRepoId = "test-repo-dep-graph";
+	let file1Id: string;
+	let file2Id: string;
+	let file3Id: string;
+	let file4Id: string;
+	let symbol1Id: string;
+	let symbol2Id: string;
+
+	beforeEach(() => {
+		// Create in-memory database
+		db = createDatabase({ path: ":memory:" });
+
+		// Apply schema with dependency_graph table
+		db.exec(`
+			CREATE TABLE repositories (
+				id TEXT PRIMARY KEY,
+				name TEXT NOT NULL,
+				full_name TEXT NOT NULL UNIQUE
+			);
+
+			CREATE TABLE indexed_files (
+				id TEXT PRIMARY KEY,
+				repository_id TEXT NOT NULL,
+				path TEXT NOT NULL,
+				content TEXT NOT NULL,
+				language TEXT,
+				size_bytes INTEGER,
+				content_hash TEXT,
+				indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
+				metadata TEXT DEFAULT '{}',
+				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
+				UNIQUE (repository_id, path)
+			);
+
+			CREATE TABLE indexed_symbols (
+				id TEXT PRIMARY KEY,
+				file_id TEXT NOT NULL,
+				repository_id TEXT NOT NULL,
+				name TEXT NOT NULL,
+				kind TEXT NOT NULL,
+				line_start INTEGER NOT NULL,
+				line_end INTEGER NOT NULL,
+				signature TEXT,
+				documentation TEXT,
+				metadata TEXT DEFAULT '{}',
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				FOREIGN KEY (file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
+				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
+				CHECK (kind IN ('function', 'class', 'interface', 'type', 'variable', 'constant', 'method', 'property', 'module', 'namespace', 'enum', 'enum_member'))
+			);
+
+			CREATE TABLE dependency_graph (
+				id TEXT PRIMARY KEY,
+				repository_id TEXT NOT NULL,
+				from_file_id TEXT,
+				to_file_id TEXT,
+				from_symbol_id TEXT,
+				to_symbol_id TEXT,
+				dependency_type TEXT NOT NULL,
+				metadata TEXT DEFAULT '{}',
+				created_at TEXT NOT NULL DEFAULT (datetime('now')),
+				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
+				FOREIGN KEY (from_file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
+				FOREIGN KEY (to_file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
+				FOREIGN KEY (from_symbol_id) REFERENCES indexed_symbols(id) ON DELETE CASCADE,
+				FOREIGN KEY (to_symbol_id) REFERENCES indexed_symbols(id) ON DELETE CASCADE,
+				CHECK (
+					(from_file_id IS NOT NULL AND to_file_id IS NOT NULL) OR
+					(from_symbol_id IS NOT NULL AND to_symbol_id IS NOT NULL)
+				),
+				CHECK (dependency_type IN ('file_import', 'symbol_usage'))
+			);
+
+			CREATE INDEX idx_dependency_graph_repository_id ON dependency_graph(repository_id);
+			CREATE INDEX idx_dependency_graph_from_file_id ON dependency_graph(from_file_id);
+			CREATE INDEX idx_dependency_graph_to_file_id ON dependency_graph(to_file_id);
+			CREATE INDEX idx_dependency_graph_from_symbol_id ON dependency_graph(from_symbol_id);
+			CREATE INDEX idx_dependency_graph_to_symbol_id ON dependency_graph(to_symbol_id);
+			CREATE INDEX idx_dependency_graph_dependency_type ON dependency_graph(dependency_type);
+			CREATE INDEX idx_dependency_graph_from_file_to_file ON dependency_graph(to_file_id, dependency_type);
+			CREATE INDEX idx_dependency_graph_composite ON dependency_graph(from_file_id, dependency_type);
+		`);
+
+		// Insert test repository
+		db.run(
+			"INSERT INTO repositories (id, name, full_name) VALUES (?, ?, ?)",
+			[testRepoId, "test-repo-dep", "owner/test-repo-dep"]
+		);
+
+		// Insert test files
+		file1Id = randomUUID();
+		file2Id = randomUUID();
+		file3Id = randomUUID();
+		file4Id = randomUUID();
+
+		db.run(
+			"INSERT INTO indexed_files (id, repository_id, path, content, language, size_bytes, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			[file1Id, testRepoId, "src/utils.ts", "export const util = 1;", "typescript", 24, new Date().toISOString()]
+		);
+		db.run(
+			"INSERT INTO indexed_files (id, repository_id, path, content, language, size_bytes, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			[file2Id, testRepoId, "src/lib.ts", "import { util } from './utils';", "typescript", 32, new Date().toISOString()]
+		);
+		db.run(
+			"INSERT INTO indexed_files (id, repository_id, path, content, language, size_bytes, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			[file3Id, testRepoId, "src/app.ts", "import { lib } from './lib';", "typescript", 28, new Date().toISOString()]
+		);
+		db.run(
+			"INSERT INTO indexed_files (id, repository_id, path, content, language, size_bytes, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			[file4Id, testRepoId, "tests/app.test.ts", "import { app } from '../src/app';", "typescript", 36, new Date().toISOString()]
+		);
+
+		// Insert test symbols
+		symbol1Id = randomUUID();
+		symbol2Id = randomUUID();
+
+		db.run(
+			"INSERT INTO indexed_symbols (id, file_id, repository_id, name, kind, line_start, line_end) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			[symbol1Id, file1Id, testRepoId, "util", "constant", 1, 1]
+		);
+		db.run(
+			"INSERT INTO indexed_symbols (id, file_id, repository_id, name, kind, line_start, line_end) VALUES (?, ?, ?, ?, ?, ?, ?)",
+			[symbol2Id, file2Id, testRepoId, "processUtil", "function", 2, 5]
+		);
+	});
+
+	afterEach(() => {
+		if (db) {
+			db.close();
+		}
+	});
+
+	describe("storeDependenciesLocal()", () => {
+		test("should store file-level dependencies", () => {
+			const dependencies = [
+				{
+					repositoryId: testRepoId,
+					fromFileId: file2Id,
+					toFileId: file1Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: { importPath: "./utils" },
+				},
+				{
+					repositoryId: testRepoId,
+					fromFileId: file3Id,
+					toFileId: file2Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: { importPath: "./lib" },
+				},
+			];
+
+			const count = storeDependenciesLocal(db, dependencies);
+
+			expect(count).toBe(2);
+
+			const rows = db.query<{ from_file_id: string; to_file_id: string; dependency_type: string }>(
+				"SELECT from_file_id, to_file_id, dependency_type FROM dependency_graph ORDER BY from_file_id"
+			);
+
+			expect(rows.length).toBe(2);
+			expect(rows[0]?.dependency_type).toBe("file_import");
+		});
+
+		test("should store symbol-level dependencies", () => {
+			const dependencies = [
+				{
+					repositoryId: testRepoId,
+					fromFileId: null,
+					toFileId: null,
+					fromSymbolId: symbol2Id,
+					toSymbolId: symbol1Id,
+					dependencyType: "symbol_usage" as const,
+					metadata: { usageType: "call" },
+				},
+			];
+
+			const count = storeDependenciesLocal(db, dependencies);
+
+			expect(count).toBe(1);
+
+			const row = db.queryOne<{ from_symbol_id: string; to_symbol_id: string }>(
+				"SELECT from_symbol_id, to_symbol_id FROM dependency_graph"
+			);
+
+			expect(row?.from_symbol_id).toBe(symbol2Id);
+			expect(row?.to_symbol_id).toBe(symbol1Id);
+		});
+
+		test("should handle empty array", () => {
+			const count = storeDependenciesLocal(db, []);
+			expect(count).toBe(0);
+		});
+
+		test("should serialize metadata as JSON", () => {
+			const dependencies = [
+				{
+					repositoryId: testRepoId,
+					fromFileId: file2Id,
+					toFileId: file1Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: { foo: "bar", nested: { value: 42 } },
+				},
+			];
+
+			storeDependenciesLocal(db, dependencies);
+
+			const row = db.queryOne<{ metadata: string }>("SELECT metadata FROM dependency_graph");
+			const parsed = JSON.parse(row?.metadata || "{}");
+
+			expect(parsed.foo).toBe("bar");
+			expect(parsed.nested.value).toBe(42);
+		});
+
+		test("should use transaction for atomic insert", () => {
+			const dependencies = Array.from({ length: 10 }, (_, i) => ({
+				repositoryId: testRepoId,
+				fromFileId: file3Id,
+				toFileId: file1Id,
+				fromSymbolId: null,
+				toSymbolId: null,
+				dependencyType: "file_import" as const,
+				metadata: { index: i },
+			}));
+
+			const count = storeDependenciesLocal(db, dependencies);
+
+			expect(count).toBe(10);
+
+			const totalCount = db.queryOne<{ count: number }>(
+				"SELECT COUNT(*) as count FROM dependency_graph"
+			);
+			expect(totalCount?.count).toBe(10);
+		});
+	});
+
+	describe("queryDependentsLocal()", () => {
+		beforeEach(() => {
+			// Set up dependency chain: file4 -> file3 -> file2 -> file1
+			const deps = [
+				{
+					repositoryId: testRepoId,
+					fromFileId: file2Id,
+					toFileId: file1Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: {},
+				},
+				{
+					repositoryId: testRepoId,
+					fromFileId: file3Id,
+					toFileId: file2Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: {},
+				},
+				{
+					repositoryId: testRepoId,
+					fromFileId: file4Id,
+					toFileId: file3Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: {},
+				},
+			];
+
+			storeDependenciesLocal(db, deps);
+		});
+
+		test("should return direct dependents (depth 1)", () => {
+			const results = queryDependentsLocal(db, testRepoId, file1Id, null, 1);
+
+			expect(results.length).toBe(1);
+			expect(results[0]?.file_path).toBe("src/lib.ts");
+			expect(results[0]?.depth).toBe(1);
+		});
+
+		test("should return multi-level dependents (depth 3)", () => {
+			const results = queryDependentsLocal(db, testRepoId, file1Id, null, 3);
+
+			expect(results.length).toBe(3);
+			
+			// Check all three levels are present
+			const depths = results.map(r => r.depth);
+			expect(depths).toContain(1);
+			expect(depths).toContain(2);
+			expect(depths).toContain(3);
+
+			// Check paths
+			const paths = results.map(r => r.file_path);
+			expect(paths).toContain("src/lib.ts");
+			expect(paths).toContain("src/app.ts");
+			expect(paths).toContain("tests/app.test.ts");
+		});
+
+		test("should respect depth limit", () => {
+			const results = queryDependentsLocal(db, testRepoId, file1Id, null, 2);
+
+			expect(results.length).toBe(2);
+			expect(results.every(r => r.depth <= 2)).toBe(true);
+		});
+
+		test("should detect cycles", () => {
+			// Create a cycle: file1 -> file2 -> file3 -> file1
+			const cycleDep = {
+				repositoryId: testRepoId,
+				fromFileId: file1Id,
+				toFileId: file3Id,
+				fromSymbolId: null,
+				toSymbolId: null,
+				dependencyType: "file_import" as const,
+				metadata: {},
+			};
+
+			storeDependenciesLocal(db, [cycleDep]);
+
+			// Query should complete without infinite loop
+			const results = queryDependentsLocal(db, testRepoId, file1Id, null, 5);
+
+			// Should still return results, but not infinite
+			expect(results.length).toBeGreaterThan(0);
+			expect(results.length).toBeLessThan(100); // Sanity check
+		});
+
+		test("should filter by symbol when provided", () => {
+			// Add symbol-level dependency
+			const symbolDep = {
+				repositoryId: testRepoId,
+				fromFileId: null,
+				toFileId: null,
+				fromSymbolId: symbol2Id,
+				toSymbolId: symbol1Id,
+				dependencyType: "symbol_usage" as const,
+				metadata: {},
+			};
+
+			storeDependenciesLocal(db, [symbolDep]);
+
+			const results = queryDependentsLocal(db, testRepoId, null, symbol1Id, 2);
+
+			expect(results.length).toBeGreaterThan(0);
+			expect(results[0]?.symbol_name).toBe("processUtil");
+		});
+
+		test("should return empty array when no dependents exist", () => {
+			const results = queryDependentsLocal(db, testRepoId, file4Id, null, 5);
+
+			expect(results.length).toBe(0);
+		});
+	});
+
+	describe("queryDependenciesLocal()", () => {
+		beforeEach(() => {
+			// Set up dependency chain: file4 -> file3 -> file2 -> file1
+			const deps = [
+				{
+					repositoryId: testRepoId,
+					fromFileId: file2Id,
+					toFileId: file1Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: {},
+				},
+				{
+					repositoryId: testRepoId,
+					fromFileId: file3Id,
+					toFileId: file2Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: {},
+				},
+				{
+					repositoryId: testRepoId,
+					fromFileId: file4Id,
+					toFileId: file3Id,
+					fromSymbolId: null,
+					toSymbolId: null,
+					dependencyType: "file_import" as const,
+					metadata: {},
+				},
+			];
+
+			storeDependenciesLocal(db, deps);
+		});
+
+		test("should return direct dependencies (depth 1)", () => {
+			const results = queryDependenciesLocal(db, testRepoId, file2Id, null, 1);
+
+			expect(results.length).toBe(1);
+			expect(results[0]?.file_path).toBe("src/utils.ts");
+			expect(results[0]?.depth).toBe(1);
+		});
+
+		test("should return multi-level dependencies (depth 3)", () => {
+			const results = queryDependenciesLocal(db, testRepoId, file4Id, null, 3);
+
+			expect(results.length).toBe(3);
+			
+			// Check all three levels are present
+			const depths = results.map(r => r.depth);
+			expect(depths).toContain(1);
+			expect(depths).toContain(2);
+			expect(depths).toContain(3);
+
+			// Check paths
+			const paths = results.map(r => r.file_path);
+			expect(paths).toContain("src/utils.ts");
+			expect(paths).toContain("src/lib.ts");
+			expect(paths).toContain("src/app.ts");
+		});
+
+		test("should respect depth limit", () => {
+			const results = queryDependenciesLocal(db, testRepoId, file4Id, null, 2);
+
+			expect(results.length).toBe(2);
+			expect(results.every(r => r.depth <= 2)).toBe(true);
+		});
+
+		test("should detect cycles", () => {
+			// Create a cycle: file1 -> file2 -> file3 -> file1
+			const cycleDep = {
+				repositoryId: testRepoId,
+				fromFileId: file1Id,
+				toFileId: file3Id,
+				fromSymbolId: null,
+				toSymbolId: null,
+				dependencyType: "file_import" as const,
+				metadata: {},
+			};
+
+			storeDependenciesLocal(db, [cycleDep]);
+
+			// Query should complete without infinite loop
+			const results = queryDependenciesLocal(db, testRepoId, file3Id, null, 5);
+
+			// Should still return results, but not infinite
+			expect(results.length).toBeGreaterThan(0);
+			expect(results.length).toBeLessThan(100); // Sanity check
+		});
+
+		test("should filter by symbol when provided", () => {
+			// Add symbol-level dependency
+			const symbolDep = {
+				repositoryId: testRepoId,
+				fromFileId: null,
+				toFileId: null,
+				fromSymbolId: symbol2Id,
+				toSymbolId: symbol1Id,
+				dependencyType: "symbol_usage" as const,
+				metadata: {},
+			};
+
+			storeDependenciesLocal(db, [symbolDep]);
+
+			const results = queryDependenciesLocal(db, testRepoId, null, symbol2Id, 2);
+
+			expect(results.length).toBeGreaterThan(0);
+			expect(results[0]?.symbol_name).toBe("util");
+		});
+
+		test("should return empty array when no dependencies exist", () => {
+			const results = queryDependenciesLocal(db, testRepoId, file1Id, null, 5);
+
+			expect(results.length).toBe(0);
 		});
 	});
 });

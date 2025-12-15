@@ -13,7 +13,10 @@ import {
 	storeReferencesLocal,
 	searchFilesLocal,
 	listRecentFilesLocal,
-	resolveFilePathLocal
+	resolveFilePathLocal,
+	storeDependenciesLocal,
+	queryDependentsLocalWrapped,
+	queryDependenciesLocalWrapped
 } from "./queries-local.js";
 
 const logger = createLogger({ module: "api-queries" });
@@ -306,8 +309,6 @@ export async function storeReferences(
  * @param repositoryId - Repository UUID
  * @returns Number of dependencies stored
  */
-// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
-// See: https://github.com/kotadb/kotadb/issues/539
 export async function storeDependencies(
 	client: SupabaseClient,
 	dependencies: Array<{
@@ -324,6 +325,14 @@ export async function storeDependencies(
 	if (dependencies.length === 0) {
 		return 0;
 	}
+
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return storeDependenciesLocal(db, dependencies);
+	}
+
+	// Cloud mode: existing Supabase logic
 
 	const records = dependencies.map((dep) => ({
 		repository_id: dep.repositoryId,
@@ -967,8 +976,6 @@ export async function getIndexJobStatus(
  * @param userId - User UUID for RLS context
  * @returns Dependency result with direct/indirect relationships and cycles
  */
-// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
-// See: https://github.com/kotadb/kotadb/issues/539
 export async function queryDependents(
 	client: SupabaseClient,
 	fileId: string,
@@ -976,6 +983,13 @@ export async function queryDependents(
 	includeTests: boolean,
 	userId: string,
 ): Promise<DependencyResult> {
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return queryDependentsLocalWrapped(db, fileId, depth, includeTests);
+	}
+
+	// Cloud mode: existing Supabase logic
 	const visited = new Set<string>();
 	const direct: string[] = [];
 	const indirect: Record<string, string[]> = {};
@@ -1068,14 +1082,19 @@ export async function queryDependents(
  * @param userId - User UUID for RLS context
  * @returns Dependency result with direct/indirect relationships and cycles
  */
-// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
-// See: https://github.com/kotadb/kotadb/issues/539
 export async function queryDependencies(
 	client: SupabaseClient,
 	fileId: string,
 	depth: number,
 	userId: string,
 ): Promise<DependencyResult> {
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return queryDependenciesLocalWrapped(db, fileId, depth);
+	}
+
+	// Cloud mode: existing Supabase logic
 	const visited = new Set<string>();
 	const direct: string[] = [];
 	const indirect: Record<string, string[]> = {};
