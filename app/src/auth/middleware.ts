@@ -8,9 +8,21 @@
 import type { AuthContext } from "@shared/types/auth";
 import { enforceRateLimit } from "@auth/rate-limit";
 import { updateLastUsed, validateApiKey, validateJwtToken } from "@auth/validator";
+import { isLocalMode } from "@config/environment";
 import { createLogger } from "@logging/logger";
 
 const logger = createLogger();
+
+/**
+ * Local mode authentication context (no real user).
+ * Uses a placeholder user ID for local-only operations.
+ */
+const LOCAL_AUTH_CONTEXT: AuthContext = {
+	userId: "local-user",
+	tier: "team", // Full access in local mode (highest tier)
+	keyId: "local-key",
+	rateLimitPerHour: Number.MAX_SAFE_INTEGER, // No rate limits locally
+};
 
 /**
  * Result of authentication request.
@@ -38,6 +50,12 @@ export interface AuthResult {
 export async function authenticateRequest(
 	request: Request,
 ): Promise<AuthResult> {
+	// BYPASS: Local mode - no authentication required
+	if (isLocalMode()) {
+		logger.debug("Local mode: Bypassing authentication");
+		return { context: LOCAL_AUTH_CONTEXT };
+	}
+
 	// Extract Authorization header
 	const authHeader = request.headers.get("Authorization");
 

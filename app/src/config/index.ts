@@ -10,3 +10,11 @@ export {
 	THRESHOLDS,
 	INDEXER_CONFIG,
 } from './constants';
+
+export type { EnvironmentConfig } from './environment';
+
+export {
+	getEnvironmentConfig,
+	isLocalMode,
+	clearEnvironmentCache,
+} from './environment';

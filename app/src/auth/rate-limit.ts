@@ -17,6 +17,7 @@ import {
 } from "@app-types/rate-limit";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { isLocalMode } from "@config/environment";
 
 const logger = createLogger({ module: "auth-rate-limit" });
 
@@ -267,6 +268,16 @@ export async function enforceRateLimit(
 	keyId: string,
 	tier: Tier,
 ): Promise<RateLimitResult> {
+	// BYPASS: Local mode - no rate limiting
+	if (isLocalMode()) {
+		return {
+			allowed: true,
+			limit: Number.MAX_SAFE_INTEGER,
+			remaining: Number.MAX_SAFE_INTEGER,
+			resetAt: Math.floor(Date.now() / 1000) + 3600, // 1 hour from now
+		};
+	}
+
 	const hourlyLimit = RATE_LIMITS[tier];
 	const dailyLimit = DAILY_RATE_LIMITS[tier];
 
