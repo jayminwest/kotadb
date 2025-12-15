@@ -1570,11 +1570,11 @@ export async function handleToolCall(
 		case "remove_repository_from_project":
 			return await executeRemoveRepositoryFromProject(supabase, params, requestId, userId);
 		case "get_index_job_status":
+			return await executeGetIndexJobStatus(supabase, params, requestId, userId);
 		case "kota_sync_export":
 			return await executeSyncExport(params, requestId);
 		case "kota_sync_import":
 			return await executeSyncImport(params, requestId);
-			return await executeGetIndexJobStatus(supabase, params, requestId, userId);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}
