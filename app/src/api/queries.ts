@@ -5,6 +5,16 @@ import type { IndexRequest, IndexedFile } from "@shared/types";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getInstallationForRepository } from "../github/installation-lookup";
 import { Sentry } from "../instrument.js";
+import { isLocalMode } from "@config/environment.js";
+import { getGlobalDatabase } from "@db/sqlite/index.js";
+import {
+	saveIndexedFilesLocal,
+	storeSymbolsLocal,
+	storeReferencesLocal,
+	searchFilesLocal,
+	listRecentFilesLocal,
+	resolveFilePathLocal
+} from "./queries-local.js";
 
 const logger = createLogger({ module: "api-queries" });
 
@@ -118,6 +128,14 @@ export async function saveIndexedFiles(
 		return 0;
 	}
 
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return saveIndexedFilesLocal(db, files, repositoryId);
+	}
+
+	// Cloud mode: existing Supabase logic
+
 	const records = files.map((file) => ({
 		repository_id: repositoryId,
 		path: file.path,
@@ -160,6 +178,14 @@ export async function storeSymbols(
 	if (symbols.length === 0) {
 		return 0;
 	}
+
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return storeSymbolsLocal(db, symbols, fileId);
+	}
+
+	// Cloud mode: existing Supabase logic
 
 	const records = symbols.map((symbol) => ({
 		file_id: fileId,
@@ -208,6 +234,14 @@ export async function storeReferences(
 	if (references.length === 0) {
 		return 0;
 	}
+
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return storeReferencesLocal(db, references, fileId);
+	}
+
+	// Cloud mode: existing Supabase logic
 
 	const records = references.map((ref) => ({
 		source_file_id: fileId,
@@ -272,6 +306,8 @@ export async function storeReferences(
  * @param repositoryId - Repository UUID
  * @returns Number of dependencies stored
  */
+// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function storeDependencies(
 	client: SupabaseClient,
 	dependencies: Array<{
@@ -329,6 +365,14 @@ export async function searchFiles(
 	options: SearchOptions = {},
 ): Promise<IndexedFile[]> {
 	const limit = Math.min(Math.max(options.limit ?? 20, 1), 100);
+
+	// Local mode: Use SQLite FTS5
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return searchFilesLocal(db, term, options.repositoryId, limit);
+	}
+
+	// Cloud mode: existing Supabase logic
 
 	// If project filter is specified, get repository IDs for that project
 	let repositoryIds: string[] | undefined;
@@ -393,6 +437,13 @@ export async function listRecentFiles(
 	limit: number,
 	userId: string,
 ): Promise<IndexedFile[]> {
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return listRecentFilesLocal(db, limit);
+	}
+
+	// Cloud mode: existing Supabase logic
 	const { data, error } = await client
 		.from("indexed_files")
 		.select("id, repository_id, path, content, metadata, indexed_at")
@@ -826,6 +877,13 @@ export async function resolveFilePath(
 	repositoryId: string,
 	userId: string,
 ): Promise<string | null> {
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return resolveFilePathLocal(db, filePath, repositoryId);
+	}
+
+	// Cloud mode: existing Supabase logic
 	const { data, error } = await client
 		.from("indexed_files")
 		.select("id")
@@ -877,6 +935,8 @@ export interface IndexJobStatus {
  * @param jobId - Index job UUID
  * @returns Index job status or null if not found
  */
+// TODO(Phase 2B): index_jobs table is cloud-only, no local implementation needed
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function getIndexJobStatus(
 	client: SupabaseClient,
 	jobId: string,
@@ -907,6 +967,8 @@ export async function getIndexJobStatus(
  * @param userId - User UUID for RLS context
  * @returns Dependency result with direct/indirect relationships and cycles
  */
+// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function queryDependents(
 	client: SupabaseClient,
 	fileId: string,
@@ -1006,6 +1068,8 @@ export async function queryDependents(
  * @param userId - User UUID for RLS context
  * @returns Dependency result with direct/indirect relationships and cycles
  */
+// TODO(Phase 2B): Add SQLite implementation when dependency_graph table is added to SQLite schema
+// See: https://github.com/kotadb/kotadb/issues/539
 export async function queryDependencies(
 	client: SupabaseClient,
 	fileId: string,

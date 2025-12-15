@@ -8,6 +8,9 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { isLocalMode } from "@config/environment.js";
+import { getGlobalDatabase } from "@db/sqlite/index.js";
+import { storeIndexedDataLocal } from "./storage-local.js";
 
 const logger = createLogger({ module: "indexer-storage" });
 
@@ -102,6 +105,13 @@ export async function storeIndexedData(
 	dependencyGraph: DependencyGraphEntry[],
 	skipDelete = false,
 ): Promise<StorageResult> {
+	// Local mode: Use SQLite
+	if (isLocalMode()) {
+		const db = getGlobalDatabase();
+		return storeIndexedDataLocal(db, repositoryId, files, symbols, references, dependencyGraph);
+	}
+
+	// Cloud mode: existing Supabase RPC
 	const { data, error } = await supabase.rpc("store_indexed_data", {
 		p_repository_id: repositoryId,
 		p_files: files,
