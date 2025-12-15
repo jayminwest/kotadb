@@ -1,33 +1,68 @@
 {
-	"compilerOptions": {
-		"target": "ES2022",
-		"module": "ESNext",
-		"moduleDetection": "force",
-		"moduleResolution": "bundler",
-		"lib": ["ESNext"],
-		"allowImportingTsExtensions": true,
-		"resolveJsonModule": true,
-		"strict": true,
-		"skipLibCheck": true,
-		"noEmit": true,
-		"noFallthroughCasesInSwitch": true,
-		"noUncheckedIndexedAccess": true,
-		"baseUrl": ".",
-		"paths": {
-			"@api/*": ["src/api/*"],
-			"@auth/*": ["src/auth/*"],
-			"@config/*": ["src/config/*"],
-			"@db/*": ["src/db/*"],
-			"@indexer/*": ["src/indexer/*"],
-			"@shared/*": ["../shared/*"],
-			"@mcp/*": ["src/mcp/*"],
-			"@validation/*": ["src/validation/*"],
-			"@queue/*": ["src/queue/*"],
-			"@github/*": ["src/github/*"],
-			"@app-types/*": ["src/types/*"],
-			"@logging/*": ["src/logging/*"]
-		},
-		"types": ["bun-types", "node"]
-	},
-	"include": ["src/**/*.ts", "tests/**/*.ts"]
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleDetection": "force",
+    "moduleResolution": "bundler",
+    "lib": [
+      "ESNext"
+    ],
+    "allowImportingTsExtensions": true,
+    "resolveJsonModule": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "noEmit": true,
+    "noFallthroughCasesInSwitch": true,
+    "noUncheckedIndexedAccess": true,
+    "baseUrl": ".",
+    "paths": {
+      "@api/*": [
+        "src/api/*"
+      ],
+      "@auth/*": [
+        "src/auth/*"
+      ],
+      "@config/*": [
+        "src/config/*"
+      ],
+      "@db/*": [
+        "src/db/*"
+      ],
+      "@indexer/*": [
+        "src/indexer/*"
+      ],
+      "@shared/*": [
+        "../shared/*"
+      ],
+      "@mcp/*": [
+        "src/mcp/*"
+      ],
+      "@validation/*": [
+        "src/validation/*"
+      ],
+      "@queue/*": [
+        "src/queue/*"
+      ],
+      "@github/*": [
+        "src/github/*"
+      ],
+      "@app-types/*": [
+        "src/types/*"
+      ],
+      "@logging/*": [
+        "src/logging/*"
+      ],
+      "@sync/*": [
+        "src/sync/*"
+      ]
+    },
+    "types": [
+      "bun-types",
+      "node"
+    ]
+  },
+  "include": [
+    "src/**/*.ts",
+    "tests/**/*.ts"
+  ]
 }
