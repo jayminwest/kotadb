@@ -4,19 +4,51 @@
  * Provides service role and anon clients for different access patterns:
  * - Service role: Full access for authentication and admin operations
  * - Anon: RLS-enforced access for user-scoped queries
+ * 
+ * Supports both cloud mode (Supabase) and local mode (SQLite).
  */
 
 import { type SupabaseClient, createClient } from "@supabase/supabase-js";
+import { isLocalMode } from "@config/environment";
+import { getGlobalDatabase, type KotaDatabase } from "@db/sqlite/sqlite-client";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
 
 const logger = createLogger({ module: "db-client" });
 
 /**
+ * Database client type (union of Supabase and SQLite clients)
+ */
+export type DatabaseClient = SupabaseClient | KotaDatabase;
+
+/**
+ * Get the appropriate database client based on environment mode.
+ * 
+ * - Local mode: Returns KotaDatabase (SQLite)
+ * - Cloud mode: Returns SupabaseClient (service role)
+ */
+export function getClient(): DatabaseClient {
+	if (isLocalMode()) {
+		logger.debug("Using local SQLite database");
+		return getGlobalDatabase();
+	}
+	
+	logger.debug("Using Supabase cloud database");
+	return getServiceClient();
+}
+
+/**
  * Get Supabase service role client (full access, bypasses RLS).
  * Used for authentication queries and admin operations.
+ * 
+ * @throws {Error} If called in local mode - use getClient() instead
  */
 export function getServiceClient(): SupabaseClient {
+	// Error if called in local mode
+	if (isLocalMode()) {
+		throw new Error('getServiceClient() called in local mode - use getClient() instead');
+	}
+
 	try {
 		const supabaseUrl = process.env.SUPABASE_URL;
 		const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
