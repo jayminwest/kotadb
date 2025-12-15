@@ -19,7 +19,7 @@ const logger = createLogger();
  */
 const LOCAL_AUTH_CONTEXT: AuthContext = {
 	userId: "local-user",
-	tier: "team", // Full access in local mode (highest tier)
+	tier: "team", // Full access in local mode (highest available tier)
 	keyId: "local-key",
 	rateLimitPerHour: Number.MAX_SAFE_INTEGER, // No rate limits locally
 };
