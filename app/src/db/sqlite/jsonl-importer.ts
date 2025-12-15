@@ -36,12 +36,15 @@ interface TableImportConfig {
 }
 
 /**
- * Default table import configurations
+ * Default table import configurations.
+ *
+ * Local-first essentials only - code intelligence tables for indexing and search.
+ * Cloud-centric tables (users, api_keys, rate_limit_*) are excluded from defaults
+ * per the local-first pivot (#534). Custom table configuration is still supported
+ * for future sync tier functionality.
  */
 const DEFAULT_IMPORT_CONFIGS: TableImportConfig[] = [
-	{ name: "users", primaryKey: "id", requiredFields: ["id", "email", "tier"] },
-	{ name: "api_keys", primaryKey: "id", requiredFields: ["id", "user_id", "name"] },
-	{ name: "repositories", primaryKey: "id", requiredFields: ["id", "user_id", "name"] },
+	{ name: "repositories", primaryKey: "id", requiredFields: ["id", "name"] },
 	{ name: "indexed_files", primaryKey: "id", requiredFields: ["id", "repository_id", "path"] },
 	{ name: "indexed_symbols", primaryKey: "id", requiredFields: ["id", "file_id", "name"] },
 	{ name: "indexed_references", primaryKey: "id", requiredFields: ["id", "file_id", "symbol_name"] },

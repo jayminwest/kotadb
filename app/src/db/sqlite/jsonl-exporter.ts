@@ -45,11 +45,14 @@ interface TableExportConfig {
 }
 
 /**
- * Default tables to export
+ * Default tables to export.
+ *
+ * Local-first essentials only - code intelligence tables for indexing and search.
+ * Cloud-centric tables (users, api_keys, rate_limit_*) are excluded from defaults
+ * per the local-first pivot (#534). Custom table configuration is still supported
+ * for future sync tier functionality.
  */
 const DEFAULT_TABLES: TableExportConfig[] = [
-	{ name: "users", excludeFields: [] },
-	{ name: "api_keys", excludeFields: ["key_hash"] }, // Never export hashes
 	{ name: "repositories" },
 	{ name: "indexed_files" },
 	{ name: "indexed_symbols" },
