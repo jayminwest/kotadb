@@ -1,6 +1,8 @@
 /**
  * MCP tool definitions and execution adapters
  */
+import type { KotaDatabase } from "@db/sqlite/sqlite-client.js";
+
 
 import {
 	addRepositoryToProject,
@@ -493,6 +495,8 @@ export function getToolDefinitions(): ToolDefinition[] {
 		ADD_REPOSITORY_TO_PROJECT_TOOL,
 		REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 		GET_INDEX_JOB_STATUS_TOOL,
+		SYNC_EXPORT_TOOL,
+		SYNC_IMPORT_TOOL,
 	];
 }
 
@@ -1450,6 +1454,85 @@ export async function executeGetIndexJobStatus(
 }
 
 /**
+
+/**
+ * Execute kota_sync_export tool
+ */
+export async function executeSyncExport(
+	params: unknown,
+	_requestId: string | number
+): Promise<unknown> {
+	// Validate params
+	if (params !== undefined && (typeof params !== "object" || params === null)) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown> | undefined;
+	const force = p?.force === true;
+	const exportDir = typeof p?.export_dir === "string" ? p.export_dir : undefined;
+
+	const { getClient } = await import("@db/client.js");
+	const { createExporter } = await import("@db/sqlite/jsonl-exporter.js");
+
+	const db = getClient() as KotaDatabase;
+	const exporter = createExporter(db, exportDir);
+
+	// Force export or use normal flow with change detection
+	const result = await exporter.exportNow();
+
+	return {
+		success: true,
+		tables_exported: result.tablesExported,
+		tables_skipped: result.tablesSkipped,
+		total_rows: result.totalRows,
+		duration_ms: result.durationMs,
+		export_dir: exportDir || "~/.kotadb/export"
+	};
+}
+
+/**
+ * Execute kota_sync_import tool
+ */
+export async function executeSyncImport(
+	params: unknown,
+	_requestId: string | number
+): Promise<unknown> {
+	// Validate params
+	if (params !== undefined && (typeof params !== "object" || params === null)) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown> | undefined;
+	const importDir = typeof p?.import_dir === "string" ? p.import_dir : undefined;
+
+	const { getClient } = await import("@db/client.js");
+	const { importFromJSONL } = await import("@db/sqlite/jsonl-importer.js");
+	const { getDefaultExportDir } = await import("@db/sqlite/jsonl-exporter.js");
+
+	const db = getClient() as KotaDatabase;
+	const dir = importDir || getDefaultExportDir();
+
+	const result = await importFromJSONL(db, dir);
+
+	if (result.errors.length > 0) {
+		return {
+			success: false,
+			tables_imported: result.tablesImported,
+			rows_imported: result.totalRowsImported,
+			errors: result.errors,
+			duration_ms: result.durationMs
+		};
+	}
+
+	return {
+		success: true,
+		tables_imported: result.tablesImported,
+		rows_imported: result.totalRowsImported,
+		duration_ms: result.durationMs,
+		import_dir: dir
+	};
+}
+/**
  * Main tool call dispatcher
  */
 export async function handleToolCall(
@@ -1488,7 +1571,49 @@ export async function handleToolCall(
 			return await executeRemoveRepositoryFromProject(supabase, params, requestId, userId);
 		case "get_index_job_status":
 			return await executeGetIndexJobStatus(supabase, params, requestId, userId);
+		case "kota_sync_export":
+			return await executeSyncExport(params, requestId);
+		case "kota_sync_import":
+			return await executeSyncImport(params, requestId);
 		default:
 			throw invalidParams(requestId, `Unknown tool: ${toolName}`);
 	}
 }
+
+/**
+ * Tool: kota_sync_export
+ */
+export const SYNC_EXPORT_TOOL: ToolDefinition = {
+	name: "kota_sync_export",
+	description: "Export local SQLite database to JSONL files for git sync. Uses hash-based change detection to skip unchanged tables. Exports to ~/.kotadb/export/ by default.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			force: {
+				type: "boolean",
+				description: "Force export even if tables unchanged (default: false)"
+			},
+			export_dir: {
+				type: "string",
+				description: "Optional: Custom export directory path"
+			}
+		}
+	}
+};
+
+/**
+ * Tool: kota_sync_import
+ */
+export const SYNC_IMPORT_TOOL: ToolDefinition = {
+	name: "kota_sync_import",
+	description: "Import JSONL files into local SQLite database. Applies deletion manifest first, then imports all tables transactionally. Typically run after git pull to sync remote changes.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			import_dir: {
+				type: "string",
+				description: "Optional: Custom import directory path (default: ~/.kotadb/export)"
+			}
+		}
+	}
+};

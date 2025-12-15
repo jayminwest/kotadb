@@ -16,6 +16,7 @@
 
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { applyDeletionManifest } from "@sync/deletion-manifest.js";
 import { createLogger } from "@logging/logger.js";
 import type { KotaDatabase } from "./sqlite-client.js";
 
@@ -101,6 +102,17 @@ export async function importFromJSONL(
 		import_dir: importDir,
 		tables: configs.map((c) => c.name),
 	});
+
+	// Apply deletion manifest first
+	const deletionManifestPath = join(importDir, ".deletions.jsonl");
+	if (existsSync(deletionManifestPath)) {
+		const deletionResult = await applyDeletionManifest(db, deletionManifestPath);
+		logger.info("Deletion manifest applied", {
+			deleted_count: deletionResult.deletedCount,
+			errors: deletionResult.errors
+		});
+	}
+
 
 	// Validate import directory exists
 	if (!existsSync(importDir)) {

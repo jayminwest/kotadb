@@ -19,6 +19,7 @@ import { join } from "node:path";
 import { createHash } from "node:crypto";
 import { createLogger } from "@logging/logger.js";
 import type { KotaDatabase } from "./sqlite-client.js";
+import { clearDeletionManifest } from "@sync/deletion-manifest.js";
 
 const logger = createLogger({ module: "jsonl-exporter" });
 
@@ -262,6 +263,11 @@ export class JSONLExporter {
 
 		this.state.lastExportAt = new Date().toISOString();
 		await this.saveState();
+
+		// Clear deletion manifest after successful export
+		// (deletions are now reflected in JSONL absence)
+		await clearDeletionManifest(this.exportDir);
+
 
 		const duration = Date.now() - startTime;
 
