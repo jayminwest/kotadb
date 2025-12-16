@@ -48,7 +48,7 @@ jobs:
           bun-version: 1.1.29
 
       - name: Cache dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: app/node_modules
           key: bun-${{ hashFiles('**/bun.lockb') }}
@@ -78,7 +78,7 @@ jobs:
           bun-version: '1.1.29'
 
       - name: Restore dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: app/node_modules
           key: bun-${{ hashFiles('**/bun.lockb') }}
@@ -162,7 +162,7 @@ jobs:
           bun-version: 1.1.29
 
       - name: Restore dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: app/node_modules
           key: bun-${{ hashFiles('**/bun.lockb') }}
@@ -196,7 +196,7 @@ jobs:
           bun-version: 1.1.29
 
       - name: Restore dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: app/node_modules
           key: bun-${{ hashFiles('**/bun.lockb') }}
@@ -227,7 +227,7 @@ jobs:
           bun-version: 1.1.29
 
       - name: Restore dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: app/node_modules
           key: bun-${{ hashFiles('**/bun.lockb') }}
@@ -323,7 +323,7 @@ jobs:
           bun-version: 1.1.29
 
       - name: Restore dependencies
-        uses: actions/cache@v4
+        uses: actions/cache@v5
         with:
           path: app/node_modules
           key: bun-${{ hashFiles('**/bun.lockb') }}
