@@ -58,7 +58,7 @@ describe("MCP Tools Integration", () => {
 		expect(data.jsonrpc).toBe("2.0");
 		expect(data.result).toBeDefined();
 		expect(data.result.tools).toBeArray();
-		expect(data.result.tools.length).toBe(6);
+		expect(data.result.tools.length).toBe(16);
 
 		const toolNames = data.result.tools.map((t: { name: string }) => t.name);
 		expect(toolNames).toContain("search_code");
