@@ -28,6 +28,9 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Sensitive data in error responses
 - Missing revoked_at check in key validation (found in #385)
 - Hardcoded magic numbers in security-critical code (should use @config constants - bf76afb)
+- Local mode bypass enabled in production or non-dev environments
+- getServiceClient() called in local mode code path (must guard or use getClient() instead)
+- Missing environment validation for cloud mode credentials at startup
 
 **Important Concerns (COMMENT level):**
 - Missing input validation on user-supplied data
@@ -35,6 +38,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Error messages that leak implementation details
 - Missing audit logging for sensitive operations
 - Insecure default configurations
+- Inadequate testing of local mode boundary conditions
 
 ### Security Checklist
 
@@ -46,6 +50,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - [ ] Rate limit headers set on all responses
 - [ ] Auth context properly isolated per request
 - [ ] Revoked keys rejected via revoked_at check (#385)
+- [ ] Local mode environment variable check in isLocalMode() (only when KOTA_LOCAL_MODE=true)
 
 **Authorization:**
 - [ ] RLS policies cover all CRUD operations (SELECT, INSERT, UPDATE, DELETE)
@@ -54,6 +59,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - [ ] Service role usage justified and documented
 - [ ] Organization-scoped data properly isolated
 - [ ] Tier-based feature access enforced
+- [ ] Local mode context isolation (placeholder user, no cross-user access)
 
 **Data Protection:**
 - [ ] No secrets in code or logs
@@ -62,6 +68,7 @@ REVIEW_CONTEXT: $ARGUMENTS
 - [ ] bcrypt used for password/key hashing
 - [ ] HTTPS enforced in production
 - [ ] Structured logging with correlation IDs (commit ed4c4f9)
+- [ ] Local mode credentials (Supabase keys) not required or accessed
 
 **Input Handling:**
 - [ ] All user input validated
@@ -77,6 +84,25 @@ REVIEW_CONTEXT: $ARGUMENTS
 - [ ] Bcrypt rounds sourced from RETRY_CONFIG.BCRYPT_ROUNDS
 - [ ] Rate limits sourced from RATE_LIMITS constant
 - [ ] All security thresholds centralized and auditable
+
+**Environment & Mode Detection (added after #540):**
+- [ ] getEnvironmentConfig() returns cached config appropriately
+- [ ] KOTA_LOCAL_MODE environment variable checked correctly
+- [ ] Cloud mode validates required Supabase credentials upfront
+- [ ] Local mode does not attempt Supabase credential validation
+- [ ] getServiceClient() throws error if called in local mode
+- [ ] getClient() returns appropriate client based on mode
+- [ ] isLocalMode() helper used consistently for mode checks
+- [ ] LOCAL_AUTH_CONTEXT has team tier (highest for local testing)
+- [ ] Local auth bypass is isolated to development contexts
+
+**Dependency Vulnerability Management (added after #164):**
+- [ ] Dependabot configuration present for npm, pip, github-actions
+- [ ] npm audit runs in CI and fails on high/critical vulnerabilities
+- [ ] pip-audit>=2.7.0 in automation dev dependencies
+- [ ] Security scan job enabled in CI pipelines
+- [ ] Audit results uploaded as artifacts (30-day retention)
+- [ ] GitHub Step Summary reports vulnerability counts
 
 ### Vulnerability Patterns Discovered
 
@@ -110,6 +136,24 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Remediation: Centralize all security constants in @config/constants.ts
 - Prevention: Use @config module for all security-critical values (RATE_LIMITS, RETRY_CONFIG, THRESHOLDS)
 
+**Local Mode Boundary Violation (discovered after #540):**
+- Attack vector: getServiceClient() called in code path reachable from local mode
+- Impact: Runtime error in local mode or Supabase credential requirement when not needed
+- Remediation: Use getClient() abstraction or guard calls with `if (!isLocalMode())`
+- Prevention: Always use getClient() for database access; getServiceClient() only for explicitly admin-only operations
+
+**Missing Environment Validation (discovered after #540):**
+- Attack vector: Cloud mode starts without verifying required Supabase credentials
+- Impact: Credentials missing at runtime cause runtime errors instead of startup failures
+- Remediation: Call getEnvironmentConfig() at startup to validate early
+- Prevention: Validate environment configuration during initialization, fail fast for missing credentials
+
+**Local Mode in Production (discovered after #540):**
+- Attack vector: KOTA_LOCAL_MODE=true accidentally set in production
+- Impact: No authentication, unlimited rate limits, single placeholder user for all requests
+- Remediation: Never set KOTA_LOCAL_MODE=true in production; document that this is development-only
+- Prevention: Verify via environment validation that local mode is only enabled in dev/test environments
+
 ### Severity Ratings
 
 **CRITICAL (immediate fix required):**
@@ -117,6 +161,8 @@ REVIEW_CONTEXT: $ARGUMENTS
 - SQL injection vulnerability
 - Exposed secrets
 - RLS disabled on sensitive table
+- getServiceClient() called in local mode path
+- Local mode enabled in production
 
 **HIGH (fix before merge):**
 - Missing RLS policy (any CRUD operation)
@@ -125,16 +171,20 @@ REVIEW_CONTEXT: $ARGUMENTS
 - Service role misuse
 - Rate limit bypass (check both hourly and daily limits - #423)
 - Hardcoded security constants (should use @config - bf76afb)
+- Unguarded environment configuration transitions
+- Missing Supabase credential validation in cloud mode startup
 
 **MEDIUM (fix in follow-up):**
 - Overly verbose error messages
 - Missing audit logging
 - Suboptimal bcrypt rounds
+- Inadequate local mode testing
 
 **LOW (nice to have):**
 - Security header improvements
 - Additional input sanitization
 - Enhanced logging
+- Dependency vulnerability documentation
 
 ## Workflow
 
@@ -142,7 +192,8 @@ REVIEW_CONTEXT: $ARGUMENTS
 2. **Check Critical**: Scan for automatic CHANGES_REQUESTED triggers
 3. **Run Checklist**: Apply security checklist to changes
 4. **Assess Severity**: Rate identified issues
-5. **Synthesize**: Produce security assessment
+5. **Environment Check**: Verify mode detection and environment config handling
+6. **Synthesize**: Produce security assessment
 
 ## Output
 
@@ -165,8 +216,15 @@ REVIEW_CONTEXT: $ARGUMENTS
 **Attack Vector Analysis:**
 - [Potential attack vectors introduced]
 
+**Environment & Mode Handling:**
+- [Verification of environment config and local mode boundaries]
+
+**Dependency Security:**
+- [Audit results and vulnerability findings]
+
 **Recommendations:**
 - [Security hardening suggestions]
 
 **Compliant Patterns:**
 - [Good security practices observed]
+

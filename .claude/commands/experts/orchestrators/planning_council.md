@@ -3,6 +3,8 @@ description: Coordinate multiple experts for comprehensive planning analysis
 argument-hint: <issue-context>
 ---
 
+> **⚠️ DEPRECATED (2025-12-16)**: Planning Council is deprecated. Branch coordinators now spawn expert agents directly via `mcp__leaf_spawner__spawn_parallel_agents`. This command will be removed in Q1 2025. Use `/experts:orchestrators:orchestrator` for full workflow orchestration, or spawn `expert-*` leaf agents directly from branch coordinators.
+
 # Planning Council
 
 **Template Category**: Structured Data

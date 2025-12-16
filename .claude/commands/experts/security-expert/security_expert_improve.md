@@ -40,12 +40,20 @@ Review recent commits affecting authentication, authorization, and database secu
 Edit the following files to incorporate learnings:
 - `security_expert_plan.md` → Update "RLS Patterns" and "Input Validation Patterns"
 - `security_expert_review.md` → Update "Security Checklist"
+- `.claude/agents/leaf/expert-security.md` → Update leaf agent knowledge base
 
 **Rules for Updates:**
 - **PRESERVE** all existing security rules - security knowledge is cumulative
 - **APPEND** new patterns with evidence from commits
 - **DATE** entries with commit reference (e.g., "Added after #123 security fix")
 - **NEVER REMOVE** security patterns unless superseded by stronger controls
+
+**Synchronization Requirements:**
+- Any improvements to security knowledge MUST be reflected in BOTH:
+  1. The original expertise files (`security_expert_plan.md` and `security_expert_review.md`)
+  2. The leaf agent knowledge base (`.claude/agents/leaf/expert-security.md`)
+- The leaf agent file is used when experts are spawned via MCP, so it must contain the most current knowledge
+- **CRITICAL**: Security knowledge is cumulative - never weaken security rules in any file
 
 ### 4. Document Vulnerability Patterns
 
@@ -102,3 +110,6 @@ Return summary of changes made to Expertise sections:
 
 **OWASP Coverage:**
 - [Updates to OWASP alignment assessment]
+
+**Leaf Agent Sync:**
+- [Confirmation that `.claude/agents/leaf/expert-security.md` was updated]

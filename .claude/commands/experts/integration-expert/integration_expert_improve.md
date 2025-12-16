@@ -42,12 +42,19 @@ Review recent commits affecting MCP tools, API endpoints, and integrations.
 Edit the following files to incorporate learnings:
 - `integration_expert_plan.md` → Update "MCP Server Patterns" and "Error Handling at Boundaries"
 - `integration_expert_review.md` → Update "MCP Tool Compliance" checklist
+- `.claude/agents/leaf/expert-integration.md` → Update leaf agent knowledge base
 
 **Rules for Updates:**
 - **PRESERVE** existing integration patterns that work
 - **APPEND** new patterns with evidence from commits
 - **DATE** entries with commit reference
 - **REMOVE** patterns superseded by better approaches
+
+**Synchronization Requirements:**
+- Any improvements to integration knowledge MUST be reflected in BOTH:
+  1. The original expertise files (`integration_expert_plan.md` and `integration_expert_review.md`)
+  2. The leaf agent knowledge base (`.claude/agents/leaf/expert-integration.md`)
+- The leaf agent file is used when experts are spawned via MCP, so it must contain the most current knowledge
 
 ### 4. Document Edge Cases
 
@@ -107,3 +114,6 @@ Return summary of changes made to Expertise sections:
 
 **External API Changes:**
 - [Adaptations for external service changes]
+
+**Leaf Agent Sync:**
+- [Confirmation that `.claude/agents/leaf/expert-integration.md` was updated]

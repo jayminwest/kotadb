@@ -72,6 +72,15 @@ FOR SELECT USING (
 4. Return auth context with user session data
 5. Note: OAuth users can now use session tokens for API access
 
+**Local-First Mode Auth Bypass (added after #540 commit 5147b65):**
+1. Check KOTA_LOCAL_MODE environment variable
+2. If KOTA_LOCAL_MODE=true, bypass all authentication validation
+3. Return LOCAL_AUTH_CONTEXT with placeholder user ID and team tier
+4. No database lookups required in local mode
+5. No rate limit enforcement in local mode
+6. Allows development and testing without Supabase credentials
+7. WARNING: This bypass is ONLY for development/local testing; must never be enabled in production
+
 **Auth Context Structure:**
 ```typescript
 {
@@ -101,6 +110,7 @@ FOR SELECT USING (
 - Key validation happens before rate limit check
 - Revoked keys rejected before rate limit consumption (#385)
 - Invalid keys return 401 before consuming quota
+- Local mode bypass: enforceRateLimit() returns unlimited when isLocalMode()=true (added after #540)
 
 **Centralized Configuration (added after commit bf76afb):**
 - Rate limit constants centralized in @config/constants.ts
@@ -137,17 +147,45 @@ FOR SELECT USING (
 - Rate limit violations
 - API key revocation events (#385)
 - RLS policy denials
+- Local mode initialization (isLocalMode() detection)
 - Note: Use process.stdout.write for structured logs (not console.*)
+
+### Environment Configuration & Mode Detection
+
+**Environment Config Management (added after #540 commit 5147b65):**
+- getEnvironmentConfig() centralized function with caching
+- Two runtime modes: 'local' (SQLite) or 'cloud' (Supabase)
+- KOTA_LOCAL_MODE environment variable controls mode selection
+- In cloud mode, validates required Supabase credentials upfront
+- Cached config prevents repeated environment variable lookups
+- isLocalMode() helper for convenient mode checking
+
+**Database Client Abstraction (added after #540 commit 5147b65):**
+- DatabaseClient type union supports both SupabaseClient and KotaDatabase
+- getClient() returns appropriate client based on environment mode
+- getServiceClient() guards against local mode calls with throw error
+- Local mode uses SQLite; cloud mode uses Supabase
+- Prevents accidental Supabase calls in local development
+
+### Security Boundaries in Local Mode
+
+**Local Mode Limitations (Design constraint from #540):**
+- LOCAL_AUTH_CONTEXT uses placeholder user_id="local-user" (not real user)
+- Team tier assigned (highest available) for maximum local testing capability
+- No actual user isolation in local mode (single user context)
+- Rate limits disabled (unlimited requests) in local mode
+- Audit logging still active but without real user tracking
+- CRITICAL: This mode is development-only; production must use cloud mode with full auth
 
 ### OWASP Top 10 Considerations
 
 **Relevant to KotaDB:**
-1. **Broken Access Control**: RLS policies, auth middleware
+1. **Broken Access Control**: RLS policies, auth middleware, local mode boundary enforcement
 2. **Cryptographic Failures**: bcrypt for key hashing, HTTPS only
 3. **Injection**: Parameterized queries, input validation
-4. **Insecure Design**: Auth context isolation, rate limiting
-5. **Security Misconfiguration**: Environment variable management, centralized config (bf76afb)
-6. **Identification Failures**: Strong API key format, secure generation
+4. **Insecure Design**: Auth context isolation, rate limiting, environment-based access control
+5. **Security Misconfiguration**: Environment variable management, centralized config (bf76afb), local mode guard (getServiceClient check)
+6. **Identification Failures**: Strong API key format, secure generation, JWT validation
 7. **Security Logging Failures**: Sentry integration, structured logging (commit ed4c4f9)
 
 ## Workflow
@@ -155,9 +193,10 @@ FOR SELECT USING (
 1. **Parse Context**: Understand feature/change from USER_PROMPT
 2. **Identify Attack Vectors**: Map potential security risks
 3. **Check RLS Impact**: Determine if new RLS policies needed
-4. **Review Auth Flow**: Verify authentication requirements
+4. **Review Auth Flow**: Verify authentication requirements and mode constraints
 5. **Assess Input Points**: Identify user input handling
-6. **Rate Limit Analysis**: Check for bypass opportunities
+6. **Rate Limit Analysis**: Check for bypass opportunities and local mode bypass appropriateness
+7. **Environment Safety**: Verify environment config and local mode boundaries
 
 ## Report Format
 
@@ -170,7 +209,7 @@ FOR SELECT USING (
 - [New policies needed, or confirmation existing policies sufficient]
 
 **Authentication Impact:**
-- [Changes to auth flow or requirements]
+- [Changes to auth flow or requirements, including local mode considerations]
 
 **Input Validation:**
 - [User input points and validation requirements]
@@ -183,3 +222,4 @@ FOR SELECT USING (
 
 **Compliance:**
 - [OWASP alignment assessment]
+

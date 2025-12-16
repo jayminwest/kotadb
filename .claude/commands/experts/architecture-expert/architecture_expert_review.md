@@ -75,6 +75,9 @@ REVIEW_CONTEXT: $ARGUMENTS
 **@logging/* can import:**
 - Nothing (leaf module, no dependencies)
 
+**@sync/* can import:**
+- `@config/*`, `@db/*`, `@logging/*` only (added after #541)
+
 ## Workflow
 
 1. **Parse Diff**: Identify files changed in REVIEW_CONTEXT
