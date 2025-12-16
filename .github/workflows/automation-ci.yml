@@ -53,6 +53,60 @@ jobs:
       - name: Install dependencies
         run: uv sync
 
+      - name: Run security audit
+        id: audit
+        working-directory: ./automation
+        run: |
+          # Create output directory
+          mkdir -p audit-results
+
+          # Run pip-audit with JSON output (allow failures for reporting)
+          uv run pip-audit --format json --output audit-results/audit.json
+
+          # Run pip-audit with exit codes for severity threshold
+          # Fail on high or critical vulnerabilities
+          uv run pip-audit
+        continue-on-error: false
+
+      - name: Generate audit summary
+        if: always()
+        working-directory: ./automation
+        run: |
+          echo "## Security Audit Results (Python)" >> $GITHUB_STEP_SUMMARY
+          echo "" >> $GITHUB_STEP_SUMMARY
+
+          # Parse JSON and create summary
+          if [ -f audit-results/audit.json ]; then
+            # Count vulnerabilities by severity
+            CRITICAL=$(jq '[.dependencies[].vulns[]? | select(.fix_versions != null)] | length // 0' audit-results/audit.json)
+
+            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
+            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
+            echo "| Vulnerabilities Found | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
+            echo "" >> $GITHUB_STEP_SUMMARY
+
+            # Add details if vulnerabilities found
+            if [ "$CRITICAL" -gt 0 ]; then
+              echo "⚠️ **Action Required**: Vulnerabilities detected in Python dependencies" >> $GITHUB_STEP_SUMMARY
+              echo "" >> $GITHUB_STEP_SUMMARY
+              echo "### Affected Packages" >> $GITHUB_STEP_SUMMARY
+              jq -r '.dependencies[] | select(.vulns | length > 0) | "- \(.name) \(.version)"' audit-results/audit.json >> $GITHUB_STEP_SUMMARY
+            else
+              echo "✅ No vulnerabilities detected in Python dependencies" >> $GITHUB_STEP_SUMMARY
+            fi
+          else
+            echo "❌ Audit failed to generate results" >> $GITHUB_STEP_SUMMARY
+          fi
+
+      - name: Upload audit results
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: automation-security-audit
+          path: |
+            automation/audit-results/
+          retention-days: 30
+
       - name: Run pytest suite with coverage
         run: |
           uv run pytest adws/adw_tests/ -v --tb=short \

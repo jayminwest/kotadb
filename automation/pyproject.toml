@@ -30,7 +30,9 @@ markers = [
 ]
 
 [tool.uv]
-dev-dependencies = []
+dev-dependencies = [
+    "pip-audit>=2.7.0",
+]
 
 [tool.coverage.run]
 source = ["adws"]
