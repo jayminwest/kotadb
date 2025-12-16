@@ -27,7 +27,7 @@
 		"@octokit/rest": "^22.0.0",
 		"@sentry/node": "^10.25.0",
 		"@supabase/supabase-js": "^2.39.0",
-		"@typescript-eslint/parser": "^8.0.0",
+		"@typescript-eslint/parser": "^8.50.0",
 		"@typescript-eslint/types": "^8.0.0",
 		"bcryptjs": "^2.4.3",
 		"cors": "^2.8.5",
