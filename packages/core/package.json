@@ -1,0 +1,67 @@
+{
+  "name": "@kotadb/core",
+  "version": "0.1.0",
+  "description": "Standalone TypeScript code intelligence library",
+  "type": "module",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "import": "./dist/index.js",
+      "types": "./dist/index.d.ts"
+    },
+    "./parsers": {
+      "import": "./dist/parsers/index.js",
+      "types": "./dist/parsers/index.d.ts"
+    },
+    "./analysis": {
+      "import": "./dist/analysis/index.js",
+      "types": "./dist/analysis/index.d.ts"
+    },
+    "./storage": {
+      "import": "./dist/storage/index.js",
+      "types": "./dist/storage/index.d.ts"
+    }
+  },
+  "files": [
+    "dist",
+    "src",
+    "README.md",
+    "CHANGELOG.md",
+    "LICENSE"
+  ],
+  "scripts": {
+    "build": "bun run build:tsc && bun run build:bundle",
+    "build:tsc": "bunx tsc --project tsconfig.json",
+    "build:bundle": "bun build src/index.ts --outdir dist --target node --format esm --minify",
+    "test": "bun test tests/*.test.ts",
+    "typecheck": "bunx tsc --noEmit",
+    "clean": "rm -rf dist",
+    "prepublishOnly": "bun run clean && bun run build && bun run test"
+  },
+  "dependencies": {
+    "@typescript-eslint/parser": "^8.0.0",
+    "@typescript-eslint/types": "^8.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "bun-types": "^1.1.0",
+    "typescript": "^5.7.0"
+  },
+  "keywords": [
+    "typescript",
+    "ast",
+    "code-intelligence",
+    "parser",
+    "analysis",
+    "symbols",
+    "dependencies"
+  ],
+  "author": "KotaDB",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/kotadb/kota-db-ts.git",
+    "directory": "packages/core"
+  }
+}
