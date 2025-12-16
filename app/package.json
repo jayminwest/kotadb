@@ -29,7 +29,7 @@
 		"@supabase/supabase-js": "^2.39.0",
 		"@typescript-eslint/parser": "^8.0.0",
 		"@typescript-eslint/types": "^8.0.0",
-		"bcryptjs": "^2.4.3",
+		"bcryptjs": "^3.0.3",
 		"cors": "^2.8.5",
 		"express": "^4.18.0",
 		"pg-boss": "^11.1.1",
