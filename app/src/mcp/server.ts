@@ -25,6 +25,8 @@ import {
 	REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 	SEARCH_CODE_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
+	SYNC_EXPORT_TOOL,
+	SYNC_IMPORT_TOOL,
 	UPDATE_PROJECT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 	executeAddRepositoryToProject,
@@ -39,6 +41,8 @@ import {
 	executeRemoveRepositoryFromProject,
 	executeSearchCode,
 	executeSearchDependencies,
+	executeSyncExport,
+	executeSyncImport,
 	executeUpdateProject,
 	executeValidateImplementationSpec,
 } from "./tools";
@@ -87,6 +91,8 @@ export function createMcpServer(context: McpServerContext): Server {
 				ADD_REPOSITORY_TO_PROJECT_TOOL,
 				REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 				GET_INDEX_JOB_STATUS_TOOL,
+				SYNC_EXPORT_TOOL,
+				SYNC_IMPORT_TOOL,
 			],
 		};
 	});
@@ -212,6 +218,12 @@ export function createMcpServer(context: McpServerContext): Server {
 						"", // requestId not used
 						context.userId,
 					);
+					break;
+				case "kota_sync_export":
+					result = await executeSyncExport(toolArgs, "");
+					break;
+				case "kota_sync_import":
+					result = await executeSyncImport(toolArgs, "");
 					break;
 				default:
 					const error = new Error(`Unknown tool: ${name}`);
