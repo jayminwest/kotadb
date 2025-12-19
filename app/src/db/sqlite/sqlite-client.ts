@@ -13,7 +13,7 @@
  */
 
 import { Database, type Statement } from "bun:sqlite";
-import { existsSync, mkdirSync } from "node:fs";
+import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { cpus } from "node:os";
 import { createLogger } from "@logging/logger.js";
@@ -116,6 +116,20 @@ export class KotaDatabase {
 
 		// Configure database pragmas
 		this.configurePragmas();
+
+		// Auto-initialize schema if not already present (writer only)
+		if (!this.config.readonly) {
+			if (!this.tableExists("indexed_files")) {
+				const schemaPath = join(__dirname, "../sqlite-schema.sql");
+				const schema = readFileSync(schemaPath, "utf-8");
+				this.exec(schema);
+				logger.info("SQLite schema initialized", {
+					path: this.config.path,
+				});
+			} else {
+				logger.debug("SQLite schema already initialized");
+			}
+		}
 
 		logger.info("Database initialized", {
 			path: this.config.path,
