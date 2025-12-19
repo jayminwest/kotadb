@@ -45,6 +45,7 @@ import {
 } from "./projects";
 import { ensureRepository, listRecentFiles, runIndexingWorkflow, searchFiles } from "./queries";
 import { buildOpenAPISpec } from "./openapi/builder.js";
+import { isLocalMode } from "@config/environment";
 
 /**
  * Extended Express Request with auth context attached
@@ -84,7 +85,7 @@ loadApiVersion().catch(() => {
 	// Silently fail - version will default to "unknown"
 });
 
-export function createExpressApp(supabase: SupabaseClient): Express {
+export function createExpressApp(supabase?: SupabaseClient): Express {
 	const app = express();
 
 	// Request logging middleware (before all other middleware)
@@ -100,10 +101,11 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 	// Health check endpoint (public, no auth)
 	app.get("/health", async (req: Request, res: Response) => {
-		const queue = getQueue();
-
+		const mode = isLocalMode() ? "local" : "cloud";
+		
 		try {
-			// Query pg-boss for queue metrics
+			// Query pg-boss for queue metrics (only in cloud mode with queue)
+			const queue = getQueue();
 			const queueInfo = await queue.getQueue(QUEUE_NAMES.INDEX_REPO);
 			const failedJobs = await queue.fetch(QUEUE_NAMES.INDEX_REPO, { includeMetadata: true });
 
@@ -128,6 +130,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				status: "ok",
 				version: apiVersion || "unknown",
 				timestamp: new Date().toISOString(),
+				mode,
 				queue: {
 					depth: queueInfo?.queuedCount || 0,
 					workers: 3, // WORKER_TEAM_SIZE from config
@@ -136,11 +139,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				},
 			});
 		} catch (error) {
-			// If queue not available, return basic health status
+			// Queue not available (local mode or queue error)
 			res.json({
 				status: "ok",
 				version: apiVersion || "unknown",
 				timestamp: new Date().toISOString(),
+				mode,
 				queue: null,
 			});
 		}
@@ -476,6 +480,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			return res.status(400).json({ error: "Field 'repository' is required" });
 		}
 
+		if (!supabase) {
+			return res.status(503).json({ 
+				error: "Async indexing unavailable in local mode - requires cloud mode with queue support" 
+			});
+		}
+
 		const indexRequest: IndexRequest = {
 			repository: payload.repository,
 			ref: payload.ref,
@@ -570,6 +580,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			return res.status(400).json({ error: "Missing term query parameter" });
 		}
 
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "Search requires cloud mode database - see docs for configuration" 
+			});
+		}
+
 		const repositoryId = req.query.repository as string | undefined;
 		const projectId = req.query.project_id as string | undefined;
 		const limit = req.query.limit ? Number(req.query.limit) : undefined;
@@ -598,6 +615,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	app.get("/files/recent", async (req: AuthenticatedRequest, res: Response) => {
 		const context = req.authContext!;
 		const limit = Number(req.query.limit ?? "10");
+
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "File listing requires cloud mode database - see docs for configuration" 
+			});
+		}
 
 		try {
 			const results = await listRecentFiles(supabase, limit, context.userId);
@@ -637,6 +661,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	// POST /mcp - MCP endpoint with SDK transport
 	app.post("/mcp", async (req: AuthenticatedRequest, res: Response) => {
 		const context = req.authContext!;
+
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "MCP server requires cloud mode database - see docs for configuration" 
+			});
+		}
 
 		// Log Accept header for debugging 406 errors (SDK requires both json AND sse)
 		const acceptHeader = req.get("Accept") || req.get("accept");
@@ -712,6 +743,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			async (req: AuthenticatedRequest, res: Response) => {
 				const context = req.authContext!;
 				addRateLimitHeaders(res, context.rateLimit);
+
+				if (!supabase) {
+					return res.status(503).json({ 
+						error: "Billing requires cloud mode - configure Supabase credentials" 
+					});
+				}
 
 				try {
 					const { tier, successUrl, cancelUrl } = req.body;
@@ -805,6 +842,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				const context = req.authContext!;
 				addRateLimitHeaders(res, context.rateLimit);
 
+				if (!supabase) {
+					return res.status(503).json({ 
+						error: "Billing requires cloud mode - configure Supabase credentials" 
+					});
+				}
+
 				try {
 					const { returnUrl } = req.body;
 
@@ -871,6 +914,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			const context = req.authContext!;
 			addRateLimitHeaders(res, context.rateLimit);
 
+			if (!supabase) {
+				return res.status(503).json({ 
+					error: "Billing requires cloud mode - configure Supabase credentials" 
+				});
+			}
+
 			try {
 				const { data: subscription } = await supabase
 					.from("subscriptions")
@@ -900,6 +949,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 	// POST /api/keys/generate - Generate API key for authenticated user
 	app.post("/api/keys/generate", async (req: Request, res: Response) => {
+		if (!supabase) {
+			return res.status(503).json({ 
+				error: "API key generation requires cloud mode - configure Supabase credentials" 
+			});
+		}
+
 		try {
 			// Extract JWT token from Authorization header
 			const authHeader = req.get("Authorization");
@@ -978,6 +1033,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 	// GET /api/keys/current - Get current API key metadata
 	app.get("/api/keys/current", async (req: Request, res: Response) => {
+		if (!supabase) {
+			return res.status(503).json({ 
+				error: "API key retrieval requires cloud mode - configure Supabase credentials" 
+			});
+		}
+
 		try {
 			// Extract JWT token from Authorization header
 			const authHeader = req.get("Authorization");
@@ -1034,6 +1095,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 	// POST /api/keys/reset - Reset API key (revoke old + generate new)
 	app.post("/api/keys/reset", async (req: Request, res: Response) => {
+		if (!supabase) {
+			return res.status(503).json({ 
+				error: "API key reset requires cloud mode - configure Supabase credentials" 
+			});
+		}
+
 		try {
 			// Extract JWT token from Authorization header
 			const authHeader = req.get("Authorization");
@@ -1092,6 +1159,12 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 
 	// DELETE /api/keys/current - Revoke current API key
 	app.delete("/api/keys/current", async (req: Request, res: Response) => {
+		if (!supabase) {
+			return res.status(503).json({ 
+				error: "API key revocation requires cloud mode - configure Supabase credentials" 
+			});
+		}
+
 		try {
 			// Extract JWT token from Authorization header
 			const authHeader = req.get("Authorization");
@@ -1165,6 +1238,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			return res.status(400).json({ error: "Field 'name' is required" });
 		}
 
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "Project management requires cloud mode - configure Supabase credentials" 
+			});
+		}
+
 		try {
 			const projectId = await createProject(supabase, context.userId, {
 				name: payload.name,
@@ -1187,6 +1267,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	app.get("/api/projects", async (req: AuthenticatedRequest, res: Response) => {
 		const context = req.authContext!;
 
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "Project management requires cloud mode - configure Supabase credentials" 
+			});
+		}
+
 		try {
 			const projects = await listProjects(supabase, context.userId);
 			addRateLimitHeaders(res, context.rateLimit);
@@ -1208,6 +1295,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		if (!projectId) {
 			addRateLimitHeaders(res, context.rateLimit);
 			return res.status(400).json({ error: "Project ID is required" });
+		}
+
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "Project management requires cloud mode - configure Supabase credentials" 
+			});
 		}
 
 		try {
@@ -1240,6 +1334,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			return res.status(400).json({ error: "Project ID is required" });
 		}
 
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "Project management requires cloud mode - configure Supabase credentials" 
+			});
+		}
+
 		try {
 			await updateProject(supabase, context.userId, projectId, payload);
 			addRateLimitHeaders(res, context.rateLimit);
@@ -1261,6 +1362,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 		if (!projectId) {
 			addRateLimitHeaders(res, context.rateLimit);
 			return res.status(400).json({ error: "Project ID is required" });
+		}
+
+		if (!supabase) {
+			addRateLimitHeaders(res, context.rateLimit);
+			return res.status(503).json({ 
+				error: "Project management requires cloud mode - configure Supabase credentials" 
+			});
 		}
 
 		try {
@@ -1288,6 +1396,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 				return res.status(400).json({ error: "Project ID and Repository ID are required" });
 			}
 
+			if (!supabase) {
+				addRateLimitHeaders(res, context.rateLimit);
+				return res.status(503).json({ 
+					error: "Project management requires cloud mode - configure Supabase credentials" 
+				});
+			}
+
 			try {
 				await addRepositoryToProject(supabase, context.userId, projectId, repoId);
 				addRateLimitHeaders(res, context.rateLimit);
@@ -1312,6 +1427,13 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			if (!projectId || !repoId) {
 				addRateLimitHeaders(res, context.rateLimit);
 				return res.status(400).json({ error: "Project ID and Repository ID are required" });
+			}
+
+			if (!supabase) {
+				addRateLimitHeaders(res, context.rateLimit);
+				return res.status(503).json({ 
+					error: "Project management requires cloud mode - configure Supabase credentials" 
+				});
 			}
 
 			try {

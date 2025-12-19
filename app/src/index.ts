@@ -7,21 +7,19 @@ import { startQueue, stopQueue, getQueue } from "@queue/client";
 import { startIndexWorker } from "@queue/workers/index-repo";
 import { QUEUE_NAMES } from "@queue/config";
 import { createLogger } from "@logging/logger";
+import { getEnvironmentConfig, isLocalMode } from "@config/environment";
 
 const PORT = Number(process.env.PORT ?? 3000);
 const logger = createLogger();
 
 async function bootstrap() {
-	// Verify Supabase environment variables
-	const supabaseUrl = process.env.SUPABASE_URL;
-	const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-
-	if (!supabaseUrl || !supabaseServiceKey) {
-		throw new Error(
-			"Missing required environment variables: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set. " +
-				"Please copy .env.sample to .env and configure your Supabase credentials.",
-		);
-	}
+	// Detect environment mode (local vs cloud)
+	const envConfig = getEnvironmentConfig();
+	logger.info("Application starting", {
+		mode: envConfig.mode,
+		localDbPath: envConfig.localDbPath,
+		supabaseUrl: envConfig.supabaseUrl,
+	});
 
 	// Check for GitHub webhook secret (warn if missing, not fatal)
 	const webhookSecret = process.env.GITHUB_WEBHOOK_SECRET;
@@ -65,41 +63,49 @@ async function bootstrap() {
 		logger.info("Billing disabled by feature flag - subscription features unavailable");
 	}
 
-	// Initialize Supabase client
-	const supabase = getServiceClient();
+	// Initialize Supabase client (cloud mode only)
+	const supabase = !isLocalMode() ? getServiceClient() : undefined;
 
-	// Test database connection
-	const { error: healthError } = await supabase
-		.from("migrations")
-		.select("id")
-		.limit(1);
-	if (healthError) {
-		throw new Error(`Supabase connection failed: ${healthError.message}`);
-	}
-	logger.info("Supabase connection successful");
-
-	// Start job queue
-	try {
-		await startQueue();
-
-		// Create queues before registering workers
-		// pg-boss requires queues to exist before workers can be registered
-		const queue = getQueue();
-		await queue.createQueue(QUEUE_NAMES.INDEX_REPO);
-		logger.info("Job queue started and index-repo queue created");
-	} catch (error) {
-		logger.error("Failed to start job queue", error instanceof Error ? error : undefined);
-		throw error;
+	// Test database connection (cloud mode only)
+	if (supabase) {
+		const { error: healthError } = await supabase
+			.from("migrations")
+			.select("id")
+			.limit(1);
+		if (healthError) {
+			throw new Error(`Supabase connection failed: ${healthError.message}`);
+		}
+		logger.info("Supabase connection successful");
+	} else {
+		logger.info("Supabase disabled in local mode");
 	}
 
-	// Start indexing worker
-	try {
-		const queue = getQueue();
-		await startIndexWorker(queue);
-		logger.info("Indexing worker registered");
-	} catch (error) {
-		logger.error("Failed to start indexing worker", error instanceof Error ? error : undefined);
-		throw error;
+	// Start job queue (cloud mode only)
+	if (!isLocalMode()) {
+		try {
+			await startQueue();
+
+			// Create queues before registering workers
+			// pg-boss requires queues to exist before workers can be registered
+			const queue = getQueue();
+			await queue.createQueue(QUEUE_NAMES.INDEX_REPO);
+			logger.info("Job queue started and index-repo queue created");
+		} catch (error) {
+			logger.error("Failed to start job queue", error instanceof Error ? error : undefined);
+			throw error;
+		}
+
+		// Start indexing worker
+		try {
+			const queue = getQueue();
+			await startIndexWorker(queue);
+			logger.info("Indexing worker registered");
+		} catch (error) {
+			logger.error("Failed to start indexing worker", error instanceof Error ? error : undefined);
+			throw error;
+		}
+	} else {
+		logger.info("Queue disabled in local mode (SQLite only)");
 	}
 
 	// Create Express app
@@ -111,7 +117,9 @@ async function bootstrap() {
 	const server = app.listen(PORT, () => {
 		logger.info("Server started", {
 			port: PORT,
-			supabase_url: supabaseUrl,
+			mode: envConfig.mode,
+			supabase_url: envConfig.supabaseUrl,
+			local_db_path: envConfig.localDbPath,
 		});
 	});
 
@@ -134,11 +142,13 @@ async function bootstrap() {
 	process.on("SIGTERM", async () => {
 		logger.info("SIGTERM signal received - closing HTTP server");
 
-		// Stop queue first (drains in-flight jobs)
-		try {
-			await stopQueue();
-		} catch (error) {
-			logger.error("Error stopping queue", error instanceof Error ? error : undefined);
+		// Stop queue first (drains in-flight jobs) - cloud mode only
+		if (!isLocalMode()) {
+			try {
+				await stopQueue();
+			} catch (error) {
+				logger.error("Error stopping queue", error instanceof Error ? error : undefined);
+			}
 		}
 
 		// Then close HTTP server
