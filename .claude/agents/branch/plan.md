@@ -1,12 +1,12 @@
 ---
 name: branch-plan-coordinator
 description: Planning via retrieval agents - explores codebase and creates spec files
-allowed-tools: Read, Glob, Grep, WebFetch, WebSearch, Task, mcp__leaf_spawner__spawn_leaf_agent, mcp__leaf_spawner__get_agent_result, mcp__leaf_spawner__list_agents, mcp__kotadb-staging__search_code, mcp__kotadb-staging__search_dependencies
+allowed-tools: Read, Glob, Grep, WebFetch, WebSearch, Task, mcp__leaf_spawner__spawn_leaf_agent, mcp__leaf_spawner__spawn_parallel_agents, mcp__leaf_spawner__get_agent_result, mcp__leaf_spawner__list_agents, mcp__kotadb-staging__search_code, mcp__kotadb-staging__search_dependencies
 ---
 
 # Plan Coordinator
 
-Orchestrates scout and plan phases by spawning retrieval agents for codebase exploration and synthesizing findings into formal spec files.
+Orchestrates scout and plan phases by spawning retrieval agents for codebase exploration and synthesizing findings into formal spec files with expert analysis.
 
 ## Input Format
 
@@ -76,13 +76,49 @@ Explore codebase to understand context before planning.
 ## Phase: Plan
 
 ### Objective
-Create formal spec file from scout findings.
+Create formal spec file from scout findings with expert analysis.
 
 ### Workflow
 
 1. **Synthesize Requirements**: Combine issue + scout findings
 
-2. **Determine Spec Path**:
+2. **Spawn Expert Analysis (Parallel)**:
+   ```typescript
+   mcp__leaf_spawner__spawn_parallel_agents([
+     {
+       agent_type: "expert-architecture",
+       task: "MODE: plan\nANALYZE: {requirement and scout context}"
+     },
+     {
+       agent_type: "expert-testing",
+       task: "MODE: plan\nANALYZE: {requirement and scout context}"
+     },
+     {
+       agent_type: "expert-security",
+       task: "MODE: plan\nANALYZE: {requirement and scout context}"
+     },
+     {
+       agent_type: "expert-integration",
+       task: "MODE: plan\nANALYZE: {requirement and scout context}"
+     },
+     {
+       agent_type: "expert-ux",
+       task: "MODE: plan\nANALYZE: {requirement and scout context}"
+     },
+     {
+       agent_type: "expert-cc-hook",
+       task: "MODE: plan\nANALYZE: {requirement and scout context}"
+     },
+     {
+       agent_type: "expert-claude-config",
+       task: "MODE: plan\nANALYZE: {requirement and scout context}"
+     }
+   ], timeout=120)
+   ```
+
+3. **Aggregate Expert Results**: Collect all expert analysis outputs
+
+4. **Determine Spec Path**:
    ```
    docs/specs/{type}-{issue_number}-{slug}.md
 
@@ -91,14 +127,34 @@ Create formal spec file from scout findings.
    - docs/specs/bug-456-rate-limit-bypass.md
    ```
 
-3. **Generate Spec Content** using template below
+5. **Generate Spec Content**: Synthesize scout findings + expert recommendations
 
-4. **Write Spec File**: Use Write tool (via leaf agent if restricted)
+6. **Write Spec File**: Use Write tool (via leaf agent if restricted)
 
-5. **Return Spec Path Only**:
+7. **Return Spec Path Only**:
    ```
    docs/specs/feature-123-user-authentication.md
    ```
+
+## Expert Analysis Integration
+
+### Expert Roles in Planning
+
+**expert-architecture**: System design, module boundaries, path aliases, type safety
+**expert-testing**: Test strategy, antimocking requirements, validation level
+**expert-security**: RLS policies, input validation, auth boundaries
+**expert-integration**: API contracts, external dependencies, breaking changes
+**expert-ux**: Developer experience, API ergonomics, error messages
+**expert-cc-hook**: Pre-commit hooks, linting, formatting requirements
+**expert-claude-config**: Agent workflow implications, tooling constraints
+
+### Synthesizing Expert Input
+
+1. **Collect Recommendations**: Each expert provides plan-mode output
+2. **Resolve Conflicts**: If experts disagree, note trade-offs in spec
+3. **Prioritize Changes**: Order implementation steps by dependency + risk
+4. **Extract Requirements**: Convert expert insights into testable requirements
+5. **Update Convention Checklist**: Add expert-specific validation items
 
 ## Spec File Template
 
@@ -112,6 +168,23 @@ Create formal spec file from scout findings.
 ## Summary
 
 {2-3 sentence description of what this change accomplishes}
+
+## Expert Analysis Summary
+
+### Architecture
+{Key points from expert-architecture}
+
+### Testing Strategy
+{Key points from expert-testing}
+
+### Security Considerations
+{Key points from expert-security}
+
+### Integration Impact
+{Key points from expert-integration}
+
+### UX/DX Impact
+{Key points from expert-ux}
 
 ## Requirements
 
@@ -163,6 +236,8 @@ Create formal spec file from scout findings.
 - [ ] Logging via process.stdout.write (no console.*)
 - [ ] Tests use real Supabase Local (antimocking)
 - [ ] Migrations synced (if applicable)
+- [ ] Pre-commit hooks pass (expert-cc-hook)
+- [ ] Agent workflow compatible (expert-claude-config)
 
 ## Dependencies
 
@@ -175,6 +250,15 @@ Create formal spec file from scout findings.
 ```
 
 ## Error Handling
+
+### Expert Agent Timeout
+```
+IF spawn_parallel_agents times out:
+  1. Check for partial results
+  2. Log which experts completed
+  3. Proceed with available analysis
+  4. Note in spec: "Incomplete expert analysis - {missing_experts} timed out"
+```
 
 ### Retrieval Agent Timeout
 ```
@@ -220,5 +304,7 @@ docs/specs/feature-123-user-auth.md
 1. **Read-only operations** - Coordinator cannot write files directly
 2. **Delegate writing** - Use leaf agents for file creation
 3. **Parallel retrieval** - Spawn multiple agents simultaneously
-4. **Convention awareness** - Include convention checklist in all specs
-5. **Validation level selection** - Always specify appropriate level in spec
+4. **Parallel expert analysis** - Use spawn_parallel_agents for all 7 experts
+5. **Convention awareness** - Include convention checklist in all specs
+6. **Validation level selection** - Always specify appropriate level in spec
+7. **Expert synthesis** - Integrate all expert recommendations into cohesive plan

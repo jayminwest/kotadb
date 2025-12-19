@@ -40,12 +40,20 @@ Review recent commits affecting test infrastructure and patterns.
 Edit the following files to incorporate learnings:
 - `testing_expert_plan.md` → Update "Test Data Strategies" and "MCP Testing Patterns"
 - `testing_expert_review.md` → Update "Test Quality Criteria"
+- `.claude/agents/leaf/expert-testing.md` → Update leaf agent knowledge base
 
 **Rules for Updates:**
 - **PRESERVE** antimocking philosophy - never weaken these rules
 - **APPEND** new test patterns with evidence from commits
 - **DATE** entries with commit reference (e.g., "Stabilized in #123")
 - **REMOVE** patterns that consistently caused flakiness
+
+**Synchronization Requirements:**
+- Any improvements to testing knowledge MUST be reflected in BOTH:
+  1. The original expertise files (`testing_expert_plan.md` and `testing_expert_review.md`)
+  2. The leaf agent knowledge base (`.claude/agents/leaf/expert-testing.md`)
+- The leaf agent file is used when experts are spawned via MCP, so it must contain the most current knowledge
+- **CRITICAL**: Ensure antimocking philosophy is consistently enforced in all files
 
 ### 4. Document Anti-Patterns
 
@@ -67,6 +75,7 @@ After each improvement cycle:
 1. Verify no mock patterns crept into expertise
 2. Confirm real-service patterns still emphasized
 3. Update checklist if new mock patterns discovered
+4. Ensure antimocking principles are consistent across all files
 
 ## Output
 
@@ -86,3 +95,6 @@ Return summary of changes made to Expertise sections:
 
 **Antimocking Reinforcement:**
 - [Any updates to antimocking checklist]
+
+**Leaf Agent Sync:**
+- [Confirmation that `.claude/agents/leaf/expert-testing.md` was updated]

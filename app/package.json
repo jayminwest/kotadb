@@ -22,6 +22,7 @@
 		"prepare": "husky || true"
 	},
 	"dependencies": {
+		"@asteasolutions/zod-to-openapi": "^8.2.0",
 		"@modelcontextprotocol/sdk": "^1.20.0",
 		"@octokit/app": "^16.1.1",
 		"@octokit/rest": "^22.0.0",
@@ -37,6 +38,7 @@
 		"zod": "^4.1.12"
 	},
 	"devDependencies": {
+		"@apidevtools/swagger-parser": "^12.1.0",
 		"@biomejs/biome": "^1.7.3",
 		"@types/bcryptjs": "^2.4.6",
 		"@types/cors": "^2.8.19",

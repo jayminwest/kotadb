@@ -35,12 +35,19 @@ Review recent commits affecting application architecture.
 Edit the following files to incorporate learnings:
 - `architecture_expert_plan.md` → Update "KotaDB Architecture Knowledge Areas"
 - `architecture_expert_review.md` → Update "Review Focus Areas"
+- `.claude/agents/leaf/expert-architecture.md` → Update leaf agent knowledge base
 
 **Rules for Updates:**
 - **PRESERVE** existing patterns unless confirmed obsolete
 - **APPEND** new learnings with evidence from commit history
 - **DATE** new entries with commit reference (e.g., "Added after #123")
 - **REMOVE** only patterns contradicted by multiple recent implementations
+
+**Synchronization Requirements:**
+- Any improvements to architecture knowledge MUST be reflected in BOTH:
+  1. The original expertise files (`architecture_expert_plan.md` and `architecture_expert_review.md`)
+  2. The leaf agent knowledge base (`.claude/agents/leaf/expert-architecture.md`)
+- The leaf agent file is used when experts are spawned via MCP, so it must contain the most current knowledge
 
 ### 4. Document Anti-Patterns
 
@@ -59,9 +66,10 @@ Edit the following files to incorporate learnings:
 ### 5. Validate Updates
 
 After updating expertise sections:
-1. Review changes for consistency
+1. Review changes for consistency across all three files
 2. Ensure no contradictions with existing patterns
 3. Verify code examples still compile conceptually
+4. Confirm leaf agent file contains all critical knowledge
 
 ## Output
 
@@ -78,3 +86,6 @@ Return summary of changes made to Expertise sections:
 
 **Patterns Removed:**
 - [Obsolete pattern, reason for removal]
+
+**Leaf Agent Sync:**
+- [Confirmation that `.claude/agents/leaf/expert-architecture.md` was updated]

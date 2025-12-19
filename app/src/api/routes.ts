@@ -44,6 +44,7 @@ import {
 	updateProject,
 } from "./projects";
 import { ensureRepository, listRecentFiles, runIndexingWorkflow, searchFiles } from "./queries";
+import { buildOpenAPISpec } from "./openapi/builder.js";
 
 /**
  * Extended Express Request with auth context attached
@@ -428,7 +429,7 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 	// Authentication middleware for all other routes
 	app.use(async (req: AuthenticatedRequest, res: Response, next: NextFunction) => {
 		// Skip auth for health check and JWT-authenticated endpoints
-		if (req.path === "/health" || req.path === "/api/keys/generate") {
+		if (req.path === "/health" || req.path === "/api/keys/generate" || req.path === "/openapi.json") {
 			return next();
 		}
 
@@ -1359,6 +1360,24 @@ export function createExpressApp(supabase: SupabaseClient): Express {
 			logger.error("Failed to trigger auto-reindex", err);
 			Sentry.captureException(err);
 			res.status(500).json({ error: err.message });
+		}
+	});
+
+	// GET /openapi.json - OpenAPI 3.1 specification (public endpoint)
+	app.get("/openapi.json", (req: Request, res: Response) => {
+		try {
+			const spec = buildOpenAPISpec();
+			
+			// Set cache headers for better performance
+			res.set("Cache-Control", "public, max-age=3600");
+			res.set("Content-Type", "application/json");
+			
+			res.json(spec);
+		} catch (error) {
+			const err = error as Error;
+			logger.error("Failed to generate OpenAPI spec", err);
+			Sentry.captureException(err);
+			res.status(500).json({ error: "Failed to generate OpenAPI specification" });
 		}
 	});
 
