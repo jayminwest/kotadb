@@ -662,13 +662,10 @@ export function createExpressApp(supabase?: SupabaseClient): Express {
 	app.post("/mcp", async (req: AuthenticatedRequest, res: Response) => {
 		const context = req.authContext!;
 
-		if (!supabase) {
-			addRateLimitHeaders(res, context.rateLimit);
-			return res.status(503).json({ 
-				error: "MCP server requires cloud mode database - see docs for configuration" 
-			});
-		}
-
+		// MCP endpoint works in both local (SQLite) and cloud (Supabase) mode
+		// In local mode, query functions use SQLite via isLocalMode() checks
+		// In cloud mode, query functions use the provided Supabase client
+		
 		// Log Accept header for debugging 406 errors (SDK requires both json AND sse)
 		const acceptHeader = req.get("Accept") || req.get("accept");
 		const hasJson =
@@ -691,7 +688,7 @@ export function createExpressApp(supabase?: SupabaseClient): Express {
 
 			// Create per-request MCP server for user isolation
 			const server = createMcpServer({
-				supabase,
+				supabase: supabase || null,
 				userId: context.userId,
 			});
 

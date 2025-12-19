@@ -2,8 +2,6 @@
  * MCP tool definitions and execution adapters
  */
 import type { KotaDatabase } from "@db/sqlite/sqlite-client.js";
-
-
 import {
 	addRepositoryToProject,
 	createProject,
@@ -544,10 +542,14 @@ function isListRecentParams(params: unknown): params is { limit?: number } | und
  * @returns Project UUID or throws "Project not found" error
  */
 async function resolveProjectId(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	userId: string,
 	projectIdentifier: string,
 ): Promise<string> {
+	if (!supabase) {
+		throw new Error("Project operations require cloud mode");
+	}
+	
 	// Try UUID regex match first
 	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 	if (uuidRegex.test(projectIdentifier)) {
@@ -603,7 +605,7 @@ async function resolveProjectId(
  * Execute search_code tool
  */
 export async function executeSearchCode(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
@@ -644,6 +646,11 @@ export async function executeSearchCode(
 	// Resolve project to project ID if provided
 	let projectId: string | undefined;
 	if (validatedParams.project) {
+		// Project filtering requires cloud mode
+		if (!supabase) {
+			throw new Error("Project filtering requires cloud mode. Use repository parameter instead or configure Supabase.");
+		}
+
 		// Try to parse as UUID first
 		const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 		if (uuidRegex.test(validatedParams.project)) {
@@ -716,7 +723,7 @@ export async function executeSearchCode(
  * Execute index_repository tool
  */
 export async function executeIndexRepository(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
@@ -724,6 +731,11 @@ export async function executeIndexRepository(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -801,7 +813,7 @@ export async function executeIndexRepository(
  * Execute list_recent_files tool
  */
 export async function executeListRecentFiles(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
@@ -828,7 +840,7 @@ export async function executeListRecentFiles(
  * Execute search_dependencies tool
  */
 export async function executeSearchDependencies(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
@@ -887,6 +899,11 @@ export async function executeSearchDependencies(
 	if (validatedParams.repository) {
 		repositoryId = validatedParams.repository;
 	} else {
+		// Auto-discovery of repository requires cloud mode
+		if (!supabase) {
+			throw new Error("Repository parameter is required in local mode. Please specify a repository ID.");
+		}
+		
 		const { data: repos } = await supabase
 			.from("repositories")
 			.select("id")
@@ -973,7 +990,7 @@ export async function executeSearchDependencies(
  * Execute analyze_change_impact tool
  */
 export async function executeAnalyzeChangeImpact(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
@@ -981,6 +998,11 @@ export async function executeAnalyzeChangeImpact(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1039,7 +1061,7 @@ export async function executeAnalyzeChangeImpact(
  * Execute validate_implementation_spec tool
  */
 export async function executeValidateImplementationSpec(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	requestId: string | number,
 	userId: string,
@@ -1047,6 +1069,11 @@ export async function executeValidateImplementationSpec(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1098,7 +1125,7 @@ export async function executeValidateImplementationSpec(
  * Execute create_project tool
  */
 export async function executeCreateProject(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	userId: string,
@@ -1106,6 +1133,11 @@ export async function executeCreateProject(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1142,7 +1174,7 @@ export async function executeCreateProject(
  * Execute list_projects tool
  */
 export async function executeListProjects(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	userId: string,
@@ -1150,6 +1182,11 @@ export async function executeListProjects(
 	// Validate params structure (all params are optional)
 	if (params !== undefined && (typeof params !== "object" || params === null)) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const projects = await listProjects(supabase, userId);
@@ -1172,7 +1209,7 @@ export async function executeListProjects(
  * Execute get_project tool
  */
 export async function executeGetProject(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	userId: string,
@@ -1180,6 +1217,11 @@ export async function executeGetProject(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1209,7 +1251,7 @@ export async function executeGetProject(
  * Execute update_project tool
  */
 export async function executeUpdateProject(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	userId: string,
@@ -1217,6 +1259,11 @@ export async function executeUpdateProject(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1265,7 +1312,7 @@ export async function executeUpdateProject(
  * Execute delete_project tool
  */
 export async function executeDeleteProject(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	userId: string,
@@ -1273,6 +1320,11 @@ export async function executeDeleteProject(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1301,7 +1353,7 @@ export async function executeDeleteProject(
  * Execute add_repository_to_project tool
  */
 export async function executeAddRepositoryToProject(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	userId: string,
@@ -1309,6 +1361,11 @@ export async function executeAddRepositoryToProject(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1364,7 +1421,7 @@ export async function executeAddRepositoryToProject(
  * Execute remove_repository_from_project tool
  */
 export async function executeRemoveRepositoryFromProject(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	userId: string,
@@ -1372,6 +1429,11 @@ export async function executeRemoveRepositoryFromProject(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1406,7 +1468,7 @@ export async function executeRemoveRepositoryFromProject(
  * Execute get_index_job_status tool
  */
 export async function executeGetIndexJobStatus(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	params: unknown,
 	_requestId: string | number,
 	_userId: string,
@@ -1414,6 +1476,11 @@ export async function executeGetIndexJobStatus(
 	// Validate params structure
 	if (typeof params !== "object" || params === null) {
 		throw new Error("Parameters must be an object");
+	}
+
+	// Cloud-only tool - requires Supabase
+	if (!supabase) {
+		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1536,7 +1603,7 @@ export async function executeSyncImport(
  * Main tool call dispatcher
  */
 export async function handleToolCall(
-	supabase: SupabaseClient,
+	supabase: SupabaseClient | null,
 	toolName: string,
 	params: unknown,
 	requestId: string | number,

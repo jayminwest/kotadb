@@ -49,11 +49,14 @@ import {
 
 const logger = createLogger({ module: "mcp-server" });
 
+
 /**
  * MCP Server context passed to tool handlers via closure
+ * 
+ * In local mode, supabase will be null as queries use SQLite directly
  */
 export interface McpServerContext {
-	supabase: SupabaseClient;
+	supabase: SupabaseClient | null;
 	userId: string;
 }
 

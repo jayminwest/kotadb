@@ -138,6 +138,10 @@ export async function saveIndexedFiles(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+
 
 	const records = files.map((file) => ({
 		repository_id: repositoryId,
@@ -189,6 +193,10 @@ export async function storeSymbols(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+
 
 	const records = symbols.map((symbol) => ({
 		file_id: fileId,
@@ -245,6 +253,10 @@ export async function storeReferences(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+
 
 	const records = references.map((ref) => ({
 		source_file_id: fileId,
@@ -333,6 +345,10 @@ export async function storeDependencies(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+
 
 	const records = dependencies.map((dep) => ({
 		repository_id: dep.repositoryId,
@@ -368,7 +384,7 @@ export async function storeDependencies(
  * @returns Array of matching indexed files
  */
 export async function searchFiles(
-	client: SupabaseClient,
+	client: SupabaseClient | null,
 	term: string,
 	userId: string,
 	options: SearchOptions = {},
@@ -382,6 +398,9 @@ export async function searchFiles(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
 
 	// If project filter is specified, get repository IDs for that project
 	let repositoryIds: string[] | undefined;
@@ -442,7 +461,7 @@ export async function searchFiles(
  * @returns Array of recently indexed files
  */
 export async function listRecentFiles(
-	client: SupabaseClient,
+	client: SupabaseClient | null,
 	limit: number,
 	userId: string,
 ): Promise<IndexedFile[]> {
@@ -453,6 +472,10 @@ export async function listRecentFiles(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+
 	const { data, error } = await client
 		.from("indexed_files")
 		.select("id, repository_id, path, content, metadata, indexed_at")
@@ -881,7 +904,7 @@ function detectLanguage(path: string): string {
  * @returns File UUID or null if not found
  */
 export async function resolveFilePath(
-	client: SupabaseClient,
+	client: SupabaseClient | null,
 	filePath: string,
 	repositoryId: string,
 	userId: string,
@@ -893,6 +916,10 @@ export async function resolveFilePath(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+
 	const { data, error } = await client
 		.from("indexed_files")
 		.select("id")
@@ -977,7 +1004,7 @@ export async function getIndexJobStatus(
  * @returns Dependency result with direct/indirect relationships and cycles
  */
 export async function queryDependents(
-	client: SupabaseClient,
+	client: SupabaseClient | null,
 	fileId: string,
 	depth: number,
 	includeTests: boolean,
@@ -990,6 +1017,13 @@ export async function queryDependents(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+	
+	// TypeScript needs this for closure type narrowing
+	const supabaseClient = client;
+
 	const visited = new Set<string>();
 	const direct: string[] = [];
 	const indirect: Record<string, string[]> = {};
@@ -1003,7 +1037,7 @@ export async function queryDependents(
 		if (currentDepth > depth) return;
 
 		// Build query for files that depend on currentFileId
-		const { data, error } = await client
+		const { data, error } = await supabaseClient
 			.from("dependency_graph")
 			.select("from_file_id, indexed_files!dependency_graph_from_file_id_fkey(id, path)")
 			.eq("to_file_id", currentFileId)
@@ -1083,7 +1117,7 @@ export async function queryDependents(
  * @returns Dependency result with direct/indirect relationships and cycles
  */
 export async function queryDependencies(
-	client: SupabaseClient,
+	client: SupabaseClient | null,
 	fileId: string,
 	depth: number,
 	userId: string,
@@ -1095,6 +1129,13 @@ export async function queryDependencies(
 	}
 
 	// Cloud mode: existing Supabase logic
+	if (!client) {
+		throw new Error("Supabase client required in cloud mode");
+	}
+	
+	// TypeScript needs this for closure type narrowing
+	const supabaseClient = client;
+
 	const visited = new Set<string>();
 	const direct: string[] = [];
 	const indirect: Record<string, string[]> = {};
@@ -1108,7 +1149,7 @@ export async function queryDependencies(
 		if (currentDepth > depth) return;
 
 		// Build query for files that currentFileId depends on
-		const { data, error } = await client
+		const { data, error } = await supabaseClient
 			.from("dependency_graph")
 			.select("to_file_id, indexed_files!dependency_graph_to_file_id_fkey(id, path)")
 			.eq("from_file_id", currentFileId)
