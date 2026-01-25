@@ -1,7 +1,8 @@
 import type { Reference } from "@indexer/reference-extractor";
-import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
+import type { Symbol as ExtractedSymbol, SymbolKind } from "@indexer/symbol-extractor";
 import { createLogger } from "@logging/logger.js";
 import type { IndexRequest, IndexedFile } from "@shared/types";
+import { detectLanguage } from "@shared/language-utils";
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { getInstallationForRepository } from "../github/installation-lookup";
 import { Sentry } from "../instrument.js";
@@ -16,7 +17,9 @@ import {
 	resolveFilePathLocal,
 	storeDependenciesLocal,
 	queryDependentsLocalWrapped,
-	queryDependenciesLocalWrapped
+	queryDependenciesLocalWrapped,
+	ensureRepositoryLocal,
+	updateRepositoryLastIndexedLocal
 } from "./queries-local.js";
 
 const logger = createLogger({ module: "api-queries" });
@@ -756,7 +759,7 @@ export async function runIndexingWorkflow(
 						id: s.id,
 						file_id: s.file_id,
 						name: s.name,
-						kind: s.kind,
+						kind: s.kind as SymbolKind,
 						lineStart: s.line_start,
 						lineEnd: s.line_end,
 						columnStart: s.metadata?.column_start || 0,
@@ -868,30 +871,6 @@ export async function createDefaultOrganization(
 	return org.id;
 }
 
-/**
- * Detect programming language from file path.
- * Helper function for metadata enrichment.
- */
-function detectLanguage(path: string): string {
-	const ext = path.split(".").pop()?.toLowerCase();
-	const languageMap: Record<string, string> = {
-		ts: "typescript",
-		tsx: "typescript",
-		js: "javascript",
-		jsx: "javascript",
-		mjs: "javascript",
-		cjs: "javascript",
-		json: "json",
-		py: "python",
-		go: "go",
-		rs: "rust",
-		java: "java",
-		cpp: "cpp",
-		c: "c",
-		h: "c",
-	};
-	return languageMap[ext ?? ""] ?? "unknown";
-}
 
 /**
  * Resolve file path to file UUID.
@@ -1211,4 +1190,226 @@ export async function queryDependencies(
 	}
 
 	return { direct, indirect, cycles };
+}
+
+/**
+ * Run indexing workflow for local mode (synchronous, no queue).
+ * 
+ * Unlike cloud mode which queues an async job, local mode
+ * executes indexing synchronously and stores directly to SQLite.
+ * 
+ * @param request - Index request with repository details
+ * @returns Indexing result with stats
+ */
+export async function runIndexingWorkflowLocal(
+	request: IndexRequest,
+): Promise<{
+	repositoryId: string;
+	filesIndexed: number;
+	symbolsExtracted: number;
+	referencesExtracted: number;
+	dependenciesExtracted: number;
+}> {
+	const { existsSync } = await import("node:fs");
+	const { resolve } = await import("node:path");
+	const { prepareRepository } = await import("@indexer/repos");
+	const { discoverSources, parseSourceFile } = await import("@indexer/parsers");
+	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
+	const { extractSymbols } = await import("@indexer/symbol-extractor");
+	const { extractReferences } = await import("@indexer/reference-extractor");
+	const { extractDependencies } = await import("@indexer/dependency-extractor");
+	const { detectCircularDependencies } = await import("@indexer/circular-detector");
+
+	const db = getGlobalDatabase();
+
+	// Determine repository path and full name
+	let localPath: string;
+	let fullName = request.repository;
+
+	if (request.localPath) {
+		localPath = resolve(request.localPath);
+
+		// SECURITY: Prevent path traversal - only allow paths within workspace
+		const workspaceRoot = resolve(process.cwd());
+		if (!localPath.startsWith(workspaceRoot)) {
+			throw new Error(`localPath must be within workspace: ${workspaceRoot}`);
+		}
+		// For local paths, use the last path segment as repo name if not in owner/repo format
+		if (!fullName.includes("/")) {
+			fullName = `local/${fullName}`;
+		}
+	} else {
+		// Use prepareRepository for remote cloning
+		const repo = await prepareRepository(request);
+		localPath = repo.localPath;
+	}
+
+	if (!existsSync(localPath)) {
+		throw new Error(`Repository path does not exist: ${localPath}`);
+	}
+
+	// Ensure repository exists in SQLite
+	const gitUrl = request.localPath ? localPath : `https://github.com/${fullName}.git`;
+	const repositoryId = ensureRepositoryLocal(db, fullName, gitUrl, request.ref);
+
+	logger.info("Starting local indexing workflow", {
+		repositoryId,
+		fullName,
+		localPath,
+	});
+
+	// Discover and parse source files
+	const sources = await discoverSources(localPath);
+	const records = (
+		await Promise.all(sources.map((source) => parseSourceFile(source, localPath)))
+	).filter((entry): entry is NonNullable<typeof entry> => entry !== null);
+
+	// Save files to SQLite
+	const filesIndexed = saveIndexedFilesLocal(db, records, repositoryId);
+
+	// Extract and store symbols, references, and dependencies
+	const allSymbolsWithFileId: Array<{
+		id: string;
+		file_id: string;
+		name: string;
+		kind: SymbolKind;
+		lineStart: number;
+		lineEnd: number;
+		columnStart: number;
+		columnEnd: number;
+		signature: string | null;
+		documentation: string | null;
+		isExported: boolean;
+	}> = [];
+	const allReferencesWithFileId: Array<Reference & { file_id: string }> = [];
+	const filesWithId: IndexedFile[] = [];
+
+	let totalSymbols = 0;
+	let totalReferences = 0;
+
+	for (const file of records) {
+		if (!isSupportedForAST(file.path)) continue;
+
+		const ast = parseFile(file.path, file.content);
+		if (!ast) continue;
+
+		const symbols = extractSymbols(ast, file.path);
+		const references = extractReferences(ast, file.path);
+
+		// Get the file_id from SQLite
+		const fileRecord = db.queryOne<{ id: string }>(
+			"SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?",
+			[repositoryId, file.path]
+		);
+
+		if (!fileRecord) {
+			logger.warn("Could not find file record after indexing", {
+				filePath: file.path,
+				repositoryId,
+			});
+			continue;
+		}
+
+		// Store file with id for dependency extraction
+		filesWithId.push({ ...file, id: fileRecord.id, repository_id: repositoryId });
+
+		// Store symbols and references
+		const symbolCount = storeSymbolsLocal(db, symbols, fileRecord.id);
+		const referenceCount = storeReferencesLocal(db, references, fileRecord.id);
+
+		totalSymbols += symbolCount;
+		totalReferences += referenceCount;
+
+		// Fetch stored symbols with their database IDs for dependency extraction
+		const storedSymbols = db.query<{
+			id: string;
+			file_id: string;
+			name: string;
+			kind: SymbolKind;
+			line_start: number;
+			line_end: number;
+			signature: string | null;
+			documentation: string | null;
+			metadata: string;
+		}>(
+			"SELECT id, file_id, name, kind, line_start, line_end, signature, documentation, metadata FROM indexed_symbols WHERE file_id = ?",
+			[fileRecord.id]
+		);
+
+		for (const s of storedSymbols) {
+			const metadata = JSON.parse(s.metadata || "{}");
+			allSymbolsWithFileId.push({
+				id: s.id,
+				file_id: s.file_id,
+				name: s.name,
+				kind: s.kind as SymbolKind,
+				lineStart: s.line_start,
+				lineEnd: s.line_end,
+				columnStart: metadata.column_start || 0,
+				columnEnd: metadata.column_end || 0,
+				signature: s.signature || null,
+				documentation: s.documentation || null,
+				isExported: metadata.is_exported || false,
+			});
+		}
+
+		// Attach file_id to references for dependency extraction
+		for (const ref of references) {
+			allReferencesWithFileId.push({ ...ref, file_id: fileRecord.id });
+		}
+	}
+
+	// Extract and store dependency graph
+	logger.info("Extracting dependency graph", {
+		fileCount: filesWithId.length,
+		repositoryId,
+	});
+
+	const dependencies = extractDependencies(
+		filesWithId,
+		allSymbolsWithFileId,
+		allReferencesWithFileId,
+		repositoryId,
+	);
+
+	// Clear existing dependencies for this repository and store new ones
+	db.run("DELETE FROM dependency_graph WHERE repository_id = ?", [repositoryId]);
+	const dependencyCount = storeDependenciesLocal(db, dependencies);
+
+	// Detect circular dependencies and log warnings
+	const filePathById = new Map(filesWithId.map((f) => [f.id!, f.path]));
+	const symbolNameById = new Map(allSymbolsWithFileId.map((s) => [s.id, s.name]));
+
+	const circularChains = detectCircularDependencies(dependencies, filePathById, symbolNameById);
+
+	if (circularChains.length > 0) {
+		logger.warn("Circular dependency chains detected", {
+			chainCount: circularChains.length,
+			repositoryId,
+			chains: circularChains.map((c) => ({
+				type: c.type,
+				description: c.description,
+			})),
+		});
+	}
+
+	// Update repository last_indexed_at
+	updateRepositoryLastIndexedLocal(db, repositoryId);
+
+	logger.info("Local indexing workflow completed", {
+		repositoryId,
+		filesIndexed,
+		symbolsExtracted: totalSymbols,
+		referencesExtracted: totalReferences,
+		dependenciesExtracted: dependencyCount,
+		circularDependencies: circularChains.length,
+	});
+
+	return {
+		repositoryId,
+		filesIndexed,
+		symbolsExtracted: totalSymbols,
+		referencesExtracted: totalReferences,
+		dependenciesExtracted: dependencyCount,
+	};
 }

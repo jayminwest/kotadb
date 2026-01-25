@@ -13,32 +13,9 @@ import { createLogger } from "@logging/logger.js";
 import type { IndexedFile } from "@shared/types";
 import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
 import type { Reference } from "@indexer/reference-extractor";
+import { detectLanguage } from "@shared/language-utils";
 
 const logger = createLogger({ module: "api-queries-local" });
-
-/**
- * Detect programming language from file path
- */
-function detectLanguage(path: string): string {
-	const ext = path.split(".").pop()?.toLowerCase();
-	const languageMap: Record<string, string> = {
-		ts: "typescript",
-		tsx: "typescript",
-		js: "javascript",
-		jsx: "javascript",
-		mjs: "javascript",
-		cjs: "javascript",
-		json: "json",
-		py: "python",
-		go: "go",
-		rs: "rust",
-		java: "java",
-		cpp: "cpp",
-		c: "c",
-		h: "c",
-	};
-	return languageMap[ext ?? ""] ?? "unknown";
-}
 
 /**
  * Save indexed files to SQLite database
@@ -656,4 +633,71 @@ export function queryDependenciesLocalWrapped(
 	// For full cycle reconstruction, we'd need to track paths in the SQL result
 	
 	return { direct, indirect, cycles };
+}
+
+/**
+ * Ensure repository exists in SQLite, create if not.
+ * Returns repository UUID.
+ * 
+ * @param db - SQLite database instance
+ * @param fullName - Repository full name (owner/repo format)
+ * @param gitUrl - Git URL for the repository (optional)
+ * @param defaultBranch - Default branch name (optional, defaults to 'main')
+ * @returns Repository UUID
+ */
+export function ensureRepositoryLocal(
+	db: KotaDatabase,
+	fullName: string,
+	gitUrl?: string,
+	defaultBranch?: string,
+): string {
+	// Check if repository already exists
+	const existing = db.queryOne<{ id: string }>(
+		"SELECT id FROM repositories WHERE full_name = ?",
+		[fullName]
+	);
+
+	if (existing) {
+		logger.debug("Repository already exists in SQLite", { fullName, id: existing.id });
+		return existing.id;
+	}
+
+	// Create new repository
+	const id = randomUUID();
+	const name = fullName.split("/").pop() || fullName;
+	const now = new Date().toISOString();
+
+	db.run(`
+		INSERT INTO repositories (id, name, full_name, git_url, default_branch, created_at, updated_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, [
+		id,
+		name,
+		fullName,
+		gitUrl || null,
+		defaultBranch || "main",
+		now,
+		now
+	]);
+
+	logger.info("Created repository in SQLite", { fullName, id });
+	return id;
+}
+
+/**
+ * Update repository last_indexed_at timestamp.
+ * 
+ * @param db - SQLite database instance
+ * @param repositoryId - Repository UUID
+ */
+export function updateRepositoryLastIndexedLocal(
+	db: KotaDatabase,
+	repositoryId: string,
+): void {
+	const now = new Date().toISOString();
+	db.run(
+		"UPDATE repositories SET last_indexed_at = ?, updated_at = ? WHERE id = ?",
+		[now, now, repositoryId]
+	);
+	logger.debug("Updated repository last_indexed_at", { repositoryId });
 }

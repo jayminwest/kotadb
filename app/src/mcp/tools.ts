@@ -1,7 +1,3 @@
-/**
- * MCP tool definitions and execution adapters
- */
-import type { KotaDatabase } from "@db/sqlite/sqlite-client.js";
 import {
 	addRepositoryToProject,
 	createProject,
@@ -21,9 +17,15 @@ import {
 	recordIndexRun,
 	resolveFilePath,
 	runIndexingWorkflow,
+	runIndexingWorkflowLocal,
 	searchFiles,
 	updateIndexRunStatus,
 } from "@api/queries";
+import { isLocalMode } from "@config/environment.js";
+/**
+ * MCP tool definitions and execution adapters
+ */
+import type { KotaDatabase } from "@db/sqlite/sqlite-client.js";
 import { buildSnippet } from "@indexer/extractors";
 import { createLogger } from "@logging/logger.js";
 import type { ChangeImpactRequest, ImplementationSpec, IndexRequest } from "@shared/types";
@@ -84,8 +86,11 @@ export const SEARCH_CODE_TOOL: ToolDefinition = {
  */
 export const INDEX_REPOSITORY_TOOL: ToolDefinition = {
 	name: "index_repository",
-	description:
-		"Index a git repository by cloning/updating it and extracting code files. Returns a run ID to track progress.",
+	description: `Index a git repository by cloning/updating it and extracting code files.
+
+In cloud mode: Queues indexing job and returns immediately with status 'pending' and a runId for tracking progress via get_indexing_status.
+
+In local mode (KOTA_LOCAL_MODE=true): Performs synchronous indexing and returns immediately with status 'completed' and full indexing stats.`,
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -549,7 +554,7 @@ async function resolveProjectId(
 	if (!supabase) {
 		throw new Error("Project operations require cloud mode");
 	}
-	
+
 	// Try UUID regex match first
 	const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
 	if (uuidRegex.test(projectIdentifier)) {
@@ -648,7 +653,9 @@ export async function executeSearchCode(
 	if (validatedParams.project) {
 		// Project filtering requires cloud mode
 		if (!supabase) {
-			throw new Error("Project filtering requires cloud mode. Use repository parameter instead or configure Supabase.");
+			throw new Error(
+				"Project filtering requires cloud mode. Use repository parameter instead or configure Supabase.",
+			);
 		}
 
 		// Try to parse as UUID first
@@ -733,11 +740,6 @@ export async function executeIndexRepository(
 		throw new Error("Parameters must be an object");
 	}
 
-	// Cloud-only tool - requires Supabase
-	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
-	}
-
 	const p = params as Record<string, unknown>;
 
 	// Check required parameter: repository
@@ -767,6 +769,43 @@ export async function executeIndexRepository(
 		ref: validatedParams.ref ?? "main", // Default to 'main' if not provided
 		localPath: validatedParams.localPath,
 	};
+
+	// LOCAL MODE: Synchronous indexing to SQLite
+	if (isLocalMode()) {
+		logger.info("Starting local mode indexing", {
+			repository: indexRequest.repository,
+			localPath: indexRequest.localPath,
+		});
+
+		try {
+			const result = await runIndexingWorkflowLocal(indexRequest);
+
+			return {
+				runId: result.repositoryId, // Add runId for API compatibility
+				repositoryId: result.repositoryId,
+				status: "completed",
+				message: "Indexing completed successfully",
+				stats: {
+					files_indexed: result.filesIndexed,
+					symbols_extracted: result.symbolsExtracted,
+					references_extracted: result.referencesExtracted,
+					dependencies_extracted: result.dependenciesExtracted,
+				},
+			};
+		} catch (error) {
+			Sentry.captureException(error, {
+				tags: { mode: "local", repository: indexRequest.repository },
+			});
+			throw error;
+		}
+	}
+
+	// CLOUD MODE: Async queue-based indexing with Supabase
+	if (!supabase) {
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
+	}
 
 	// Ensure repository exists in database
 	const repositoryId = await ensureRepository(supabase, userId, indexRequest);
@@ -901,9 +940,11 @@ export async function executeSearchDependencies(
 	} else {
 		// Auto-discovery of repository requires cloud mode
 		if (!supabase) {
-			throw new Error("Repository parameter is required in local mode. Please specify a repository ID.");
+			throw new Error(
+				"Repository parameter is required in local mode. Please specify a repository ID.",
+			);
 		}
-		
+
 		const { data: repos } = await supabase
 			.from("repositories")
 			.select("id")
@@ -1002,7 +1043,9 @@ export async function executeAnalyzeChangeImpact(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1073,7 +1116,9 @@ export async function executeValidateImplementationSpec(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1137,7 +1182,9 @@ export async function executeCreateProject(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1186,7 +1233,9 @@ export async function executeListProjects(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const projects = await listProjects(supabase, userId);
@@ -1221,7 +1270,9 @@ export async function executeGetProject(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1263,7 +1314,9 @@ export async function executeUpdateProject(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1324,7 +1377,9 @@ export async function executeDeleteProject(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1365,7 +1420,9 @@ export async function executeAddRepositoryToProject(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1433,7 +1490,9 @@ export async function executeRemoveRepositoryFromProject(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1480,7 +1539,9 @@ export async function executeGetIndexJobStatus(
 
 	// Cloud-only tool - requires Supabase
 	if (!supabase) {
-		throw new Error("This tool requires cloud mode. Please configure Supabase to use project management and indexing features.");
+		throw new Error(
+			"This tool requires cloud mode. Please configure Supabase to use project management and indexing features.",
+		);
 	}
 
 	const p = params as Record<string, unknown>;
@@ -1527,7 +1588,7 @@ export async function executeGetIndexJobStatus(
  */
 export async function executeSyncExport(
 	params: unknown,
-	_requestId: string | number
+	_requestId: string | number,
 ): Promise<unknown> {
 	// Validate params
 	if (params !== undefined && (typeof params !== "object" || params === null)) {
@@ -1553,7 +1614,7 @@ export async function executeSyncExport(
 		tables_skipped: result.tablesSkipped,
 		total_rows: result.totalRows,
 		duration_ms: result.durationMs,
-		export_dir: exportDir || "~/.kotadb/export"
+		export_dir: exportDir || "~/.kotadb/export",
 	};
 }
 
@@ -1562,7 +1623,7 @@ export async function executeSyncExport(
  */
 export async function executeSyncImport(
 	params: unknown,
-	_requestId: string | number
+	_requestId: string | number,
 ): Promise<unknown> {
 	// Validate params
 	if (params !== undefined && (typeof params !== "object" || params === null)) {
@@ -1587,7 +1648,7 @@ export async function executeSyncImport(
 			tables_imported: result.tablesImported,
 			rows_imported: result.totalRowsImported,
 			errors: result.errors,
-			duration_ms: result.durationMs
+			duration_ms: result.durationMs,
 		};
 	}
 
@@ -1596,7 +1657,7 @@ export async function executeSyncImport(
 		tables_imported: result.tablesImported,
 		rows_imported: result.totalRowsImported,
 		duration_ms: result.durationMs,
-		import_dir: dir
+		import_dir: dir,
 	};
 }
 /**
@@ -1652,20 +1713,21 @@ export async function handleToolCall(
  */
 export const SYNC_EXPORT_TOOL: ToolDefinition = {
 	name: "kota_sync_export",
-	description: "Export local SQLite database to JSONL files for git sync. Uses hash-based change detection to skip unchanged tables. Exports to ~/.kotadb/export/ by default.",
+	description:
+		"Export local SQLite database to JSONL files for git sync. Uses hash-based change detection to skip unchanged tables. Exports to ~/.kotadb/export/ by default.",
 	inputSchema: {
 		type: "object",
 		properties: {
 			force: {
 				type: "boolean",
-				description: "Force export even if tables unchanged (default: false)"
+				description: "Force export even if tables unchanged (default: false)",
 			},
 			export_dir: {
 				type: "string",
-				description: "Optional: Custom export directory path"
-			}
-		}
-	}
+				description: "Optional: Custom export directory path",
+			},
+		},
+	},
 };
 
 /**
@@ -1673,14 +1735,15 @@ export const SYNC_EXPORT_TOOL: ToolDefinition = {
  */
 export const SYNC_IMPORT_TOOL: ToolDefinition = {
 	name: "kota_sync_import",
-	description: "Import JSONL files into local SQLite database. Applies deletion manifest first, then imports all tables transactionally. Typically run after git pull to sync remote changes.",
+	description:
+		"Import JSONL files into local SQLite database. Applies deletion manifest first, then imports all tables transactionally. Typically run after git pull to sync remote changes.",
 	inputSchema: {
 		type: "object",
 		properties: {
 			import_dir: {
 				type: "string",
-				description: "Optional: Custom import directory path (default: ~/.kotadb/export)"
-			}
-		}
-	}
+				description: "Optional: Custom import directory path (default: ~/.kotadb/export)",
+			},
+		},
+	},
 };

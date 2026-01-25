@@ -128,7 +128,17 @@ export function getEnvironmentConfig(): EnvironmentConfig {
  * ```
  */
 export function isLocalMode(): boolean {
-	return getEnvironmentConfig().mode === 'local';
+	const config = getEnvironmentConfig();
+
+	// CRITICAL: Prevent local mode in production
+	if (config.mode === 'local' && process.env.NODE_ENV === 'production') {
+		throw new Error(
+			'SECURITY ERROR: Local mode cannot be enabled in production. ' +
+				'This would bypass all authentication and rate limiting.',
+		);
+	}
+
+	return config.mode === 'local';
 }
 
 /**
