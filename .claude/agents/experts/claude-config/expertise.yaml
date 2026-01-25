@@ -1,0 +1,430 @@
+# Claude Code Configuration Expertise
+# Target: 400-600 lines | Domain: Operational knowledge for .claude/ configuration
+# Adapted for KotaDB project conventions
+
+overview:
+  description: |
+    Claude Code configuration for KotaDB—.claude/ directory structure, command patterns,
+    hook implementation with standard Python (hook_helpers.py), agent registry management,
+    and expert domain organization. This expertise enables correct configuration of Claude
+    Code within the KotaDB codebase conventions.
+  scope: |
+    Covers .claude/ directory organization (agents/, commands/, hooks/, hooks/utils/),
+    command frontmatter with Template Category, hook implementation using standard Python
+    with hook_helpers.py utilities, agent-registry.json maintenance, expert 4-agent pattern
+    (plan/build/improve/question in agents/experts/<domain>/), and KotaDB-specific conventions.
+
+    KOTADB ADAPTATIONS:
+    - Hooks use standard Python with hook_helpers.py (NOT uv shebang)
+    - Commands include Template Category field
+    - Tools in agent frontmatter use YAML array format (NOT comma-separated)
+    - Agent-registry.json must be updated when adding agents
+    - Logging uses sys.stdout.write (never print())
+
+    Does NOT cover agent prompt content authoring (see agent-authoring expert).
+  rationale: |
+    Correct .claude/ configuration enables tooling, discoverability, and maintainability.
+    Poor structure creates fragmentation and breaks tooling. KotaDB has established
+    conventions that differ from other Claude Code projects and must be followed.
+
+core_implementation:
+  directory_structure:
+    .claude/:
+      agents/:
+        purpose: Agent definitions (general-purpose + branch/ + leaf/ + experts/)
+        README.md: Documents agent structure, registry, tool access
+        agent-template.md: Starting template for new agents
+        agent-registry.json: Machine-readable agent catalog with indexes
+        branch/: Multi-agent coordination agents (plan, build, review, meta)
+        leaf/: Focused task agents (retrieval, build)
+        experts/<domain>/:
+          purpose: 4-agent pattern (plan/build/improve/question + expertise.yaml)
+          pattern: Domain experts with queryable knowledge
+      commands/:
+        purpose: Slash commands by category
+        workflows/: SDLC phase commands (prime, plan, implement, validate)
+        docs/: Documentation reference commands
+        issues/: Issue management commands
+        git/: Git operation commands
+        testing/: Test-related commands
+        ci/: CI/CD commands
+        tools/: Development tools
+        app/: Application development commands
+        automation/: ADW automation commands
+        worktree/: Worktree management commands
+        release/: Release workflow commands
+        validation/: Validation commands
+        experts/orchestrators/: Expert orchestration commands
+      hooks/:
+        purpose: Lifecycle hooks (standard Python with hook_helpers.py)
+        utils/hook_helpers.py: Shared hook utilities
+      settings.json:
+        purpose: Project-wide config (committed)
+      settings.local.json:
+        purpose: Local overrides (gitignored)
+
+  key_files:
+    - path: .claude/commands/<category>/<name>.md
+      purpose: Slash command (frontmatter + prompt)
+      invocation: /category:name (e.g., /workflows:plan)
+    - path: .claude/agents/experts/<domain>/<domain>-{plan,build,improve,question}-agent.md
+      purpose: Expert 4-agent pattern with standardized colors
+    - path: .claude/agents/experts/<domain>/expertise.yaml
+      purpose: Structured domain knowledge (400-600 lines target)
+    - path: .claude/hooks/<hook-name>.py
+      purpose: Lifecycle hook using hook_helpers.py
+    - path: .claude/hooks/utils/hook_helpers.py
+      purpose: Shared hook utilities (read_hook_input, output_result, etc.)
+    - path: .claude/agents/agent-registry.json
+      purpose: Machine-readable agent catalog with capability/model/tool indexes
+
+key_operations:
+  create_slash_command:
+    when: Adding new command functionality
+    approach: |
+      1. Create .claude/commands/<category>/<name>.md
+      2. Add frontmatter and Template Category:
+         ```markdown
+         # /command-name
+
+         **Template Category**: Path Resolution | Action | Reference
+
+         Brief description of command purpose.
+
+         ## Inputs
+         - `$1` (param_name): Description
+
+         ## Context
+
+         **Project**: KotaDB - HTTP API service for code indexing
+         ...
+
+         ## Instructions
+         ...
+         ```
+      3. Invoked as /category:name
+    examples:
+      - .claude/commands/workflows/plan.md -> /workflows:plan
+      - .claude/commands/docs/architecture.md -> /docs:architecture
+    pitfalls:
+      - what: "CRITICAL - Using colons in frontmatter string values"
+        instead: "No colons in description or any YAML value"
+        reason: "Colons break YAML parsing in Claude Code's configuration system"
+      - what: "Missing Template Category"
+        instead: "Always include Template Category after the title"
+        reason: "KotaDB convention for command classification"
+
+  implement_hook:
+    when: Need to run code on agent lifecycle events
+    events: [PreToolUse, PostToolUse, UserPromptSubmit, Stop]
+    approach: |
+      1. Create .claude/hooks/<hook-name>.py with standard Python shebang:
+         ```python
+         #!/usr/bin/env python3
+         """Hook description."""
+
+         import os
+         import sys
+
+         # Add parent directory for imports
+         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+         from hooks.utils.hook_helpers import (
+             read_hook_input,
+             output_result,
+             get_file_path_from_input,
+             get_project_root,
+         )
+
+         def main() -> None:
+             hook_input = read_hook_input()
+             # Hook logic here
+             output_result("continue", "Optional message")
+
+         if __name__ == "__main__":
+             main()
+         ```
+      2. Exit via output_result("continue") or output_result("block")
+      3. Configure in .claude/settings.json hooks object
+      4. Use matcher for tool-specific targeting
+    kotadb_conventions:
+      - NEVER use print() - use sys.stdout.write() per logging standards
+      - Import from hooks.utils.hook_helpers for shared utilities
+      - Use standard Python shebang (#!/usr/bin/env python3), NOT uv
+    examples:
+      - auto_linter.py: PostToolUse hook for JS/TS file linting
+
+  create_expert_domain:
+    when: Adding new expert domain with queryable expertise
+    approach: |
+      1. Create .claude/agents/experts/<domain>/
+      2. Create expertise.yaml (overview, core_implementation, key_operations,
+         decision_trees, patterns, best_practices, known_issues)
+         Target: 400-600 lines, max 1000 lines
+      3. Create <domain>-plan-agent.md:
+         - model: sonnet
+         - color: yellow
+         - tools: [Read, Glob, Grep, Write]
+      4. Create <domain>-build-agent.md:
+         - model: sonnet
+         - color: green
+         - tools: [Read, Write, Edit, Glob, Grep, Bash]
+      5. Create <domain>-improve-agent.md:
+         - model: sonnet
+         - color: purple
+         - tools: [Read, Write, Edit, Glob, Grep, Bash]
+      6. Create <domain>-question-agent.md:
+         - model: haiku
+         - color: cyan
+         - tools: [Read, Glob, Grep]
+      7. Update agent-registry.json with all new agents
+    kotadb_adaptations:
+      - Use YAML array format for tools (NOT comma-separated)
+      - Add MCP tools where appropriate (mcp__kotadb__*)
+      - Update agent-registry.json capabilityIndex, modelIndex, toolMatrix
+    pitfalls:
+      - what: "CRITICAL - Using colons in agent description field"
+        instead: "Remove colons from description values"
+        reason: "Colons cause agent discovery to fail silently"
+      - what: "Forgetting to update agent-registry.json"
+        instead: "Always add new agents to registry with capabilities and tools"
+        reason: "Registry enables programmatic agent discovery"
+
+  update_agent_registry:
+    when: Adding, modifying, or removing agents
+    approach: |
+      1. Read current .claude/agents/agent-registry.json
+      2. Update agents object with new agent definition:
+         ```json
+         "agent-name": {
+           "name": "agent-name",
+           "description": "Brief description",
+           "file": "path/to/agent.md",
+           "model": "haiku|sonnet|opus",
+           "capabilities": ["capability1", "capability2"],
+           "tools": ["Tool1", "Tool2"],
+           "readOnly": true|false
+         }
+         ```
+      3. Update capabilityIndex - add agent to relevant capability arrays
+      4. Update modelIndex - add agent to model tier array
+      5. Update toolMatrix - add agent to each tool's array
+    validation:
+      - Ensure file path matches actual agent location
+      - Verify all tools listed exist
+      - Confirm capabilities align with agent purpose
+
+  configure_settings:
+    when: Configuring permissions, hooks, or project behavior
+    structure: |
+      .claude/settings.json:
+      {
+        "statusLine": {"type": "command", "command": "..."},
+        "permissions": {"allow": ["Read", "Glob"], "deny": []},
+        "env": {"VAR": "value"},
+        "hooks": {
+          "<EventType>": [
+            {
+              "matcher": {"tool_name": "Edit"},
+              "hooks": [{"type": "command", "command": "python3 .claude/hooks/<name>.py", "timeout": 5000}]
+            }
+          ]
+        }
+      }
+    notes: |
+      - Local overrides in settings.local.json (gitignored)
+      - Matcher enables tool-specific hooks (e.g., PostToolUse only for Edit)
+      - Valid JSON (no trailing commas)
+      - Hook commands use python3, not uv
+
+decision_trees:
+  command_vs_agent_vs_expert:
+    question: What am I creating?
+    options:
+      - if: User-invoked task with fixed workflow
+        then: Slash command (.claude/commands/<category>/)
+      - if: Model-invoked sub-agent for delegation
+        then: Agent (.claude/agents/)
+      - if: Domain expertise with plan/build/improve/question
+        then: Expert domain (.claude/agents/experts/<domain>/)
+      - if: Multi-agent coordination
+        then: Branch agent (.claude/agents/branch/)
+      - if: Focused task execution
+        then: Leaf agent (.claude/agents/leaf/)
+
+  agent_model_selection:
+    question: Which model tier?
+    options:
+      - if: Fast, read-only exploration
+        then: haiku (scout-agent, review-agent, question agents)
+      - if: Balanced implementation work
+        then: sonnet (build agents, plan agents, improve agents)
+      - if: Complex coordination and reasoning
+        then: opus (orchestrator-agent)
+
+  expert_location:
+    question: Where to put expert files?
+    options:
+      - file: Agent files (plan, build, improve, question)
+        location: .claude/agents/experts/<domain>/
+      - file: Expertise YAML
+        location: .claude/agents/experts/<domain>/expertise.yaml
+      - file: Orchestrator commands
+        location: .claude/commands/experts/orchestrators/
+
+patterns:
+  expert_domain_4agent:
+    structure: |
+      .claude/agents/experts/<domain>/
+      ├── expertise.yaml (400-600 lines target, 1000 max)
+      ├── <domain>-plan-agent.md (yellow, sonnet, Read/Glob/Grep/Write)
+      ├── <domain>-build-agent.md (green, sonnet, Read/Write/Edit/Glob/Grep/Bash)
+      ├── <domain>-improve-agent.md (purple, sonnet, all + Bash)
+      └── <domain>-question-agent.md (cyan, haiku, Read/Glob/Grep)
+    color_coding:
+      plan: yellow (analysis, planning)
+      build: green (creation, implementation)
+      improve: purple (review, expertise evolution)
+      question: cyan (meta, read-only Q&A)
+    trade_offs:
+      pros: [Plan-build-improve lifecycle, Color-coded roles, Queryable expertise]
+      cons: [5 files per domain, Requires registry updates]
+
+  agent_frontmatter_format:
+    kotadb_style: |
+      ---
+      name: agent-name
+      description: Brief description without colons
+      tools:
+        - Read
+        - Glob
+        - Grep
+        - mcp__kotadb__search_code
+      constraints:
+        - Constraint 1
+        - Constraint 2
+      ---
+    notes:
+      - Tools as YAML array, NOT comma-separated string
+      - model and color optional but recommended
+      - Description MUST NOT contain colons
+      - MCP tools use mcp__server__tool format
+
+  command_template_category:
+    categories:
+      path_resolution: Commands that find or locate files/resources
+      action: Commands that perform changes (build, implement)
+      reference: Commands that provide documentation
+      analysis: Commands that analyze without changing
+    usage: |
+      # /command-name
+
+      **Template Category**: Action
+
+      Command description...
+
+  hook_helpers_pattern:
+    usage: |
+      from hooks.utils.hook_helpers import (
+          read_hook_input,      # Parse JSON from stdin
+          output_result,        # Write JSON result to stdout
+          get_file_path_from_input,  # Extract file path from hook input
+          get_project_root,     # Get CLAUDE_PROJECT_DIR or cwd
+          is_js_ts_file,        # Check if file is JS/TS
+      )
+    conventions:
+      - NEVER use print() - violates logging standards
+      - Always use sys.stdout.write() for output
+      - Import hook_helpers from hooks.utils
+      - Add sys.path.insert for parent directory access
+
+  agent_registry_structure:
+    sections:
+      agents: Individual agent definitions with tools and capabilities
+      capabilityIndex: Map capabilities to agent IDs for discovery
+      modelIndex: Map model tiers to agent IDs
+      toolMatrix: Map tools to agents that use them
+    usage: |
+      Programmatic discovery:
+      - Find agents by capability: registry.capabilityIndex["implement"]
+      - Find agents by model: registry.modelIndex["sonnet"]
+      - Find agents using tool: registry.toolMatrix["Bash"]
+
+best_practices:
+  organization:
+    - Agents in .claude/agents/, commands in .claude/commands/
+    - Expert domains: agents/experts/<domain>/ (4-agent + expertise.yaml)
+    - Branch agents: agents/branch/ for coordination
+    - Leaf agents: agents/leaf/ for focused tasks
+    - Expertise.yaml: 400-600 lines target, 1000 hard limit
+
+  commands:
+    - Include Template Category after title
+    - Naming: /category:command pattern
+    - Use allowed-tools to restrict capabilities per command
+    - CRITICAL: Never use colons in frontmatter string values
+
+  agents:
+    - Tools as YAML array format (NOT comma-separated)
+    - Include constraints section for behavioral boundaries
+    - Update agent-registry.json for every new agent
+    - CRITICAL: Never use colons in description field
+    - Add MCP tools where appropriate (mcp__kotadb__*)
+
+  hooks:
+    - Standard Python shebang (#!/usr/bin/env python3)
+    - Import from hooks.utils.hook_helpers
+    - NEVER use print() - use sys.stdout.write()
+    - Use output_result() for structured responses
+    - Configure in settings.json with matchers
+
+  settings:
+    - settings.json: project-wide (committed)
+    - settings.local.json: local overrides (gitignored)
+    - Valid JSON (no trailing commas)
+    - Hook commands use python3
+
+known_issues:
+  - issue: Colons in frontmatter description values break YAML parsing
+    impact: Agents/commands with colons in description fail discovery silently
+    resolution: Remove all colons from description field values
+    prevention: Review all descriptions before commit
+    status: ongoing vigilance required
+
+  - issue: Comma-separated tools format not supported
+    impact: Tools listed as "Read, Glob, Grep" won't parse correctly
+    resolution: Use YAML array format for tools
+    status: use correct format
+
+  - issue: Agent registry out of sync with agent files
+    impact: Programmatic discovery fails to find new agents
+    resolution: Update agent-registry.json when adding/modifying agents
+    status: manual maintenance required
+
+  - issue: Hook using print() violates logging standards
+    impact: Inconsistent output, potential buffering issues
+    resolution: Use sys.stdout.write() per KotaDB conventions
+    status: enforced via code review
+
+potential_enhancements:
+  - Automated agent registry validation (compare files to registry)
+  - Frontmatter linting for description colons
+  - Template Category validation
+  - Hook output validation
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: initial
+    contradiction_count: 0
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
+    last_reviewed: 2026-01-25
+    utility_ratio: 1.0
+    notes: |
+      Initial creation of kotadb-specific claude-config expertise.
+      Adapted from book's claude-config expertise with KotaDB conventions:
+      - Standard Python hooks with hook_helpers.py
+      - YAML array format for tools
+      - Template Category in commands
+      - Agent registry maintenance
+      - sys.stdout.write logging standard

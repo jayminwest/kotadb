@@ -1,0 +1,539 @@
+# Agent Authoring & Configuration Expertise
+# Target: 400-600 lines | Domain: Operational knowledge for kotadb agent creation
+
+overview:
+  description: |
+    Agent authoring and configuration for kotadb—frontmatter schema with tools[], constraints[],
+    readOnly, expertDomain, and modes[]; branch/leaf hierarchy patterns; agent-registry.json
+    integration; MCP tool selection (mcp__kotadb__, mcp__leaf_spawner__); and system prompt
+    structure. This expertise enables correct agent configuration for discoverability, capability,
+    and appropriate model selection within kotadb's architecture.
+  scope: |
+    Covers agent.md frontmatter (name, description, tools[], model, constraints[], readOnly,
+    expertDomain, modes[]), branch/leaf hierarchy organization, agent-registry.json with
+    capability/model/tool indexes, MCP tool patterns, and system prompt organization.
+    Does NOT cover prompt content specifics or orchestration patterns (see orchestration expert).
+  rationale: |
+    Consistent agent configuration enables discoverability, correct tool usage, and appropriate
+    model selection. kotadb's branch/leaf hierarchy enables parallel agent spawning via
+    mcp__leaf_spawner__ tools. Poor agent config leads to capability gaps, security issues,
+    and confusion about agent responsibilities.
+
+core_implementation:
+  primary_files:
+    - path: .claude/agents/
+      purpose: All agent examples with frontmatter patterns
+    - path: .claude/agents/branch/
+      purpose: Coordinator agents (plan, build, review, meta) that spawn leaf agents
+    - path: .claude/agents/leaf/
+      purpose: Execution agents (retrieval, build, review, experts) spawned by branches
+    - path: .claude/agents/experts/
+      purpose: Expert domain patterns (4-agent standard with plan/build/improve/question)
+    - path: .claude/agents/agent-registry.json
+      purpose: Machine-readable registry with capabilityIndex, modelIndex, toolMatrix
+    - path: .claude/agents/agent-template.md
+      purpose: Template for new agent creation
+
+  key_sections:
+    - name: Branch Agent Frontmatter
+      location: .claude/agents/branch/plan.md (lines 1-5)
+      summary: Coordinator frontmatter with allowed-tools and leaf spawner MCP
+    - name: Leaf Agent Frontmatter
+      location: .claude/agents/leaf/build.md (lines 1-6)
+      summary: Execution agent frontmatter with tools list and readOnly field
+    - name: Agent Registry Structure
+      location: .claude/agents/agent-registry.json
+      summary: agents, capabilityIndex, modelIndex, toolMatrix structure
+
+key_operations:
+  write_agent_frontmatter:
+    name: Write Complete Agent Frontmatter (kotadb schema)
+    description: Populate all agent.md frontmatter fields correctly for kotadb
+    when_to_use: Creating new agent or updating existing
+    approach: |
+      Required frontmatter fields:
+      1. name: kebab-case identifier (e.g., branch-plan-coordinator, leaf-build)
+      2. description: Action verb + purpose (NEVER use colons in value)
+      3. tools: YAML list format (not comma-separated like book pattern)
+         - Tool1
+         - Tool2
+      4. model: haiku/sonnet/opus
+
+      kotadb-specific optional fields:
+      5. constraints: List of behavioral boundaries
+      6. readOnly: true|false (explicit flag for leaf agents)
+      7. expertDomain: Domain name for expert leaf agents
+      8. modes: [plan, build, review] for multi-mode experts
+      9. allowed-tools: Alternative field name used in branch agents
+
+      Format (kotadb style):
+      ---
+      name: agent-name
+      description: Brief action-oriented description
+      tools:
+        - Read
+        - Glob
+        - Grep
+      model: sonnet
+      constraints:
+        - Never modify files outside scope
+      readOnly: true
+      ---
+
+      CRITICAL: NEVER use colons in description values. Colons break Claude Code's
+      agent discovery parser. Use "Plans agent creation for kotadb" not
+      "Plans agent creation: for kotadb".
+    examples:
+      - agent: leaf-retrieval
+        frontmatter: "name: leaf-retrieval | tools: [Read, Glob, Grep, WebFetch, WebSearch] | model: haiku | readOnly: true"
+      - agent: branch-build-coordinator
+        frontmatter: "name: branch-build-coordinator | allowed-tools: Read, Glob, Grep, Task, Bash, mcp__leaf_spawner__* | model: sonnet"
+    pitfalls:
+      - what: Using colons in description field values
+        instead: Remove all colons from descriptions
+        reason: Causes silent agent discovery failure
+      - what: Using comma-separated tools string
+        instead: Use YAML list format with tools[]
+      - what: Missing readOnly field on leaf agents
+        instead: Explicitly set readOnly for clarity
+
+  select_tools_for_kotadb_agent:
+    name: Select Tools Based on Agent Role (kotadb patterns)
+    description: Grant appropriate tools including kotadb MCP tools
+    when_to_use: Configuring tools field in frontmatter
+    approach: |
+      Branch Agents (Coordinators):
+      - Read, Glob, Grep (exploration)
+      - Task (delegation to leaf agents)
+      - mcp__leaf_spawner__spawn_leaf_agent
+      - mcp__leaf_spawner__spawn_parallel_agents
+      - mcp__leaf_spawner__get_agent_result
+      - mcp__leaf_spawner__list_agents
+      - mcp__kotadb__search_code (optional)
+      - mcp__kotadb__search_dependencies (optional)
+      - WebFetch (for branch-plan only)
+
+      Leaf Agents - Retrieval (Read-only):
+      - Read, Glob, Grep
+      - WebFetch, WebSearch
+      - NO Write, Edit, Bash, Task
+
+      Leaf Agents - Build (Write access):
+      - Read, Write, Edit, Bash
+      - Glob, Grep
+      - NO Task (leaf agents don't spawn)
+
+      Leaf Agents - Expert (Domain-specific):
+      - Read, Glob, Grep (always)
+      - Write, Edit (if modes include build)
+      - Bash (if operational domain)
+      - NO Task (experts are leaf-level)
+
+      Expert Domain Agents:
+      - Plan: Read, Glob, Grep, Write (Write for spec caching)
+      - Build: Read, Write, Edit, Glob, Grep
+      - Improve: Read, Write, Edit, Glob, Grep, Bash
+      - Question: Read, Glob, Grep (read-only)
+    examples:
+      - role: branch-plan-coordinator
+        tools: Read, Glob, Grep, WebFetch, Task, mcp__leaf_spawner__*, mcp__kotadb__search_*
+      - role: leaf-retrieval
+        tools: Read, Glob, Grep, WebFetch, WebSearch
+      - role: leaf-build
+        tools: Read, Write, Edit, Bash, Glob, Grep
+
+  select_model_for_agent:
+    name: Select Model for Agent
+    description: Choose appropriate model based on reasoning needs and cost
+    when_to_use: Setting model field in frontmatter
+    approach: |
+      Model selection decision tree for kotadb:
+
+      haiku (fast, cheap):
+      - Leaf retrieval agents (search and read only)
+      - Question agents (fast Q&A)
+      - Review agents (read-only analysis)
+      - Scout agent (exploration)
+      - Test first before downgrading from sonnet
+
+      sonnet (balanced, default):
+      - Branch coordinators (plan, build, review, meta)
+      - Leaf build agents (implementation)
+      - Expert agents (plan/build/improve)
+      - Most branch agents use sonnet
+
+      opus (powerful, expensive):
+      - Orchestrator agent (complex multi-agent coordination)
+      - Meta-agent operations
+      - Only when complexity justifies cost
+    examples:
+      - agent: leaf-retrieval | model: haiku | reason: Fast read-only search
+      - agent: branch-plan-coordinator | model: sonnet | reason: Moderate planning + spawning
+      - agent: orchestrator-agent | model: opus | reason: Complex multi-agent coordination
+
+  write_agent_description:
+    name: Write Effective Agent Description
+    description: Create description that aids discoverability and invocation
+    when_to_use: Writing description field in frontmatter
+    approach: |
+      Pattern: [Action Verb] + [Domain/Object] + [Context/Purpose]
+
+      Components:
+      1. Action verb: Explore, Plan, Implement, Review, Coordinate, Orchestrate
+      2. Domain/Object: What it acts on (codebase, specs, files, agents)
+      3. Context: When/why to invoke (optional but valuable)
+
+      Character limit: Keep under 100 characters
+      NEVER USE COLONS: Replace with dashes or commas
+
+      Description patterns by hierarchy:
+      - Branch: "{Action} via {child} agents - {purpose}"
+      - Leaf: "{Action} agent - {capability summary}"
+      - Expert: "{Domain} expert - {specific focus}"
+    examples:
+      - good: "Planning via retrieval agents - explores codebase and creates spec files"
+      - good: "Code implementation agent - writes, edits, and executes code changes"
+      - bad: "Plans: implementation" (colon breaks parser)
+      - bad: "Helper for code" (vague, no action verb)
+
+  structure_agent_prompt:
+    name: Structure Agent System Prompt Content (kotadb)
+    description: Organize agent prompt with clear sections for kotadb agents
+    when_to_use: Writing agent body content (after frontmatter)
+    approach: |
+      Standard sections for kotadb agents (in order):
+      1. # Agent Name - H1 header
+      2. Brief intro paragraph (1-2 sentences)
+      3. ## Input Format - Expected task format from coordinator
+      4. ## Capabilities - What the agent can do
+      5. ## Workflow - Numbered steps with phase boundaries
+      6. ## KotaDB Conventions - MANDATORY for build agents
+         - Path aliases (@api/*, @db/*, @shared/*, etc.)
+         - Logging (process.stdout.write, never console.*)
+         - Testing (antimocking - real Supabase)
+      7. ## Output Format - Success/failure templates
+      8. ## Error Handling - Recovery patterns
+      9. ## Constraints - Behavioral boundaries
+
+      Branch agents add:
+      - Phase sections (Scout, Plan, Build, Review)
+      - Expert integration sections
+      - Spec file templates
+
+      Leaf agents emphasize:
+      - Task format from coordinator
+      - Concise output format
+      - Convention compliance
+    examples:
+      - location: .claude/agents/branch/plan.md
+        sections: Input Format, Phase Scout, Phase Plan, Expert Analysis Integration, Spec Template, Error Handling, Output Format, Constraints
+      - location: .claude/agents/leaf/build.md
+        sections: Capabilities, Task Format, Implementation Workflow, KotaDB Conventions, Output Format, Error Handling, Constraints
+
+  update_agent_registry:
+    name: Update agent-registry.json
+    description: Register new agent in machine-readable registry
+    when_to_use: After creating new agent file
+    approach: |
+      agent-registry.json structure:
+      {
+        "agents": {
+          "agent-id": {
+            "name": "agent-id",
+            "description": "Brief description",
+            "file": "path/to/agent.md",
+            "model": "sonnet",
+            "capabilities": ["verb1", "verb2"],
+            "tools": ["Tool1", "Tool2"],
+            "readOnly": true|false
+          }
+        },
+        "capabilityIndex": {
+          "verb": ["agent-id-1", "agent-id-2"]
+        },
+        "modelIndex": {
+          "haiku": ["agent-id-1"],
+          "sonnet": ["agent-id-2"],
+          "opus": ["agent-id-3"]
+        },
+        "toolMatrix": {
+          "ToolName": ["agent-id-1", "agent-id-2"]
+        }
+      }
+
+      Update steps:
+      1. Add agent entry under "agents" key
+      2. Add capabilities to capabilityIndex (verb -> agent mapping)
+      3. Add to modelIndex under appropriate tier
+      4. Add each tool to toolMatrix
+    examples:
+      - agent: agent-authoring-plan-agent
+        registry_entry: "capabilities: ['plan', 'analyze', 'create'], tools: ['Read', 'Glob', 'Grep', 'Write']"
+
+decision_trees:
+  branch_vs_leaf_selection:
+    name: Branch vs Leaf Agent Selection
+    entry_point: Does this agent spawn other agents?
+    branches:
+      - condition: Spawns agents (coordinates workflow)
+        action: Branch agent in .claude/agents/branch/
+      - condition: Executes tasks (no spawning)
+        action: Leaf agent in .claude/agents/leaf/
+      - condition: Expert domain (4-agent pattern)
+        action: Expert agents in .claude/agents/experts/<domain>/
+
+  tool_selection_by_hierarchy:
+    name: Tool Selection by Agent Hierarchy
+    entry_point: What is the agent's hierarchy level?
+    branches:
+      - condition: Branch (coordinator)
+        action: Task, mcp__leaf_spawner__*, Read, Glob, Grep (no Write typically)
+      - condition: Leaf retrieval (read-only)
+        action: Read, Glob, Grep, WebFetch, WebSearch (no Write/Edit/Bash)
+      - condition: Leaf build (write access)
+        action: Read, Write, Edit, Bash, Glob, Grep (no Task)
+      - condition: Expert plan
+        action: Read, Glob, Grep, Write (Write for spec caching)
+      - condition: Expert build
+        action: Read, Write, Edit, Glob, Grep
+      - condition: Expert improve
+        action: Read, Write, Edit, Glob, Grep, Bash
+      - condition: Expert question
+        action: Read, Glob, Grep (read-only)
+
+  model_selection_by_complexity:
+    name: Model Selection for Agent
+    entry_point: What level of reasoning is required?
+    branches:
+      - condition: Simple search, read, retrieval
+        action: haiku (leaf-retrieval, question agents)
+      - condition: Planning, building, coordination
+        action: sonnet (branch agents, expert plan/build/improve)
+      - condition: Complex multi-agent orchestration
+        action: opus (orchestrator-agent only)
+
+patterns:
+  branch_leaf_hierarchy:
+    name: Branch/Leaf Agent Hierarchy
+    context: kotadb uses branch agents that spawn leaf agents
+    implementation: |
+      Hierarchy structure:
+      .claude/agents/
+      ├── branch/           # Coordinators - spawn leaf agents
+      │   ├── plan.md       # Scout + Plan phases via leaf spawning
+      │   ├── build.md      # Implementation via build agents
+      │   ├── review.md     # Validation via review agents
+      │   └── meta.md       # System updates via meta agents
+      └── leaf/             # Executors - spawned by branches
+          ├── retrieval.md  # Read-only exploration (haiku)
+          ├── build.md      # Code implementation (sonnet)
+          ├── review.md     # Code review (haiku)
+          └── expert-*.md   # Domain experts (sonnet)
+
+      Branch agents use:
+      - mcp__leaf_spawner__spawn_leaf_agent(agent_type, task)
+      - mcp__leaf_spawner__spawn_parallel_agents([...], timeout)
+      - mcp__leaf_spawner__get_agent_result(agent_id)
+      - mcp__leaf_spawner__list_agents()
+
+      Leaf agents:
+      - Never spawn other agents
+      - Receive structured task from branch
+      - Return structured output
+      - Must include readOnly: true|false in frontmatter
+    trade_offs:
+      - advantage: Parallel execution via spawn_parallel_agents
+        cost: More complex orchestration
+      - advantage: Clear separation of concerns
+        cost: Multiple agent files per workflow
+    real_examples:
+      - location: .claude/agents/branch/plan.md
+        note: Spawns retrieval + expert agents in parallel
+      - location: .claude/agents/leaf/build.md
+        note: Spawned by branch-build, writes code
+
+  expert_4agent_pattern:
+    name: Expert 4-Agent Pattern (kotadb adaptation)
+    context: Domain experts with plan/build/improve/question workflow
+    implementation: |
+      Standard 4-Agent Pattern for kotadb:
+      .claude/agents/experts/<domain>/
+      ├── expertise.yaml                   # 400-600 line structured knowledge
+      ├── <domain>-plan-agent.md          # Analyzes requirements, writes spec
+      ├── <domain>-build-agent.md         # Implements from spec
+      ├── <domain>-improve-agent.md       # Updates expertise from changes
+      └── <domain>-question-agent.md      # Read-only Q&A about domain
+
+      kotadb frontmatter for expert agents:
+      ---
+      name: <domain>-plan-agent
+      description: Plans <domain> tasks for kotadb. Expects USER_PROMPT
+      tools:
+        - Read
+        - Glob
+        - Grep
+        - Write
+      model: sonnet
+      expertDomain: <domain>
+      ---
+
+      Tool sets by agent role:
+      - Plan: Read, Glob, Grep, Write (Write for spec caching)
+      - Build: Read, Write, Edit, Glob, Grep
+      - Improve: Read, Write, Edit, Glob, Grep, Bash
+      - Question: Read, Glob, Grep (read-only, haiku)
+
+      Color scheme (optional, for visual identification):
+      - Plan: yellow (analysis)
+      - Build: green (creation)
+      - Improve: purple (learning)
+      - Question: cyan (advisory)
+    trade_offs:
+      - advantage: Clear phase separation, expertise evolves independently
+        cost: Multiple agent files per domain
+    real_examples:
+      - location: .claude/agents/experts/agent-authoring/
+        note: This domain - 4-agent pattern with expertise.yaml
+
+  agent_registry_integration:
+    name: Agent Registry Integration Pattern
+    context: Machine-readable registry enables programmatic agent selection
+    implementation: |
+      agent-registry.json enables:
+      1. Capability-based selection (capabilityIndex)
+      2. Model tier filtering (modelIndex)
+      3. Tool availability checking (toolMatrix)
+
+      Usage in orchestration:
+      - Query capabilityIndex to find agents for "implement"
+      - Filter by modelIndex for cost-appropriate selection
+      - Validate tools available in toolMatrix
+
+      Registry update workflow:
+      1. Create agent .md file
+      2. Add to agents{} with all fields
+      3. Update capabilityIndex with agent's capabilities
+      4. Add to appropriate modelIndex tier
+      5. Add each tool to toolMatrix
+    trade_offs:
+      - advantage: Enables dynamic agent selection
+        cost: Registry must be kept in sync with agent files
+
+  mcp_tool_patterns:
+    name: MCP Tool Selection Patterns
+    context: kotadb uses MCP tools for leaf spawning and codebase search
+    implementation: |
+      Leaf Spawner MCP tools (branch agents only):
+      - mcp__leaf_spawner__spawn_leaf_agent(agent_type, task)
+      - mcp__leaf_spawner__spawn_parallel_agents([{agent_type, task}, ...], timeout)
+      - mcp__leaf_spawner__get_agent_result(agent_id)
+      - mcp__leaf_spawner__list_agents()
+
+      KotaDB MCP tools (search and analysis):
+      - mcp__kotadb__search_code(term)
+      - mcp__kotadb__search_dependencies(file_path, direction, depth)
+      - mcp__kotadb__analyze_change_impact(files)
+      - mcp__kotadb__list_recent_files()
+
+      Tool selection by agent type:
+      - Branch plan: All leaf_spawner + kotadb search tools
+      - Branch build: leaf_spawner + kotadb search_dependencies
+      - Leaf retrieval: No MCP (uses core Glob/Grep/Read)
+      - Leaf expert: kotadb tools as needed for domain
+
+best_practices:
+  - category: Frontmatter
+    practices:
+      - practice: Use YAML list format for tools (not comma-separated)
+        evidence: All kotadb agents use tools list format
+        timestamp: 2025-01-25
+      - practice: NEVER use colons in description field values
+        evidence: Colons break Claude Code agent discovery parser
+        timestamp: 2025-01-25
+      - practice: Include readOnly field for leaf agents
+        evidence: Enables clear capability identification
+        timestamp: 2025-01-25
+      - practice: Use constraints[] for behavioral boundaries
+        evidence: kotadb agent-template.md pattern
+        timestamp: 2025-01-25
+
+  - category: Tool Selection
+    practices:
+      - practice: Branch agents get mcp__leaf_spawner__ tools, leaf agents don't
+        evidence: Branch/leaf hierarchy requires spawning only at branch level
+        timestamp: 2025-01-25
+      - practice: Leaf retrieval agents are strictly read-only (no Write/Edit/Bash)
+        evidence: leaf-retrieval.md has readOnly: true
+        timestamp: 2025-01-25
+      - practice: Expert plan agents get Write for spec caching only
+        evidence: Spec files written to docs/specs/
+        timestamp: 2025-01-25
+
+  - category: Naming
+    practices:
+      - practice: Branch agents use branch-{role}-coordinator naming
+        evidence: branch-plan-coordinator, branch-build-coordinator
+        timestamp: 2025-01-25
+      - practice: Leaf agents use leaf-{role} naming
+        evidence: leaf-retrieval, leaf-build
+        timestamp: 2025-01-25
+      - practice: Expert agents use <domain>-{phase}-agent naming
+        evidence: 4-agent pattern convention
+        timestamp: 2025-01-25
+
+  - category: Prompt Structure
+    practices:
+      - practice: Include KotaDB Conventions section in all build agents
+        evidence: Path aliases, logging, antimocking are mandatory
+        timestamp: 2025-01-25
+      - practice: Define Input Format section for all agents
+        evidence: Structured task format from coordinator
+        timestamp: 2025-01-25
+      - practice: Include Output Format with success/failure templates
+        evidence: All kotadb agents have structured output
+        timestamp: 2025-01-25
+
+  - category: Registry
+    practices:
+      - practice: Update agent-registry.json when adding/modifying agents
+        evidence: Registry enables programmatic agent selection
+        timestamp: 2025-01-25
+      - practice: Include capabilities as action verbs
+        evidence: capabilityIndex uses verbs (explore, implement, review)
+        timestamp: 2025-01-25
+
+known_issues:
+  - issue: Branch agents cannot write files directly (must delegate to leaf)
+    workaround: Use leaf-build agent for file creation
+    status: by-design
+    timestamp: 2025-01-25
+
+  - issue: Expert agents are leaf-level, cannot spawn other agents
+    workaround: Branch coordinators orchestrate expert parallel execution
+    status: by-design
+    timestamp: 2025-01-25
+
+potential_enhancements:
+  - enhancement: Automated agent-registry.json validation on agent changes
+    rationale: Catch missing registry entries early
+    effort: low
+    timestamp: 2025-01-25
+
+  - enhancement: Tool set templates by hierarchy level
+    rationale: Reduce configuration errors based on branch/leaf pattern
+    effort: low
+    timestamp: 2025-01-25
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: "initial-high"
+    contradiction_count: 0
+    last_reviewed: 2025-01-25
+    notes: |
+      Initial expertise creation for kotadb agent-authoring domain.
+      Adapted from book's agent-authoring expertise with:
+      - YAML list format for tools (not comma-separated)
+      - Branch/leaf hierarchy (not flat expert structure)
+      - agent-registry.json integration
+      - MCP tool patterns (mcp__kotadb__, mcp__leaf_spawner__)
+      - kotadb-specific conventions (path aliases, antimocking)

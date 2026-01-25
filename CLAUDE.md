@@ -140,6 +140,35 @@ KotaDB is a code intelligence API (Bun + TypeScript + Supabase) powering AI deve
 | `/experts:orchestrators:planning_council` | Multi-expert planning analysis |
 | `/experts:orchestrators:review_panel` | Multi-expert code review |
 
+### Expert Domains (4-Agent Pattern)
+
+Expert domains provide structured expertise with plan→build→improve→question workflow. Each domain has queryable expertise.yaml plus 4 specialized agents.
+
+| Domain | Purpose | Location |
+|--------|---------|----------|
+| `claude-config` | .claude/ configuration management (commands, hooks, settings, agents) | `.claude/agents/experts/claude-config/` |
+| `agent-authoring` | Agent creation and modification (frontmatter, tool selection, registry) | `.claude/agents/experts/agent-authoring/` |
+
+**Usage via /do:**
+
+Questions (no approval needed):
+- `/do "How do I create a slash command?"` → routes to `claude-config-question-agent`
+- `/do "What tools should my agent have?"` → routes to `agent-authoring-question-agent`
+
+Implementation (plan→approval→build→improve):
+- `/do "Add new hook for X"` → plan spec → user approval → build → improve
+- `/do "Create new agent for Y"` → plan spec → user approval → build → improve
+
+**Direct Agent Access:**
+```
+Task tool with subagent_type: "<domain>-<phase>-agent"
+Example: subagent_type: "claude-config-plan-agent"
+```
+
+**Expertise Files:**
+- `.claude/agents/experts/claude-config/expertise.yaml` - config knowledge
+- `.claude/agents/experts/agent-authoring/expertise.yaml` - authoring knowledge
+
 ## Common Workflows
 
 **New Feature**:

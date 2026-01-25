@@ -166,6 +166,78 @@
       "capabilities": ["implement", "write", "edit", "execute"],
       "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
       "readOnly": false
+    },
+    "claude-config-plan-agent": {
+      "name": "claude-config-plan-agent",
+      "description": "Claude configuration planning and spec generation specialist",
+      "file": ".claude/agents/experts/claude-config/claude-config-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": ["claude-config-planning", "spec-generation"],
+      "tools": ["Read", "Glob", "Grep", "Write"],
+      "readOnly": false
+    },
+    "claude-config-build-agent": {
+      "name": "claude-config-build-agent",
+      "description": "Claude configuration implementation specialist",
+      "file": ".claude/agents/experts/claude-config/claude-config-build-agent.md",
+      "model": "sonnet",
+      "capabilities": ["claude-config-implementation"],
+      "tools": ["Read", "Write", "Edit", "Glob", "Grep"],
+      "readOnly": false
+    },
+    "claude-config-improve-agent": {
+      "name": "claude-config-improve-agent",
+      "description": "Claude configuration expertise evolution specialist",
+      "file": ".claude/agents/experts/claude-config/claude-config-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": ["claude-config-expertise-evolution"],
+      "tools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
+      "readOnly": false
+    },
+    "claude-config-question-agent": {
+      "name": "claude-config-question-agent",
+      "description": "Claude configuration Q&A specialist",
+      "file": ".claude/agents/experts/claude-config/claude-config-question-agent.md",
+      "model": "haiku",
+      "capabilities": ["claude-config-qa"],
+      "tools": ["Read", "Glob", "Grep"],
+      "readOnly": true
+    },
+    "agent-authoring-plan-agent": {
+      "name": "agent-authoring-plan-agent",
+      "description": "Agent authoring planning and spec generation specialist",
+      "file": ".claude/agents/experts/agent-authoring/agent-authoring-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": ["agent-authoring-planning", "spec-generation"],
+      "tools": ["Read", "Glob", "Grep", "Write"],
+      "readOnly": false
+    },
+    "agent-authoring-build-agent": {
+      "name": "agent-authoring-build-agent",
+      "description": "Agent authoring implementation specialist",
+      "file": ".claude/agents/experts/agent-authoring/agent-authoring-build-agent.md",
+      "model": "sonnet",
+      "capabilities": ["agent-authoring-implementation"],
+      "tools": ["Read", "Write", "Edit", "Glob", "Grep"],
+      "readOnly": false
+    },
+    "agent-authoring-improve-agent": {
+      "name": "agent-authoring-improve-agent",
+      "description": "Agent authoring expertise evolution specialist",
+      "file": ".claude/agents/experts/agent-authoring/agent-authoring-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": ["agent-authoring-expertise-evolution"],
+      "tools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
+      "readOnly": false
+    },
+    "agent-authoring-question-agent": {
+      "name": "agent-authoring-question-agent",
+      "description": "Agent authoring Q&A specialist",
+      "file": ".claude/agents/experts/agent-authoring/agent-authoring-question-agent.md",
+      "model": "haiku",
+      "capabilities": ["agent-authoring-qa"],
+      "tools": ["Read", "Glob", "Grep"],
+      "readOnly": true
     }
   },
   "capabilityIndex": {
@@ -199,20 +271,29 @@
     "configure": ["branch-meta"],
     "read": ["leaf-retrieval"],
     "write": ["leaf-build"],
-    "edit": ["leaf-build"]
+    "edit": ["leaf-build"],
+    "claude-config-planning": ["claude-config-plan-agent"],
+    "claude-config-implementation": ["claude-config-build-agent"],
+    "claude-config-expertise-evolution": ["claude-config-improve-agent"],
+    "claude-config-qa": ["claude-config-question-agent"],
+    "agent-authoring-planning": ["agent-authoring-plan-agent"],
+    "agent-authoring-implementation": ["agent-authoring-build-agent"],
+    "agent-authoring-expertise-evolution": ["agent-authoring-improve-agent"],
+    "agent-authoring-qa": ["agent-authoring-question-agent"],
+    "spec-generation": ["claude-config-plan-agent", "agent-authoring-plan-agent"]
   },
   "modelIndex": {
-    "haiku": ["scout-agent", "review-agent", "leaf-retrieval"],
-    "sonnet": ["build-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-build"],
+    "haiku": ["scout-agent", "review-agent", "leaf-retrieval", "claude-config-question-agent", "agent-authoring-question-agent"],
+    "sonnet": ["build-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
     "opus": ["orchestrator-agent"]
   },
   "toolMatrix": {
-    "Glob": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build"],
-    "Grep": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build"],
-    "Read": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build"],
-    "Edit": ["build-agent", "leaf-build"],
-    "Write": ["build-agent", "leaf-build"],
-    "Bash": ["build-agent", "leaf-build"],
+    "Glob": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
+    "Grep": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
+    "Read": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
+    "Edit": ["build-agent", "leaf-build", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
+    "Write": ["build-agent", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
+    "Bash": ["build-agent", "leaf-build", "claude-config-improve-agent", "agent-authoring-improve-agent"],
     "NotebookEdit": ["build-agent"],
     "Task": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta"],
     "TodoWrite": ["build-agent", "orchestrator-agent"],

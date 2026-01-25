@@ -3,21 +3,205 @@
 **Template Category**: Action
 **Prompt Level**: 6 (Self-Modifying)
 
-End-to-end autonomous workflow for resolving GitHub issues. Routes through scout → plan → build → review → validate phases with full autonomy and auto-fix loops.
+End-to-end autonomous workflow for resolving GitHub issues AND Claude Code configuration tasks. Routes through appropriate workflows:
+
+- **ADW (Python Orchestration)**: SDLC workflows (scout → plan → build → review → validate) for GitHub issues
+- **Expert Domains (Claude Code)**: Configuration and agent authoring via plan → build → improve cycles
 
 ## Variables
 
-- `$ARGUMENTS`: Issue reference (multiple formats supported)
+- `$ARGUMENTS`: Issue reference OR expert domain request
+
+## Classification Priority
+
+**IMPORTANT**: Check expert domain keywords FIRST. If no match, fall through to ADW routing.
+
+```
+1. Expert Domain Detection (claude-config, agent-authoring)
+   → Route to Pattern A (implementation) or Pattern B (question)
+2. ADW Detection (issue numbers, GitHub URLs, SDLC keywords)
+   → Route to ADW workflow
+3. Free-form text
+   → Classify and route appropriately
+```
 
 ## Input Formats
 
-Parse `$ARGUMENTS` to extract issue context:
+Parse `$ARGUMENTS` to extract context:
 
 | Format | Example | Action |
 |--------|---------|--------|
+| Expert domain keywords | `"create slash command"`, `"new agent"` | Route to expert workflow |
 | Issue number | `#123` or `123` | Fetch via `gh issue view 123 --json title,body,labels` |
 | GitHub URL | `https://github.com/.../issues/123` | Extract number, fetch via gh |
-| Free-form text | `"Add user authentication"` | Use as requirement directly |
+| Free-form text | `"Add user authentication"` | Use as requirement directly (ADW) |
+
+---
+
+## Expert Domain Routing (Priority - Check First)
+
+### Expert Domains
+
+**Claude Config Expert**
+- Keywords: "slash command", "command", "hook", "settings.json", ".claude config", "expert triad"
+- Locations: References to .claude/commands/, .claude/hooks/, .claude/settings.json
+- Indicators: Command creation, hook implementation, .claude/ directory organization
+- Examples: "Create new slash command for X", "Add hook for Y event", "Configure settings"
+
+**Agent Authoring Expert**
+- Keywords: "create agent", "new agent", "agent config", "tool selection", "agent description", "agent frontmatter"
+- Locations: References to .claude/agents/, agent creation, coordinator setup
+- Indicators: Agent file creation, tool set decisions, model selection for agents
+- Examples: "Create a new scout agent", "Configure tools for the build agent", "Add new coordinator"
+
+### Pattern Detection
+
+After identifying expert domain, determine pattern:
+
+**Implementation Request (Pattern A)**:
+- Verbs: create, add, implement, configure, update, fix
+- Objects: Concrete things to build/change
+- Flow: plan-agent → user approval → build-agent → improve-agent
+
+**Question Request (Pattern B)**:
+- Phrasing: "How do I...", "What is...", "Why...", "Explain...", "When should I..."
+- Flow: question-agent → report answer
+
+### Expert Workflow Execution
+
+#### Pattern A: Expert Implementation (Plan→Build→Improve)
+
+**Phase 1 - Plan:**
+```
+Task tool:
+  subagent_type: "<domain>-plan-agent"
+  prompt: |
+    USER_PROMPT: {requirement}
+
+    Analyze this requirement and create a specification.
+    Save spec to: .claude/.cache/specs/{domain}/{slug}-spec.md
+    Return the spec path when complete.
+```
+
+**Phase 2 - User Approval:**
+```
+Use AskUserQuestion:
+  question: "Plan complete. Specification saved to {spec_path}. Ready to proceed with implementation?"
+  options:
+    - "Yes, continue to build" (Recommended)
+    - "No, stop here - I'll review the spec first"
+```
+
+**If user selects "No":**
+- Report spec location
+- Suggest resume command: `/do "build from {spec_path}"`
+- Exit gracefully (NOT an error)
+
+**Phase 3 - Build (if approved):**
+```
+Task tool:
+  subagent_type: "<domain>-build-agent"
+  prompt: |
+    PATH_TO_SPEC: {spec_path}
+
+    Read the specification and implement the changes.
+    Report files modified when complete.
+```
+
+**Phase 4 - Improve (Optional):**
+```
+Task tool:
+  subagent_type: "<domain>-improve-agent"
+  prompt: |
+    Review recent {domain} changes and update expert knowledge.
+```
+
+If improve-agent fails: log error, continue (workflow is still successful).
+
+#### Pattern B: Expert Question (Direct Answer)
+
+```
+Task tool:
+  subagent_type: "<domain>-question-agent"
+  prompt: |
+    USER_PROMPT: {requirement}
+
+    Provide an informed answer based on {domain} expertise.
+```
+
+Report answer directly. No approval gate needed.
+
+### Expert Domain Output Formats
+
+**Pattern A Complete:**
+```markdown
+## `/do` - Complete
+
+**Requirement:** {requirement}
+**Domain:** {claude-config|agent-authoring}
+**Status:** Success
+
+### Workflow Stages
+
+| Stage | Status | Key Output |
+|-------|--------|------------|
+| Plan | ✓ Complete | {spec_path} |
+| Build | ✓ Complete | {file_count} files modified |
+| Improve | ✓ Complete | Expert knowledge updated |
+
+### Files Modified
+
+- {file}: {change summary}
+
+### Next Steps
+
+{context-specific suggestions}
+```
+
+**Pattern A - User Declined:**
+```markdown
+## `/do` - Plan Complete, Awaiting Review
+
+**Requirement:** {requirement}
+**Domain:** {claude-config|agent-authoring}
+**Status:** Plan Complete - User Review Requested
+
+### Specification
+
+Plan saved to: {spec_path}
+
+Review the specification and when ready, resume with:
+```
+/do "build from {spec_path}"
+```
+
+### Next Steps
+
+1. Review the spec at {spec_path}
+2. Edit if needed
+3. Resume build with command above
+```
+
+**Pattern B Complete:**
+```markdown
+## `/do` - Complete
+
+**Requirement:** {requirement}
+**Domain:** {claude-config|agent-authoring}
+**Type:** Question
+
+### Answer
+
+{answer from question-agent}
+
+### Related
+
+{any related topics, files, or examples}
+```
+
+---
+
+## ADW Routing (GitHub Issues & SDLC)
 
 ## Issue Classification
 
@@ -211,13 +395,24 @@ If any phase fails unrecoverably:
 **Resume**: Re-run `/do {original_input}` after fixing
 ```
 
-## Constraints
+## ADW Constraints
 
 1. **No user checkpoints** - Run fully autonomously
 2. **Use current branch** - Do not create new branches
 3. **Commit only** - Do not push or create PR
 4. **Unlimited fix attempts** - Keep fixing until validation passes
 5. **Convention enforcement** - Fail review if conventions violated
+
+---
+
+## Expert Domain Constraints
+
+1. **User approval required** - Plan phase requires explicit approval before build
+2. **Spec preservation** - Specs saved even if build fails (enable resume)
+3. **Graceful degradation** - Improve phase failures don't fail workflow
+4. **Question direct** - Question patterns skip approval (read-only)
+
+---
 
 ## ADW Integration
 
@@ -337,6 +532,131 @@ ADW state is stored in `automation/agents/{adw_id}/adw_state.json`:
   }
 }
 ```
+
+---
+
+## Expert Domain Error Handling
+
+### Classification Errors
+
+**Classification unclear:**
+- Use AskUserQuestion to disambiguate
+- Provide options: "Expert domain workflow" vs "ADW workflow"
+
+**Empty requirement:**
+- Ask user what they want to do
+- Provide examples of common requests
+
+### Pattern A Errors (Expert Implementation)
+
+**Plan phase fails:**
+- Report error with context
+- Suggest retrying with more detailed requirement
+- Exit gracefully (no spec to build from)
+
+**User declines at approval gate:**
+- NOT an error - valid workflow outcome
+- Report spec location
+- Suggest resume command
+- Exit gracefully with status: "Plan Complete - User Review Requested"
+
+**Build phase fails:**
+- Preserve the spec (it's valid, build just failed)
+- Report what went wrong
+- Provide resume command: `/do "build from {spec_path}"`
+- Skip improve stage
+
+**Improve phase fails:**
+- Log the error
+- Set improve_status: "Skipped - Error"
+- Continue (workflow is still successful)
+
+### Pattern B Errors (Expert Question)
+
+**Agent fails:**
+- Report error with context
+- Suggest manual approach if applicable
+
+**Agent returns empty result:**
+- Report diagnostic info
+- Suggest retry or alternative approach
+
+---
+
+## Expert Domain Examples
+
+### Claude Config - Implementation (Pattern A)
+
+```bash
+/do "Create slash command for code review"
+
+# /do executes:
+# 1. Classification: claude-config expert, implementation request
+# 2. Pattern: A (Plan→Build→Improve)
+# 3. Spawn: claude-config-plan-agent
+# 4. Wait for spec path
+# 5. AskUserQuestion: "Plan complete at {spec_path}. Proceed?"
+# 6. If yes: Spawn claude-config-build-agent with spec_path
+# 7. Wait for files modified
+# 8. Spawn: claude-config-improve-agent
+# 9. Report results
+```
+
+### Claude Config - Question (Pattern B)
+
+```bash
+/do "How do I add a pre-commit hook?"
+
+# /do executes:
+# 1. Classification: claude-config expert, question
+# 2. Pattern: B (Question-Agent)
+# 3. Spawn: claude-config-question-agent
+# 4. Wait for answer
+# 5. Report answer
+```
+
+### Agent Authoring - Implementation (Pattern A)
+
+```bash
+/do "Create a new validation agent"
+
+# /do executes Pattern A with agent-authoring domain:
+# 1. agent-authoring-plan-agent → creates spec
+# 2. User approval gate
+# 3. agent-authoring-build-agent → creates agent file
+# 4. agent-authoring-improve-agent → updates expertise
+```
+
+### Agent Authoring - Question (Pattern B)
+
+```bash
+/do "What model should I use for a coordinator?"
+
+# /do executes Pattern B with agent-authoring-question-agent
+```
+
+### ADW Workflow (Fallback)
+
+```bash
+/do #123
+
+# No expert domain keywords detected
+# Route to ADW workflow:
+# scout → plan → build → review → validate
+```
+
+### Ambiguous Request
+
+```bash
+/do "Add feature"
+
+# Ambiguous - could be expert domain or ADW
+# Use AskUserQuestion:
+#   "What type of feature? (1) Claude config/agent (2) GitHub issue/code feature"
+# Route based on response
+```
+
+---
 
 ## Observability
 
