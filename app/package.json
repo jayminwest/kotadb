@@ -1,6 +1,6 @@
 {
   "name": "kota-db",
-  "version": "0.1.0",
+  "version": "2.0.0",
   "description": "KotaDB indexing and API service built with Bun + TypeScript.",
   "private": true,
   "type": "module",
