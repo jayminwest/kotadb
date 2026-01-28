@@ -32,12 +32,6 @@ export type {
 	Symbol,
 	Reference,
 	Dependency,
-	Project,
-	ProjectRepository,
-	ProjectWithRepos,
-	ProjectListItem,
-	CreateProjectRequest,
-	UpdateProjectRequest,
 } from "./entities";
 
 // Authentication types

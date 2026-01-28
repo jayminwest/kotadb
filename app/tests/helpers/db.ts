@@ -20,10 +20,9 @@ import { createDatabase, type KotaDatabase } from "@db/sqlite/index.js";
 export interface TestRepository {
 	id: string;
 	name: string;
-	owner: string;
+	fullName: string;
 	defaultBranch: string;
-	remoteUrl?: string;
-	localPath?: string;
+	gitUrl?: string;
 }
 
 export interface TestFile {
@@ -32,7 +31,7 @@ export interface TestFile {
 	path: string;
 	content: string;
 	language: string;
-	lastIndexedAt: string;
+	indexedAt: string;
 	contentHash: string;
 }
 
@@ -72,28 +71,7 @@ export interface TestFixture {
 // Default Test Content
 // ============================================================================
 
-const DEFAULT_TEST_FILE_CONTENT = `
-import { createLogger } from "@logging/logger.js";
-
-const logger = createLogger({ module: "test" });
-
-export function processData(input: string): string {
-  logger.info("Processing data", { input });
-  return input.toUpperCase();
-}
-
-export class DataProcessor {
-  constructor(private config: ProcessorConfig) {}
-  
-  process(data: string): string {
-    return processData(data);
-  }
-}
-
-interface ProcessorConfig {
-  mode: "strict" | "lenient";
-}
-`.trim();
+const DEFAULT_TEST_FILE_CONTENT = 'import { createLogger } from "@logging/logger.js";\n\nconst logger = createLogger({ module: "test" });\n\nexport function processData(input: string): string {\n  logger.info("Processing data", { input });\n  return input.toUpperCase();\n}\n\nexport class DataProcessor {\n  constructor(private config: ProcessorConfig) {}\n  \n  process(data: string): string {\n    return processData(data);\n  }\n}\n\ninterface ProcessorConfig {\n  mode: "strict" | "lenient";\n}';
 
 // ============================================================================
 // Database Creation Functions
@@ -147,23 +125,20 @@ export function createTestRepository(
 	const repo: TestRepository = {
 		id: randomUUID(),
 		name: "test-repo",
-		owner: "test-owner",
+		fullName: "test-owner/test-repo",
 		defaultBranch: "main",
-		remoteUrl: "https://github.com/test-owner/test-repo",
-		localPath: "/tmp/test-repo",
+		gitUrl: "https://github.com/test-owner/test-repo",
 		...overrides,
 	};
 
 	db.run(
-		`INSERT INTO repositories (id, name, owner, default_branch, remote_url, local_path)
-     VALUES (?, ?, ?, ?, ?, ?)`,
+		'INSERT INTO repositories (id, name, full_name, default_branch, git_url) VALUES (?, ?, ?, ?, ?)',
 		[
 			repo.id,
 			repo.name,
-			repo.owner,
+			repo.fullName,
 			repo.defaultBranch,
-			repo.remoteUrl ?? null,
-			repo.localPath ?? null,
+			repo.gitUrl ?? null,
 		],
 	);
 
@@ -184,21 +159,20 @@ export function createTestFile(
 		path: "src/test.ts",
 		content: DEFAULT_TEST_FILE_CONTENT,
 		language: "typescript",
-		lastIndexedAt: new Date().toISOString(),
+		indexedAt: new Date().toISOString(),
 		contentHash: randomUUID(),
 		...overrides,
 	};
 
 	db.run(
-		`INSERT INTO indexed_files (id, repository_id, path, content, language, last_indexed_at, content_hash)
-     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		'INSERT INTO indexed_files (id, repository_id, path, content, language, indexed_at, content_hash) VALUES (?, ?, ?, ?, ?, ?, ?)',
 		[
 			file.id,
 			file.repositoryId,
 			file.path,
 			file.content,
 			file.language,
-			file.lastIndexedAt,
+			file.indexedAt,
 			file.contentHash,
 		],
 	);
@@ -231,8 +205,7 @@ export function createTestSymbol(
 	};
 
 	db.run(
-		`INSERT INTO indexed_symbols (id, file_id, repository_id, name, kind, signature, start_line, end_line, start_column, end_column, documentation)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		'INSERT INTO indexed_symbols (id, file_id, repository_id, name, kind, signature, start_line, end_line, start_column, end_column, documentation) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)',
 		[
 			symbol.id,
 			symbol.fileId,
@@ -272,8 +245,7 @@ export function createTestReference(
 	};
 
 	db.run(
-		`INSERT INTO indexed_references (id, file_id, repository_id, target_symbol_id, reference_type, line, column, context)
-     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		'INSERT INTO indexed_references (id, file_id, repository_id, target_symbol_id, reference_type, line, column, context) VALUES (?, ?, ?, ?, ?, ?, ?, ?)',
 		[
 			ref.id,
 			ref.fileId,
@@ -308,13 +280,13 @@ export function createFullTestFixture(
 
 	for (let i = 0; i < fileCount; i++) {
 		const file = createTestFile(db, repository.id, {
-			path: `src/module${i + 1}.ts`,
+			path: 'src/module' + (i + 1) + '.ts',
 		});
 		files.push(file);
 
 		for (let j = 0; j < symbolsPerFile; j++) {
 			const symbol = createTestSymbol(db, file.id, repository.id, {
-				name: `function${i + 1}_${j + 1}`,
+				name: 'function' + (i + 1) + '_' + (j + 1),
 				startLine: j * 10 + 1,
 				endLine: j * 10 + 8,
 			});
@@ -354,7 +326,7 @@ export function clearTestData(db: KotaDatabase): void {
  */
 export function getTableCount(db: KotaDatabase, tableName: string): number {
 	const result = db.queryOne<{ count: number }>(
-		`SELECT COUNT(*) as count FROM ${tableName}`,
+		'SELECT COUNT(*) as count FROM ' + tableName,
 	);
 	return result?.count ?? 0;
 }

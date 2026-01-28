@@ -5,7 +5,7 @@
  * sample schemas, and expected security scheme definitions.
  * 
  * NOTE: Updated for local-only v2.0.0 (Issue #591)
- * Cloud-only endpoints (subscriptions, API keys) have been removed.
+ * Cloud-only endpoints (subscriptions, API keys, jobs, projects) have been removed.
  */
 
 /**
@@ -23,27 +23,19 @@ export const minimalValidSpec = {
 /**
  * Expected core endpoints that must be documented
  * 
- * NOTE: Local-only mode - subscription and API key endpoints removed.
- * Project endpoints remain but use local SQLite storage.
+ * NOTE: Local-only mode - these are the only endpoints in the OpenAPI spec.
+ * Removed endpoints:
+ * - /jobs/{jobId} (job tracking removed)
+ * - /api/projects (projects removed)  
+ * - /api/keys/* (API keys removed)
+ * - /api/subscriptions/* (subscriptions removed)
  */
 export const expectedCoreEndpoints = [
 	{ path: '/health', method: 'get' },
 	{ path: '/index', method: 'post' },
-	{ path: '/jobs/{jobId}', method: 'get' },
 	{ path: '/search', method: 'get' },
 	{ path: '/files/recent', method: 'get' },
-	{ path: '/api/projects', method: 'get' },
-	{ path: '/api/projects', method: 'post' },
-	{ path: '/api/projects/{id}', method: 'get' },
-	{ path: '/api/projects/{id}', method: 'patch' },
-	{ path: '/api/projects/{id}', method: 'delete' },
-	// Cloud-only endpoints removed for v2.0.0:
-	// - /api/keys/generate
-	// - /api/keys/current
-	// - /api/keys/reset
-	// - /api/subscriptions/create-checkout-session
-	// - /api/subscriptions/create-portal-session
-	// - /api/subscriptions/current
+	{ path: '/mcp', method: 'post' },
 ];
 
 /**

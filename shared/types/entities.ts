@@ -5,7 +5,6 @@
  * for type-safe queries and ORM operations.
  */
 
-export * from "./projects";
 
 /**
  * Repository entity from repositories table.
