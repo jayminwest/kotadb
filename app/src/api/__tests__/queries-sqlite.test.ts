@@ -493,6 +493,75 @@ describe("SQLite Query Layer - queries.ts", () => {
 		});
 	});
 
+	describe("searchFilesLocal - FTS edge cases (Issue #595)", () => {
+		beforeEach(() => {
+			// Insert test files with various content patterns
+			const files = [
+				{ path: "src/config.ts", content: "const preCommitHook = 'pre-commit'; // hyphenated term" },
+				{ path: "src/search.ts", content: "function searchAndFind() { return 'search and find'; }" },
+				{ path: "src/types.ts", content: "type PlanType = 'smb' | 'enterprise'; // planType smb" },
+				{ path: "src/quotes.ts", content: 'const message = "say \\"hello\\""; // embedded quotes' },
+			];
+
+			for (const file of files) {
+				const id = randomUUID();
+				db.run(
+					"INSERT INTO indexed_files (id, repository_id, path, content, language, size_bytes, indexed_at) VALUES (?, ?, ?, ?, ?, ?, ?)",
+					[id, testRepoId, file.path, file.content, "typescript", file.content.length, new Date().toISOString()]
+				);
+			}
+		});
+
+		test("should search hyphenated terms without SQL errors", () => {
+			// This previously failed with: Error: no such column: commit
+			const results = searchFilesLocal(db, "pre-commit", testRepoId, 10);
+			expect(Array.isArray(results)).toBe(true);
+			// Should find the file with "pre-commit" content
+			expect(results.length).toBeGreaterThan(0);
+			expect(results[0]?.content).toContain("pre-commit");
+		});
+
+		test("should search multi-word phrases without SQL errors", () => {
+			// This previously failed with: Error: no such column: smb
+			const results = searchFilesLocal(db, "planType smb", testRepoId, 10);
+			expect(Array.isArray(results)).toBe(true);
+		});
+
+		test("should search FTS keywords (AND, OR, NOT) as literals", () => {
+			// "and" was previously interpreted as FTS5 AND operator
+			const resultsAnd = searchFilesLocal(db, "search and find", testRepoId, 10);
+			expect(Array.isArray(resultsAnd)).toBe(true);
+
+			const resultsOr = searchFilesLocal(db, "smb or enterprise", testRepoId, 10);
+			expect(Array.isArray(resultsOr)).toBe(true);
+
+			const resultsNot = searchFilesLocal(db, "not found", testRepoId, 10);
+			expect(Array.isArray(resultsNot)).toBe(true);
+		});
+
+		test("should handle search terms containing double quotes", () => {
+			// Terms with quotes need proper escaping
+			const results = searchFilesLocal(db, 'say "hello"', testRepoId, 10);
+			expect(Array.isArray(results)).toBe(true);
+		});
+
+		test("should handle terms that look like FTS5 operators", () => {
+			// Ensure operator-like terms don't cause syntax errors
+			const results1 = searchFilesLocal(db, "OR", testRepoId, 10);
+			expect(Array.isArray(results1)).toBe(true);
+
+			const results2 = searchFilesLocal(db, "AND", testRepoId, 10);
+			expect(Array.isArray(results2)).toBe(true);
+
+			const results3 = searchFilesLocal(db, "NOT", testRepoId, 10);
+			expect(Array.isArray(results3)).toBe(true);
+
+			const results4 = searchFilesLocal(db, "NEAR", testRepoId, 10);
+			expect(Array.isArray(results4)).toBe(true);
+		});
+	});
+
+
 	describe("listRecentFilesLocal()", () => {
 		beforeEach(() => {
 			// Insert files with different timestamps

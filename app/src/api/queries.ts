@@ -241,6 +241,26 @@ function storeDependenciesInternal(
 	return count;
 }
 
+/**
+ * Escape a search term for use in SQLite FTS5 MATCH clause.
+ * Wraps the entire term in double quotes for exact phrase matching.
+ * Escapes internal double quotes by doubling them.
+ * 
+ * This ensures that:
+ * - Multi-word searches match adjacent words in order ("hello world")
+ * - Hyphenated terms don't trigger FTS5 operator parsing ("mom-and-pop")
+ * - FTS5 keywords (AND, OR, NOT) are treated as literals, not operators
+ * 
+ * @param term - Raw search term from user input
+ * @returns Escaped term safe for FTS5 MATCH clause
+ */
+function escapeFts5Term(term: string): string {
+	// Escape internal double quotes by doubling them
+	const escaped = term.replace(/"/g, '""');
+	// Wrap in double quotes for exact phrase matching
+	return `"${escaped}"`;
+}
+
 function searchFilesInternal(
 	db: KotaDatabase,
 	term: string,
@@ -281,7 +301,8 @@ function searchFilesInternal(
 			LIMIT ?
 		`;
 
-	const params = hasRepoFilter ? [term, repositoryId, limit] : [term, limit];
+	const escapedTerm = escapeFts5Term(term);
+	const params = hasRepoFilter ? [escapedTerm, repositoryId, limit] : [escapedTerm, limit];
 	const rows = db.query<{
 		id: string;
 		repository_id: string;
