@@ -167,7 +167,7 @@ key_operations:
       3. Create <domain>-plan-agent.md:
          - model: sonnet
          - color: yellow
-         - tools: [Read, Glob, Grep, Write]
+         - tools: [Read, Glob, Grep, Write, Bash]
       4. Create <domain>-build-agent.md:
          - model: sonnet
          - color: green
@@ -175,7 +175,7 @@ key_operations:
       5. Create <domain>-improve-agent.md:
          - model: sonnet
          - color: purple
-         - tools: [Read, Write, Edit, Glob, Grep, Bash]
+         - tools: [Read, Write, Edit, Glob, Grep, Bash, Task]
       6. Create <domain>-question-agent.md:
          - model: haiku
          - color: cyan
@@ -291,6 +291,45 @@ key_operations:
     rationale: |
       /do command uses keyword-based classification to route to correct expert.
       Each domain needs detection patterns, examples, and orchestration updates.
+  tool_permissions_philosophy:
+    timestamp: 2026-01-28
+    evidence: commit 446e999 tool permissions fix for 20 expert agents
+    principle: "Permissive tools + strict prompts"
+    when: Deciding which tools to grant expert agents
+    approach: |
+      Grant tools liberally based on what an agent MIGHT need, then use prompts
+      to constrain behavior. This prevents workflow breakage when agents need
+      capabilities for validation or verification that weren't anticipated.
+
+      Plan agents (yellow, sonnet):
+      - GRANT: [Read, Glob, Grep, Write, Bash]
+      - Bash enables: git operations, file statistics, wc, verification commands
+      - Rationale: Plan agents write specs and may need to check git state,
+        count files, or verify current state
+
+      Build agents (green, sonnet):
+      - GRANT: [Read, Write, Edit, Glob, Grep, Bash]
+      - Bash enables: type-checking (bunx tsc), test runs (bun test), linting
+      - Rationale: Build agents implement and should verify their work
+
+      Improve agents (purple, sonnet):
+      - GRANT: [Read, Write, Edit, Glob, Grep, Bash, Task]
+      - Task enables: spawning sub-agents for complex analysis
+      - Rationale: Improve agents analyze patterns and may delegate to experts
+
+      Question agents (cyan, haiku):
+      - GRANT: [Read, Glob, Grep]
+      - Rationale: Read-only, fast answers
+    discovered_issue:
+      symptom: Plan agents couldn't write specs, build agents couldn't run tests
+      root_cause: Tool permissions too restrictive, agents failed tasks silently
+      resolution: Added Bash to plan/build agents, Task to improve agents
+      lesson: Better to grant tools and constrain via prompt than block capabilities
+    examples:
+      - Plan agent uses Bash for "git status" to check current branch
+      - Build agent uses Bash for "bunx tsc --noEmit" to verify types
+      - Improve agent uses Task to spawn scout-agent for pattern analysis
+
 
 decision_trees:
   command_vs_agent_vs_expert:
@@ -328,9 +367,9 @@ patterns:
     structure: |
       .claude/agents/experts/<domain>/
       ├── expertise.yaml (400-600 lines target, 1000 max)
-      ├── <domain>-plan-agent.md (yellow, sonnet, Read/Glob/Grep/Write)
+      ├── <domain>-plan-agent.md (yellow, sonnet, Read/Glob/Grep/Write/Bash)
       ├── <domain>-build-agent.md (green, sonnet, Read/Write/Edit/Glob/Grep/Bash)
-      ├── <domain>-improve-agent.md (purple, sonnet, all + Bash)
+      ├── <domain>-improve-agent.md (purple, sonnet, all + Bash + Task)
       └── <domain>-question-agent.md (cyan, haiku, Read/Glob/Grep)
     color_coding:
       plan: yellow (analysis, planning)
@@ -361,13 +400,15 @@ patterns:
         - Glob
         - Grep
         - mcp__kotadb__search_code
+      model: haiku|sonnet|opus
+      color: yellow|green|purple|cyan
       constraints:
         - Constraint 1
         - Constraint 2
       ---
     notes:
       - Tools as YAML array, NOT comma-separated string
-      - model and color optional but recommended
+      - model and color optional but recommended for expert agents
       - Description MUST NOT contain colons
       - MCP tools use mcp__server__tool format
 
@@ -426,10 +467,12 @@ patterns:
       - Registry file grows large (agent-registry.json now 873 lines)
       - /do command complexity increases with domain count
       - Multi-line JSON formatting essential for diff readability
+      - Tool permissions must be consistent across similar agent roles
     best_practices:
       - Use consistent capability naming pattern (<domain>-planning, <domain>-implementation)
       - Keep domain keywords non-overlapping for routing accuracy
       - Document all domains in single CLAUDE.md table for discoverability
+      - Apply uniform tool permissions across agent types (plan/build/improve/question)
 
 best_practices:
   organization:
@@ -447,9 +490,11 @@ best_practices:
   agents:
     - Tools as YAML array format (NOT comma-separated)
     - Include constraints section for behavioral boundaries
+    - Include model and color fields for expert agents
     - Update agent-registry.json for every new agent
     - CRITICAL: Never use colons in description field
     - Add MCP tools where appropriate (mcp__kotadb__*)
+    - Apply "permissive tools + strict prompts" philosophy
 
   hooks:
     - Standard Python shebang (#!/usr/bin/env python3)
@@ -470,6 +515,7 @@ best_practices:
     - Use multi-line JSON arrays in agent-registry.json for git diffs
     - Keep /do domain detection patterns specific and non-overlapping
     - Update all 3 files (CLAUDE.md, do.md, agent-registry.json) atomically
+    - Grant consistent tool permissions across agent types within domain
 
 known_issues:
   - issue: Colons in frontmatter description values break YAML parsing
@@ -492,6 +538,11 @@ known_issues:
     impact: Inconsistent output, potential buffering issues
     resolution: Use sys.stdout.write() per KotaDB conventions
     status: enforced via code review
+  - issue: Tool permissions too restrictive for agent workflows
+    impact: Agents silently fail to complete tasks (can't write specs, run tests)
+    resolution: Apply "permissive tools + strict prompts" philosophy
+    discovered: 2026-01-28 (commit 446e999)
+    status: resolved via systematic tool permission audit
 
 potential_enhancements:
   - Automated agent registry validation (compare files to registry)
@@ -499,20 +550,22 @@ potential_enhancements:
   - Template Category validation
   - Hook output validation
   - Expert domain registry validation (ensure CLAUDE.md, do.md, agent-registry.json in sync)
+  - Tool permission consistency checker across agent types
 
 stability:
   convergence_indicators:
     insight_rate_trend: growing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 2
-    patterns_updated_this_cycle: 3
+    new_patterns_added_this_cycle: 1
+    patterns_updated_this_cycle: 2
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
       Expert domain expansion cycle (2 -> 7 domains):
-      - Added expert_domain_expansion pattern documenting scaling challenges
-      - Added update_do_command_for_expert operation for routing updates
-      - Updated create_expert_domain to include CLAUDE.md and /do updates
-      - Added active_domains tracking to core_implementation and patterns
-      - Added formatting_convention to update_agent_registry for JSON arrays
-      - Multi-domain architecture now stable with clear expansion playbook
+      Expert domain system stabilizing after 2->7 domain expansion:
+      - Added tool_permissions_philosophy operation documenting "permissive tools + strict prompts"
+      - Updated expert_domain_expansion pattern with tool permission consistency requirement
+      - Updated create_expert_domain to include tool specifications for all 4 agent types
+      - Updated best_practices with tool permission philosophy
+      - Added known_issue tracking restrictive tool permission problem and resolution
+

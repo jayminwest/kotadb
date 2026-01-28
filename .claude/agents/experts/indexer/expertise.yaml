@@ -337,6 +337,112 @@ key_operations:
     timestamp: 2026-01-28
     evidence: commit 5af086f, app/src/api/queries.ts
 
+
+  batch_process_large_repos:
+    when: Indexing repositories with 200+ files to avoid database transaction timeouts
+    approach: |
+      1. Chunk files array into batches (BATCH_SIZE = 50 files)
+      2. Process chunks sequentially with atomic transactions per chunk
+      3. For first chunk: perform full DELETE+INSERT (skipDelete=false)
+      4. For subsequent chunks: skip DELETE phase (skipDelete=true)
+      5. Filter symbols, references, dependencies per chunk by file_path
+      6. Accumulate stats across chunks for final reporting
+      7. Update job progress metadata after each chunk completion
+      
+      Chunking pattern:
+      ```typescript
+      const chunks: FileData[][] = [];
+      for (let i = 0; i < files.length; i += BATCH_SIZE) {
+        chunks.push(files.slice(i, i + BATCH_SIZE));
+      }
+      
+      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
+        const chunk = chunks[chunkIndex];
+        const skipDelete = chunkIndex > 0; // Only DELETE on first chunk
+        
+        // Filter data for this chunk
+        const chunkFilePaths = new Set(chunk.map(f => f.path));
+        const chunkSymbols = symbols.filter(s => chunkFilePaths.has(s.file_path));
+        const chunkReferences = references.filter(r => chunkFilePaths.has(r.source_file_path));
+        const chunkDependencies = deps.filter(d => d.from_file_path && chunkFilePaths.has(d.from_file_path));
+        
+        // Store chunk atomically
+        await storeIndexedData(db, repoId, chunk, chunkSymbols, chunkReferences, chunkDependencies, skipDelete);
+      }
+      ```
+      
+      Key benefits:
+      - Each chunk commits within transaction timeout limits
+      - First chunk DELETE removes stale data
+      - Subsequent chunks only INSERT new data
+      - Progress tracking enables observability
+      - Failed chunks don't affect completed chunks
+    examples:
+      - 250-file repository -> 5 chunks of 50 files each
+      - Each chunk commits atomically in separate transaction
+      - Progress metadata: chunks_completed, current_chunk
+    pitfalls:
+      - what: Deleting on every chunk
+        instead: Only DELETE on first chunk (skipDelete parameter)
+        reason: Repeated DELETEs cause conflicts and performance issues
+      - what: Single transaction for entire large repo
+        instead: Batch into chunks with separate transactions
+        reason: Large transactions timeout on SQLite
+      - what: Not filtering symbols/references per chunk
+        instead: Filter by file_path Set for each chunk
+        reason: Orphaned data references files not in chunk
+    timestamp: 2026-01-28
+    evidence: commit d47a650, app/src/queue/workers/index-repo.ts
+
+  filter_build_artifacts:
+    when: Discovering source files to avoid indexing build output and dependencies
+    approach: |
+      Maintain comprehensive IGNORED_DIRECTORIES set covering:
+      
+      Version control:
+      - .git
+      
+      Package managers:
+      - node_modules (JS/TS)
+      - vendor (Go, Ruby, PHP)
+      
+      Build output:
+      - build, dist, out
+      - target (Rust, Java/Maven)
+      
+      Framework-specific build/cache:
+      - .next, .vercel, .turbo (Next.js, Vercel, Turborepo)
+      - .nuxt, .output (Nuxt.js)
+      - .svelte-kit (SvelteKit)
+      - .angular, .vite, .parcel-cache
+      - .nx (Nx monorepo)
+      
+      Test coverage:
+      - coverage
+      
+      Python:
+      - __pycache__, .pytest_cache
+      - venv, .venv, env
+      
+      General cache:
+      - .cache
+      
+      Result: 27 ignored directories (expanded from original 7)
+      Ensures only source files indexed, not generated code or dependencies.
+    examples:
+      - .next directory skipped for Next.js projects
+      - venv directory skipped for Python projects
+      - target directory skipped for Rust/Java projects
+    pitfalls:
+      - what: Incomplete ignored directories list
+        instead: Cover all modern build tools and package managers
+        reason: Build artifacts inflate index and add noise
+      - what: Hardcoding list in multiple places
+        instead: Single IGNORED_DIRECTORIES constant
+        reason: Maintainability and consistency
+    timestamp: 2026-01-28
+    evidence: commit 5a4bca3, app/src/indexer/parsers.ts
+
 decision_trees:
   ast_parsing_strategy:
     question: How should I parse this file?
@@ -519,6 +625,43 @@ patterns:
     timestamp: 2026-01-28
     evidence: commit 1eab8bc, packages/core/src/storage/
 
+
+  batch_transaction_pattern:
+    structure: |
+      // Chunk large datasets for atomic batch processing
+      const BATCH_SIZE = 50;
+      const chunks = chunkArray(items, BATCH_SIZE);
+      
+      let totalProcessed = 0;
+      
+      for (let i = 0; i < chunks.length; i++) {
+        const chunk = chunks[i];
+        const isFirstChunk = i === 0;
+        
+        // Process chunk in single transaction
+        db.transaction(() => {
+          // First chunk: full cleanup + insert
+          if (isFirstChunk) {
+            db.run("DELETE FROM table WHERE ...");
+          }
+          
+          // All chunks: insert new data
+          for (const item of chunk) {
+            db.run("INSERT INTO table ...", item);
+          }
+        });
+        
+        totalProcessed += chunk.length;
+        
+        // Update progress
+        reportProgress(totalProcessed, items.length);
+      }
+    trade_offs:
+      pros: [Avoids transaction timeouts, Atomic per-chunk commits, Progress tracking, Partial success on failure]
+      cons: [More complex than single transaction, Multiple database round-trips, Partial state if interrupted]
+    timestamp: 2026-01-28
+    evidence: commit d47a650
+
 best_practices:
   ast_parsing:
     - Use @typescript-eslint/parser for modern TypeScript support
@@ -545,7 +688,9 @@ best_practices:
     - Try extensions in priority order (.ts first)
     - Handle index file resolution
     - Return null for unresolvable imports (graceful)
-
+    - Use path.join + path.normalize (NOT path.resolve)
+    - Preserve relative path structure for database matching
+    timestamp: 2026-01-28
   storage:
     - Use single transaction for atomicity
     - Build lookup maps for efficient foreign key resolution
@@ -569,6 +714,17 @@ best_practices:
     - Never use console.* (use process.stdout.write for raw output)
 
 known_issues:
+  - issue: path.resolve() converts relative to absolute paths
+    impact: Import resolution fails when database stores relative paths
+    resolution: Use path.join() + path.normalize() to preserve relative structure
+    prevention: |
+      Never use path.resolve() in import resolution.
+      Always use: path.normalize(path.join(fromDir, importSource))
+      This preserves relative paths matching database storage format.
+    status: resolved
+    timestamp: 2026-01-28
+    evidence: commit 5713a52, app/src/indexer/import-resolver.ts
+
   - issue: tsconfig.json path mapping not supported
     impact: Absolute imports with path aliases not resolved
     resolution: Only relative imports currently supported
@@ -643,13 +799,16 @@ stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 2
-    patterns_updated_this_cycle: 3
+    new_patterns_added_this_cycle: 5
+    patterns_updated_this_cycle: 1
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Cycle 1 update - added FTS5 search patterns and storage abstraction:
-      - FTS5 term escaping for special characters (hyphens, AND/OR/NOT)
+      Cycle 2 update - added batch processing and build artifact filtering:
+      - Previous: FTS5 term escaping, storage abstraction, schema validation
+      - New: Batch processing for large repos, build artifact filtering (27 dirs)
+      - New: Path resolution fix (path.join + normalize vs resolve)
+      - Updated: @kotadb/core extraction completed with storage abstraction
       - Storage abstraction pattern from @kotadb/core extraction
       - Schema constraint validation alignment
       - Updated local-only v2 architecture patterns

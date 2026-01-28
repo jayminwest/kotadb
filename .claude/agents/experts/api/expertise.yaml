@@ -341,6 +341,38 @@ key_operations:
         instead: "Resolve to absolute paths before validation"
         reason: "Relative paths can bypass naive validation"
 
+
+  test_mcp_tool:
+    when: Testing MCP tool implementations for correctness and edge cases
+    approach: |
+      1. Create two test files in app/tests/mcp/:
+         - <tool-name>.test.ts - Unit tests with validation checks
+         - <tool-name>.integration.test.ts - Integration tests with real database
+      
+      2. Unit test pattern covers parameter validation and error handling
+      3. Integration test pattern uses file-based database via KOTADB_PATH
+      4. Coverage checklist per tool:
+         - Parameter validation (missing, wrong type, invalid values)
+         - Empty results and results with data cases
+         - Optional parameters (limit, filters)
+         - Edge cases (special characters, FTS5 keywords)
+    
+    timestamp: 2026-01-28
+    evidence: commit 8156491 (added 43 tests across 8 MCP tools)
+    rationale: |
+      Comprehensive MCP tool testing ensures reliability for Claude Code integration.
+      Two-tier approach: unit tests verify parameter validation, integration tests
+      verify database operations. Using KOTADB_PATH env var allows file-based test
+      databases, working around global database singleton pattern.
+    
+    pitfalls:
+      - what: "Using in-memory databases with getGlobalDatabase()"
+        instead: "Use KOTADB_PATH env var to point to file-based test database"
+        reason: "Global database singleton needs file path for proper isolation"
+      - what: "Skipping parameter type validation tests"
+        instead: "Test all parameter types and missing required parameters"
+        reason: "LLM can pass incorrect types, validation must be robust"
+
 decision_trees:
   endpoint_vs_mcp_tool:
     question: Should this be an HTTP endpoint or MCP tool?
@@ -533,6 +565,14 @@ best_practices:
     - Extract and validate all query parameters early
     - Use typed AuthenticatedRequest for authenticated routes
     - Return JSON errors with { error: "message" } format
+
+  testing:
+    - Create both unit and integration tests for each MCP tool
+    - Unit tests: parameter validation, error cases, type checking
+    - Integration tests: database operations with seeded fixtures
+    - Use KOTADB_PATH env var for file-based test database isolation
+    - Clear test data in afterEach to prevent test pollution
+    - Aim for 5-8 tests per tool covering all code paths
     - Log errors with createLogger before returning 500
 
   mcp:
@@ -609,29 +649,38 @@ potential_enhancements:
     effort: low
 
 
+
 stability:
   convergence_indicators:
-    insight_rate_trend: growing
+    insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 3
-    patterns_updated_this_cycle: 1
+    new_patterns_added_this_cycle: 1
+    patterns_updated_this_cycle: 0
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Second review cycle after local-only v2 refactor (d669841):
+      Third review cycle - MCP tooling cleanup (commit 8156491):
       
       New patterns added:
-      1. FTS5 search term escaping (implement_fts5_search operation)
-      2. Local file path validation (validate_local_file_paths operation)
-      3. Local auth bypass pattern
+      1. MCP tool testing (test_mcp_tool operation)
+         - 43 tests across 8 tools (5-8 per tool)
+         - Two-tier: unit (validation) + integration (database)
+         - KOTADB_PATH isolation for file-based test databases
       
-      Updated patterns:
-      - FTS5 search pattern with escapeFts5Term() implementation details
+      Previous patterns remain stable:
+      - FTS5 search term escaping (5af086f)
+      - Local file path validation (efecf9c)
+      - Local auth bypass (d669841)
       
-      Key learnings from commits 5af086f, d669841, efecf9c:
-      - FTS5 requires double-quote escaping to prevent operator interpretation
-      - Path traversal validation critical for local mode file operations
-      - Local auth bypass simplifies development while maintaining security model
+      Architecture stability: Very High
+      - Local-only v2 patterns fully converged
+      - Testing patterns standardized across MCP tools
+      - Zero contradictions across 3 review cycles
+      - Insight rate trending stable
       
-      Architecture stability: High (local-only v2 patterns converging)
-      Next review: After next 5-10 API-related commits
+      Domain maturity: High
+      - All core operations documented
+      - All 8 MCP tools have comprehensive test coverage
+      - Error handling and validation patterns established
+      
+      Next review: After 10-15 API commits or architectural changes
