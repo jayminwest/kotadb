@@ -106,6 +106,10 @@ export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
 				type: "number",
 				description: "Optional: Maximum number of files to return (default: 10)",
 			},
+			repository: {
+				type: "string",
+				description: "Optional: Filter results to a specific repository ID",
+			},
 		},
 	},
 };
@@ -337,11 +341,12 @@ export function getToolDefinitions(): ToolDefinition[] {
 /**
  * Type guard for list_recent_files params
  */
-function isListRecentParams(params: unknown): params is { limit?: number } | undefined {
+function isListRecentParams(params: unknown): params is { limit?: number; repository?: string } | undefined {
 	if (params === undefined) return true;
 	if (typeof params !== "object" || params === null) return false;
 	const p = params as Record<string, unknown>;
 	if (p.limit !== undefined && typeof p.limit !== "number") return false;
+	if (p.repository !== undefined && typeof p.repository !== "string") return false;
 	return true;
 }
 
@@ -485,9 +490,14 @@ export async function executeListRecentFiles(
 
 	const limit =
 		params && typeof params === "object" && "limit" in params ? (params.limit as number) : 10;
+	
+	const repository =
+		params && typeof params === "object" && "repository" in params 
+			? (params.repository as string | undefined) 
+			: undefined;
 
-	// Use SQLite via listRecentFiles
-	const files = listRecentFiles(limit);
+	// Use SQLite via listRecentFiles with optional repository filter
+	const files = listRecentFiles(limit, repository);
 
 	return {
 		results: files.map((file) => ({

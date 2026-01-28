@@ -328,15 +328,27 @@ function searchFilesInternal(
 function listRecentFilesInternal(
 	db: KotaDatabase,
 	limit: number,
+	repositoryId?: string,
 ): IndexedFile[] {
-	const sql = `
-		SELECT
-			id, repository_id, path, content, metadata, indexed_at
-		FROM indexed_files
-		ORDER BY indexed_at DESC
-		LIMIT ?
-	`;
+	const hasRepoFilter = repositoryId !== undefined;
+	const sql = hasRepoFilter
+		? `
+			SELECT
+				id, repository_id, path, content, metadata, indexed_at
+			FROM indexed_files
+			WHERE repository_id = ?
+			ORDER BY indexed_at DESC
+			LIMIT ?
+		`
+		: `
+			SELECT
+				id, repository_id, path, content, metadata, indexed_at
+			FROM indexed_files
+			ORDER BY indexed_at DESC
+			LIMIT ?
+		`;
 
+	const params = hasRepoFilter ? [repositoryId, limit] : [limit];
 	const rows = db.query<{
 		id: string;
 		repository_id: string;
@@ -344,7 +356,7 @@ function listRecentFilesInternal(
 		content: string;
 		metadata: string;
 		indexed_at: string;
-	}>(sql, [limit]);
+	}>(sql, params);
 
 	return rows.map((row) => {
 		const metadata = JSON.parse(row.metadata || '{}');
@@ -515,8 +527,9 @@ export function searchFiles(
  */
 export function listRecentFiles(
 	limit: number,
+	repositoryId?: string,
 ): IndexedFile[] {
-	return listRecentFilesInternal(getGlobalDatabase(), limit);
+	return listRecentFilesInternal(getGlobalDatabase(), limit, repositoryId);
 }
 
 /**
@@ -1069,9 +1082,10 @@ export function searchFilesLocal(
  */
 export function listRecentFilesLocal(
 	db: KotaDatabase,
-	limit: number
+	limit: number,
+	repositoryId?: string,
 ): IndexedFile[] {
-	return listRecentFilesInternal(db, limit);
+	return listRecentFilesInternal(db, limit, repositoryId);
 }
 
 /**

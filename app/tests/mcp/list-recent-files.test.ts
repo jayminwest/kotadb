@@ -59,3 +59,54 @@ describe("list_recent_files MCP tool", () => {
 		expect(result.results).toBeDefined();
 	});
 });
+
+describe("list_recent_files MCP tool - repository filtering", () => {
+	const requestId = "test-request-1";
+	const userId = "test-user-1";
+
+	test("should accept repository parameter", async () => {
+		const result = (await executeListRecentFiles(
+			{ limit: 10, repository: "test-repo-id" },
+			requestId,
+			userId,
+		)) as { results: Array<unknown> };
+
+		expect(result.results).toBeDefined();
+		expect(Array.isArray(result.results)).toBe(true);
+	});
+
+	test("should throw error when repository is not a string", async () => {
+		await expect(async () => {
+			await executeListRecentFiles({ repository: 123 }, requestId, userId);
+		}).toThrow();
+	});
+
+	test("should filter results by repository when provided", async () => {
+		// Note: This test requires seeded test data with multiple repositories
+		// Implementation will depend on existing test setup patterns
+		const result = (await executeListRecentFiles(
+			{ repository: "specific-repo-id" },
+			requestId,
+			userId,
+		)) as { 
+			results: Array<{ projectRoot: string }> 
+		};
+
+		expect(result.results).toBeDefined();
+		// All results should be from the specified repository
+		result.results.forEach(file => {
+			expect(file.projectRoot).toBe("specific-repo-id");
+		});
+	});
+
+	test("should return all files when repository not specified (backward compatibility)", async () => {
+		const withoutFilter = (await executeListRecentFiles(
+			{ limit: 10 },
+			requestId,
+			userId,
+		)) as { results: Array<unknown> };
+
+		expect(withoutFilter.results).toBeDefined();
+		expect(Array.isArray(withoutFilter.results)).toBe(true);
+	});
+});

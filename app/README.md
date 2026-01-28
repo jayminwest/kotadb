@@ -27,7 +27,7 @@ bun run src/index.ts
 PORT=4000 bun run src/index.ts
 ```
 
-The server will start on port 3000 by default. Data is stored in `~/.kotadb/kotadb.sqlite`.
+The server will start on port 3000 by default. Data is stored in `.kotadb/kota.db` within your project directory.
 
 ## Development Commands
 
@@ -71,21 +71,6 @@ scripts/        # Bash scripts for development
 - `GET /search?term=query` - Search indexed files
 - `GET /files/recent` - List recently indexed files
 - `POST /mcp` - Model Context Protocol endpoint
-
-## Docker
-
-Build and run in a container:
-
-```bash
-# From repository root
-docker compose up dev
-
-# Manual build (from app/ directory)
-docker build -t kotadb:test .
-
-# Run container
-docker run -p 3000:3000 -e PORT=3000 kotadb:test
-```
 
 ## Learn More
 

@@ -1,15 +1,15 @@
 # Contributing to KotaDB
 
-Thank you for your interest in contributing to KotaDB! This document provides guidelines for contributing to the open source core codebase.
+Thank you for your interest in contributing to KotaDB! This document provides guidelines for contributing to the codebase.
 
 ## Development Setup
 
 ### Prerequisites
 
 - [Bun](https://bun.sh) v1.1+
-- [Docker Desktop](https://www.docker.com/products/docker-desktop) (for Supabase Local)
-- [Supabase CLI](https://supabase.com/docs/guides/cli) (optional, for migrations)
 - Git 2.0+
+
+That's it! KotaDB is local-only and uses SQLite - no Docker, PostgreSQL, or external services required.
 
 ### Getting Started
 
@@ -21,21 +21,14 @@ cd kotadb
 # Install dependencies
 cd app && bun install
 
-# Start local Supabase instance
-cd app && bunx supabase start
+# Run the server (database auto-creates on first run)
+bun run src/index.ts
 
-# Copy environment template
-cp .env.sample .env
-# Edit .env with your local Supabase credentials (output from supabase start)
-
-# Apply database migrations
-cd app && bunx supabase db push
-
-# Run tests to verify setup
-cd app && bun run test:setup
-cd app && bun test
-cd app && bun run test:teardown
+# Run tests
+bun test
 ```
+
+The server will start on port 3000 by default. Data is stored in `.kotadb/kota.db` in your project directory.
 
 ## Git Flow and Branch Strategy
 
@@ -72,31 +65,27 @@ git checkout -b chore/your-chore-name
 
 ## Testing Philosophy: Antimocking
 
-KotaDB follows an **antimocking philosophy** - tests use real service connections (Supabase Local, Stripe Test Mode) instead of mocks or stubs.
+KotaDB follows an **antimocking philosophy** - tests use real SQLite databases instead of mocks or stubs.
 
 **Why antimocking?**
 
 - Catches integration bugs that mocks would miss
-- Ensures production parity (tests run against real PostgreSQL)
-- Validates database migrations and RLS policies
-- Tests actual network behavior, timeouts, and error handling
+- Ensures tests run against real database behavior
+- Validates schema migrations and queries
+- Tests actual SQLite-specific behavior (FTS5, triggers, etc.)
 
 **Testing Guidelines:**
 
-- DO use real Supabase Local database connections
-- DO use real Stripe Test Mode for billing tests
-- DO NOT create mock helpers (`createMockSupabase`, `createFakeStripe`, etc.)
-- DO NOT use manual spies or stubs
-- DO use Docker Compose for isolated test environments
+- DO use real SQLite database connections
+- DO create isolated test databases per test file
+- DO NOT create mock helpers (`createMockDb`, etc.)
+- DO NOT use manual spies or stubs for database operations
 
 See `.claude/commands/docs/anti-mock.md` for complete testing philosophy.
 
 ### Running Tests
 
 ```bash
-# Start test infrastructure (Supabase Local + services)
-cd app && bun run test:setup
-
 # Run all tests
 cd app && bun test
 
@@ -105,12 +94,6 @@ cd app && bun test src/api/routes.test.ts
 
 # Run tests with filter
 cd app && bun test --filter integration
-
-# Reset test database if needed
-cd app && bun run test:reset
-
-# Stop test infrastructure when done
-cd app && bun run test:teardown
 ```
 
 ## Code Style and Linting
@@ -131,9 +114,8 @@ cd app && bunx tsc --noEmit
 **Code Standards:**
 
 - TypeScript strict mode enabled
-- Path aliases required (`@api/*`, `@auth/*`, `@db/*`, etc. - see `app/tsconfig.json`)
+- Path aliases required (`@api/*`, `@db/*`, `@indexer/*`, etc. - see `app/tsconfig.json`)
 - Use `process.stdout.write()` / `process.stderr.write()` (NEVER `console.*`)
-- Use `sys.stdout.write()` / `sys.stderr.write()` in Python (NEVER `print()`)
 
 ## Commit Message Format
 
@@ -161,18 +143,18 @@ Use [Conventional Commits](https://www.conventionalcommits.org) format:
 
 ```
 feat(mcp): add dependency graph traversal tool
-fix(auth): prevent rate limit bypass via JWT rotation
+fix(db): handle FTS5 special characters in search
 chore(deps): upgrade Bun to v1.2.0
-docs(readme): add self-hosting guide
-test(api): add integration tests for GitHub webhook
+docs(readme): update storage location
+test(api): add integration tests for search endpoint
 ```
 
 **AVOID meta-commentary patterns:**
 
-- ❌ "Based on the plan, this commit adds..."
-- ❌ "Here is the implementation of..."
-- ❌ "Looking at the issue, I can see..."
-- ✅ "feat(api): add rate limiting middleware"
+- "Based on the plan, this commit adds..."
+- "Here is the implementation of..."
+- "Looking at the issue, I can see..."
+- "feat(api): add rate limiting middleware" (correct)
 
 ## Pull Request Guidelines
 

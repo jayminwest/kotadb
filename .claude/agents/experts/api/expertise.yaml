@@ -341,6 +341,116 @@ key_operations:
         instead: "Resolve to absolute paths before validation"
         reason: "Relative paths can bypass naive validation"
 
+  add_optional_parameter_filters:
+    when: Adding optional filtering parameters to query functions and MCP tools
+    approach: |
+      1. In query layer (app/src/api/queries.ts), create internal function with optional parameter:
+         ```typescript
+         function listRecentFilesInternal(
+             db: KotaDatabase,
+             limit: number,
+             repositoryId?: string,
+         ): IndexedFile[] {
+             const hasRepoFilter = repositoryId !== undefined;
+             const sql = hasRepoFilter
+                 ? `
+                     SELECT ... FROM indexed_files
+                     WHERE repository_id = ?
+                     ORDER BY indexed_at DESC
+                     LIMIT ?
+                 `
+                 : `
+                     SELECT ... FROM indexed_files
+                     ORDER BY indexed_at DESC
+                     LIMIT ?
+                 `;
+             
+             const params = hasRepoFilter ? [repositoryId, limit] : [limit];
+             const rows = db.query<ResultType>(sql, params);
+             return rows.map(transformRow);
+         }
+         ```
+         
+      2. In MCP tool (app/src/mcp/tools.ts), add type guard for optional parameters:
+         ```typescript
+         function isListRecentParams(params: unknown): 
+             params is { limit?: number; repository?: string } | undefined {
+             if (params === undefined) return true;
+             if (typeof params !== "object" || params === null) return false;
+             const p = params as Record<string, unknown>;
+             if (p.limit !== undefined && typeof p.limit !== "number") return false;
+             if (p.repository !== undefined && typeof p.repository !== "string") return false;
+             return true;
+         }
+         ```
+      
+      3. Extract optional parameter in executor with safe casting:
+         ```typescript
+         const repository =
+             params && typeof params === "object" && "repository" in params 
+                 ? (params.repository as string | undefined) 
+                 : undefined;
+         ```
+      
+      4. Update tool schema to document optional parameter:
+         ```typescript
+         export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
+             name: "list_recent_files",
+             description: "List recently indexed files...",
+             inputSchema: {
+                 type: "object",
+                 properties: {
+                     limit: {
+                         type: "number",
+                         description: "Optional: Maximum number of files (default: 10)",
+                     },
+                     repository: {
+                         type: "string",
+                         description: "Optional: Filter results to a specific repository ID",
+                     },
+                 },
+             },
+         };
+         ```
+      
+      5. Pass optional parameter through to query function:
+         ```typescript
+         const files = listRecentFiles(limit, repository);
+         ```
+
+    timestamp: 2026-01-28
+    evidence: Issue #608 (repository filtering for list_recent_files)
+    related_files:
+      - app/src/mcp/tools.ts (lines 344-351 type guard, 482-500 executor)
+      - app/src/api/queries.ts (lines 328-372 listRecentFilesInternal)
+      - app/tests/mcp/list-recent-files.test.ts (repository filtering tests)
+    
+    rationale: |
+      Optional parameter filtering enables multi-repository support without breaking
+      backward compatibility. The hasRepoFilter conditional pattern avoids SQL concatenation
+      and ensures parameter arrays always match query placeholders.
+      
+      Key insight: Use conditional SQL strings based on hasRepoFilter flag rather than
+      building WHERE clauses dynamically. This is safer and more maintainable.
+    
+    applied_to_tools:
+      - search_code: filters by repository (existing pattern)
+      - list_recent_files: filters by repository (new in #608)
+      - search_dependencies: filters by repository (existing pattern)
+    
+    pitfalls:
+      - what: "Forgetting to validate optional parameter type in type guard"
+        instead: "Check both !== undefined AND correct type before using"
+        reason: "LLM may pass wrong type; validation prevents crashes"
+      - what: "Parameter array length mismatch with SQL placeholders"
+        instead: "Use hasFilter flag to control both SQL and params array"
+        reason: "Mismatched params cause binding errors"
+      - what: "Not documenting optional parameter in tool schema"
+        instead: "Add description to inputSchema properties"
+        reason: "LLM needs guidance on when to use optional filters"
+      - what: "Using hasParameter ? value : undefined in executor"
+        instead: "Extract with safe casting: (params.prop as string | undefined)"
+        reason: "Type safety and clarity"
 
   test_mcp_tool:
     when: Testing MCP tool implementations for correctness and edge cases
@@ -654,15 +764,21 @@ stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 1
+    new_patterns_added_this_cycle: 2
     patterns_updated_this_cycle: 0
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Third review cycle - MCP tooling cleanup (commit 8156491):
+      Fourth review cycle - Multi-repository filtering support (Issue #608):
       
       New patterns added:
-      1. MCP tool testing (test_mcp_tool operation)
+      1. Optional parameter filtering (add_optional_parameter_filters operation)
+         - hasRepoFilter conditional SQL pattern for safe filtering
+         - Type guard validation for optional parameters
+         - Backward compatibility via conditional SQL strings
+         - Applied to list_recent_files, search_code, search_dependencies
+      
+      2. MCP tool testing (test_mcp_tool operation) [from previous cycle]
          - 43 tests across 8 tools (5-8 per tool)
          - Two-tier: unit (validation) + integration (database)
          - KOTADB_PATH isolation for file-based test databases
@@ -675,12 +791,14 @@ stability:
       Architecture stability: Very High
       - Local-only v2 patterns fully converged
       - Testing patterns standardized across MCP tools
-      - Zero contradictions across 3 review cycles
+      - Optional filtering pattern consistent across 3+ tools
+      - Zero contradictions across 4 review cycles
       - Insight rate trending stable
       
       Domain maturity: High
       - All core operations documented
       - All 8 MCP tools have comprehensive test coverage
       - Error handling and validation patterns established
+      - Multi-repository filtering pattern standardized
       
       Next review: After 10-15 API commits or architectural changes

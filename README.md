@@ -155,6 +155,26 @@ curl -X POST http://localhost:3000/mcp \
   }'
 ```
 
+## Multi-Repository Support
+
+KotaDB v2.0.0 uses project-local storage in `.kotadb/` directories, providing automatic isolation between projects. All MCP tools support an optional `repository` parameter for filtering results when multiple repositories are indexed.
+
+**Quick Start:**
+
+```typescript
+// List all recent files
+await tools.list_recent_files({ limit: 20 });
+
+// Filter by repository
+await tools.list_recent_files({ 
+  limit: 20, 
+  repository: "your-org/your-repo" 
+});
+```
+
+See `docs/guides/multi-repo-best-practices.md` for detailed guidance on working with multiple repositories, including configuration examples and troubleshooting.
+
+
 **Security & Configuration:**
 
 By default, KotaDB only accepts requests from localhost origins. Configure `KOTA_ALLOWED_ORIGINS` environment variable (comma-separated list of allowed origins) if needed.
