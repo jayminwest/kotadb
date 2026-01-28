@@ -3,9 +3,10 @@
  *
  * The MCP SDK wraps tool results in content blocks. This module provides
  * utilities to extract and parse tool results from SDK response format.
+ *
+ * NOTE: Auth headers removed for local-only v2.0.0 (Issue #591, #607)
  */
 
-import { createAuthHeader } from "./db";
 import { expect } from "bun:test";
 
 /**
@@ -52,26 +53,23 @@ export function extractToolResult(data: any): any {
 }
 
 /**
- * Send an MCP JSON-RPC request
+ * Send an MCP JSON-RPC request (local mode - no auth)
  *
  * @param baseUrl - Base URL of the server (e.g., http://localhost:3000)
  * @param method - JSON-RPC method name (e.g., tools/list, tools/call)
  * @param params - Method parameters
- * @param tier - API tier for authentication (free, solo, team)
  * @returns Response object with status and JSON data
  */
 export async function sendMcpRequest(
 	baseUrl: string,
 	method: string,
 	params: any = {},
-	tier: "free" | "solo" | "team" | "disabled" = "free",
 ): Promise<{ status: number; data: any }> {
 	const response = await fetch(`${baseUrl}/mcp`, {
 		method: "POST",
 		headers: {
 			"Content-Type": "application/json",
 			Accept: "application/json, text/event-stream",
-			Authorization: createAuthHeader(tier),
 		},
 		body: JSON.stringify({
 			jsonrpc: "2.0",
@@ -86,18 +84,14 @@ export async function sendMcpRequest(
 }
 
 /**
- * Create MCP request headers with authentication
+ * Create MCP request headers (local mode - no auth)
  *
- * @param tier - API tier for authentication (free, solo, team)
  * @returns Headers object for MCP requests
  */
-export function createMcpHeaders(
-	tier: "free" | "solo" | "team" | "disabled" = "free",
-): Record<string, string> {
+export function createMcpHeaders(): Record<string, string> {
 	return {
 		"Content-Type": "application/json",
 		Accept: "application/json, text/event-stream",
-		Authorization: createAuthHeader(tier),
 	};
 }
 

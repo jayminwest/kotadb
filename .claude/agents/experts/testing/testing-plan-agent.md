@@ -6,6 +6,7 @@ tools:
   - Glob
   - Grep
   - Write
+  - Bash
 model: sonnet
 color: yellow
 ---

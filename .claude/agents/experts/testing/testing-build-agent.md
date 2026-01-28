@@ -7,6 +7,7 @@ tools:
   - Edit
   - Glob
   - Grep
+  - Bash
 model: sonnet
 color: green
 ---

@@ -1,392 +1,360 @@
 /**
- * Real database test helpers for integration testing
- * Uses local PostgreSQL test database instead of mocks
+ * SQLite test helpers for integration testing
+ *
+ * Provides in-memory and file-based SQLite test databases with
+ * fixture creation utilities for KotaDB local-only architecture.
+ *
+ * @module tests/helpers/db
  */
 
-import { type SupabaseClient, createClient } from "@supabase/supabase-js";
+import { mkdtempSync, rmSync } from "node:fs";
+import { join } from "node:path";
+import { tmpdir } from "node:os";
+import { randomUUID } from "node:crypto";
+import { createDatabase, type KotaDatabase } from "@db/sqlite/index.js";
+
+// ============================================================================
+// Type Definitions
+// ============================================================================
+
+export interface TestRepository {
+	id: string;
+	name: string;
+	owner: string;
+	defaultBranch: string;
+	remoteUrl?: string;
+	localPath?: string;
+}
+
+export interface TestFile {
+	id: string;
+	repositoryId: string;
+	path: string;
+	content: string;
+	language: string;
+	lastIndexedAt: string;
+	contentHash: string;
+}
+
+export interface TestSymbol {
+	id: string;
+	fileId: string;
+	repositoryId: string;
+	name: string;
+	kind: string;
+	signature?: string;
+	startLine: number;
+	endLine: number;
+	startColumn: number;
+	endColumn: number;
+	documentation?: string;
+}
+
+export interface TestReference {
+	id: string;
+	fileId: string;
+	repositoryId: string;
+	targetSymbolId?: string;
+	referenceType: string;
+	line: number;
+	column: number;
+	context?: string;
+}
+
+export interface TestFixture {
+	repository: TestRepository;
+	files: TestFile[];
+	symbols: TestSymbol[];
+	references: TestReference[];
+}
+
+// ============================================================================
+// Default Test Content
+// ============================================================================
+
+const DEFAULT_TEST_FILE_CONTENT = `
+import { createLogger } from "@logging/logger.js";
+
+const logger = createLogger({ module: "test" });
+
+export function processData(input: string): string {
+  logger.info("Processing data", { input });
+  return input.toUpperCase();
+}
+
+export class DataProcessor {
+  constructor(private config: ProcessorConfig) {}
+  
+  process(data: string): string {
+    return processData(data);
+  }
+}
+
+interface ProcessorConfig {
+  mode: "strict" | "lenient";
+}
+`.trim();
+
+// ============================================================================
+// Database Creation Functions
+// ============================================================================
 
 /**
- * Test database connection details
- * Points to Supabase Local Kong gateway on port 54322 (local default)
- * or dynamically generated port in CI (from .env.test)
- *
- * Architecture:
- * - Port 54322 = Kong gateway (routes /rest/v1/ to PostgREST) - Use this for Supabase JS client
- * - Port 54321 = PostgREST direct (no /rest/v1/ prefix) - Use this for raw HTTP access
- *
- * The Supabase JS client expects Kong gateway format with /rest/v1/ prefix.
- *
- * Environment variables (set by CI workflow from .env.test):
- * - SUPABASE_URL: Supabase API URL (defaults to http://localhost:54322 for local dev)
- * - SUPABASE_SERVICE_KEY: Service role key (defaults to local Supabase demo key)
+ * Get an in-memory test database with schema initialized
  */
-const TEST_DB_URL = process.env.SUPABASE_URL || "http://localhost:54322";
-const TEST_DB_KEY =
-	process.env.SUPABASE_SERVICE_KEY ||
-	"eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImV4cCI6MTk4MzgxMjk5Nn0.EGIM96RAZx35lJzdJsyH-qQwv8Hdp7fsn3W0YpN81IU";
-
-/**
- * Get a Supabase client connected to the test database
- * This returns a real client, not a mock
- */
-export function getSupabaseTestClient(): SupabaseClient {
-	return createClient(TEST_DB_URL, TEST_DB_KEY);
+export function getTestDatabase(): KotaDatabase {
+	return createDatabase({ path: ":memory:" });
 }
 
 /**
- * Test API keys for each tier
- * These match the keys seeded in supabase/seed.sql
+ * Get a file-based test database in a temp directory
  */
-export const TEST_API_KEYS = {
-	free: "kota_free_test1234567890ab_0123456789abcdef0123456789abcdef",
-	solo: "kota_solo_solo1234567890ab_0123456789abcdef0123456789abcdef",
-	team: "kota_team_team1234567890ab_0123456789abcdef0123456789abcdef",
-	disabled: "kota_free_disabled12345678_0123456789abcdef0123456789abcdef",
-};
-
-/**
- * Test user IDs matching the seeded data
- */
-export const TEST_USER_IDS = {
-	free: "00000000-0000-0000-0000-000000000001",
-	solo: "00000000-0000-0000-0000-000000000002",
-	team: "00000000-0000-0000-0000-000000000003",
-	// Aliases for multi-user RLS testing
-	alice: "00000000-0000-0000-0000-000000000001", // Same as free user
-	bob: "00000000-0000-0000-0000-000000000002", // Same as solo user
-};
-
-/**
- * Test organization IDs
- */
-export const TEST_ORG_IDS = {
-	testOrg: "10000000-0000-0000-0000-000000000001",
-};
-
-/**
- * Test repository IDs
- */
-export const TEST_REPO_IDS = {
-	userRepo: "20000000-0000-0000-0000-000000000001",
-	soloRepo: "20000000-0000-0000-0000-000000000002",
-	teamRepo: "20000000-0000-0000-0000-000000000003",
-};
-
-/**
- * Get a test API key for the specified tier
- */
-export function getTestApiKey(
-	tier: "free" | "solo" | "team" | "disabled" = "free",
-): string {
-	return TEST_API_KEYS[tier];
+export function getFileTestDatabase(
+	tempDir: string,
+	filename: string = "test.db",
+): KotaDatabase {
+	return createDatabase({ path: join(tempDir, filename) });
 }
 
 /**
- * Create Authorization header with test API key
- */
-export function createAuthHeader(
-	tier: "free" | "solo" | "team" | "disabled" = "free",
-): string {
-	return `Bearer ${getTestApiKey(tier)}`;
-}
-
-/**
- * Reset test database to clean state
- * Truncates all tables and re-seeds with test data
+ * Create a temporary directory for test databases
  *
- * Note: This requires the reset-test-db.sh script to be run
- * or direct database connection to execute TRUNCATE commands
+ * Returns the path to the created temp directory.
+ * Caller is responsible for cleanup using cleanupTempDir().
  */
-export async function resetTestDatabase(): Promise<void> {
-	// For now, this would require calling the reset script
-	// In a production test suite, this could use a direct database connection
-	// or Supabase admin API to truncate tables
-	throw new Error(
-		"resetTestDatabase not yet implemented - use ./scripts/reset-test-db.sh",
+export function createTempDir(prefix: string = "kotadb-test-"): string {
+	return mkdtempSync(join(tmpdir(), prefix));
+}
+
+/**
+ * Clean up a temporary directory
+ */
+export function cleanupTempDir(tempDir: string): void {
+	rmSync(tempDir, { recursive: true, force: true });
+}
+
+// ============================================================================
+// Fixture Creation Functions
+// ============================================================================
+
+/**
+ * Create a test repository
+ */
+export function createTestRepository(
+	db: KotaDatabase,
+	overrides: Partial<TestRepository> = {},
+): TestRepository {
+	const repo: TestRepository = {
+		id: randomUUID(),
+		name: "test-repo",
+		owner: "test-owner",
+		defaultBranch: "main",
+		remoteUrl: "https://github.com/test-owner/test-repo",
+		localPath: "/tmp/test-repo",
+		...overrides,
+	};
+
+	db.run(
+		`INSERT INTO repositories (id, name, owner, default_branch, remote_url, local_path)
+     VALUES (?, ?, ?, ?, ?, ?)`,
+		[
+			repo.id,
+			repo.name,
+			repo.owner,
+			repo.defaultBranch,
+			repo.remoteUrl ?? null,
+			repo.localPath ?? null,
+		],
 	);
+
+	return repo;
 }
 
 /**
- * Create a test organization in the database
- * Returns the created organization's ID
+ * Create a test file
  */
-export async function createTestOrganization(overrides?: {
-	name?: string;
-	slug?: string;
-	ownerId?: string;
-}): Promise<string> {
-	const client = getSupabaseTestClient();
-	const orgId = crypto.randomUUID();
-	const name = overrides?.name || `Test Org ${orgId.slice(0, 8)}`;
-	const slug = overrides?.slug || `test-org-${orgId.slice(0, 8)}`;
-	const ownerId = overrides?.ownerId || TEST_USER_IDS.free;
+export function createTestFile(
+	db: KotaDatabase,
+	repositoryId: string,
+	overrides: Partial<Omit<TestFile, "id" | "repositoryId">> = {},
+): TestFile {
+	const file: TestFile = {
+		id: randomUUID(),
+		repositoryId,
+		path: "src/test.ts",
+		content: DEFAULT_TEST_FILE_CONTENT,
+		language: "typescript",
+		lastIndexedAt: new Date().toISOString(),
+		contentHash: randomUUID(),
+		...overrides,
+	};
 
-	const { error } = await client.from("organizations").insert({
-		id: orgId,
-		name,
-		slug,
-		owner_id: ownerId,
-	});
+	db.run(
+		`INSERT INTO indexed_files (id, repository_id, path, content, language, last_indexed_at, content_hash)
+     VALUES (?, ?, ?, ?, ?, ?, ?)`,
+		[
+			file.id,
+			file.repositoryId,
+			file.path,
+			file.content,
+			file.language,
+			file.lastIndexedAt,
+			file.contentHash,
+		],
+	);
 
-	if (error) {
-		// Supabase error objects may lack message property - fallback to JSON serialization
-		throw new Error(
-			`Failed to create test organization: ${error.message || JSON.stringify(error)}`,
-		);
-	}
-
-	return orgId;
+	return file;
 }
 
 /**
- * Create a test repository in the database
- * Returns the created repository's ID
+ * Create a test symbol
  */
-export async function createTestRepository(overrides?: {
-	fullName?: string;
-	userId?: string;
-	orgId?: string;
-}): Promise<string> {
-	const client = getSupabaseTestClient();
-	const repoId = crypto.randomUUID();
-	const fullName =
-		overrides?.fullName || `test-user/test-repo-${repoId.slice(0, 8)}`;
-	const userId = overrides?.userId;
-	const orgId = overrides?.orgId;
+export function createTestSymbol(
+	db: KotaDatabase,
+	fileId: string,
+	repositoryId: string,
+	overrides: Partial<Omit<TestSymbol, "id" | "fileId" | "repositoryId">> = {},
+): TestSymbol {
+	const symbol: TestSymbol = {
+		id: randomUUID(),
+		fileId,
+		repositoryId,
+		name: "testFunction",
+		kind: "function",
+		signature: "function testFunction(): void",
+		startLine: 1,
+		endLine: 5,
+		startColumn: 0,
+		endColumn: 1,
+		documentation: "A test function",
+		...overrides,
+	};
 
-	// Must have either userId or orgId, not both
-	if ((!userId && !orgId) || (userId && orgId)) {
-		throw new Error("Must provide either userId or orgId, not both");
-	}
+	db.run(
+		`INSERT INTO indexed_symbols (id, file_id, repository_id, name, kind, signature, start_line, end_line, start_column, end_column, documentation)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		[
+			symbol.id,
+			symbol.fileId,
+			symbol.repositoryId,
+			symbol.name,
+			symbol.kind,
+			symbol.signature ?? null,
+			symbol.startLine,
+			symbol.endLine,
+			symbol.startColumn,
+			symbol.endColumn,
+			symbol.documentation ?? null,
+		],
+	);
 
-	const { error } = await client.from("repositories").insert({
-		id: repoId,
-		full_name: fullName,
-		user_id: userId || null,
-		org_id: orgId || null,
-	});
-
-	if (error) {
-		// Supabase error objects may lack message property - fallback to JSON serialization
-		throw new Error(
-			`Failed to create test repository: ${error.message || JSON.stringify(error)}`,
-		);
-	}
-
-	return repoId;
+	return symbol;
 }
 
 /**
- * Reset hourly rate limit counters for test isolation
- *
- * Deletes rate limit counter records from the database. Can target a specific API key
- * or reset all counters if no keyId is provided.
- *
- * @param keyId - Optional API key ID to reset. If omitted, resets all counters.
- * @returns Count of deleted counter records (0 if none existed)
- *
- * @example
- * // Clean up after individual test
- * afterEach(async () => {
- *   await resetRateLimitCounters(testKeyId);
- * });
- *
- * @example
- * // Global cleanup in test suite
- * afterAll(async () => {
- *   await resetRateLimitCounters(); // Reset all counters
- * });
- *
- * Note: Compatible with CI environment (respects dynamic ports from .env.test)
+ * Create a test reference
  */
-export async function resetRateLimitCounters(
-	keyId?: string,
-): Promise<number> {
-	const client = getSupabaseTestClient();
+export function createTestReference(
+	db: KotaDatabase,
+	fileId: string,
+	repositoryId: string,
+	overrides: Partial<Omit<TestReference, "id" | "fileId" | "repositoryId">> = {},
+): TestReference {
+	const ref: TestReference = {
+		id: randomUUID(),
+		fileId,
+		repositoryId,
+		referenceType: "call",
+		line: 10,
+		column: 5,
+		context: "testFunction();",
+		...overrides,
+	};
 
-	let query = client.from("rate_limit_counters").delete({ count: "exact" });
+	db.run(
+		`INSERT INTO indexed_references (id, file_id, repository_id, target_symbol_id, reference_type, line, column, context)
+     VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+		[
+			ref.id,
+			ref.fileId,
+			ref.repositoryId,
+			ref.targetSymbolId ?? null,
+			ref.referenceType,
+			ref.line,
+			ref.column,
+			ref.context ?? null,
+		],
+	);
 
-	if (keyId) {
-		query = query.eq("key_id", keyId);
-	}
-
-	const { error, count } = await query;
-
-	if (error) {
-		throw new Error(
-			`Failed to reset rate limit counters: ${error.message || JSON.stringify(error)}`,
-		);
-	}
-
-	return count || 0;
+	return ref;
 }
 
 /**
- * Reset daily rate limit counters for test isolation
- *
- * Deletes daily rate limit counter records from the database. Can target a specific API key
- * or reset all daily counters if no keyId is provided.
- *
- * @param keyId - Optional API key ID to reset. If omitted, resets all daily counters.
- * @returns Count of deleted counter records (0 if none existed)
- *
- * @example
- * // Clean up after individual test
- * afterEach(async () => {
- *   await resetDailyRateLimitCounters(testKeyId);
- * });
- *
- * Note: Compatible with CI environment (respects dynamic ports from .env.test)
+ * Create a full test fixture with repository, files, symbols, and references
  */
-export async function resetDailyRateLimitCounters(
-	keyId?: string,
-): Promise<number> {
-	const client = getSupabaseTestClient();
+export function createFullTestFixture(
+	db: KotaDatabase,
+	options: {
+		fileCount?: number;
+		symbolsPerFile?: number;
+	} = {},
+): TestFixture {
+	const { fileCount = 3, symbolsPerFile = 2 } = options;
 
-	let query = client
-		.from("rate_limit_counters_daily")
-		.delete({ count: "exact" });
+	const repository = createTestRepository(db);
+	const files: TestFile[] = [];
+	const symbols: TestSymbol[] = [];
+	const references: TestReference[] = [];
 
-	if (keyId) {
-		query = query.eq("key_id", keyId);
+	for (let i = 0; i < fileCount; i++) {
+		const file = createTestFile(db, repository.id, {
+			path: `src/module${i + 1}.ts`,
+		});
+		files.push(file);
+
+		for (let j = 0; j < symbolsPerFile; j++) {
+			const symbol = createTestSymbol(db, file.id, repository.id, {
+				name: `function${i + 1}_${j + 1}`,
+				startLine: j * 10 + 1,
+				endLine: j * 10 + 8,
+			});
+			symbols.push(symbol);
+		}
 	}
 
-	const { error, count } = await query;
-
-	if (error) {
-		throw new Error(
-			`Failed to reset daily rate limit counters: ${error.message || JSON.stringify(error)}`,
-		);
+	// Create cross-file references
+	if (symbols.length > 1) {
+		const ref = createTestReference(db, files[0]!.id, repository.id, {
+			targetSymbolId: symbols[1]!.id,
+			referenceType: "call",
+		});
+		references.push(ref);
 	}
 
-	return count || 0;
+	return { repository, files, symbols, references };
+}
+
+// ============================================================================
+// Utility Functions
+// ============================================================================
+
+/**
+ * Clear all data from test tables (useful for test isolation)
+ */
+export function clearTestData(db: KotaDatabase): void {
+	// Order matters due to foreign key constraints
+	db.run("DELETE FROM indexed_references");
+	db.run("DELETE FROM indexed_symbols");
+	db.run("DELETE FROM indexed_files");
+	db.run("DELETE FROM repositories");
 }
 
 /**
- * Reset all rate limit counters (both hourly and daily) for test isolation
- *
- * Convenience function to reset both hourly and daily rate limit counters.
- *
- * @param keyId - Optional API key ID to reset. If omitted, resets all counters.
- * @returns Total count of deleted counter records
+ * Get count of records in a table
  */
-export async function resetAllRateLimitCounters(
-	keyId?: string,
-): Promise<number> {
-	const hourlyCount = await resetRateLimitCounters(keyId);
-	const dailyCount = await resetDailyRateLimitCounters(keyId);
-	return hourlyCount + dailyCount;
-}
-
-/**
- * Get current rate limit status for an API key
- *
- * Retrieves the rate limit counter state for debugging and test assertions.
- * Returns null if no counter exists (key has not been rate limited yet).
- *
- * @param keyId - API key ID to inspect
- * @returns Counter state with request_count, window_start, and created_at, or null
- *
- * @example
- * // Inspect counter state during test
- * const status = await getRateLimitStatus(testKeyId);
- * if (status) {
- *   console.log(`Key has made ${status.request_count} requests`);
- *   console.log(`Window started at ${status.window_start}`);
- * }
- *
- * @example
- * // Assert counter state in test
- * const status = await getRateLimitStatus(testKeyId);
- * expect(status).not.toBeNull();
- * expect(status?.request_count).toBe(50);
- *
- * Note: Compatible with CI environment (respects dynamic ports from .env.test)
- */
-export async function getRateLimitStatus(keyId: string): Promise<{
-	request_count: number;
-	window_start: string;
-	created_at: string;
-} | null> {
-	const client = getSupabaseTestClient();
-
-	const { data, error } = await client
-		.from("rate_limit_counters")
-		.select("request_count, window_start, created_at")
-		.eq("key_id", keyId)
-		.maybeSingle();
-
-	if (error) {
-		throw new Error(
-			`Failed to get rate limit status: ${error.message || JSON.stringify(error)}`,
-		);
-	}
-
-	return data;
-}
-
-/**
- * Create a test index job with specific user context for RLS testing.
- *
- * Simplifies multi-user RLS testing by creating jobs directly in the database
- * with proper user context set. Useful for testing that users can only query
- * their own jobs.
- *
- * @param options - Job creation options
- * @param options.userId - User ID to create the job for (required for RLS)
- * @param options.repositoryId - Repository ID for the job (auto-creates if not provided)
- * @param options.ref - Git ref to index (defaults to "main")
- * @param options.status - Job status (defaults to "pending")
- * @returns Created job ID
- *
- * @example
- * // Create job for User A
- * const jobId = await createTestJob({ userId: TEST_USER_IDS.alice });
- *
- * @example
- * // Create completed job for User B
- * const jobId = await createTestJob({
- *   userId: TEST_USER_IDS.bob,
- *   status: "completed"
- * });
- *
- * Note: Compatible with CI environment (respects dynamic ports from .env.test)
- */
-export async function createTestJob(options: {
-	userId: string;
-	repositoryId?: string;
-	ref?: string;
-	status?: "pending" | "running" | "completed" | "failed" | "skipped";
-}): Promise<string> {
-	const client = getSupabaseTestClient();
-	const { userId, ref = "main", status = "pending" } = options;
-
-	// Create repository if not provided
-	let repositoryId = options.repositoryId;
-	if (!repositoryId) {
-		repositoryId = await createTestRepository({ userId });
-	}
-
-	// Set user context for RLS
-	await client.rpc("set_user_context", { user_id: userId });
-
-	// Create job
-	const jobId = crypto.randomUUID();
-	const { error } = await client.from("index_jobs").insert({
-		id: jobId,
-		repository_id: repositoryId,
-		ref,
-		status,
-	});
-
-	if (error) {
-		throw new Error(
-			`Failed to create test job: ${error.message || JSON.stringify(error)}`,
-		);
-	}
-
-	// Clear user context
-	await client.rpc("clear_user_context");
-
-	return jobId;
+export function getTableCount(db: KotaDatabase, tableName: string): number {
+	const result = db.queryOne<{ count: number }>(
+		`SELECT COUNT(*) as count FROM ${tableName}`,
+	);
+	return result?.count ?? 0;
 }

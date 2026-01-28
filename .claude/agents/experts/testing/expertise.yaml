@@ -403,6 +403,231 @@ key_operations:
       Some tests need to control schema initialization timing (migrations,
       sync tests with custom schemas). skipSchemaInit prevents conflicts
       with auto-initialization from sqlite-schema.sql.
+  create_sqlite_test_fixtures:
+    when: Creating reusable test data for database-dependent tests
+    approach: |
+      Use typed fixture factory functions from app/tests/helpers/db.ts to create
+      realistic test data with minimal boilerplate. This pattern eliminates the need
+      for manual INSERT statements while maintaining type safety.
+
+      1. Import fixture helpers
+         ```typescript
+         import {
+           getTestDatabase,
+           createTestRepository,
+           createTestFile,
+           createTestSymbol,
+           createTestReference,
+           createFullTestFixture,
+           TestRepository,
+           TestFile,
+         } from "../helpers/db.js";
+         ```
+      2. Create fixtures with defaults + overrides
+         ```typescript
+         describe("Repository Search", () => {
+           let db: KotaDatabase;
+           let repo: TestRepository;
+           let files: TestFile[];
+
+           beforeEach(() => {
+             db = getTestDatabase();
+             // Create repository with custom name
+             repo = createTestRepository(db, {
+               name: "my-custom-repo",
+               owner: "test-org"
+             });
+             // Create multiple files
+             files = [
+               createTestFile(db, repo.id, { path: "src/index.ts" }),
+               createTestFile(db, repo.id, { path: "src/utils.ts" }),
+             ];
+           });
+
+           afterEach(() => {
+             db?.close();
+           });
+
+           test("searches across files", () => {
+             const results = searchRepository(db, repo.id, "function");
+             expect(results.length).toBeGreaterThan(0);
+           });
+         });
+         ```
+      3. For comprehensive multi-entity fixtures, use createFullTestFixture
+         ```typescript
+         const fixture = createFullTestFixture(db, {
+           fileCount: 5,
+           symbolsPerFile: 3,
+         });
+         // Returns: { repository, files[], symbols[], references[] }
+         ```
+    pitfalls:
+      - what: "Manual INSERT statements when fixtures exist"
+        instead: "Use createTestRepository, createTestFile, etc. helpers"
+        reason: "Fixtures provide type safety, documentation, and consistency"
+      - what: "Creating fixtures in beforeAll"
+        instead: "Create fresh fixtures in beforeEach or each test"
+        reason: "Tests should not share fixture state"
+      - what: "Hardcoding UUIDs or timestamps"
+        instead: "Let fixtures generate them with randomUUID and new Date()"
+        reason: "Unique IDs prevent cross-test collisions"
+    timestamp: 2026-01-28
+    evidence: Issue #607, app/tests/helpers/db.ts (complete rewrite)
+    rationale: |
+      The migration from Supabase to SQLite revealed the need for reusable fixture
+      patterns. Typed factory functions reduce boilerplate while maintaining
+      expressiveness. The fixture pattern scales well as test coverage expands.
+
+  simplify_test_environment_setup:
+    when: Configuring test environment via setup.ts
+    approach: |
+      After SQLite migration, test environment setup is dramatically simplified.
+      No global state or external service dependencies are needed.
+
+      1. Minimal setup.ts - rely on per-test isolation
+         ```typescript
+         // app/tests/setup.ts
+         // No global setup needed for SQLite in-memory tests
+         // Each test creates its own isolated database instance
+
+         // Optional: Set default test timeout
+         // Bun.jest.setTimeout(30000);
+
+         // Optional: Global test hooks can be added here if needed
+         // import { beforeAll, afterAll } from "bun:test";
+         // beforeAll(async () => { ... });
+         // afterAll(async () => { ... });
+         ```
+      2. Previous pattern (deprecated - don't use):
+         - No need to load .env.test files
+         - No need to reset rate limit counters globally
+         - No need for service client initialization
+      3. All setup moves to individual test files
+         ```typescript
+         beforeEach(() => {
+           db = getTestDatabase(); // Fresh database per test
+         });
+         afterEach(() => {
+           db?.close();
+         });
+         ```
+    benefits:
+      - Eliminates global state pollution between tests
+      - No external service dependencies (Supabase, PostgreSQL)
+      - Faster test startup (no environment variable parsing)
+      - Per-test isolation is automatic via in-memory databases
+      - Simpler CI configuration (no .env.test, no service containers)
+    timestamp: 2026-01-28
+    evidence: Issue #607, commit d669841, app/tests/setup.ts
+    rationale: |
+      Local-only SQLite architecture eliminates the need for centralized environment
+      setup. In-memory databases provide complete test isolation without shared state.
+      This pattern is more reliable than previous Supabase-based approach.
+
+  test_mcp_endpoints_locally:
+    when: Testing MCP (Model Context Protocol) endpoints in local mode
+    approach: |
+      After removing Supabase, MCP tests no longer need authentication headers.
+      Simplify test setup by removing tier-based authentication.
+
+      1. Old pattern (pre-migration, deprecated):
+         ```typescript
+         // DON'T DO THIS - authentication was required before migration
+         const response = await sendMcpRequest(
+           baseUrl,
+           "tools/call",
+           params,
+           "team" // tier parameter - no longer needed
+         );
+         ```
+      2. New pattern (local-only, post-migration):
+         ```typescript
+         import { sendMcpRequest, extractToolResult } from "../helpers/mcp.js";
+
+         describe("MCP Tools", () => {
+           test("calls search tool successfully", async () => {
+             const response = await sendMcpRequest(
+               "http://localhost:3000",
+               "tools/call",
+               {
+                 name: "search_codebase",
+                 arguments: { query: "function greet" }
+               }
+               // No tier parameter needed - auth is implicit in local mode
+             );
+
+             const result = extractToolResult(response.data);
+             expect(result.matches).toBeDefined();
+             expect(Array.isArray(result.matches)).toBe(true);
+           });
+         });
+         ```
+      3. Headers are automatically set (no auth needed)
+         ```typescript
+         export function createMcpHeaders(): Record<string, string> {
+           return {
+             "Content-Type": "application/json",
+             Accept: "application/json, text/event-stream",
+             // Authorization header removed - local mode is always authenticated
+           };
+         }
+         ```
+    key_changes:
+      - Removed tier parameter from sendMcpRequest() signature
+      - Removed createAuthHeader() dependency
+      - Removed tier parameter from createMcpHeaders()
+      - All local mode requests are automatically authenticated
+    timestamp: 2026-01-28
+    evidence: Issue #607, app/tests/helpers/mcp.ts
+    rationale: |
+      Local-only mode doesn't require API key authentication. Removing auth headers
+      simplifies test code and eliminates a source of test failures related to
+      authentication setup.
+
+  clean_up_temp_directories_with_unique_identifiers:
+    when: Testing file-based operations that create temporary directories
+    approach: |
+      Use randomUUID().slice(0, 8) to create unique prefixes for test directories.
+      This prevents collisions when tests run in parallel.
+
+      1. Create temp directory with unique prefix
+         ```typescript
+         import { mkdtempSync, rmSync, existsSync } from "node:fs";
+         import { join } from "node:path";
+         import { tmpdir } from "node:os";
+         import { randomUUID } from "node:crypto";
+
+         describe("File Processing", () => {
+           const testId = randomUUID().slice(0, 8);
+           const tempDir = join(tmpdir(), \`kota-test-\${testId}\`);
+
+           beforeAll(() => {
+             mkdtempSync(tempDir, { recursive: true });
+           });
+
+           afterAll(() => {
+             if (existsSync(tempDir)) {
+               rmSync(tempDir, { recursive: true, force: true });
+             }
+           });
+
+           test("processes files in directory", () => {
+             // Test implementation using tempDir
+           });
+         });
+         ```
+      2. Benefits of unique prefixes:
+         - Parallel test execution doesn't cause collisions
+         - Failed cleanup doesn't block subsequent test runs
+         - Easy to identify stale test artifacts on disk
+         - Deterministic cleanup with existsSync guard
+    timestamp: 2026-01-28
+    evidence: Issue #607, app/tests/helpers/db.ts (createTempDir, cleanupTempDir)
+    rationale: |
+      Unique directory prefixes prevent race conditions in parallel test execution.
+      The existsSync guard provides graceful error handling if cleanup partially fails.
+
 decision_trees:
   test_type_selection:
     question: What type of test should I write?
@@ -678,16 +903,28 @@ stability:
   convergence_indicators:
     insight_rate_trend: increasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 5
-    patterns_updated_this_cycle: 1
+    new_patterns_added_this_cycle: 9
+    patterns_updated_this_cycle: 0
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      First improve cycle after initial creation.
+      Second improve cycle - SQLite migration learnings extraction.
+      
+      Previous cycle (first):
       - Added 5 new key_operations from recent commits (5af086f, d669841)
       - FTS5 edge case testing patterns (Issue #595)
       - Environment variable restoration for test isolation
       - Filesystem workflow testing with real file operations
       - Security boundary testing for path traversal
       - skipSchemaInit option for custom schema tests
-      - Updated known_issues with FTS5 resolution
+      
+      This cycle (SQLite migration focus):
+      - Created SQLite test fixtures pattern (typed factory functions)
+      - Simplified test environment setup (removed Supabase/Postgres dependencies)
+      - Local-only MCP testing without authentication headers
+      - Unique identifier pattern for temp directory cleanup
+      - Complete migration from Supabase to SQLite test infrastructure
+      - Issue #607 and #591 learnings incorporated
+      
+      Total patterns in expertise: 13 key_operations
+      Domain stability: Moderate (SQLite migration patterns now established)
