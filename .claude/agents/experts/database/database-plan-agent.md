@@ -58,7 +58,10 @@ app/
 
 ### Database Configuration
 
-- **Database Location**: `~/.kotadb/kota.db` or `KOTADB_PATH` env var
+- **Database Location**: `<project-root>/.kotadb/kota.db` (project-local, v2.0.0+)
+- **Path Resolution**: Explicit config > `KOTADB_PATH` env var > project-local default
+- **Project Root Detection**: Walk up from cwd until finding `.git` marker
+- **Auto-Configuration**: `.kotadb/` automatically added to `.gitignore` on initialization
 - **WAL Mode**: Enabled for concurrent access
 - **Foreign Keys**: Enabled for referential integrity
 - **FTS5**: External content tables for code search

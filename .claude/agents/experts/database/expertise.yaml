@@ -12,17 +12,22 @@ overview:
     Covers SQLite schema at app/src/db/sqlite-schema.sql, database client at 
     app/src/db/sqlite/sqlite-client.ts, query layer at app/src/api/queries.ts,
     FTS5 full-text search patterns, dependency graph recursive CTEs, WAL mode
-    configuration, connection pooling, and migration strategies.
+    configuration, connection pooling, migration strategies, and project-local
+    storage configuration (project-root.ts, gitignore.ts).
 
-    KOTADB DATABASE ARCHITECTURE:
+    KOTADB DATABASE ARCHITECTURE (v2 - LOCAL-FIRST):
     - Local-only SQLite storage (no Supabase, no cloud)
-    - Database location: ~/.kotadb/kota.db (or KOTADB_PATH env var)
+    - Project-local database location: <project-root>/.kotadb/kota.db
+    - Path resolution: config > KOTADB_PATH env var > project-local default
+    - Project root detection via .git marker walking
+    - Auto-gitignore management for .kotadb/ directory
     - WAL mode enabled for concurrent reads/writes
     - FTS5 for code search with external content tables
     - Connection pool pattern: 1 writer + N readers
     - Type mappings: uuid->TEXT, timestamptz->TEXT(ISO8601), jsonb->TEXT, boolean->INTEGER
 
     Does NOT cover cloud database patterns or Supabase (removed in v2).
+    Storage is project-local, not user-home-local (changed in v2.0.0).
   rationale: |
     Correct database design enables fast code search, reliable dependency tracking,
     and safe concurrent access. Poor schema design leads to slow queries, data
@@ -31,13 +36,18 @@ overview:
 
 core_implementation:
   database_location:
-    primary: ~/.kotadb/kota.db
+    primary: <project-root>/.kotadb/kota.db
     environment_override: KOTADB_PATH
     resolution_order:
-      - Explicit config path
+      - Explicit config path (config.path parameter)
       - KOTADB_PATH environment variable
-      - Default ~/.kotadb/kota.db
+      - Project-local default: .kotadb/kota.db in project root (found via .git marker)
+    project_root_detection: Walks up from process.cwd() until finding .git directory
     directory_creation: Automatic via sqlite-client.ts
+    gitignore_management: Automatic via gitignore.ts (ensures .kotadb/ is gitignored)
+    note: |
+      v2 (2026-01-28+): Project-local storage is the default for local-first architecture.
+      Database is stored relative to project root, not user home directory.
 
   key_files:
     - path: app/src/db/sqlite-schema.sql
@@ -65,6 +75,14 @@ core_implementation:
         - saveIndexedFiles() (batch insert with transactions)
         - queryDependents() (recursive CTE for dependents)
         - queryDependencies() (recursive CTE for dependencies)
+    - path: app/src/config/project-root.ts
+      purpose: Project root detection for determining storage location
+      exports:
+        - findProjectRoot() (walk up to .git marker)
+    - path: app/src/config/gitignore.ts
+      purpose: Auto-management of .gitignore for .kotadb/ directory
+      exports:
+        - ensureKotadbIgnored() (adds .kotadb/ to gitignore, non-fatal)
 
   schema_design_principles:
     type_mappings:
@@ -193,6 +211,194 @@ key_operations:
     timestamp: 2026-01-28
     evidence: Commit 2032801, app/src/db/sqlite/sqlite-client.ts
     related_issue: "#574 - auto-initialize SQLite schema on local mode startup"
+
+  resolve_project_local_path:
+    when: Determining where to store database and exports for project-local operation
+    approach: |
+      Implement three-tier path resolution for project-local storage:
+      
+      ```typescript
+      // Priority: explicit config > env var > project-local default
+      export function resolveDbPath(configPath?: string): string {
+        if (configPath) {
+          return configPath;  // Explicit config takes precedence
+        }
+        
+        const envPath = process.env.KOTADB_PATH;
+        if (envPath) {
+          return envPath;  // Environment variable override
+        }
+        
+        return getDefaultDbPath();  // Fall back to project-local default
+      }
+      
+      export function getDefaultDbPath(): string {
+        const projectRoot = findProjectRoot();
+        if (!projectRoot) {
+          throw new Error(
+            "Unable to determine project root. Please either:\n" +
+            "  1. Run KotaDB from within a project directory (containing .git)\n" +
+            "  2. Set KOTADB_PATH environment variable\n" +
+            "  3. Provide explicit path via config.path parameter"
+          );
+        }
+        
+        ensureKotadbIgnored(projectRoot);  // Auto-add .kotadb/ to gitignore
+        return join(projectRoot, ".kotadb", "kota.db");
+      }
+      ```
+      
+      Key patterns:
+      - Three-tier resolution: config > env > project-local
+      - Project-local default: `.kotadb/kota.db` relative to project root
+      - Clear error messages guiding user to fix setup issues
+      - Auto-management of gitignore for database directory
+    benefits:
+      - Works out-of-the-box for developers (no env var needed)
+      - Supports explicit config for testing/CI
+      - Supports env var override for special deployments
+      - Database automatically gitignored (no accidental commits)
+      - Clear guidance when setup is incomplete
+    trade_offs:
+      - Requires .git directory to determine project root
+      - Non-fatal failures in gitignore update may be confusing
+    timestamp: 2026-01-28
+    evidence: Commit d669841, app/src/config/project-root.ts, app/src/db/sqlite/sqlite-client.ts
+    related_issue: "#592 - project-local .kotadb/ storage"
+
+  detect_project_root:
+    when: Need to find project root for determining storage location
+    approach: |
+      Walk up directory tree from current working directory until finding .git marker:
+      
+      ```typescript
+      /**
+       * Find the project root by walking up the directory tree.
+       * Looks for .git directory as the project root marker.
+       */
+      export function findProjectRoot(startDir: string = process.cwd()): string | null {
+        let current = startDir;
+        
+        while (true) {
+          const gitDir = join(current, ".git");
+          if (existsSync(gitDir)) {
+            logger.debug("Found project root", { path: current, marker: ".git" });
+            return current;
+          }
+          
+          // Move up one directory
+          const parent = dirname(current);
+          if (parent === current) {
+            // We've reached the filesystem root
+            break;
+          }
+          current = parent;
+        }
+        
+        logger.debug("No project root found", { startDir });
+        return null;
+      }
+      ```
+      
+      Algorithm:
+      1. Start from given directory (default: process.cwd())
+      2. Check if .git exists in current directory
+      3. If found, return as project root
+      4. Move up to parent directory
+      5. Stop when reaching filesystem root (dirname returns same path)
+      6. Return null if not found
+      
+      Design decisions:
+      - Use .git as marker (reliable, present in all Git repos)
+      - Return null instead of throwing (allows fallback to env var)
+      - Log at debug level for visibility without noise
+      - Handle filesystem root detection via dirname comparison
+    pitfalls:
+      - what: "Starting from wrong directory"
+        instead: "Always pass process.cwd() or explicit startDir"
+        reason: "Walking up from /tmp won't find project in /home/user/project"
+      - what: "Throwing error instead of returning null"
+        instead: "Return null and let caller handle fallback logic"
+        reason: "Allows graceful fallback to env var or explicit config"
+    timestamp: 2026-01-28
+    evidence: Commit d669841, app/src/config/project-root.ts lines 30-52
+
+  ensure_kotadb_in_gitignore:
+    when: Setting up project-local storage to prevent database commits
+    approach: |
+      Automatically ensure .kotadb/ directory is in project's .gitignore:
+      
+      ```typescript
+      /**
+       * Ensure .kotadb/ is added to project's .gitignore.
+       * If gitignore is malformed or inaccessible, logs warning but does not fail.
+       */
+      export function ensureKotadbIgnored(projectRoot: string): boolean {
+        const gitignorePath = join(projectRoot, ".gitignore");
+        
+        try {
+          // Check if .kotadb/ is already ignored
+          if (existsSync(gitignorePath)) {
+            const content = readFileSync(gitignorePath, "utf-8");
+            
+            // Check for multiple valid patterns
+            const patterns = [
+              /^\.kotadb\/$/m,        // .kotadb/
+              /^\.kotadb$/m,          // .kotadb
+              /^\.kotadb\*$/m,        // .kotadb*
+              /^\/\.kotadb\/$/m,      // /.kotadb/
+            ];
+            
+            if (patterns.some(pattern => pattern.test(content))) {
+              logger.debug(".kotadb/ already in .gitignore", { path: gitignorePath });
+              return true;
+            }
+          }
+          
+          // Append .kotadb/ entry with clear comment
+          const entry = "\n# KotaDB local storage\n.kotadb/\n";
+          appendFileSync(gitignorePath, entry);
+          
+          logger.info("Added .kotadb/ to .gitignore", { path: gitignorePath });
+          return true;
+          
+        } catch (error) {
+          // Non-fatal: log warning and continue
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          process.stderr.write(
+            `[WARN] Could not update .gitignore (non-fatal)\n` +
+            `  path: ${gitignorePath}\n` +
+            `  error: ${errorMessage}\n`
+          );
+          logger.warn("Could not update .gitignore (non-fatal)", {
+            path: gitignorePath,
+            error: errorMessage,
+          });
+          return false;
+        }
+      }
+      ```
+      
+      Key patterns:
+      - Check multiple gitignore patterns (.kotadb/, .kotadb, .kotadb*, /.kotadb/)
+      - Non-fatal error handling (log warning, continue)
+      - Clear comment in gitignore explaining purpose
+      - Idempotent (safe to call multiple times)
+      - Handles missing .gitignore gracefully (creates entry)
+    benefits:
+      - Prevents accidental database commits
+      - Works silently without breaking database initialization
+      - Handles various .gitignore formats
+      - Clear logging for troubleshooting
+    error_handling:
+      - Missing .gitignore: Creates new entry (appendFileSync creates file)
+      - Inaccessible .gitignore: Warns but continues (non-fatal)
+      - Already ignored: Logs debug message and returns true
+    timestamp: 2026-01-28
+    evidence: Commit d669841, app/src/config/gitignore.ts lines 29-68
+    related_issue: "#592 - project-local .kotadb/ storage"
+
+
 
   create_migration:
     when: Adding new tables, columns, or indexes
@@ -514,20 +720,24 @@ stability:
   convergence_indicators:
     insight_rate_trend: increasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 2
-    patterns_updated_this_cycle: 1
+    new_patterns_added_this_cycle: 5
+    patterns_updated_this_cycle: 2
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Cycle 2026-01-28: Added 2 new patterns, updated 1 existing.
+      Cycle 2026-01-28: Added 5 new patterns, updated 2 existing (database_location, key_files).
       
       New patterns added:
       1. escape_fts5_search_terms - Critical FTS5 escaping function (commit 5af086f)
       2. auto_initialize_schema - Automatic schema initialization (commit 2032801)
+      3. resolve_project_local_path - Three-tier path resolution for project-local storage (commit d669841, issue #592)
+      4. detect_project_root - Walk up to .git marker for project root detection (commit d669841, issue #592)
+      5. ensure_kotadb_in_gitignore - Auto-management of .kotadb/ in gitignore (commit d669841, issue #592)
       
       Updated patterns:
-      1. design_fts5_search - Added CRITICAL note about escapeFts5Term() requirement
+      1. database_location - Updated to reflect project-local v2 default
+      2. key_files - Added project-root.ts and gitignore.ts entries
       
-      Evidence: Real production bugs solved (issue #595, #574)
-      Test coverage: 5 new tests for FTS5 edge cases
-      Domain stability: Increasing - local-only patterns converging
+      Evidence: Real production implementations in local-only v2 refactor (commit d669841)
+      Test coverage: Integration tested in project initialization workflow
+      Domain stability: Increasing - project-local storage patterns converging with local-first architecture
