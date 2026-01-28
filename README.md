@@ -214,6 +214,3 @@ docs/                  # Documentation
 
 See `app/README.md` for application-specific quickstart and `automation/adws/README.md` for automation workflows.
 
-## Project Roadmap
-
-For strategic priorities, planned features, and development timeline, see [ROADMAP.md](ROADMAP.md).
