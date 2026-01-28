@@ -1,79 +1,293 @@
-# /do - Universal Issue Resolution
+---
+description: Universal entry point - delegates to appropriate workflow
+argument-hint: <requirement>
+allowed-tools: Read, Glob, Grep, Task, AskUserQuestion
+---
 
-**Template Category**: Action
-**Prompt Level**: 6 (Self-Modifying)
+# `/do` - Universal Workflow Entry Point
 
-End-to-end autonomous workflow for resolving GitHub issues AND Claude Code configuration tasks. Routes through appropriate workflows:
+Single command interface for all workflows. Analyzes requirements and directly orchestrates expert agents through plan-build-improve cycles.
 
-- **ADW (Python Orchestration)**: SDLC workflows (scout → plan → build → review → validate) for GitHub issues
-- **Expert Domains (Claude Code)**: Configuration and agent authoring via plan → build → improve cycles
+## CRITICAL: Orchestration-First Approach
 
-## Variables
+### ABSOLUTE RULE: DELEGATE EVERYTHING
 
-- `$ARGUMENTS`: Issue reference OR expert domain request
+**IMPORTANT: First and foremost, remember that you should delegate as much as possible to subagents. Even reading and writing single files MUST be delegated to subagents.**
 
-## Classification Priority
+This command exists to orchestrate workflows—NOT to do work directly. You are a dispatcher, not a worker.
 
-**IMPORTANT**: Check expert domain keywords FIRST. If no match, fall through to ADW routing.
+**Your ONLY responsibilities:**
+1. Parse and classify requirements
+2. Select the appropriate pattern (A, B, or C)
+3. Spawn expert agents via Task tool
+4. Wait for results
+5. Synthesize and report outcomes
 
+**You MUST NOT:**
+- Read files directly (delegate to agents)
+- Write files directly (delegate to agents)
+- Make code changes (delegate to agents)
+- Make implementation decisions (delegate to plan-agent)
+- Answer domain questions directly (delegate to question-agent)
+
+**Why This Matters:**
+- Expert agents have domain-specific context in their prompts
+- Expert agents have access to expertise.yaml knowledge
+- Direct work bypasses the plan-build-improve learning cycle
+- Direct work doesn't update expertise for future improvements
+
+### The Golden Rule
+
+> **If you're about to use Read, Write, Edit, or Grep—STOP. Spawn an agent instead.**
+
+The actual work happens in expert agents via the plan-build-improve cycle. You orchestrate. They execute.
+
+## Purpose
+
+The `/do` command is the universal orchestrator for all workflows. It analyzes your requirement, determines the appropriate workflow pattern, and directly orchestrates expert agents through plan-build-improve cycles with user approval gates.
+
+## How It Works
+
+1. **Parse Requirement**: Extract what you need done
+2. **Classify Type**: Determine workflow (expert domain or simple operation)
+3. **Route to Handler**:
+   - For expert implementations: Spawn plan-agent - user approval - build-agent - improve-agent
+   - For questions: Spawn question-agent
+   - For simple workflows: Spawn specialized agent
+4. **Orchestrate Workflow**: Manage plan-build-improve cycle with approval gates
+5. **Report Results**: Synthesize and present outcomes
+
+## CRITICAL: Execution Control Rules
+
+**IMPORTANT: The base `/do` agent MUST wait for all subagent work to complete before responding. Premature exit causes incomplete results and user confusion.**
+
+### Rule 1: Never Use Background Execution for Task Tool
+
+**Task tool calls MUST NOT use `run_in_background: true`.**
+
+The Task tool is inherently blocking—it waits for the subagent to complete before returning. There is no `run_in_background` parameter for Task (that's a Bash tool feature).
+
+**Correct Task Usage:**
 ```
-1. Expert Domain Detection (claude-config, agent-authoring)
-   → Route to Pattern A (implementation) or Pattern B (question)
-2. ADW Detection (issue numbers, GitHub URLs, SDLC keywords)
-   → Route to ADW workflow
-3. Free-form text
-   → Classify and route appropriately
+Task(
+  subagent_type: "claude-config-plan-agent",
+  prompt: |
+    USER_PROMPT: {requirement}
+)
 ```
 
-## Input Formats
+**Incorrect (DO NOT USE):**
+```
+Task(
+  subagent_type: "claude-config-plan-agent",
+  prompt: |
+    USER_PROMPT: {requirement}
+  run_in_background: true  # NOT a valid Task parameter
+)
+```
 
-Parse `$ARGUMENTS` to extract context:
+### Rule 2: Wait for ALL Task Results Before Responding
 
-| Format | Example | Action |
-|--------|---------|--------|
-| Expert domain keywords | `"create slash command"`, `"new agent"` | Route to expert workflow |
-| Issue number | `#123` or `123` | Fetch via `gh issue view 123 --json title,body,labels` |
-| GitHub URL | `https://github.com/.../issues/123` | Extract number, fetch via gh |
-| Free-form text | `"Add user authentication"` | Use as requirement directly (ADW) |
+**You MUST collect and process the full output from EVERY Task call before generating your final response.**
+
+The Task tool blocks until the subagent completes. However, you must explicitly:
+1. **Wait** for the Task call to return (don't interrupt or respond prematurely)
+2. **Capture** the full output from the subagent
+3. **Process** the results (synthesize, extract file paths, etc.)
+4. **Only then** generate the final report
+
+**Anti-Pattern:**
+```
+# WRONG: Responding before Task completes
+Use Task(...) to spawn claude-config-plan-agent
+
+## `/do` - Complete
+Handler: claude-config
+Results: Working on it...
+```
+
+**Correct Pattern:**
+```
+# CORRECT: Wait, collect, then respond
+Use Task(...) to spawn claude-config-plan-agent
+[WAIT for Task to complete and return results]
+[CAPTURE the full output]
+[EXTRACT file paths, status, next steps]
+
+## `/do` - Complete
+Handler: claude-config
+Results: [synthesized from actual output]
+Files Modified: [extracted from output]
+Next Steps: [from handler recommendations]
+```
+
+### Rule 3: Parallel Execution Must Still Block
+
+**For parallel subagent execution, spawn ALL agents in a SINGLE message, then wait for ALL to complete.**
+
+**Parallel Pattern:**
+```
+# Spawn multiple in parallel (single message, multiple Task calls)
+Use Task(subagent_type: "claude-config-question-agent", prompt: ...)
+Use Task(subagent_type: "agent-authoring-question-agent", prompt: ...)
+
+# Task tool executes these in parallel but blocks until ALL complete
+# Now collect results from both:
+[CAPTURE claude-config output]
+[CAPTURE agent-authoring output]
+
+# Now synthesize and respond
+```
+
+The Task tool handles parallelism automatically when you make multiple calls in one message. You don't need (and must not use) `run_in_background`.
+
+### Why This Matters
+
+**In `--print` mode and other execution contexts:**
+- The base agent's output is the user's only feedback
+- If you exit before subagents complete, their work is lost
+- Results appear empty even though subagents ran successfully
+- User sees "complete" but no actual results
+
+**Always wait. Always collect. Always synthesize before reporting.**
+
+### Rule 4: Orchestration Sequence for Expert Implementations
+
+**For expert domain implementation requests, /do MUST orchestrate the plan-build-improve cycle directly.**
+
+**Orchestration Pattern:**
+```
+# Step 1: Plan Phase
+Use Task(subagent_type: "<domain>-plan-agent", prompt: "USER_PROMPT: {requirement}")
+[WAIT for plan-agent to complete]
+[EXTRACT spec_path from output]
+
+# Step 2: User Approval Gate
+Use AskUserQuestion(
+  question: "Plan complete. Spec saved to {spec_path}. Proceed with implementation?",
+  options: ["Yes, continue to build", "No, stop here - I'll review first"]
+)
+[WAIT for user response]
+
+# If user says "No":
+#   Report spec location, suggest resuming with /do "build from {spec_path}"
+#   Exit gracefully
+
+# Step 3: Build Phase (if approved)
+Use Task(subagent_type: "<domain>-build-agent", prompt: "PATH_TO_SPEC: {spec_path}")
+[WAIT for build-agent to complete]
+[EXTRACT files modified from output]
+
+# Step 4: Improve Phase (always run, but non-blocking on failure)
+Use Task(subagent_type: "<domain>-improve-agent", prompt: "Review recent changes for domain expertise updates")
+[WAIT for improve-agent to complete]
+[CAPTURE expertise updates, but don't fail workflow if this fails]
+
+# Step 5: Synthesize and Report
+```
+
+**Why This Pattern:**
+- Plan must complete before user can approve
+- Build must wait for approval (prevents unwanted implementations)
+- Improve is opportunistic (workflow succeeds even if improve fails)
+- All phases block on Task completion before proceeding
+
+**Sequential Dependencies:**
+Build depends on spec_path from plan. Improve depends on build completing (changes to analyze). User approval depends on spec being ready to review.
+
+**Error Handling:**
+- Plan fails - report error, exit (no spec to build from)
+- User declines - save spec location, exit gracefully (valid outcome)
+- Build fails - preserve spec, report error, skip improve
+- Improve fails - log error, but workflow succeeds (improvement is bonus)
 
 ---
 
-## Expert Domain Routing (Priority - Check First)
+## Step 1: Parse Arguments
 
-### Expert Domains
+Extract requirement from `$ARGUMENTS`:
+- Remove any flags (future: `--background`, `--plan-only`, etc.)
+- Capture the core requirement description
+
+## Step 2: Classify Requirement
+
+Analyze the requirement to determine type and pattern. **Expert domains take priority** when implementation is needed.
+
+---
+
+### Expert Domain Requests (Priority - Check First)
 
 **Claude Config Expert**
-- Keywords: "slash command", "command", "hook", "settings.json", ".claude config", "expert triad"
+- Keywords: "slash command", "command", "hook", "settings.json", ".claude config", "settings", "frontmatter"
 - Locations: References to .claude/commands/, .claude/hooks/, .claude/settings.json
 - Indicators: Command creation, hook implementation, .claude/ directory organization
 - Examples: "Create new slash command for X", "Add hook for Y event", "Configure settings"
 
 **Agent Authoring Expert**
-- Keywords: "create agent", "new agent", "agent config", "tool selection", "agent description", "agent frontmatter"
-- Locations: References to .claude/agents/, agent creation, coordinator setup
+- Keywords: "create agent", "new agent", "agent config", "tool selection", "agent description", "agent frontmatter", "agent registry"
+- Locations: References to .claude/agents/, agent creation, expert domain setup
 - Indicators: Agent file creation, tool set decisions, model selection for agents
-- Examples: "Create a new scout agent", "Configure tools for the build agent", "Add new coordinator"
+- Examples: "Create a new scout agent", "Configure tools for the build agent", "Add new expert domain"
 
-### Pattern Detection
+### Pattern Classification (After Domain Identified)
 
-After identifying expert domain, determine pattern:
+Once expert domain is identified, determine which pattern:
 
-**Implementation Request (Pattern A)**:
-- Verbs: create, add, implement, configure, update, fix
+**Implementation Request (Pattern A):**
+- Verbs: fix, add, create, implement, update, configure, refactor
 - Objects: Concrete things to build/change
-- Flow: plan-agent → user approval → build-agent → improve-agent
+- Pattern: Use Pattern A (Plan-Build-Improve)
 
-**Question Request (Pattern B)**:
+**Question Request (Pattern B):**
 - Phrasing: "How do I...", "What is...", "Why...", "Explain...", "When should I..."
-- Flow: question-agent → report answer
+- Pattern: Use Pattern B (Question-Agent)
 
-### Expert Workflow Execution
+**Simple Operation (Pattern C):**
+- Verbs: regenerate, format, lint, compile
+- Objects: Single-purpose operations
+- Pattern: Use Pattern C (Simple Workflow)
+- Examples: "Format file X", "Run linter"
 
-#### Pattern A: Expert Implementation (Plan→Build→Improve)
+**Ambiguous** - Ask user for clarification
+- Multiple possible interpretations
+- Use AskUserQuestion to disambiguate
+
+---
+
+## Step 3: Determine Handler Type
+
+Based on classification, determine which orchestration pattern to use:
+
+**Pattern A: Expert Implementation (Plan-Build-Improve)**
+- Triggers: Expert domain + implementation request
+- Examples: "Create new slash command for X", "Add hook for logging", "Create new agent"
+- Flow: Spawn plan-agent - user approval - build-agent - improve-agent
+
+**Pattern B: Expert Question (Direct Answer)**
+- Triggers: Expert domain + question phrasing
+- Examples: "How do I structure frontmatter?", "What model for coordinators?"
+- Flow: Spawn question-agent - report answer
+
+**Pattern C: Simple Workflow (Single Agent)**
+- Triggers: Simple tasks, specialized operations
+- Examples: "Format code in file X", "Run validation"
+- Flow: Spawn specialized agent - report results
+
+---
+
+## Step 4: Execute Pattern
+
+Execute the appropriate orchestration pattern based on Step 3 classification.
+
+---
+
+### Pattern A: Expert Implementation (Plan-Build-Improve)
+
+**Used for:** Expert domain implementation requests (most common pattern)
 
 **Phase 1 - Plan:**
 ```
-Task tool:
+Use Task tool:
   subagent_type: "<domain>-plan-agent"
   prompt: |
     USER_PROMPT: {requirement}
@@ -82,6 +296,8 @@ Task tool:
     Save spec to: .claude/.cache/specs/{domain}/{slug}-spec.md
     Return the spec path when complete.
 ```
+
+Capture `spec_path` from plan-agent output.
 
 **Phase 2 - User Approval:**
 ```
@@ -92,14 +308,18 @@ Use AskUserQuestion:
     - "No, stop here - I'll review the spec first"
 ```
 
-**If user selects "No":**
-- Report spec location
+**If user selects "No, stop here":**
+- Skip to Report with status: "Plan Complete - User Review Requested"
+- Include spec location in report
 - Suggest resume command: `/do "build from {spec_path}"`
-- Exit gracefully (NOT an error)
+- Exit gracefully (this is NOT an error)
 
-**Phase 3 - Build (if approved):**
+**If user selects "Yes, continue to build":**
+- Proceed to Phase 3
+
+**Phase 3 - Build:**
 ```
-Task tool:
+Use Task tool:
   subagent_type: "<domain>-build-agent"
   prompt: |
     PATH_TO_SPEC: {spec_path}
@@ -108,20 +328,37 @@ Task tool:
     Report files modified when complete.
 ```
 
+Capture `files_modified` from build-agent output.
+
 **Phase 4 - Improve (Optional):**
 ```
-Task tool:
+Use Task tool:
   subagent_type: "<domain>-improve-agent"
   prompt: |
     Review recent {domain} changes and update expert knowledge.
+
+    Analyze git history, extract learnings, update expertise.yaml
+    Report expertise updates when complete.
 ```
 
-If improve-agent fails: log error, continue (workflow is still successful).
+**Error Handling for Improve:**
+If improve-agent fails:
+- Log the error
+- Set `improve_status: "Skipped - Error"`
+- Continue to Report (workflow is still successful)
 
-#### Pattern B: Expert Question (Direct Answer)
+**Domains Using This Pattern:**
+- claude-config
+- agent-authoring
+
+---
+
+### Pattern B: Expert Question (Direct Answer)
+
+**Used for:** Expert domain questions (no implementation)
 
 ```
-Task tool:
+Use Task tool:
   subagent_type: "<domain>-question-agent"
   prompt: |
     USER_PROMPT: {requirement}
@@ -129,36 +366,73 @@ Task tool:
     Provide an informed answer based on {domain} expertise.
 ```
 
-Report answer directly. No approval gate needed.
+Capture answer from question-agent output.
+Proceed to Report.
 
-### Expert Domain Output Formats
+**Domains Using This Pattern:**
+- claude-config
+- agent-authoring
 
-**Pattern A Complete:**
-```markdown
-## `/do` - Complete
+---
 
-**Requirement:** {requirement}
-**Domain:** {claude-config|agent-authoring}
-**Status:** Success
+### Pattern C: Simple Workflow (Single Agent)
 
-### Workflow Stages
+**Used for:** Simple operations, formatting, single-purpose tasks
 
-| Stage | Status | Key Output |
-|-------|--------|------------|
-| Plan | ✓ Complete | {spec_path} |
-| Build | ✓ Complete | {file_count} files modified |
-| Improve | ✓ Complete | Expert knowledge updated |
+**Examples:**
+- "Format markdown in file X" - direct operation
+- "Run linter" - simple task
 
-### Files Modified
-
-- {file}: {change summary}
-
-### Next Steps
-
-{context-specific suggestions}
+```
+Use Task tool:
+  subagent_type: "build-agent"
+  prompt: |
+    {requirement with any needed context}
 ```
 
-**Pattern A - User Declined:**
+Capture results from agent.
+Proceed to Report.
+
+**Note:** This pattern is for lightweight, single-step operations that don't need plan-build-improve.
+
+---
+
+## Step 5: Wait and Collect Results
+
+**CRITICAL: MUST wait for all Task calls to complete before proceeding.**
+
+For Pattern A (Expert Implementation):
+- Wait for plan-agent - extract spec_path
+- Wait for user approval - get decision
+- Wait for build-agent - extract files_modified
+- Wait for improve-agent - extract expertise_updates (or log failure)
+
+For Pattern B (Question):
+- Wait for question-agent - extract answer
+
+For Pattern C (Simple):
+- Wait for agent - extract results
+
+**Validation Checkpoint:**
+Before proceeding to Report, verify:
+- [ ] All spawned agents returned results
+- [ ] Results are non-empty (or error is logged)
+- [ ] No pending Task calls
+- [ ] Handler output captured
+
+If validation fails: investigate and report issue, don't claim completion.
+
+---
+
+## Step 6: Report Results
+
+Generate pattern-appropriate report:
+
+---
+
+### Report Format: Pattern A (Expert Implementation)
+
+**If user declined at approval gate:**
 ```markdown
 ## `/do` - Plan Complete, Awaiting Review
 
@@ -182,7 +456,81 @@ Review the specification and when ready, resume with:
 3. Resume build with command above
 ```
 
-**Pattern B Complete:**
+**If full workflow completed:**
+```markdown
+## `/do` - Complete
+
+**Requirement:** {requirement}
+**Domain:** {claude-config|agent-authoring}
+**Status:** Success
+
+### Workflow Stages
+
+| Stage | Status | Key Output |
+|-------|--------|------------|
+| Plan | Complete | {spec_path} |
+| Build | Complete | {file_count} files modified |
+| Improve | Complete | Expert knowledge updated |
+
+### Files Modified
+
+{list from build-agent output}
+- /absolute/path/to/file1.md - {what changed}
+- /absolute/path/to/file2.yaml - {what changed}
+
+### Expertise Updated
+
+{summary from improve-agent, or "Skipped - Error" if failed}
+
+### Specification
+
+The plan specification is saved at: {spec_path}
+
+This can be used for future reference or to re-run build stage.
+
+### Next Steps
+
+{context-specific suggestions based on what was done}
+```
+
+**If build failed:**
+```markdown
+## `/do` - Build Failed
+
+**Requirement:** {requirement}
+**Domain:** {claude-config|agent-authoring}
+**Status:** Build Failed (Plan Preserved)
+
+### What Happened
+
+The build phase encountered an error:
+{error details from build-agent}
+
+### Specification Preserved
+
+Plan is valid and saved at: {spec_path}
+
+You can:
+1. Review the spec for issues
+2. Edit if needed
+3. Retry with: `/do "build from {spec_path}"`
+
+### Diagnostic Info
+
+- Plan phase: Successful
+- User approval: Granted
+- Build phase: Failed
+- Improve phase: Skipped (no changes to analyze)
+
+### Recommended Action
+
+{specific suggestions based on error type}
+```
+
+---
+
+### Report Format: Pattern B (Expert Question)
+
 ```markdown
 ## `/do` - Complete
 
@@ -196,121 +544,177 @@ Review the specification and when ready, resume with:
 
 ### Related
 
-{any related topics, files, or examples}
+{any related topics, files, or examples from question-agent}
 ```
 
 ---
 
-## ADW Routing (GitHub Issues & SDLC)
+### Report Format: Pattern C (Simple Workflow)
 
-## Issue Classification
+```markdown
+## `/do` - Complete
 
-Determine issue type from labels or content:
+**Requirement:** {requirement}
+**Handler:** {agent used}
+**Status:** Success
 
-| Type | Indicators | Spec Required |
-|------|------------|---------------|
-| `feature` | `enhancement`, `feature`, "add", "implement", "create" | Yes |
-| `bug` | `bug`, "fix", "broken", "error", "failing" | Yes |
-| `chore` | `chore`, `maintenance`, "update deps", "refactor" | No |
+### Results
 
-## Execution Flow
+{results from agent}
 
-### Phase 1: Scout (if spec required)
+### Files Modified
 
-```
-Task tool:
-  subagent_type: "branch-plan-coordinator"
-  prompt: |
-    PHASE: Scout
-    REQUIREMENT: {parsed_requirement}
-    ISSUE_TYPE: {feature|bug|chore}
+{if any files were modified}
 
-    Explore codebase to understand:
-    1. Relevant files and modules
-    2. Existing patterns to follow
-    3. Dependencies and impacts
-    4. Test file locations
+### Next Steps
 
-    Return findings as structured report.
+{if applicable}
 ```
 
-### Phase 2: Plan (if spec required)
+---
 
-```
-Task tool:
-  subagent_type: "branch-plan-coordinator"
-  prompt: |
-    PHASE: Plan
-    REQUIREMENT: {parsed_requirement}
-    ISSUE_TYPE: {feature|bug}
-    SCOUT_FINDINGS: {scout_output}
+## Classification Logic
 
-    Create spec file at docs/specs/{type}-{issue_number}-{slug}.md
+Use these patterns to classify requirements:
 
-    Return: spec file path only
-```
+---
 
-### Phase 3: Build
+### Expert Domain Indicators (Priority - Check First)
 
-```
-Task tool:
-  subagent_type: "branch-build-coordinator"
-  prompt: |
-    PHASE: Build
-    SPEC_FILE: {spec_path} (or inline requirement for chores)
+**Claude Config Expert (High Confidence):**
+- Verbs: create, add, implement, configure, update, fix
+- Objects: command, hook, settings, slash command, frontmatter
+- Locations: .claude/commands/, .claude/hooks/, .claude/settings.json
+- Pattern: Claude Code configuration changes
 
-    Implement all changes per spec.
-    Run validation after implementation.
-    Auto-fix any failures.
-    Commit when validation passes.
+**Agent Authoring Expert (High Confidence):**
+- Verbs: create, configure, update, set up
+- Objects: agent, expert domain, tool selection, frontmatter, registry
+- Locations: .claude/agents/, agent file names, agent-registry.json
+- Pattern: Agent creation or configuration tasks
 
-    Return: build completion report
-```
+**Expert Question Detection:**
+- Phrasing: "How do I...", "What is the pattern for...", "Explain...", "Why..."
+- Action: Route to `<domain>-question-agent` instead of `<domain>-plan-agent`
 
-### Phase 4: Review
+---
 
-```
-Task tool:
-  subagent_type: "branch-review-coordinator"
-  prompt: |
-    PHASE: Review
-    SPEC_FILE: {spec_path}
-    BUILD_OUTPUT: {build_report}
+### Pattern Classification (After Domain Identified)
 
-    Verify implementation matches requirements.
-    Check convention compliance.
+Once expert domain is identified, determine which pattern:
 
-    Return: review report with APPROVE or issues
-```
+**Implementation Request:**
+- Verbs: fix, add, create, implement, update, configure, refactor
+- Objects: Concrete things to build/change
+- Pattern: Use Pattern A (Plan-Build-Improve)
 
-### Phase 5: Validate (Final)
+**Question Request:**
+- Phrasing: "How do I...", "What is...", "Why...", "Explain...", "When should I..."
+- Pattern: Use Pattern B (Question-Agent)
 
-Run validation commands based on change scope:
+**Simple Operation:**
+- Verbs: regenerate, format, lint, compile
+- Objects: Single-purpose operations
+- Pattern: Use Pattern C (Simple Workflow)
 
-| Level | Commands | Use When |
-|-------|----------|----------|
-| 1 | `bun run lint && bunx tsc --noEmit` | Docs, config only |
-| 2 | Level 1 + `bun test --filter integration` | Features, bugs |
-| 3 | Level 2 + `bun test && bun run build` | Schema, auth, migrations |
+**Ambiguous Indicators (Ask User):**
+- Generic verbs: do, make, help with
+- Vague objects: "something", "this", "that"
+- Multiple possible interpretations
 
-## Auto-Fix Loop
+---
 
-If validation fails:
+## Error Handling
 
-```
-WHILE validation_fails:
-  1. Parse error output
-  2. Spawn build agent with fix task:
-     Task tool:
-       subagent_type: "branch-build-coordinator"
-       prompt: |
-         FIX_MODE: true
-         ERRORS: {validation_errors}
+### Classification Errors
 
-         Fix the identified issues.
-  3. Re-run validation
-  4. Continue until pass
-```
+**Classification unclear:**
+- Use AskUserQuestion to disambiguate
+- Provide options: "Claude config (commands/hooks/settings)" vs "Agent authoring (agents/registry)"
+- Never guess when multiple patterns could apply
+
+**Empty requirement:**
+- Ask user what they want to do
+- Provide examples of common requests
+
+---
+
+### Pattern A Errors (Expert Implementation)
+
+**Plan phase fails:**
+- Report error with context
+- Include full error details from plan-agent
+- Suggest retrying with more detailed requirement
+- Exit gracefully (no spec to build from, no point continuing)
+
+**User declines at approval gate:**
+- This is NOT an error - it's a valid workflow outcome
+- Report spec location
+- Suggest how to resume later
+- Exit gracefully with status: "Plan Complete - User Review Requested"
+
+**Build phase fails:**
+- Preserve the spec (it's valid, build just failed)
+- Report what went wrong with full error context
+- Suggest manual review of spec
+- Provide resume command: `/do "build from {spec_path}"`
+- Skip improve stage (nothing to learn from a failed build)
+- Overall status: Failed (but plan is preserved)
+
+**Improve phase fails:**
+- Log the error for diagnostics
+- Set improve_status: "Skipped - Error"
+- Continue to report (build succeeded, that's what matters)
+- Overall workflow status: Success (improvement is a bonus)
+- Rationale: Expertise updates shouldn't block successful builds
+
+---
+
+### Pattern B Errors (Expert Question)
+
+**Agent fails:**
+- Report error with full context
+- Suggest manual approach if applicable
+- Overall status: Failed
+
+**Agent returns empty result:**
+- Report diagnostic info (agent spawned, but no output)
+- Suggest retry or alternative approach
+- Don't claim completion with empty results
+
+---
+
+### Pattern C Errors (Simple Workflow)
+
+**Agent fails:**
+- Report error with context
+- Suggest alternative approaches
+- Overall status: Failed
+
+---
+
+### General Error Principles
+
+**Never claim completion with incomplete results:**
+- Validate outputs before reporting success
+- Empty outputs - investigate, don't report "complete"
+- Partial outputs - report "Partial Success" with details
+
+**Preserve artifacts on failure:**
+- Specs are valuable even if build fails
+- Error context should be comprehensive
+
+**Graceful degradation:**
+- If improve fails, build success is still success
+- User declining is not a failure, it's a choice
+
+**Actionable error messages:**
+- Always include what went wrong
+- Always include how to retry or work around
+- Include diagnostic info for debugging
+- Suggest specific next steps
+
+---
 
 ## KotaDB Conventions (MUST ENFORCE)
 
@@ -318,25 +722,22 @@ All agents must follow these conventions:
 
 ### Path Aliases
 Use TypeScript path aliases for all imports:
-- `@api/*` → `src/api/*`
-- `@auth/*` → `src/auth/*`
-- `@db/*` → `src/db/*`
-- `@indexer/*` → `src/indexer/*`
-- `@mcp/*` → `src/mcp/*`
-- `@shared/*` → `src/shared/*`
-- `@validation/*` → `src/validation/*`
-- `@queue/*` → `src/queue/*`
-- `@logging/*` → `src/logging/*`
+- `@api/*` - src/api/*
+- `@db/*` - src/db/*
+- `@indexer/*` - src/indexer/*
+- `@mcp/*` - src/mcp/*
+- `@shared/*` - src/shared/*
+- `@validation/*` - src/validation/*
+- `@logging/*` - src/logging/*
 
 ### Logging Standards
 - Use `process.stdout.write()` or `process.stderr.write()`
 - NEVER use `console.log`, `console.error`, etc.
 - Use `@logging/logger` factory for structured logging
 
-### Testing (Antimocking)
-- Real Supabase Local connections only
-- NO mocks, stubs, or fakes for database operations
-- Use failure injection utilities for error testing
+### Storage
+- Local SQLite only (no cloud dependencies)
+- Database at `app/data/kotadb.db`
 
 ### Commit Format
 ```
@@ -344,246 +745,14 @@ Use TypeScript path aliases for all imports:
 
 {body}
 
-🤖 Generated with [Claude Code](https://claude.com/claude-code)
+Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>
 ```
 
-## Output Format
-
-After completion, report:
-
-```markdown
-## /do Complete
-
-**Issue**: {#number or description}
-**Type**: {feature|bug|chore}
-**Phases**: scout ✓ → plan ✓ → build ✓ → review ✓ → validate ✓
-
-### Artifacts
-- Spec: {path or "N/A for chore"}
-- Commit: {commit hash}
-
-### Files Modified
-- {file}: {change summary}
-
-### Validation
-- Level: {1|2|3}
-- Lint: ✓
-- Typecheck: ✓
-- Tests: {X/Y passed}
-
-### Next Steps
-{Any manual steps needed, or "Ready for PR"}
-```
-
-## Error Handling
-
-If any phase fails unrecoverably:
-
-```markdown
-## /do Failed
-
-**Failed Phase**: {phase_name}
-**Error**: {description}
-
-**Attempted Fixes**: {N} iterations
-
-**Manual Resolution Required**:
-1. {specific fix instruction}
-
-**Resume**: Re-run `/do {original_input}` after fixing
-```
-
-## ADW Constraints
-
-1. **No user checkpoints** - Run fully autonomously
-2. **Use current branch** - Do not create new branches
-3. **Commit only** - Do not push or create PR
-4. **Unlimited fix attempts** - Keep fixing until validation passes
-5. **Convention enforcement** - Fail review if conventions violated
-
 ---
 
-## Expert Domain Constraints
-
-1. **User approval required** - Plan phase requires explicit approval before build
-2. **Spec preservation** - Specs saved even if build fails (enable resume)
-3. **Graceful degradation** - Improve phase failures don't fail workflow
-4. **Question direct** - Question patterns skip approval (read-only)
-
----
-
-## ADW Integration
-
-The `/do` command integrates with the Python ADW orchestration layer for multi-phase workflow execution.
-
-### Commands
-
-#### `/do/adw` - Full ADW Workflow Execution
-
-Execute complete ADW workflow (scout → plan → build → review → validate) for a GitHub issue using Python orchestration.
-
-**Usage**:
-```
-/do #123 workflow
-/do/adw 456
-```
-
-**Execution Flow**:
-1. Extract issue number from input (supports `#123`, `123`, or GitHub URL)
-2. Invoke Python orchestrator: `uv run automation/adws/adw_sdlc.py {issue_number} --stream-tokens`
-3. Parse real-time TokenEvent JSON lines from stdout
-4. Monitor progress via `automation/agents/{adw_id}/adw_state.json`
-5. Report completion with token usage and artifacts
-
-**Output**:
-```markdown
-## ADW Workflow Complete
-
-**Issue**: #518
-**ADW ID**: adw_20251213_142600_518
-**Phases**: scout ✓ → plan ✓ → build ✓ → review ✓
-
-### Token Usage
-- Total Input: 125,430
-- Total Output: 18,920
-- Total Cost: $0.6592
-
-### Artifacts
-- Spec: docs/specs/feature-518-do-adw-integration.md
-- Branch: feat/518-do-adw-integration
-- Worktree: /tmp/worktrees/feat-518-do-adw-integration
-```
-
-#### `/do/status` - Query ADW Workflow State
-
-Query current state of an ADW workflow execution.
-
-**Usage**:
-```
-/do/status adw_20251213_142600_518
-```
-
-**Output**:
-```markdown
-## ADW Status: adw_20251213_142600_518
-
-**Issue**: #518 - feat(adw): integrate /do paradigm with Python ADW orchestration layer
-**Branch**: feat/518-do-adw-integration
-**Worktree**: /tmp/worktrees/feat-518-do-adw-integration
-**PR Created**: No
-
-### Phase Status
-- Scout: completed
-- Plan: completed
-- Build: in_progress
-- Review: pending
-
-### Files
-- Spec: docs/specs/feature-518-do-adw-integration.md
-```
-
-### TokenEvent Schema
-
-Real-time token usage events emitted during workflow execution:
-
-```typescript
-interface TokenEvent {
-  adw_id: string;              // ADW execution ID
-  phase: string;               // Phase name (plan, build, review)
-  agent: string;               // Agent name (classify_issue, generate_branch, etc.)
-  input_tokens: number;        // Prompt tokens consumed
-  output_tokens: number;       // Completion tokens generated
-  cache_read_tokens: number;   // Cached tokens read (prompt caching)
-  cache_creation_tokens: number; // Tokens written to cache
-  cost_usd: number;            // Calculated cost in USD
-  timestamp: string;           // ISO 8601 timestamp
-}
-```
-
-**Pricing (as of 2025-12-13)**:
-- Input tokens: $3.00 per million tokens
-- Output tokens: $15.00 per million tokens
-- Cache write: $3.75 per million tokens
-- Cache read: $0.30 per million tokens
-
-### State Files
-
-ADW state is stored in `automation/agents/{adw_id}/adw_state.json`:
-
-```json
-{
-  "adw_id": "adw_20251213_142600_518",
-  "issue_number": "518",
-  "branch_name": "feat/518-do-adw-integration",
-  "plan_file": "docs/specs/feature-518-do-adw-integration.md",
-  "issue_class": "feature",
-  "worktree_name": "feat-518-do-adw-integration",
-  "worktree_path": "/tmp/worktrees/feat-518-do-adw-integration",
-  "worktree_created_at": "2025-12-13T14:26:00Z",
-  "pr_created": false,
-  "extra": {
-    "metrics": {
-      "total_input_tokens": 125430,
-      "total_output_tokens": 18920,
-      "total_cost_usd": 0.6592
-    }
-  }
-}
-```
-
----
-
-## Expert Domain Error Handling
-
-### Classification Errors
-
-**Classification unclear:**
-- Use AskUserQuestion to disambiguate
-- Provide options: "Expert domain workflow" vs "ADW workflow"
-
-**Empty requirement:**
-- Ask user what they want to do
-- Provide examples of common requests
-
-### Pattern A Errors (Expert Implementation)
-
-**Plan phase fails:**
-- Report error with context
-- Suggest retrying with more detailed requirement
-- Exit gracefully (no spec to build from)
-
-**User declines at approval gate:**
-- NOT an error - valid workflow outcome
-- Report spec location
-- Suggest resume command
-- Exit gracefully with status: "Plan Complete - User Review Requested"
-
-**Build phase fails:**
-- Preserve the spec (it's valid, build just failed)
-- Report what went wrong
-- Provide resume command: `/do "build from {spec_path}"`
-- Skip improve stage
-
-**Improve phase fails:**
-- Log the error
-- Set improve_status: "Skipped - Error"
-- Continue (workflow is still successful)
-
-### Pattern B Errors (Expert Question)
-
-**Agent fails:**
-- Report error with context
-- Suggest manual approach if applicable
-
-**Agent returns empty result:**
-- Report diagnostic info
-- Suggest retry or alternative approach
-
----
-
-## Expert Domain Examples
+## Examples
 
 ### Claude Config - Implementation (Pattern A)
 
@@ -592,7 +761,7 @@ ADW state is stored in `automation/agents/{adw_id}/adw_state.json`:
 
 # /do executes:
 # 1. Classification: claude-config expert, implementation request
-# 2. Pattern: A (Plan→Build→Improve)
+# 2. Pattern: A (Plan-Build-Improve)
 # 3. Spawn: claude-config-plan-agent
 # 4. Wait for spec path
 # 5. AskUserQuestion: "Plan complete at {spec_path}. Proceed?"
@@ -621,10 +790,10 @@ ADW state is stored in `automation/agents/{adw_id}/adw_state.json`:
 /do "Create a new validation agent"
 
 # /do executes Pattern A with agent-authoring domain:
-# 1. agent-authoring-plan-agent → creates spec
+# 1. agent-authoring-plan-agent creates spec
 # 2. User approval gate
-# 3. agent-authoring-build-agent → creates agent file
-# 4. agent-authoring-improve-agent → updates expertise
+# 3. agent-authoring-build-agent creates agent file
+# 4. agent-authoring-improve-agent updates expertise
 ```
 
 ### Agent Authoring - Question (Pattern B)
@@ -635,14 +804,20 @@ ADW state is stored in `automation/agents/{adw_id}/adw_state.json`:
 # /do executes Pattern B with agent-authoring-question-agent
 ```
 
-### ADW Workflow (Fallback)
+### User Declining at Approval Gate
 
 ```bash
-/do #123
+/do "Add new hook for session logging"
 
-# No expert domain keywords detected
-# Route to ADW workflow:
-# scout → plan → build → review → validate
+# Workflow:
+# 1. claude-config-plan-agent creates spec
+# 2. AskUserQuestion: "Proceed with build?"
+# 3. User selects: "No, stop here - I'll review first"
+# 4. /do reports:
+#    "Plan Complete - User Review Requested"
+#    "Spec at: .claude/.cache/specs/claude-config/session-logging-hook-spec.md"
+#    "Resume with: /do 'build from {spec_path}'"
+# 5. Exit gracefully (NOT an error)
 ```
 
 ### Ambiguous Request
@@ -650,85 +825,96 @@ ADW state is stored in `automation/agents/{adw_id}/adw_state.json`:
 ```bash
 /do "Add feature"
 
-# Ambiguous - could be expert domain or ADW
+# Ambiguous - unclear which domain
 # Use AskUserQuestion:
-#   "What type of feature? (1) Claude config/agent (2) GitHub issue/code feature"
+#   "What type of feature?"
+#   Options:
+#     - "Claude config (commands, hooks, settings)"
+#     - "Agent authoring (agents, registry, expert domains)"
 # Route based on response
 ```
+
+### Build Resumption (Future Enhancement)
+
+```bash
+# After reviewing spec, user can resume:
+/do "build from .claude/.cache/specs/claude-config/code-review-command-spec.md"
+
+# /do executes:
+# 1. Detects "build from {path}" pattern
+# 2. Skips plan phase (spec already exists)
+# 3. Skips approval (user already reviewed)
+# 4. Spawns: claude-config-build-agent with PATH_TO_SPEC
+# 5. Spawns: claude-config-improve-agent
+# 6. Reports results
+```
+
+**Note:** Build resumption is a future enhancement. For Phase 1, users would re-run full workflow.
 
 ---
 
 ## Observability
 
-ADW logs are accessible via symlink for easy discovery:
+Spec files are stored locally:
 
-**Paths**:
-- Symlink: `.claude/data/adw_logs/`
-- Actual: `automation/logs/kota-db-ts/`
-
-**Structure**:
-```
-.claude/data/adw_logs/
-  {env}/                          # Environment (local, ci, prod)
-    {adw_id}/                     # ADW execution ID
-      {agent_name}/               # Agent name (classify_issue, generate_branch, etc.)
-        raw_output.jsonl          # Streaming JSONL output
-        raw_output.json           # Parsed final output
-        prompts/                  # Generated prompts
-          {command_name}.txt      # Prompt text for command
-```
+**Spec Files**:
+- Location: `.claude/.cache/specs/{domain}/`
+- Format: `{slug}-spec.md`
 
 **Example**:
 ```
-.claude/data/adw_logs/
-  local/
-    adw_20251213_142600_518/
-      classify_issue/
-        raw_output.jsonl
-        raw_output.json
-        prompts/
-          classify_issue.txt
-      generate_branch/
-        raw_output.jsonl
-        raw_output.json
-        prompts/
-          generate_branch.txt
+.claude/.cache/specs/
+  claude-config/
+    code-review-command-spec.md
+    session-logging-hook-spec.md
+  agent-authoring/
+    validation-agent-spec.md
 ```
 
-**Log Format** (JSONL):
-```json
-{"type": "message", "content": "Starting phase: scout"}
-{"type": "token_event", "data": {"input_tokens": 1250, "output_tokens": 320, "cost_usd": 0.0087}}
-{"type": "result", "status": "success", "output": "..."}
-```
-
-**Reading Logs**:
+**Reading Specs**:
 ```bash
-# View latest execution
-ls -t .claude/data/adw_logs/local/ | head -1
+# List all specs
+ls -la .claude/.cache/specs/
 
-# View agent output
-cat .claude/data/adw_logs/local/{adw_id}/{agent_name}/raw_output.json | jq
-
-# Stream real-time output
-tail -f .claude/data/adw_logs/local/{adw_id}/{agent_name}/raw_output.jsonl
+# View a specific spec
+cat .claude/.cache/specs/claude-config/code-review-command-spec.md
 ```
 
-**TypeScript State Reader**:
-```typescript
-import { readADWState, listADWWorkflows } from '@claude/utils/adw-state-reader';
+---
 
-// Read specific workflow
-const state = readADWState('adw_20251213_142600_518');
-if (state) {
-  console.log(`Branch: ${state.branch_name}`);
-  console.log(`Spec: ${state.plan_file}`);
-}
+## Implementation Notes
 
-// List all workflows
-const workflows = listADWWorkflows();
-workflows.forEach(id => {
-  const state = readADWState(id);
-  // ... process state
-});
-```
+**Current State:**
+- 2 expert domains active: claude-config, agent-authoring
+- 3 orchestration patterns: Expert Implementation (A), Expert Question (B), Simple Workflow (C)
+- Expert domains use plan-build-improve cycle with user approval gates
+- Classification uses keyword matching + pattern detection with fallback to user questions
+
+**Execution Control:**
+- Task tool calls are inherently blocking (wait for subagent completion)
+- No `run_in_background` parameter exists for Task tool (Bash only)
+- Parallel execution: multiple Task calls in single message, still blocks for ALL
+- /do MUST collect full output before responding
+- Orchestration patterns enforce sequential dependencies (plan-approval-build-improve)
+- Validation checkpoints prevent premature completion
+- `--print` mode compatibility guaranteed by synchronous execution pattern
+
+**Orchestration:**
+- /do directly manages plan-build-improve cycle (no coordinator intermediary)
+- User approval gate after plan phase prevents unwanted implementations
+- Improve phase is opportunistic (non-blocking failure)
+- Specs are artifacts - preserved even if build fails, enable resumption
+- Pattern selection based on requirement type (implementation vs question)
+
+**Expert Domain Constraints:**
+- User approval required - Plan phase requires explicit approval before build
+- Spec preservation - Specs saved even if build fails (enable resume)
+- Graceful degradation - Improve phase failures don't fail workflow
+- Question direct - Question patterns skip approval (read-only)
+
+**Future Enhancements:**
+- Implement `--background` flag for autonomous execution (skip approval gates)
+- Add `--plan-only` flag (stop after plan, don't ask to continue)
+- Add `--build-only <spec-path>` flag (resume from existing spec)
+- Add `--no-improve` flag (skip improvement phase)
+- Build resumption: `/do "build from {spec_path}"` pattern

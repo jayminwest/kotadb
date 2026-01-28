@@ -51,7 +51,7 @@ describe("Deletion Manifest", () => {
   });
 
   test("applyDeletionManifest() removes records from database", async () => {
-    db = createDatabase({ path: join(tempDir, "test.db") });
+    db = createDatabase({ path: join(tempDir, "test.db"), skipSchemaInit: true });
     db.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -77,7 +77,7 @@ describe("Deletion Manifest", () => {
   });
 
   test("applyDeletionManifest() handles non-existent table gracefully", async () => {
-    db = createDatabase({ path: join(tempDir, "test.db") });
+    db = createDatabase({ path: join(tempDir, "test.db"), skipSchemaInit: true });
 
     await recordDeletion("nonexistent_table", "123", exportDir);
 
@@ -102,7 +102,7 @@ describe("Deletion Manifest", () => {
   });
 
   test("applyDeletionManifest() handles multiple deletions across tables", async () => {
-    db = createDatabase({ path: join(tempDir, "test.db") });
+    db = createDatabase({ path: join(tempDir, "test.db"), skipSchemaInit: true });
     db.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -155,7 +155,7 @@ describe("Deletion Manifest", () => {
   });
 
   test("applyDeletionManifest() returns immediately if manifest is empty", async () => {
-    db = createDatabase({ path: join(tempDir, "test.db") });
+    db = createDatabase({ path: join(tempDir, "test.db"), skipSchemaInit: true });
     
     const result = await applyDeletionManifest(db, join(exportDir, ".deletions.jsonl"));
 
@@ -164,7 +164,7 @@ describe("Deletion Manifest", () => {
   });
 
   test("applyDeletionManifest() batches deletions by table", async () => {
-    db = createDatabase({ path: join(tempDir, "test.db") });
+    db = createDatabase({ path: join(tempDir, "test.db"), skipSchemaInit: true });
     db.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,

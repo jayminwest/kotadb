@@ -2,8 +2,8 @@
  * MCP HTTP header validation utilities
  */
 
-import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { Sentry } from "../instrument.js";
 
 const logger = createLogger({ module: "mcp-headers" });
 
@@ -62,7 +62,11 @@ export function validateOrigin(origin: string | null): boolean {
 		logger.warn("Origin validation failed: not in allowed list", { origin });
 		return false;
 	} catch (error) {
-		logger.error("Origin validation error", error instanceof Error ? error : new Error(String(error)), { origin });
+		logger.error(
+			"Origin validation error",
+			error instanceof Error ? error : new Error(String(error)),
+			{ origin },
+		);
 		Sentry.captureException(error, {
 			tags: { origin: origin ?? "null" },
 		});
@@ -91,8 +95,7 @@ export function parseAccept(accept: string | null): {
 
 	const acceptLower = accept.toLowerCase();
 	return {
-		json:
-			acceptLower.includes("application/json") || acceptLower.includes("*/*"),
+		json: acceptLower.includes("application/json") || acceptLower.includes("*/*"),
 		sse: acceptLower.includes("text/event-stream"),
 	};
 }

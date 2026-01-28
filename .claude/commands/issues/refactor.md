@@ -22,7 +22,7 @@ Author a refactoring plan for the code improvement described in `$ARGUMENTS` (is
 - Investigate impacted modules in `src/**`, `tests/**`, and any infrastructure that depends on the code being refactored.
 - Capture all impacted files (and any new assets) in the dedicated section so implementors have clear scope boundaries.
 - Reference the repo git flow: work from `refactor/<issue-number>-<slug>` off `develop`, with `develop` promoted to `main` on release.
-- Integrate `/anti-mock` expectations: update test coverage to validate behavior preservation, use real Supabase connections, and document any temporary test skips.
+- Integrate `/anti-mock` expectations: update test coverage to validate behavior preservation, use real database connections, and document any temporary test skips.
 - Ensure the plan's closing tasks rerun validation and push the branch so a PR can be raised (PR titles must end with the issue number, e.g. `refactor: extract auth logic (#210)`).
 - Consult `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and read only the documentation whose conditions align with the refactoring scope.
 - When the refactoring introduces new patterns or documentation, add or update the relevant conditional entry so future agents can discover it quickly.
@@ -75,7 +75,7 @@ Author a refactoring plan for the code improvement described in `$ARGUMENTS` (is
 - Update call sites and consumers
 - Remove deprecated code paths
 ### Validation
-- Tests to add/update (integration/e2e hitting Supabase per `/anti-mock`)
+- Tests to add/update (integration/e2e using SQLite per `/anti-mock`)
 - Manual checks to run (verify behavior preservation)
 
 ## Step by Step Tasks

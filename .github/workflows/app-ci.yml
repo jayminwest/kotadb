@@ -15,9 +15,6 @@ on:
       - 'app/**'
       - 'shared/**'
       - '.github/workflows/app-ci.yml'
-      - '.github/scripts/setup-supabase-ci.sh'
-      - 'docker-compose.test.yml'
-      - 'supabase/**'
       - 'package.json'
       - 'bun.lock'
   pull_request:
@@ -25,9 +22,6 @@ on:
       - 'app/**'
       - 'shared/**'
       - '.github/workflows/app-ci.yml'
-      - '.github/scripts/setup-supabase-ci.sh'
-      - 'docker-compose.test.yml'
-      - 'supabase/**'
       - 'package.json'
       - 'bun.lock'
 
@@ -57,93 +51,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Validate migration sync
-        run: bun run test:validate-migrations
-
-  security-scan:
-    name: Security Audit
-    runs-on: ubuntu-latest
-    needs: setup
-    defaults:
-      run:
-        working-directory: ./app
-    steps:
-      - name: Checkout code
-        uses: actions/checkout@v4
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: '1.1.29'
-
-      - name: Restore dependencies
-        uses: actions/cache@v4
-        with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
-          restore-keys: |
-            bun-
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Run npm audit
-        id: audit
-        run: |
-          # Create output directory
-          mkdir -p audit-results
-
-          # Run audit with JSON output (allow failures for reporting)
-          npm audit --json > audit-results/audit.json || true
-
-          # Run audit with exit codes for severity threshold
-          # Audit levels: info (0), low (0), moderate (0), high (1), critical (1)
-          npm audit --audit-level=high
-        continue-on-error: false
-
-      - name: Generate audit summary
-        if: always()
-        run: |
-          echo "## Security Audit Results" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Parse JSON and create summary
-          if [ -f audit-results/audit.json ]; then
-            # Extract vulnerability counts
-            CRITICAL=$(jq '.metadata.vulnerabilities.critical // 0' audit-results/audit.json)
-            HIGH=$(jq '.metadata.vulnerabilities.high // 0' audit-results/audit.json)
-            MODERATE=$(jq '.metadata.vulnerabilities.moderate // 0' audit-results/audit.json)
-            LOW=$(jq '.metadata.vulnerabilities.low // 0' audit-results/audit.json)
-            INFO=$(jq '.metadata.vulnerabilities.info // 0' audit-results/audit.json)
-
-            echo "| Severity | Count |" >> $GITHUB_STEP_SUMMARY
-            echo "|----------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Critical | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
-            echo "| High | $HIGH |" >> $GITHUB_STEP_SUMMARY
-            echo "| Moderate | $MODERATE |" >> $GITHUB_STEP_SUMMARY
-            echo "| Low | $LOW |" >> $GITHUB_STEP_SUMMARY
-            echo "| Info | $INFO |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-
-            # Add failure notice if vulnerabilities found
-            if [ "$CRITICAL" -gt 0 ] || [ "$HIGH" -gt 0 ]; then
-              echo "⚠️ **Action Required**: High or critical vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
-            else
-              echo "✅ No high or critical vulnerabilities detected" >> $GITHUB_STEP_SUMMARY
-            fi
-          else
-            echo "❌ Audit failed to generate results" >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload audit results
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: app-security-audit
-          path: |
-            app/audit-results/
-          retention-days: 30
 
   typecheck:
     runs-on: ubuntu-latest
@@ -212,7 +119,6 @@ jobs:
   test:
     runs-on: ubuntu-latest
     needs: [typecheck, lint]
-    environment: Preview
     defaults:
       run:
         working-directory: app
@@ -237,14 +143,6 @@ jobs:
       - name: Install dependencies (cache miss fallback)
         run: bun install --frozen-lockfile
 
-      - name: Install Stripe CLI
-        run: |
-          curl -s https://packages.stripe.dev/api/security/keypair/stripe-cli-gpg/public | gpg --dearmor | sudo tee /usr/share/keyrings/stripe.gpg
-          echo "deb [signed-by=/usr/share/keyrings/stripe.gpg] https://packages.stripe.dev/stripe-cli-debian-local stable main" | sudo tee /etc/apt/sources.list.d/stripe.list
-          sudo apt update
-          sudo apt install stripe
-          stripe --version
-
       - name: Install uv (required for ADW MCP tools)
         uses: astral-sh/setup-uv@v5
         with:
@@ -255,25 +153,8 @@ jobs:
           which uv
           uv --version
 
-      - name: Setup Docker Compose test stack and generate credentials
-        working-directory: .
-        env:
-          STRIPE_SECRET_KEY: ${{ secrets.STRIPE_SECRET_KEY }}
-          STRIPE_SOLO_PRICE_ID: ${{ secrets.STRIPE_SOLO_PRICE_ID }}
-          STRIPE_TEAM_PRICE_ID: ${{ secrets.STRIPE_TEAM_PRICE_ID }}
-        run: |
-          chmod +x .github/scripts/setup-supabase-ci.sh
-          chmod +x app/scripts/generate-env-test-compose.sh
-          chmod +x app/scripts/run-migrations-compose.sh
-          chmod +x app/scripts/cleanup-test-containers.sh
-          .github/scripts/setup-supabase-ci.sh
-
       - name: Test
-        run: |
-          # Tests automatically load .env.test via preload script (tests/setup.ts)
-          # No manual export needed - keeping for backwards compatibility
-          export $(grep -v '^#' ../.env.test | xargs) || true
-          bun run test --coverage --coverage-reporter=text --coverage-reporter=lcov
+        run: bun run test --coverage --coverage-reporter=text --coverage-reporter=lcov
 
       - name: Generate coverage summary
         if: always()
@@ -281,7 +162,6 @@ jobs:
           echo "## Application Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
           if [ -f coverage/coverage-final.json ]; then
-            # Parse coverage-final.json to extract summary stats
             echo "Coverage report generated successfully." >> $GITHUB_STEP_SUMMARY
             echo "" >> $GITHUB_STEP_SUMMARY
             echo "Full coverage details available in artifacts." >> $GITHUB_STEP_SUMMARY
@@ -298,13 +178,6 @@ jobs:
             app/coverage/
             app/coverage.info
           retention-days: 30
-
-      - name: Teardown Docker Compose test stack
-        if: always()
-        working-directory: .
-        run: |
-          chmod +x app/scripts/cleanup-test-containers.sh
-          app/scripts/cleanup-test-containers.sh || true
 
   build:
     runs-on: ubuntu-latest
@@ -335,6 +208,3 @@ jobs:
 
       - name: Build application
         run: bun run build
-
-      # Note: Bun runtime doesn't require compilation artifacts
-      # The build script runs type-checking which is sufficient validation

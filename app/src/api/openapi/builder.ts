@@ -127,7 +127,7 @@ Common HTTP status codes:
 - **Files**: Retrieve recently indexed files
 - **Projects**: Manage multi-repository projects
 - **API Keys**: Generate and manage API keys
-- **Subscriptions**: Manage Stripe billing and subscriptions
+
 			`.trim(),
 			contact: {
 				name: 'KotaDB Support',
@@ -180,10 +180,6 @@ Common HTTP status codes:
 			{
 				name: 'API Keys',
 				description: 'API key generation and management',
-			},
-			{
-				name: 'Subscriptions',
-				description: 'Stripe billing and subscription management',
 			},
 		],
 	});

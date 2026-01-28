@@ -5,7 +5,7 @@
  */
 
 import { describe, expect, it, beforeEach, afterEach } from "bun:test";
-import { mkdtempSync, rmSync, existsSync } from "node:fs";
+import { mkdtempSync, rmSync, existsSync, mkdirSync } from "node:fs";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 import { KotaDatabase, createDatabase } from "../sqlite-client.js";
@@ -173,7 +173,7 @@ describe("importFromJSONL", () => {
 		`);
 
 		// Create import directory
-		Bun.write(join(importDir, "placeholder"), "").then(() => {});
+		mkdirSync(importDir, { recursive: true });
 	});
 
 	afterEach(() => {

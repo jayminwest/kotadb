@@ -177,7 +177,7 @@ CREATE TABLE IF NOT EXISTS indexed_references (
     FOREIGN KEY (target_symbol_id) REFERENCES indexed_symbols(id) ON DELETE SET NULL,
     
     -- CHECK constraint replaces PostgreSQL enum
-    CHECK (reference_type IN ('import', 'call', 'property_access', 'type_reference'))
+    CHECK (reference_type IN ('import', 'call', 'extends', 'implements', 'property_access', 'type_reference', 'variable_reference'))
 );
 
 -- Indexes for common queries

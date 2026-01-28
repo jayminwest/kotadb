@@ -39,9 +39,9 @@ The failure context JSON contains:
 - **Environment issues**: Check test environment setup
 
 ### Migration Validation Failures (bun run test:validate-migrations)
-- **Drift detected**: Copy migrations from app/src/db/migrations/ to app/supabase/migrations/
-- **Missing files**: Ensure both directories have identical migration files
-- **Content mismatch**: Update Supabase migrations directory to match source
+- **Drift detected**: Verify SQLite migration files are valid and up to date
+- **Missing files**: Ensure all migration files are present and valid
+- **Content mismatch**: Update migration files to match schema changes
 
 ## Instructions
 

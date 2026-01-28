@@ -1,5 +1,5 @@
 /**
- * Comprehensive tests for SQLite query layer (queries-local.ts)
+ * Comprehensive tests for SQLite query layer (queries.ts)
  *
  * Following antimocking philosophy: uses real in-memory SQLite databases
  * 
@@ -28,144 +28,20 @@ import {
 	storeDependenciesLocal,
 	queryDependentsLocal,
 	queryDependenciesLocal,
-} from "@api/queries-local.js";
-import { storeIndexedDataLocal } from "@indexer/storage-local.js";
+} from "@api/queries.js";
+import { storeIndexedDataLocal } from "@indexer/storage.js";
 import type { IndexedFile } from "@shared/types";
 import type { Symbol as ExtractedSymbol } from "@indexer/symbol-extractor";
 import type { Reference } from "@indexer/reference-extractor";
 
-describe("SQLite Query Layer - queries-local.ts", () => {
+describe("SQLite Query Layer - queries.ts", () => {
 	let db: KotaDatabase;
 	const testRepoId = "test-repo-123";
 
 	beforeEach(() => {
 		// Create in-memory database for each test (antimocking pattern)
+		// createDatabase() auto-initializes schema from sqlite-schema.sql
 		db = createDatabase({ path: ":memory:" });
-
-		// Apply schema inline (from sqlite-schema.sql)
-		db.exec(`
-			-- Repositories table
-			CREATE TABLE repositories (
-				id TEXT PRIMARY KEY,
-				user_id TEXT,
-				org_id TEXT,
-				name TEXT NOT NULL,
-				full_name TEXT NOT NULL UNIQUE,
-				git_url TEXT,
-				default_branch TEXT NOT NULL DEFAULT 'main',
-				last_indexed_at TEXT,
-				created_at TEXT NOT NULL DEFAULT (datetime('now')),
-				updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-				metadata TEXT DEFAULT '{}'
-			);
-
-			-- Indexed files table
-			CREATE TABLE indexed_files (
-				id TEXT PRIMARY KEY,
-				repository_id TEXT NOT NULL,
-				path TEXT NOT NULL,
-				content TEXT NOT NULL,
-				language TEXT,
-				size_bytes INTEGER,
-				content_hash TEXT,
-				indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
-				metadata TEXT DEFAULT '{}',
-				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-				UNIQUE (repository_id, path)
-			);
-
-			-- FTS5 virtual table for code search
-			CREATE VIRTUAL TABLE indexed_files_fts USING fts5(
-				path,
-				content,
-				content='indexed_files',
-				content_rowid='rowid'
-			);
-
-			-- FTS5 sync triggers
-			CREATE TRIGGER indexed_files_fts_ai 
-			AFTER INSERT ON indexed_files 
-			BEGIN
-				INSERT INTO indexed_files_fts(rowid, path, content) 
-				VALUES (new.rowid, new.path, new.content);
-			END;
-
-			CREATE TRIGGER indexed_files_fts_ad 
-			AFTER DELETE ON indexed_files 
-			BEGIN
-				INSERT INTO indexed_files_fts(indexed_files_fts, rowid, path, content) 
-				VALUES ('delete', old.rowid, old.path, old.content);
-			END;
-
-			CREATE TRIGGER indexed_files_fts_au 
-			AFTER UPDATE ON indexed_files 
-			BEGIN
-				INSERT INTO indexed_files_fts(indexed_files_fts, rowid, path, content) 
-				VALUES ('delete', old.rowid, old.path, old.content);
-				INSERT INTO indexed_files_fts(rowid, path, content) 
-				VALUES (new.rowid, new.path, new.content);
-			END;
-
-			-- Indexed symbols table
-			CREATE TABLE indexed_symbols (
-				id TEXT PRIMARY KEY,
-				file_id TEXT NOT NULL,
-				repository_id TEXT NOT NULL,
-				name TEXT NOT NULL,
-				kind TEXT NOT NULL,
-				line_start INTEGER NOT NULL,
-				line_end INTEGER NOT NULL,
-				signature TEXT,
-				documentation TEXT,
-				metadata TEXT DEFAULT '{}',
-				created_at TEXT NOT NULL DEFAULT (datetime('now')),
-				FOREIGN KEY (file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
-				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-				CHECK (kind IN ('function', 'class', 'interface', 'type', 'variable', 'constant', 'method', 'property', 'module', 'namespace', 'enum', 'enum_member'))
-			);
-
-			-- Indexed references table
-			CREATE TABLE indexed_references (
-				id TEXT PRIMARY KEY,
-				file_id TEXT NOT NULL,
-				repository_id TEXT NOT NULL,
-				symbol_name TEXT NOT NULL,
-				target_symbol_id TEXT,
-				target_file_path TEXT,
-				line_number INTEGER NOT NULL,
-				column_number INTEGER DEFAULT 0,
-				reference_type TEXT NOT NULL,
-				metadata TEXT DEFAULT '{}',
-				created_at TEXT NOT NULL DEFAULT (datetime('now')),
-				FOREIGN KEY (file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
-				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-				FOREIGN KEY (target_symbol_id) REFERENCES indexed_symbols(id) ON DELETE SET NULL,
-				CHECK (reference_type IN ('import', 'call', 'extends', 'implements', 'type_reference', 'variable_reference'))
-			);
-
-			-- Projects table
-			CREATE TABLE projects (
-				id TEXT PRIMARY KEY,
-				user_id TEXT,
-				org_id TEXT,
-				name TEXT NOT NULL,
-				description TEXT,
-				created_at TEXT NOT NULL DEFAULT (datetime('now')),
-				updated_at TEXT NOT NULL DEFAULT (datetime('now')),
-				metadata TEXT DEFAULT '{}'
-			);
-
-			-- Project repositories junction table
-			CREATE TABLE project_repositories (
-				id TEXT PRIMARY KEY,
-				project_id TEXT NOT NULL,
-				repository_id TEXT NOT NULL,
-				added_at TEXT NOT NULL DEFAULT (datetime('now')),
-				FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE CASCADE,
-				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-				UNIQUE (project_id, repository_id)
-			);
-		`);
 
 		// Insert test repository
 		db.run(
@@ -762,7 +638,7 @@ describe("SQLite Query Layer - queries-local.ts", () => {
 					source_file_path: "src/lib.ts",
 					target_symbol_key: "src/utils.ts::PI::1",
 					line_number: 1,
-					reference_type: "variable_reference",
+					reference_type: "type_reference",
 				},
 			];
 
@@ -1031,77 +907,6 @@ describe("Dependency Graph - Local Mode", () => {
 	beforeEach(() => {
 		// Create in-memory database
 		db = createDatabase({ path: ":memory:" });
-
-		// Apply schema with dependency_graph table
-		db.exec(`
-			CREATE TABLE repositories (
-				id TEXT PRIMARY KEY,
-				name TEXT NOT NULL,
-				full_name TEXT NOT NULL UNIQUE
-			);
-
-			CREATE TABLE indexed_files (
-				id TEXT PRIMARY KEY,
-				repository_id TEXT NOT NULL,
-				path TEXT NOT NULL,
-				content TEXT NOT NULL,
-				language TEXT,
-				size_bytes INTEGER,
-				content_hash TEXT,
-				indexed_at TEXT NOT NULL DEFAULT (datetime('now')),
-				metadata TEXT DEFAULT '{}',
-				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-				UNIQUE (repository_id, path)
-			);
-
-			CREATE TABLE indexed_symbols (
-				id TEXT PRIMARY KEY,
-				file_id TEXT NOT NULL,
-				repository_id TEXT NOT NULL,
-				name TEXT NOT NULL,
-				kind TEXT NOT NULL,
-				line_start INTEGER NOT NULL,
-				line_end INTEGER NOT NULL,
-				signature TEXT,
-				documentation TEXT,
-				metadata TEXT DEFAULT '{}',
-				created_at TEXT NOT NULL DEFAULT (datetime('now')),
-				FOREIGN KEY (file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
-				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-				CHECK (kind IN ('function', 'class', 'interface', 'type', 'variable', 'constant', 'method', 'property', 'module', 'namespace', 'enum', 'enum_member'))
-			);
-
-			CREATE TABLE dependency_graph (
-				id TEXT PRIMARY KEY,
-				repository_id TEXT NOT NULL,
-				from_file_id TEXT,
-				to_file_id TEXT,
-				from_symbol_id TEXT,
-				to_symbol_id TEXT,
-				dependency_type TEXT NOT NULL,
-				metadata TEXT DEFAULT '{}',
-				created_at TEXT NOT NULL DEFAULT (datetime('now')),
-				FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-				FOREIGN KEY (from_file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
-				FOREIGN KEY (to_file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
-				FOREIGN KEY (from_symbol_id) REFERENCES indexed_symbols(id) ON DELETE CASCADE,
-				FOREIGN KEY (to_symbol_id) REFERENCES indexed_symbols(id) ON DELETE CASCADE,
-				CHECK (
-					(from_file_id IS NOT NULL AND to_file_id IS NOT NULL) OR
-					(from_symbol_id IS NOT NULL AND to_symbol_id IS NOT NULL)
-				),
-				CHECK (dependency_type IN ('file_import', 'symbol_usage'))
-			);
-
-			CREATE INDEX idx_dependency_graph_repository_id ON dependency_graph(repository_id);
-			CREATE INDEX idx_dependency_graph_from_file_id ON dependency_graph(from_file_id);
-			CREATE INDEX idx_dependency_graph_to_file_id ON dependency_graph(to_file_id);
-			CREATE INDEX idx_dependency_graph_from_symbol_id ON dependency_graph(from_symbol_id);
-			CREATE INDEX idx_dependency_graph_to_symbol_id ON dependency_graph(to_symbol_id);
-			CREATE INDEX idx_dependency_graph_dependency_type ON dependency_graph(dependency_type);
-			CREATE INDEX idx_dependency_graph_from_file_to_file ON dependency_graph(to_file_id, dependency_type);
-			CREATE INDEX idx_dependency_graph_composite ON dependency_graph(from_file_id, dependency_type);
-		`);
 
 		// Insert test repository
 		db.run(

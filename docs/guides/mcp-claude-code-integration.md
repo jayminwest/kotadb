@@ -11,27 +11,14 @@ KotaDB provides an MCP server endpoint that allows Claude Code to search indexed
 ## Prerequisites
 
 - Claude Code CLI installed (`claude` command available)
-- KotaDB server running (local or remote)
-- Valid KotaDB API key (free, solo, or team tier)
+- KotaDB server running locally
 
 ## Registering KotaDB with Claude Code
 
 Use the `claude mcp add` command to register KotaDB as an MCP server:
 
-### Local Development
-
 ```bash
-claude mcp add kotadb http://localhost:3000/mcp \
-  -t http \
-  -H "Authorization: Bearer YOUR_API_KEY_HERE"
-```
-
-### Production
-
-```bash
-claude mcp add kotadb https://your-kotadb-instance.com/mcp \
-  -t http \
-  -H "Authorization: Bearer YOUR_API_KEY_HERE"
+claude mcp add kotadb http://localhost:3000/mcp -t http
 ```
 
 ### Verify Connection
@@ -52,20 +39,10 @@ Claude Code stores MCP server configurations in `.mcp.json` in your project root
 ```json
 {
   "mcpServers": {
-    "kotadb-staging": {
+    "kotadb": {
       "type": "http",
-      "url": "https://kotadb-staging.fly.dev/mcp",
+      "url": "http://localhost:3000/mcp",
       "headers": {
-        "Authorization": "Bearer kota_solo_YOUR_API_KEY_HERE",
-        "Accept": "application/json, text/event-stream",
-        "MCP-Protocol-Version": "2025-06-18"
-      }
-    },
-    "kotadb-production": {
-      "type": "http",
-      "url": "https://kotadb.fly.dev/mcp",
-      "headers": {
-        "Authorization": "Bearer ${KOTADB_PRODUCTION_API_KEY}",
         "Accept": "application/json, text/event-stream",
         "MCP-Protocol-Version": "2025-06-18"
       }
@@ -86,29 +63,9 @@ Claude Code stores MCP server configurations in `.mcp.json` in your project root
    - Current version: `"2025-06-18"`
    - Required for protocol compatibility
 
-3. **Authorization**: Your KotaDB API key
-   - Format: `"Bearer kota_{tier}_{random}_{hash}"`
-   - Can use environment variables: `"Bearer ${KOTADB_API_KEY}"`
-
-### Environment Variables
-
-You can use environment variables in headers with the `${VAR}` syntax:
-
-```json
-{
-  "headers": {
-    "Authorization": "Bearer ${KOTADB_API_KEY}",
-    "Accept": "application/json, text/event-stream",
-    "MCP-Protocol-Version": "2025-06-18"
-  }
-}
-```
-
-Optionally specify defaults: `${VAR:-default_value}`
-
 ## Available Tools
 
-KotaDB exposes three MCP tools:
+KotaDB exposes the following MCP tools:
 
 ### 1. search_code
 
@@ -151,30 +108,16 @@ List recently indexed files.
 Use the list_recent_files tool to show the 20 most recently indexed files
 ```
 
-## Authentication & Rate Limiting
+### 4. search_dependencies
 
-All MCP requests require authentication via Bearer token in the `Authorization` header.
+Find files that depend on or are depended on by a target file.
 
-### Rate Limits by Tier
-
-- **Free tier**: 100 requests/hour
-- **Solo tier**: 1,000 requests/hour
-- **Team tier**: 10,000 requests/hour
-
-Rate limit headers are included in all responses:
-- `X-RateLimit-Limit`: Total requests allowed per hour
-- `X-RateLimit-Remaining`: Requests remaining in current window
-- `X-RateLimit-Reset`: Unix timestamp when limit resets
-
-### Handling Rate Limit Errors
-
-When rate limit is exceeded, the server returns HTTP 429 with `Retry-After` header:
-
-```json
-{
-  "error": "Rate limit exceeded. Try again in 1234 seconds."
-}
-```
+**Parameters:**
+- `file_path` (required): Relative file path within repository
+- `direction` (optional): `"dependents"`, `"dependencies"`, or `"both"` (default: `"both"`)
+- `depth` (optional): Recursion depth 1-5 (default: `1`)
+- `include_tests` (optional): Include test files (default: `true`)
+- `repository` (optional): Repository ID
 
 ## Testing MCP Tools from Claude Code
 
@@ -189,6 +132,7 @@ Expected response:
 - search_code
 - index_repository
 - list_recent_files
+- search_dependencies
 
 ### Test search_code
 
@@ -202,12 +146,6 @@ Expected response:
 "Use the index_repository tool to index the repository at /path/to/repo"
 ```
 
-### Test list_recent_files
-
-```
-"Use the list_recent_files tool to show the 10 most recently indexed files"
-```
-
 ## Troubleshooting
 
 ### Connection Failed
@@ -216,8 +154,7 @@ Expected response:
 
 **Solutions**:
 1. Verify server is running: `curl http://localhost:3000/health`
-2. Check API key is valid
-3. Verify MCP endpoint is accessible: `curl http://localhost:3000/mcp`
+2. Verify MCP endpoint is accessible: `curl http://localhost:3000/mcp`
 
 ### 406 Not Acceptable
 
@@ -228,32 +165,11 @@ Expected response:
 ```json
 {
   "headers": {
-    "Authorization": "Bearer YOUR_API_KEY",
     "Accept": "application/json, text/event-stream",
     "MCP-Protocol-Version": "2025-06-18"
   }
 }
 ```
-
-This is a common issue when upgrading or first configuring Claude Code integration. The MCP SDK requires both content types in the Accept header even when using JSON-only mode.
-
-### 401 Unauthorized
-
-**Error**: `Authentication failed`
-
-**Solutions**:
-1. Verify API key format: `kota_{tier}_{random}_{hash}`
-2. Check API key is enabled (not disabled in database)
-3. Regenerate API key if compromised
-
-### 429 Too Many Requests
-
-**Error**: `Rate limit exceeded`
-
-**Solutions**:
-1. Wait for rate limit window to reset (check `Retry-After` header)
-2. Upgrade to higher tier (solo or team)
-3. Reduce request frequency
 
 ### Tool Execution Errors
 
@@ -275,23 +191,10 @@ cd app && bun run src/index.ts
 
 2. Register local server with Claude Code:
 ```bash
-claude mcp add kotadb-local http://localhost:3000/mcp \
-  -t http \
-  -H "Authorization: Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef"
+claude mcp add kotadb-local http://localhost:3000/mcp -t http
 ```
 
 3. Test integration in Claude Code session
-
-### Production Deployment
-
-1. Deploy KotaDB to production server
-2. Generate production API key
-3. Register production server with Claude Code:
-```bash
-claude mcp add kotadb-prod https://api.kotadb.com/mcp \
-  -t http \
-  -H "Authorization: Bearer YOUR_PROD_API_KEY"
-```
 
 ## Protocol Details
 
@@ -340,25 +243,13 @@ Errors follow JSON-RPC 2.0 error codes:
 - `-32601`: Method Not Found (unknown JSON-RPC method)
 - `-32603`: Internal Error (tool validation or execution error)
 
-```json
-{
-  "jsonrpc": "2.0",
-  "id": 1,
-  "error": {
-    "code": -32603,
-    "message": "Missing required parameter: term"
-  }
-}
-```
-
 ## References
 
 - [Model Context Protocol Specification](https://spec.modelcontextprotocol.io/)
 - [Claude Code MCP Documentation](https://docs.claude.com/en/docs/claude-code/mcp)
-- [KotaDB API Documentation](../api/README.md)
 
 ---
 
-**Last Verified**: 2025-12-05
-**KotaDB Version**: 0.1.1
+**Last Verified**: 2026-01-25
+**KotaDB Version**: 2.0.0
 **MCP Protocol Version**: 2025-06-18

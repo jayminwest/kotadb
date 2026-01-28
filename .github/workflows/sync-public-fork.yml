@@ -24,7 +24,6 @@ on:
       - '.gitignore'
       - 'package.json'
       - 'biome.json'
-      - 'docker-compose.yml'
       - '.github/workflows/sync-public-fork.yml'
 
 jobs:

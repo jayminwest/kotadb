@@ -57,11 +57,7 @@ export function isRequest(value: unknown): value is JsonRpcRequest {
 export function isNotification(value: unknown): value is JsonRpcNotification {
 	if (typeof value !== "object" || value === null) return false;
 	const obj = value as Record<string, unknown>;
-	return (
-		obj.jsonrpc === "2.0" &&
-		obj.id === undefined &&
-		typeof obj.method === "string"
-	);
+	return obj.jsonrpc === "2.0" && obj.id === undefined && typeof obj.method === "string";
 }
 
 /**
@@ -122,20 +118,14 @@ export function invalidRequest(
 /**
  * Build a Method Not Found response
  */
-export function methodNotFound(
-	id: string | number,
-	method: string,
-): JsonRpcResponse {
+export function methodNotFound(id: string | number, method: string): JsonRpcResponse {
 	return error(id, ErrorCodes.MethodNotFound, `Method not found: ${method}`);
 }
 
 /**
  * Build an Invalid Params response
  */
-export function invalidParams(
-	id: string | number,
-	message = "Invalid params",
-): JsonRpcResponse {
+export function invalidParams(id: string | number, message = "Invalid params"): JsonRpcResponse {
 	return error(id, ErrorCodes.InvalidParams, message);
 }
 

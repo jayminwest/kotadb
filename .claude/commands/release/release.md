@@ -12,7 +12,7 @@ Before creating a release, the command performs comprehensive checks:
 2. **CI Status**: Verify all GitHub Actions are passing on `develop` branch
 3. **Migration Sync**: Run `bun run test:validate-migrations` to check drift
 4. **Type Checking**: Execute `bunx tsc --noEmit` for type safety
-5. **Supabase Schema Parity**: Compare staging and production schema snapshots
+5. **SQLite Schema Validation**: Verify database schema is correct
 6. **Health Checks**: Verify API endpoints are responding correctly
 
 ## Version Bumping
@@ -82,14 +82,14 @@ Brief description of release highlights
 - [x] Clean working tree verified
 - [x] Migration sync validated
 - [x] Type checking passed
-- [x] Supabase schema parity confirmed
-- [x] Health checks passed on staging
+- [x] SQLite schema validated
+- [x] Health checks passed locally
 
 ### Deployment Plan
 1. Merge this PR to main
-2. GitHub Actions will auto-deploy to production
-3. Monitor Sentry for errors
-4. Verify health checks on production
+2. Create GitHub release for distribution
+3. Monitor logs for errors
+4. Verify local health checks pass
 
 ### Rollback Plan
 If issues arise:
@@ -143,27 +143,18 @@ bun run test:validate-migrations
 # Must exit 0 with no diff reported
 ```
 
-### Supabase Schema Comparison
+### SQLite Schema Validation
 ```bash
-# Export staging schema
-supabase db dump --db-url=<STAGING_URL> --schema=public > /tmp/staging-schema.sql
-
-# Export production schema
-supabase db dump --db-url=<PRODUCTION_URL> --schema=public > /tmp/production-schema.sql
-
-# Compare (excluding version comments and timestamps)
-diff -u <(grep -v "^--" /tmp/staging-schema.sql) \
-        <(grep -v "^--" /tmp/production-schema.sql)
-# Must show no differences
+cd app
+# Verify SQLite database schema is up to date
+bun run db:check-schema
+# Must exit 0 with schema validated
 ```
 
 ### Health Check Verification
 ```bash
-# Staging API health
-curl -f https://staging-api.kotadb.io/health || exit 1
-
-# Production API health (read-only check)
-curl -f https://api.kotadb.io/health || exit 1
+# Local API health check
+curl -f http://localhost:3000/health || exit 1
 ```
 
 ## Versioning Strategy
@@ -187,7 +178,7 @@ KotaDB follows **Semantic Versioning** (semver.org):
 
 ## Emergency Hotfix Process
 
-For critical production issues requiring immediate fix:
+For critical issues requiring immediate fix:
 
 ```bash
 # Create hotfix branch from main
@@ -228,9 +219,9 @@ Copy this checklist when creating release PR:
 - [ ] Clean working tree (no uncommitted changes)
 - [ ] Migration sync validated (`bun run test:validate-migrations`)
 - [ ] Type checking passed (`bunx tsc --noEmit`)
-- [ ] Supabase schema parity (staging vs production)
-- [ ] Health checks passed on staging API
-- [ ] Health checks passed on production API (read-only)
+- [ ] SQLite schema validated
+- [ ] Health checks passed locally API
+- [ ] Local health checks passed
 - [ ] Version bumped in package.json
 - [ ] Changelog generated and reviewed
 
@@ -238,8 +229,8 @@ Copy this checklist when creating release PR:
 - [ ] Git tag created (vX.Y.Z)
 - [ ] GitHub release published
 - [ ] develop synced with main
-- [ ] Production deployment verified
-- [ ] Sentry monitoring checked (no new errors)
+- [ ] Release verified
+- [ ] Log monitoring checked (no new errors)
 - [ ] API health checks passing post-deployment
 ```
 
@@ -333,7 +324,7 @@ git revert -m 1 <merge-commit-sha>
 git push origin main
 
 # 3. Deploy previous version
-# (Vercel will auto-deploy on push to main)
+# (Tag release on main branch)
 
 # 4. Create post-mortem issue
 gh issue create --title "Post-mortem: v$VERSION rollback" \
@@ -348,7 +339,7 @@ git checkout develop
 ## Related Documentation
 
 - [Branching Strategy](../../CLAUDE.md#branching-strategy) - Git flow overview
-- [Deployment](../../docs/deployment/staging-environments.md) - Vercel preview deployments
+- [Local Development](../../docs/development.md) - Local development setup
 - [CI Configuration](../ci/ci-configuration.md) - GitHub Actions workflows
 - [Testing Guide](../testing/testing-guide.md) - Validation tests
 
@@ -356,6 +347,6 @@ git checkout develop
 
 - **Never force-push** to `main` or `develop`
 - **Always require PR approval** for releases
-- **Monitor Sentry** for 24h post-release
+- **Monitor logs** for 24h post-release
 - **Document breaking changes** prominently in release notes
 - **Coordinate with team** before major releases

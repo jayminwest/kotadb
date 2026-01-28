@@ -1,14 +1,13 @@
 /**
  * Test server lifecycle helpers for Express app testing.
+ * 
+ * NOTE: Queue system and Supabase removed for local-only v2.0.0 (Issue #591)
+ * Test server now starts with SQLite only.
  */
 
 import type { Server } from "node:http";
 import { createExpressApp } from "@api/routes";
 import type { Express } from "express";
-import { getSupabaseTestClient } from "./db";
-import { startQueue, stopQueue, getQueue } from "@queue/client";
-import { QUEUE_NAMES } from "@queue/config";
-import { startIndexWorker } from "@queue/workers/index-repo";
 
 /**
  * Start a test server instance
@@ -20,19 +19,8 @@ export async function startTestServer(): Promise<{
 	server: Server;
 	url: string;
 }> {
-	const supabase = getSupabaseTestClient();
-
-	// Start job queue
-	await startQueue();
-
-	// Create queues before registering workers
-	const queue = getQueue();
-	await queue.createQueue(QUEUE_NAMES.INDEX_REPO);
-
-	// Start indexing worker
-	await startIndexWorker(queue);
-
-	const app = createExpressApp(supabase);
+	// Local-only mode - no Supabase, no queue
+	const app = createExpressApp();
 
 	// Use a random port for parallel test execution
 	const port = 0; // 0 = assign random available port
@@ -65,12 +53,6 @@ export async function stopTestServer(server: Server): Promise<void> {
 			if (err) {
 				reject(err);
 			} else {
-				// Stop job queue
-				try {
-					await stopQueue();
-				} catch (error) {
-					// Ignore errors if queue was already stopped
-				}
 				console.log("Test server stopped");
 				resolve();
 			}

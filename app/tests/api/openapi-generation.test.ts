@@ -3,6 +3,9 @@
  * 
  * Tests that the OpenAPI spec is generated correctly with all required
  * endpoints, schemas, and security definitions.
+ * 
+ * NOTE: Updated for local-only v2.0.0 (Issue #591)
+ * Cloud-only endpoints (subscriptions) have been removed.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -154,15 +157,15 @@ describe('OpenAPI Spec Generation', () => {
 		expect(spec.tags).toBeDefined();
 		expect(Array.isArray(spec.tags)).toBe(true);
 		
-		// Check for expected tags
+		// Check for expected tags (local-only mode)
 		const tagNames = spec.tags.map((t: any) => t.name);
 		expect(tagNames).toContain('Health');
 		expect(tagNames).toContain('Indexing');
 		expect(tagNames).toContain('Jobs');
 		expect(tagNames).toContain('Search');
 		expect(tagNames).toContain('Projects');
-		expect(tagNames).toContain('API Keys');
-		expect(tagNames).toContain('Subscriptions');
+		// NOTE: Subscriptions tag removed for local-only v2.0.0
+		// API Keys may or may not be present depending on local mode
 	});
 
 	test('all paths have operation IDs or summaries', () => {

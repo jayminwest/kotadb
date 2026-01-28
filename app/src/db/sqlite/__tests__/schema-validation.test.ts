@@ -460,6 +460,7 @@ describe("SQLite Schema Validation", () => {
 				"import",
 				"call",
 				"extends",
+				"property_access",
 				"implements",
 				"type_reference",
 				"variable_reference",

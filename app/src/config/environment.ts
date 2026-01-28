@@ -1,8 +1,9 @@
 /**
  * Environment Configuration Module
  *
- * Detects local-first vs cloud-sync mode for KotaDB.
- * Provides environment configuration based on runtime mode.
+ * KotaDB v2.0.0 - Local-Only Mode
+ * This version operates exclusively in local mode using SQLite storage.
+ * Cloud/Supabase functionality has been removed for this release.
  */
 
 import { createLogger } from '@logging/logger';
@@ -11,19 +12,13 @@ const logger = createLogger({ module: 'environment' });
 
 /**
  * Environment configuration for KotaDB.
- * Defines runtime mode and associated credentials.
+ * Local-only mode configuration.
  */
 export interface EnvironmentConfig {
-	/** Runtime mode: local-first or cloud-sync */
-	mode: 'local' | 'cloud';
-	/** Local SQLite database path (local mode only) */
+	/** Runtime mode: always 'local' in v2.0.0 */
+	mode: 'local';
+	/** Local SQLite database path */
 	localDbPath?: string;
-	/** Supabase project URL (cloud mode only) */
-	supabaseUrl?: string;
-	/** Supabase service role key (cloud mode only) */
-	supabaseServiceKey?: string;
-	/** Supabase anonymous key (cloud mode only) */
-	supabaseAnonKey?: string;
 }
 
 /**
@@ -33,27 +28,22 @@ export interface EnvironmentConfig {
 let cachedConfig: EnvironmentConfig | null = null;
 
 /**
- * Get environment configuration based on runtime mode.
+ * Get environment configuration for local-only mode.
  *
- * Checks KOTA_LOCAL_MODE environment variable to determine mode:
- * - If 'true': Returns local-first configuration with optional KOTADB_PATH
- * - Otherwise: Returns cloud-sync configuration with Supabase credentials
+ * Returns local configuration with optional KOTADB_PATH override.
+ * Default database location: ~/.kotadb/kota.db
  *
- * @throws {Error} If cloud mode is detected but required Supabase credentials are missing
  * @returns {EnvironmentConfig} Environment configuration object
  *
  * @example
  * ```typescript
- * // Local mode
- * process.env.KOTA_LOCAL_MODE = 'true';
  * const config = getEnvironmentConfig();
- * // { mode: 'local', localDbPath: './kota.db' }
+ * // { mode: 'local', localDbPath: '~/.kotadb/kota.db' }
  *
- * // Cloud mode
- * process.env.SUPABASE_URL = 'https://example.supabase.co';
- * process.env.SUPABASE_SERVICE_KEY = 'service_key';
+ * // With custom path
+ * process.env.KOTADB_PATH = '/custom/path/kota.db';
  * const config = getEnvironmentConfig();
- * // { mode: 'cloud', supabaseUrl: '...', supabaseServiceKey: '...' }
+ * // { mode: 'local', localDbPath: '/custom/path/kota.db' }
  * ```
  */
 export function getEnvironmentConfig(): EnvironmentConfig {
@@ -62,83 +52,36 @@ export function getEnvironmentConfig(): EnvironmentConfig {
 		return cachedConfig;
 	}
 
-	const localMode = process.env.KOTA_LOCAL_MODE === 'true';
-
-	if (localMode) {
-		logger.info('Environment configured for local-first mode', {
-			localDbPath: process.env.KOTADB_PATH || 'default',
-		});
-
-		cachedConfig = {
-			mode: 'local',
-			localDbPath: process.env.KOTADB_PATH || undefined,
-		};
-
-		return cachedConfig;
-	}
-
-	// Cloud mode - require Supabase credentials
-	const supabaseUrl = process.env.SUPABASE_URL;
-	const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-	const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-	if (!supabaseUrl || !supabaseServiceKey) {
-		const errorMsg =
-			'Cloud mode requires SUPABASE_URL and SUPABASE_SERVICE_KEY. ' +
-			'Set KOTA_LOCAL_MODE=true for local operation.';
-
-		logger.error('Missing required Supabase credentials for cloud mode', {
-			hasSupabaseUrl: !!supabaseUrl,
-			hasSupabaseServiceKey: !!supabaseServiceKey,
-		});
-
-		throw new Error(errorMsg);
-	}
-
-	logger.info('Environment configured for cloud-sync mode', {
-		supabaseUrl,
-		hasServiceKey: !!supabaseServiceKey,
-		hasAnonKey: !!supabaseAnonKey,
+	logger.info('Environment configured for local-only mode (v2.0.0)', {
+		localDbPath: process.env.KOTADB_PATH || 'default (~/.kotadb/kota.db)',
 	});
 
 	cachedConfig = {
-		mode: 'cloud',
-		supabaseUrl,
-		supabaseServiceKey,
-		supabaseAnonKey,
+		mode: 'local',
+		localDbPath: process.env.KOTADB_PATH || undefined,
 	};
 
 	return cachedConfig;
 }
 
 /**
- * Check if KotaDB is running in local-first mode.
+ * Check if KotaDB is running in local mode.
  *
- * @returns {boolean} True if KOTA_LOCAL_MODE=true, false otherwise
+ * In v2.0.0, this always returns true as KotaDB operates
+ * exclusively in local-only mode.
+ *
+ * @returns {boolean} Always returns true in v2.0.0
  *
  * @example
  * ```typescript
  * if (isLocalMode()) {
- *   // Use SQLite storage
+ *   // Use SQLite storage (always true in v2.0.0)
  *   const db = await openLocalDatabase();
- * } else {
- *   // Use Supabase cloud storage
- *   const client = createSupabaseClient();
  * }
  * ```
  */
 export function isLocalMode(): boolean {
-	const config = getEnvironmentConfig();
-
-	// CRITICAL: Prevent local mode in production
-	if (config.mode === 'local' && process.env.NODE_ENV === 'production') {
-		throw new Error(
-			'SECURITY ERROR: Local mode cannot be enabled in production. ' +
-				'This would bypass all authentication and rate limiting.',
-		);
-	}
-
-	return config.mode === 'local';
+	return true;
 }
 
 /**

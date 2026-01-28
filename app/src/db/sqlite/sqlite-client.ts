@@ -36,6 +36,8 @@ export interface DatabaseConfig {
 	foreignKeys: boolean;
 	/** Cache size in pages (negative = KB) */
 	cacheSize: number;
+	/** Skip auto-initialization of schema (for tests that manage their own schema) */
+	skipSchemaInit: boolean;
 }
 
 /**
@@ -48,6 +50,7 @@ export const DEFAULT_CONFIG: DatabaseConfig = {
 	busyTimeout: 30000,
 	foreignKeys: true,
 	cacheSize: -64000, // 64MB cache
+	skipSchemaInit: false,
 };
 
 /**
@@ -118,7 +121,7 @@ export class KotaDatabase {
 		this.configurePragmas();
 
 		// Auto-initialize schema if not already present (writer only)
-		if (!this.config.readonly) {
+		if (!this.config.readonly && !this.config.skipSchemaInit) {
 			if (!this.tableExists("indexed_files")) {
 				const schemaPath = join(__dirname, "../sqlite-schema.sql");
 				const schema = readFileSync(schemaPath, "utf-8");

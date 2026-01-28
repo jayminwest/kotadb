@@ -1,6 +1,8 @@
 /**
  * Spec validation logic for validate_implementation_spec MCP tool
  *
+ * Local-only v2.0.0: Uses SQLite instead of Supabase
+ *
  * Validates implementation specs against KotaDB conventions:
  * - Migration naming conventions
  * - Path alias usage
@@ -9,29 +11,22 @@
  * - Dependency compatibility
  */
 
-import { Sentry } from "../instrument.js";
-import { createLogger } from "@logging/logger.js";
-import type { SupabaseClient } from "@supabase/supabase-js";
-import type {
-	ImplementationSpec,
-	ValidationResult,
-	ValidationIssue,
-} from "@shared/types";
 import { resolveFilePath } from "@api/queries";
-import { getGitHubClient } from "./github-integration";
+import { getGlobalDatabase } from "@db/sqlite/index.js";
+import { createLogger } from "@logging/logger.js";
+import type { ImplementationSpec, ValidationIssue, ValidationResult } from "@shared/types";
+import { Sentry } from "../instrument.js";
 
 const logger = createLogger({ module: "mcp-spec-validation" });
 
 /**
  * Validate implementation spec against KotaDB conventions
  *
- * @param supabase - Supabase client instance
  * @param spec - Implementation spec to validate
- * @param userId - User ID for RLS context
+ * @param userId - User ID for context
  * @returns Validation results
  */
 export async function validateImplementationSpec(
-	supabase: SupabaseClient,
 	spec: ImplementationSpec,
 	userId: string,
 ): Promise<ValidationResult> {
@@ -41,12 +36,8 @@ export async function validateImplementationSpec(
 	try {
 		logger.info("Starting spec validation", { feature_name: spec.feature_name, user_id: userId });
 
-		// Resolve repository ID
-		const repositoryId = await resolveRepositoryId(
-			supabase,
-			spec.repository,
-			userId,
-		);
+		// Resolve repository ID from SQLite
+		const repositoryId = resolveRepositoryId(spec.repository);
 
 		if (!repositoryId) {
 			errors.push({
@@ -54,7 +45,10 @@ export async function validateImplementationSpec(
 				message: "No repository found. Please index a repository first.",
 			});
 
-			logger.warn("Spec validation failed: no repository", { feature_name: spec.feature_name, user_id: userId });
+			logger.warn("Spec validation failed: no repository", {
+				feature_name: spec.feature_name,
+				user_id: userId,
+			});
 
 			return {
 				valid: false,
@@ -66,43 +60,34 @@ export async function validateImplementationSpec(
 			};
 		}
 
-	// Validate file conflicts
-	const fileConflicts = await checkFileConflicts(
-		supabase,
-		spec,
-		repositoryId,
-		userId,
-	);
-	errors.push(...fileConflicts.errors);
-	warnings.push(...fileConflicts.warnings);
+		// Validate file conflicts
+		const fileConflicts = checkFileConflicts(spec, repositoryId);
+		errors.push(...fileConflicts.errors);
+		warnings.push(...fileConflicts.warnings);
 
-	// Validate naming conventions
-	const namingIssues = validateNamingConventions(spec);
-	errors.push(...namingIssues.errors);
-	warnings.push(...namingIssues.warnings);
+		// Validate naming conventions
+		const namingIssues = validateNamingConventions(spec);
+		errors.push(...namingIssues.errors);
+		warnings.push(...namingIssues.warnings);
 
-	// Validate path aliases
-	const pathAliasIssues = await validatePathAliases(spec);
-	errors.push(...pathAliasIssues.errors);
-	warnings.push(...pathAliasIssues.warnings);
+		// Validate path aliases
+		const pathAliasIssues = validatePathAliases(spec);
+		errors.push(...pathAliasIssues.errors);
+		warnings.push(...pathAliasIssues.warnings);
 
-	// Estimate test coverage impact
-	const testCoverageIssues = estimateTestCoverageImpact(spec);
-	warnings.push(...testCoverageIssues);
+		// Estimate test coverage impact
+		const testCoverageIssues = estimateTestCoverageImpact(spec);
+		warnings.push(...testCoverageIssues);
 
-	// Validate dependencies
-	const dependencyIssues = validateDependencies(spec);
-	warnings.push(...dependencyIssues);
+		// Validate dependencies
+		const dependencyIssues = validateDependencies(spec);
+		warnings.push(...dependencyIssues);
 
-	// Generate approval conditions
-	const approvalConditions = generateApprovalConditions(
-		spec,
-		errors,
-		warnings,
-	);
+		// Generate approval conditions
+		const approvalConditions = generateApprovalConditions(spec, errors, warnings);
 
-	// Calculate risk assessment
-	const riskAssessment = calculateRiskAssessment(spec, errors, warnings);
+		// Calculate risk assessment
+		const riskAssessment = calculateRiskAssessment(spec, errors, warnings);
 
 		// Generate summary
 		const summary = generateSummary(spec, errors, warnings);
@@ -124,10 +109,14 @@ export async function validateImplementationSpec(
 			summary,
 		};
 	} catch (error) {
-		logger.error("Spec validation error", error instanceof Error ? error : new Error(String(error)), {
-			feature_name: spec.feature_name,
-			user_id: userId,
-		});
+		logger.error(
+			"Spec validation error",
+			error instanceof Error ? error : new Error(String(error)),
+			{
+				feature_name: spec.feature_name,
+				user_id: userId,
+			},
+		);
 		Sentry.captureException(error, {
 			tags: { feature_name: spec.feature_name, user_id: userId },
 		});
@@ -138,52 +127,40 @@ export async function validateImplementationSpec(
 /**
  * Resolve repository ID from request or use first available repository
  */
-async function resolveRepositoryId(
-	supabase: SupabaseClient,
-	repositoryId: string | undefined,
-	userId: string,
-): Promise<string | null> {
+function resolveRepositoryId(repositoryId: string | undefined): string | null {
 	if (repositoryId) {
 		return repositoryId;
 	}
 
-	// Get first repository for user
-	const { data } = await supabase
-		.from("repositories")
-		.select("id")
-		.eq("user_id", userId)
-		.limit(1)
-		.maybeSingle();
+	// Get first repository from SQLite
+	const db = getGlobalDatabase();
+	const repo = db.queryOne<{ id: string }>(
+		"SELECT id FROM repositories ORDER BY created_at DESC LIMIT 1",
+		[],
+	);
 
-	return data?.id ?? null;
+	return repo?.id ?? null;
 }
 
 /**
- * Check for file conflicts (files already exist or are in other branches)
+ * Check for file conflicts (files already exist)
  */
-async function checkFileConflicts(
-	supabase: SupabaseClient,
+function checkFileConflicts(
 	spec: ImplementationSpec,
 	repositoryId: string,
-	userId: string,
-): Promise<{ errors: ValidationIssue[]; warnings: ValidationIssue[] }> {
+): { errors: ValidationIssue[]; warnings: ValidationIssue[] } {
 	const errors: ValidationIssue[] = [];
 	const warnings: ValidationIssue[] = [];
 
 	// Check files_to_create for conflicts
 	if (spec.files_to_create) {
 		for (const fileSpec of spec.files_to_create) {
-			const fileId = await resolveFilePath(
-				supabase,
-				fileSpec.path,
-				repositoryId,
-				userId,
-			);
+			const fileId = resolveFilePath(fileSpec.path, repositoryId);
 
 			if (fileId) {
 				errors.push({
 					type: "file_conflict",
-					message: `File already exists: ${fileSpec.path}`,
+					message: "File already exists: " + fileSpec.path,
 					affected_resource: fileSpec.path,
 					suggested_fix: "Remove from files_to_create or rename the file",
 				});
@@ -191,42 +168,7 @@ async function checkFileConflicts(
 		}
 	}
 
-	// Check for GitHub branch conflicts (if available)
-	const { data: repo } = await supabase
-		.from("repositories")
-		.select("full_name")
-		.eq("id", repositoryId)
-		.maybeSingle();
-
-	if (repo && repo.full_name) {
-		const [owner, repoName] = repo.full_name.split("/");
-		if (owner && repoName) {
-			const githubClient = getGitHubClient();
-			if (githubClient.isAvailable()) {
-				const allFiles = [
-					...(spec.files_to_create?.map((f) => f.path) ?? []),
-					...(spec.files_to_modify?.map((f) => f.path) ?? []),
-				];
-
-				const conflicts = await githubClient.detectFileConflicts(
-					owner,
-					repoName,
-					allFiles,
-				);
-
-				for (const conflict of conflicts) {
-					warnings.push({
-						type: "branch_conflict",
-						message: conflict.description,
-						affected_resource: conflict.metadata?.overlapping_files
-							? (conflict.metadata.overlapping_files as string[])[0]
-							: undefined,
-						suggested_fix: "Coordinate with open PR or wait for merge",
-					});
-				}
-			}
-		}
-	}
+	// Note: GitHub branch conflict detection removed for local-only mode
 
 	return { errors, warnings };
 }
@@ -234,9 +176,10 @@ async function checkFileConflicts(
 /**
  * Validate naming conventions
  */
-function validateNamingConventions(
-	spec: ImplementationSpec,
-): { errors: ValidationIssue[]; warnings: ValidationIssue[] } {
+function validateNamingConventions(spec: ImplementationSpec): {
+	errors: ValidationIssue[];
+	warnings: ValidationIssue[];
+} {
 	const errors: ValidationIssue[] = [];
 	const warnings: ValidationIssue[] = [];
 
@@ -248,7 +191,7 @@ function validateNamingConventions(
 			if (!migrationPattern.test(migration.filename)) {
 				errors.push({
 					type: "naming_convention",
-					message: `Invalid migration filename: ${migration.filename}`,
+					message: "Invalid migration filename: " + migration.filename,
 					affected_resource: migration.filename,
 					suggested_fix:
 						"Use format: YYYYMMDDHHMMSS_description.sql (e.g., 20251108120000_add_oauth_providers.sql)",
@@ -274,7 +217,7 @@ function validateNamingConventions(
 			) {
 				warnings.push({
 					type: "naming_convention",
-					message: `Test file should use .test.ts or .spec.ts extension: ${filePath}`,
+					message: "Test file should use .test.ts or .spec.ts extension: " + filePath,
 					affected_resource: filePath,
 					suggested_fix: "Rename to use .test.ts or .spec.ts extension",
 				});
@@ -288,9 +231,10 @@ function validateNamingConventions(
 /**
  * Validate path alias usage
  */
-async function validatePathAliases(
-	spec: ImplementationSpec,
-): Promise<{ errors: ValidationIssue[]; warnings: ValidationIssue[] }> {
+function validatePathAliases(spec: ImplementationSpec): {
+	errors: ValidationIssue[];
+	warnings: ValidationIssue[];
+} {
 	const errors: ValidationIssue[] = [];
 	const warnings: ValidationIssue[] = [];
 
@@ -324,14 +268,14 @@ async function validatePathAliases(
 
 			if (parts.length > 1) {
 				const topLevelDir = parts[0];
-				const expectedAlias = `@${topLevelDir}/`;
+				const expectedAlias = "@" + topLevelDir + "/";
 
 				if (!validPrefixes.includes(expectedAlias)) {
 					warnings.push({
 						type: "path_alias",
-						message: `File in app/src/${topLevelDir}/ but no standard path alias exists`,
+						message: "File in app/src/" + topLevelDir + "/ but no standard path alias exists",
 						affected_resource: filePath,
-						suggested_fix: `Consider using existing aliases: ${validPrefixes.join(", ")}`,
+						suggested_fix: "Consider using existing aliases: " + validPrefixes.join(", "),
 					});
 				}
 			}
@@ -344,42 +288,38 @@ async function validatePathAliases(
 /**
  * Estimate test coverage impact
  */
-function estimateTestCoverageImpact(
-	spec: ImplementationSpec,
-): ValidationIssue[] {
+function estimateTestCoverageImpact(spec: ImplementationSpec): ValidationIssue[] {
 	const warnings: ValidationIssue[] = [];
 
 	// Count implementation files vs test files
 	const implementationFiles =
-		spec.files_to_create?.filter(
-			(f) => !f.path.includes("test") && !f.path.includes("spec"),
-		) ?? [];
+		spec.files_to_create?.filter((f) => !f.path.includes("test") && !f.path.includes("spec")) ?? [];
 	const testFiles =
-		spec.files_to_create?.filter(
-			(f) => f.path.includes("test") || f.path.includes("spec"),
-		) ?? [];
+		spec.files_to_create?.filter((f) => f.path.includes("test") || f.path.includes("spec")) ?? [];
 
 	// Warn if implementation files lack corresponding tests
 	if (implementationFiles.length > 0 && testFiles.length === 0) {
 		warnings.push({
 			type: "test_coverage",
-			message: `No test files specified for ${implementationFiles.length} implementation file(s)`,
-			suggested_fix:
-				"Add test files for new implementation files to maintain test coverage",
+			message:
+				"No test files specified for " + implementationFiles.length + " implementation file(s)",
+			suggested_fix: "Add test files for new implementation files to maintain test coverage",
 		});
 	}
 
 	// Warn if test coverage ratio is low
 	const testRatio =
-		implementationFiles.length > 0
-			? testFiles.length / implementationFiles.length
-			: 1;
+		implementationFiles.length > 0 ? testFiles.length / implementationFiles.length : 1;
 	if (testRatio < 0.5 && implementationFiles.length > 2) {
 		warnings.push({
 			type: "test_coverage",
-			message: `Low test coverage ratio: ${testFiles.length} tests for ${implementationFiles.length} implementation files`,
-			suggested_fix:
-				"Consider adding more test files to achieve at least 1:1 ratio",
+			message:
+				"Low test coverage ratio: " +
+				testFiles.length +
+				" tests for " +
+				implementationFiles.length +
+				" implementation files",
+			suggested_fix: "Consider adding more test files to achieve at least 1:1 ratio",
 		});
 	}
 
@@ -402,7 +342,7 @@ function validateDependencies(spec: ImplementationSpec): ValidationIssue[] {
 		if (!dep.version) {
 			warnings.push({
 				type: "dependency",
-				message: `No version specified for dependency: ${dep.name}`,
+				message: "No version specified for dependency: " + dep.name,
 				affected_resource: dep.name,
 				suggested_fix: "Specify an exact version or version range",
 			});
@@ -412,10 +352,10 @@ function validateDependencies(spec: ImplementationSpec): ValidationIssue[] {
 		if (dep.name.includes("mock") || dep.name.includes("stub")) {
 			warnings.push({
 				type: "dependency",
-				message: `Mocking library detected: ${dep.name}. KotaDB follows antimocking philosophy.`,
+				message:
+					"Mocking library detected: " + dep.name + ". KotaDB follows antimocking philosophy.",
 				affected_resource: dep.name,
-				suggested_fix:
-					"Consider using real service instances instead of mocks (see /anti-mock)",
+				suggested_fix: "Consider using real service instances instead of mocks (see /anti-mock)",
 			});
 		}
 	}
@@ -435,15 +375,13 @@ function generateApprovalConditions(
 
 	// Blocking conditions from errors
 	if (errors.length > 0) {
-		conditions.push(
-			`Fix ${errors.length} validation error(s) before implementation`,
-		);
+		conditions.push("Fix " + errors.length + " validation error(s) before implementation");
 	}
 
 	// Migration-specific conditions
 	if (spec.migrations && spec.migrations.length > 0) {
 		conditions.push(
-			"Ensure migration sync between app/src/db/migrations and app/supabase/migrations",
+			"Verify SQLite schema changes in app/src/db/sqlite-schema.sql",
 		);
 		conditions.push("Run migration sync validation: bun run test:validate-migrations");
 	}
@@ -457,9 +395,7 @@ function generateApprovalConditions(
 
 	// Test coverage conditions
 	const hasTests =
-		spec.files_to_create?.some(
-			(f) => f.path.includes("test") || f.path.includes("spec"),
-		) ?? false;
+		spec.files_to_create?.some((f) => f.path.includes("test") || f.path.includes("spec")) ?? false;
 	if (!hasTests) {
 		conditions.push("Add test files before merging to maintain coverage");
 	}
@@ -467,7 +403,9 @@ function generateApprovalConditions(
 	// Dependency conditions
 	if (spec.dependencies_to_add && spec.dependencies_to_add.length > 0) {
 		conditions.push(
-			`Verify ${spec.dependencies_to_add.length} new dependencies are necessary and compatible`,
+			"Verify " +
+				spec.dependencies_to_add.length +
+				" new dependencies are necessary and compatible",
 		);
 	}
 
@@ -489,11 +427,11 @@ function calculateRiskAssessment(
 	const riskFactors: string[] = [];
 
 	if (errors.length > 0) {
-		riskFactors.push(`${errors.length} blocking errors`);
+		riskFactors.push(errors.length + " blocking errors");
 	}
 
 	if (warnings.length > 3) {
-		riskFactors.push(`${warnings.length} warnings`);
+		riskFactors.push(warnings.length + " warnings");
 	}
 
 	if (spec.breaking_changes) {
@@ -501,13 +439,12 @@ function calculateRiskAssessment(
 	}
 
 	if (spec.migrations && spec.migrations.length > 0) {
-		riskFactors.push(`${spec.migrations.length} database migrations`);
+		riskFactors.push(spec.migrations.length + " database migrations");
 	}
 
-	const totalFiles =
-		(spec.files_to_create?.length ?? 0) + (spec.files_to_modify?.length ?? 0);
+	const totalFiles = (spec.files_to_create?.length ?? 0) + (spec.files_to_modify?.length ?? 0);
 	if (totalFiles > 20) {
-		riskFactors.push(`${totalFiles} files affected`);
+		riskFactors.push(totalFiles + " files affected");
 	}
 
 	if (riskFactors.length === 0) {
@@ -515,10 +452,10 @@ function calculateRiskAssessment(
 	}
 
 	if (riskFactors.length >= 3 || spec.breaking_changes) {
-		return `HIGH RISK - ${riskFactors.join(", ")}. Requires careful review and testing.`;
+		return "HIGH RISK - " + riskFactors.join(", ") + ". Requires careful review and testing.";
 	}
 
-	return `MEDIUM RISK - ${riskFactors.join(", ")}. Standard review process recommended.`;
+	return "MEDIUM RISK - " + riskFactors.join(", ") + ". Standard review process recommended.";
 }
 
 /**
@@ -531,24 +468,23 @@ function generateSummary(
 ): string {
 	const parts: string[] = [];
 
-	parts.push(`Validation for feature: ${spec.feature_name}.`);
+	parts.push("Validation for feature: " + spec.feature_name + ".");
 
 	if (errors.length > 0) {
-		parts.push(`FAILED - ${errors.length} error(s) must be fixed.`);
+		parts.push("FAILED - " + errors.length + " error(s) must be fixed.");
 	} else {
 		parts.push("PASSED - No blocking errors.");
 	}
 
 	if (warnings.length > 0) {
-		parts.push(`${warnings.length} warning(s) for review.`);
+		parts.push(warnings.length + " warning(s) for review.");
 	}
 
-	const totalFiles =
-		(spec.files_to_create?.length ?? 0) + (spec.files_to_modify?.length ?? 0);
-	parts.push(`${totalFiles} files planned.`);
+	const totalFiles = (spec.files_to_create?.length ?? 0) + (spec.files_to_modify?.length ?? 0);
+	parts.push(totalFiles + " files planned.");
 
 	if (spec.migrations && spec.migrations.length > 0) {
-		parts.push(`${spec.migrations.length} migration(s) included.`);
+		parts.push(spec.migrations.length + " migration(s) included.");
 	}
 
 	return parts.join(" ");

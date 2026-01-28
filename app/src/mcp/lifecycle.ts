@@ -2,8 +2,8 @@
  * MCP lifecycle handlers (initialize, capability negotiation)
  */
 
-import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { Sentry } from "../instrument.js";
 
 const logger = createLogger({ module: "mcp-lifecycle" });
 
@@ -63,7 +63,10 @@ export function handleInitialize(_params: InitializeRequest): InitializeResult {
 			},
 		};
 	} catch (error) {
-		logger.error("MCP server initialization failed", error instanceof Error ? error : new Error(String(error)));
+		logger.error(
+			"MCP server initialization failed",
+			error instanceof Error ? error : new Error(String(error)),
+		);
 		Sentry.captureException(error);
 		throw error;
 	}

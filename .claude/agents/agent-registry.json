@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "title": "Claude Code Agent Registry",
   "description": "Machine-readable registry of available agents with capability and model indexes",
-  "version": "1.0.0",
+  "version": "2.0.0",
   "agents": {
     "scout-agent": {
       "name": "scout-agent",
@@ -61,116 +61,24 @@
       ],
       "readOnly": true
     },
-    "orchestrator-agent": {
-      "name": "orchestrator-agent",
-      "description": "Multi-agent coordination and workflow delegation specialist",
-      "file": "orchestrator-agent.md",
-      "model": "opus",
-      "capabilities": ["orchestrate", "coordinate", "delegate", "plan", "synthesize"],
-      "tools": [
-        "Task",
-        "SlashCommand",
-        "Read",
-        "Glob",
-        "Grep",
-        "TodoWrite",
-        "AskUserQuestion",
-        "mcp__kotadb__search_code",
-        "mcp__kotadb__search_dependencies"
-      ],
-      "readOnly": true
-    },
-    "branch-plan": {
-      "name": "branch-plan",
-      "description": "Planning coordinator via retrieval agents",
-      "file": "branch/plan.md",
+    "docs-scraper": {
+      "name": "docs-scraper",
+      "description": "Documentation scraping specialist for fetching and saving docs as markdown",
+      "file": "docs-scraper.md",
       "model": "sonnet",
-      "capabilities": ["plan", "research", "investigate", "find"],
+      "capabilities": ["scrape", "fetch", "document"],
       "tools": [
-        "Read",
-        "Glob",
-        "Grep",
+        "mcp__firecrawl-mcp__firecrawl_scrape",
         "WebFetch",
-        "Task",
-        "mcp__leaf_spawner__spawn_leaf_agent",
-        "mcp__leaf_spawner__get_agent_result",
-        "mcp__leaf_spawner__list_agents"
+        "Write",
+        "Edit"
       ],
-      "readOnly": true
-    },
-    "branch-build": {
-      "name": "branch-build",
-      "description": "Build coordinator via build agents",
-      "file": "branch/build.md",
-      "model": "sonnet",
-      "capabilities": ["implement", "build", "create", "fix"],
-      "tools": [
-        "Read",
-        "Glob",
-        "Grep",
-        "Task",
-        "mcp__leaf_spawner__spawn_leaf_agent",
-        "mcp__leaf_spawner__get_agent_result",
-        "mcp__leaf_spawner__list_agents"
-      ],
-      "readOnly": true
-    },
-    "branch-review": {
-      "name": "branch-review",
-      "description": "Review coordinator via review agents",
-      "file": "branch/review.md",
-      "model": "sonnet",
-      "capabilities": ["review", "verify", "check", "test"],
-      "tools": [
-        "Read",
-        "Glob",
-        "Grep",
-        "Task",
-        "mcp__leaf_spawner__spawn_leaf_agent",
-        "mcp__leaf_spawner__get_agent_result",
-        "mcp__leaf_spawner__list_agents"
-      ],
-      "readOnly": true
-    },
-    "branch-meta": {
-      "name": "branch-meta",
-      "description": "Meta coordinator for system updates",
-      "file": "branch/meta.md",
-      "model": "sonnet",
-      "capabilities": ["update", "improve", "configure"],
-      "tools": [
-        "Read",
-        "Glob",
-        "Grep",
-        "Task",
-        "mcp__leaf_spawner__spawn_leaf_agent",
-        "mcp__leaf_spawner__get_agent_result",
-        "mcp__leaf_spawner__list_agents"
-      ],
-      "readOnly": true
-    },
-    "leaf-retrieval": {
-      "name": "leaf-retrieval",
-      "description": "Leaf agent for search and retrieval tasks",
-      "file": "leaf/retrieval.md",
-      "model": "haiku",
-      "capabilities": ["search", "read", "find"],
-      "tools": ["Read", "Glob", "Grep", "WebFetch", "WebSearch"],
-      "readOnly": true
-    },
-    "leaf-build": {
-      "name": "leaf-build",
-      "description": "Leaf agent for code implementation",
-      "file": "leaf/build.md",
-      "model": "sonnet",
-      "capabilities": ["implement", "write", "edit", "execute"],
-      "tools": ["Read", "Write", "Edit", "Bash", "Glob", "Grep"],
       "readOnly": false
     },
     "claude-config-plan-agent": {
       "name": "claude-config-plan-agent",
       "description": "Claude configuration planning and spec generation specialist",
-      "file": ".claude/agents/experts/claude-config/claude-config-plan-agent.md",
+      "file": "experts/claude-config/claude-config-plan-agent.md",
       "model": "sonnet",
       "capabilities": ["claude-config-planning", "spec-generation"],
       "tools": ["Read", "Glob", "Grep", "Write"],
@@ -179,7 +87,7 @@
     "claude-config-build-agent": {
       "name": "claude-config-build-agent",
       "description": "Claude configuration implementation specialist",
-      "file": ".claude/agents/experts/claude-config/claude-config-build-agent.md",
+      "file": "experts/claude-config/claude-config-build-agent.md",
       "model": "sonnet",
       "capabilities": ["claude-config-implementation"],
       "tools": ["Read", "Write", "Edit", "Glob", "Grep"],
@@ -188,7 +96,7 @@
     "claude-config-improve-agent": {
       "name": "claude-config-improve-agent",
       "description": "Claude configuration expertise evolution specialist",
-      "file": ".claude/agents/experts/claude-config/claude-config-improve-agent.md",
+      "file": "experts/claude-config/claude-config-improve-agent.md",
       "model": "sonnet",
       "capabilities": ["claude-config-expertise-evolution"],
       "tools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
@@ -197,7 +105,7 @@
     "claude-config-question-agent": {
       "name": "claude-config-question-agent",
       "description": "Claude configuration Q&A specialist",
-      "file": ".claude/agents/experts/claude-config/claude-config-question-agent.md",
+      "file": "experts/claude-config/claude-config-question-agent.md",
       "model": "haiku",
       "capabilities": ["claude-config-qa"],
       "tools": ["Read", "Glob", "Grep"],
@@ -206,7 +114,7 @@
     "agent-authoring-plan-agent": {
       "name": "agent-authoring-plan-agent",
       "description": "Agent authoring planning and spec generation specialist",
-      "file": ".claude/agents/experts/agent-authoring/agent-authoring-plan-agent.md",
+      "file": "experts/agent-authoring/agent-authoring-plan-agent.md",
       "model": "sonnet",
       "capabilities": ["agent-authoring-planning", "spec-generation"],
       "tools": ["Read", "Glob", "Grep", "Write"],
@@ -215,7 +123,7 @@
     "agent-authoring-build-agent": {
       "name": "agent-authoring-build-agent",
       "description": "Agent authoring implementation specialist",
-      "file": ".claude/agents/experts/agent-authoring/agent-authoring-build-agent.md",
+      "file": "experts/agent-authoring/agent-authoring-build-agent.md",
       "model": "sonnet",
       "capabilities": ["agent-authoring-implementation"],
       "tools": ["Read", "Write", "Edit", "Glob", "Grep"],
@@ -224,7 +132,7 @@
     "agent-authoring-improve-agent": {
       "name": "agent-authoring-improve-agent",
       "description": "Agent authoring expertise evolution specialist",
-      "file": ".claude/agents/experts/agent-authoring/agent-authoring-improve-agent.md",
+      "file": "experts/agent-authoring/agent-authoring-improve-agent.md",
       "model": "sonnet",
       "capabilities": ["agent-authoring-expertise-evolution"],
       "tools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
@@ -233,7 +141,7 @@
     "agent-authoring-question-agent": {
       "name": "agent-authoring-question-agent",
       "description": "Agent authoring Q&A specialist",
-      "file": ".claude/agents/experts/agent-authoring/agent-authoring-question-agent.md",
+      "file": "experts/agent-authoring/agent-authoring-question-agent.md",
       "model": "haiku",
       "capabilities": ["agent-authoring-qa"],
       "tools": ["Read", "Glob", "Grep"],
@@ -242,36 +150,22 @@
   },
   "capabilityIndex": {
     "explore": ["scout-agent"],
-    "search": ["scout-agent", "leaf-retrieval"],
+    "search": ["scout-agent"],
     "analyze": ["scout-agent", "review-agent"],
-    "research": ["scout-agent", "branch-plan"],
-    "implement": ["build-agent", "branch-build", "leaf-build"],
+    "research": ["scout-agent"],
+    "implement": ["build-agent"],
     "modify": ["build-agent"],
-    "execute": ["build-agent", "leaf-build"],
-    "create": ["build-agent", "branch-build"],
-    "fix": ["build-agent", "branch-build"],
-    "review": ["review-agent", "branch-review"],
+    "execute": ["build-agent"],
+    "create": ["build-agent"],
+    "fix": ["build-agent"],
+    "review": ["review-agent"],
     "audit": ["review-agent"],
     "quality": ["review-agent"],
     "security": ["review-agent"],
     "feedback": ["review-agent"],
-    "orchestrate": ["orchestrator-agent"],
-    "coordinate": ["orchestrator-agent"],
-    "delegate": ["orchestrator-agent"],
-    "plan": ["orchestrator-agent", "branch-plan"],
-    "synthesize": ["orchestrator-agent"],
-    "investigate": ["branch-plan"],
-    "find": ["branch-plan", "leaf-retrieval"],
-    "build": ["branch-build"],
-    "verify": ["branch-review"],
-    "check": ["branch-review"],
-    "test": ["branch-review"],
-    "update": ["branch-meta"],
-    "improve": ["branch-meta"],
-    "configure": ["branch-meta"],
-    "read": ["leaf-retrieval"],
-    "write": ["leaf-build"],
-    "edit": ["leaf-build"],
+    "scrape": ["docs-scraper"],
+    "fetch": ["docs-scraper"],
+    "document": ["docs-scraper"],
     "claude-config-planning": ["claude-config-plan-agent"],
     "claude-config-implementation": ["claude-config-build-agent"],
     "claude-config-expertise-evolution": ["claude-config-improve-agent"],
@@ -283,30 +177,24 @@
     "spec-generation": ["claude-config-plan-agent", "agent-authoring-plan-agent"]
   },
   "modelIndex": {
-    "haiku": ["scout-agent", "review-agent", "leaf-retrieval", "claude-config-question-agent", "agent-authoring-question-agent"],
-    "sonnet": ["build-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
-    "opus": ["orchestrator-agent"]
+    "haiku": ["scout-agent", "review-agent", "claude-config-question-agent", "agent-authoring-question-agent"],
+    "sonnet": ["build-agent", "docs-scraper", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"]
   },
   "toolMatrix": {
-    "Glob": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
-    "Grep": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
-    "Read": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta", "leaf-retrieval", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
-    "Edit": ["build-agent", "leaf-build", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
-    "Write": ["build-agent", "leaf-build", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
-    "Bash": ["build-agent", "leaf-build", "claude-config-improve-agent", "agent-authoring-improve-agent"],
+    "Glob": ["scout-agent", "build-agent", "review-agent", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
+    "Grep": ["scout-agent", "build-agent", "review-agent", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
+    "Read": ["scout-agent", "build-agent", "review-agent", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
+    "Edit": ["build-agent", "docs-scraper", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
+    "Write": ["build-agent", "docs-scraper", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
+    "Bash": ["build-agent", "claude-config-improve-agent", "agent-authoring-improve-agent"],
     "NotebookEdit": ["build-agent"],
-    "Task": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent", "branch-plan", "branch-build", "branch-review", "branch-meta"],
-    "TodoWrite": ["build-agent", "orchestrator-agent"],
-    "SlashCommand": ["orchestrator-agent"],
-    "AskUserQuestion": ["orchestrator-agent"],
-    "WebFetch": ["review-agent", "branch-plan", "leaf-retrieval"],
-    "WebSearch": ["leaf-retrieval"],
-    "mcp__kotadb__search_code": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
-    "mcp__kotadb__search_dependencies": ["scout-agent", "build-agent", "review-agent", "orchestrator-agent"],
+    "Task": ["scout-agent", "build-agent", "review-agent"],
+    "TodoWrite": ["build-agent"],
+    "WebFetch": ["review-agent", "docs-scraper"],
+    "mcp__kotadb__search_code": ["scout-agent", "build-agent", "review-agent"],
+    "mcp__kotadb__search_dependencies": ["scout-agent", "build-agent", "review-agent"],
     "mcp__kotadb__list_recent_files": ["scout-agent"],
     "mcp__kotadb__analyze_change_impact": ["build-agent", "review-agent"],
-    "mcp__leaf_spawner__spawn_leaf_agent": ["branch-plan", "branch-build", "branch-review", "branch-meta"],
-    "mcp__leaf_spawner__get_agent_result": ["branch-plan", "branch-build", "branch-review", "branch-meta"],
-    "mcp__leaf_spawner__list_agents": ["branch-plan", "branch-build", "branch-review", "branch-meta"]
+    "mcp__firecrawl-mcp__firecrawl_scrape": ["docs-scraper"]
   }
 }

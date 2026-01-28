@@ -100,7 +100,7 @@ export const SearchResultSchema = z.object({
 	dependencies: z.array(z.string())
 		.openapi({
 			description: 'Package dependencies extracted from file',
-			example: ['express', '@supabase/supabase-js'],
+			example: ['express', 'better-sqlite3'],
 		}),
 	indexedAt: z.string()
 		.datetime()
@@ -376,103 +376,6 @@ export const ProjectListItemSchema = ProjectSchema.extend({
 			example: 3,
 		}),
 }).openapi('ProjectListItem');
-
-// ===== Subscription Schemas =====
-
-export const CreateCheckoutSessionRequestSchema = z.object({
-	tier: z.enum(['solo', 'team'])
-		.openapi({
-			description: 'Subscription tier to purchase',
-			example: 'solo',
-		}),
-	successUrl: z.string()
-		.url()
-		.openapi({
-			description: 'Success URL to redirect after payment',
-			example: 'https://app.kotadb.com/success',
-		}),
-	cancelUrl: z.string()
-		.url()
-		.openapi({
-			description: 'Cancel URL to redirect if user cancels',
-			example: 'https://app.kotadb.com/cancel',
-		}),
-}).openapi('CreateCheckoutSessionRequest');
-
-export const CreateCheckoutSessionResponseSchema = z.object({
-	url: z.string()
-		.url()
-		.openapi({
-			description: 'Stripe Checkout session URL',
-			example: 'https://checkout.stripe.com/c/pay/cs_test_...',
-		}),
-	sessionId: z.string()
-		.openapi({
-			description: 'Stripe session ID',
-			example: 'cs_test_a1b2c3d4e5f6g7h8i9j0k1l2m3n4o5p6',
-		}),
-}).openapi('CreateCheckoutSessionResponse');
-
-export const CreatePortalSessionRequestSchema = z.object({
-	returnUrl: z.string()
-		.url()
-		.openapi({
-			description: 'Return URL after user completes billing portal actions',
-			example: 'https://app.kotadb.com/settings',
-		}),
-}).openapi('CreatePortalSessionRequest');
-
-export const CreatePortalSessionResponseSchema = z.object({
-	url: z.string()
-		.url()
-		.openapi({
-			description: 'Stripe billing portal URL',
-			example: 'https://billing.stripe.com/p/session/test_...',
-		}),
-}).openapi('CreatePortalSessionResponse');
-
-export const CurrentSubscriptionResponseSchema = z.object({
-	subscription: z.object({
-		id: z.string()
-			.uuid()
-			.openapi({
-				description: 'Subscription UUID',
-				example: '950e8400-e29b-41d4-a716-446655440000',
-			}),
-		tier: z.enum(['free', 'solo', 'team'])
-			.openapi({
-				description: 'Subscription tier',
-				example: 'solo',
-			}),
-		status: z.enum(['trialing', 'active', 'past_due', 'canceled', 'unpaid'])
-			.openapi({
-				description: 'Subscription status',
-				example: 'active',
-			}),
-		current_period_start: z.string()
-			.datetime()
-			.nullable()
-			.openapi({
-				description: 'Current period start timestamp',
-				example: '2025-12-01T00:00:00Z',
-			}),
-		current_period_end: z.string()
-			.datetime()
-			.nullable()
-			.openapi({
-				description: 'Current period end timestamp',
-				example: '2026-01-01T00:00:00Z',
-			}),
-		cancel_at_period_end: z.boolean()
-			.openapi({
-				description: 'Whether subscription cancels at period end',
-				example: false,
-			}),
-	}).nullable()
-		.openapi({
-			description: 'Subscription data (null if no subscription exists)',
-		}),
-}).openapi('CurrentSubscriptionResponse');
 
 // ===== API Key Schemas =====
 

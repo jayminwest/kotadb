@@ -39,7 +39,7 @@ describe("Sync Integration", () => {
 
   test("full sync cycle: export, delete, import", async () => {
     // Setup: Create source database
-    sourceDb = createDatabase({ path: join(tempDir, "source.db") });
+    sourceDb = createDatabase({ path: join(tempDir, "source.db"), skipSchemaInit: true });
     sourceDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -66,7 +66,7 @@ describe("Sync Integration", () => {
     await recordDeletion("repositories", "1", exportDir);
 
     // Import to target database
-    targetDb = createDatabase({ path: join(tempDir, "target.db") });
+    targetDb = createDatabase({ path: join(tempDir, "target.db"), skipSchemaInit: true });
     targetDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -89,7 +89,7 @@ describe("Sync Integration", () => {
 
   test("sync preserves data integrity across multiple tables", async () => {
     // Setup: Create source database with multiple tables
-    sourceDb = createDatabase({ path: join(tempDir, "source.db") });
+    sourceDb = createDatabase({ path: join(tempDir, "source.db"), skipSchemaInit: true });
     sourceDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -115,7 +115,7 @@ describe("Sync Integration", () => {
     exporter.cancel();
 
     // Import to target database
-    targetDb = createDatabase({ path: join(tempDir, "target.db") });
+    targetDb = createDatabase({ path: join(tempDir, "target.db"), skipSchemaInit: true });
     targetDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -151,7 +151,7 @@ describe("Sync Integration", () => {
 
   test("sync handles updates correctly", async () => {
     // Setup: Create source database
-    sourceDb = createDatabase({ path: join(tempDir, "source.db") });
+    sourceDb = createDatabase({ path: join(tempDir, "source.db"), skipSchemaInit: true });
     sourceDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -166,7 +166,7 @@ describe("Sync Integration", () => {
     exporter1.cancel();
 
     // Create target and import
-    targetDb = createDatabase({ path: join(tempDir, "target.db") });
+    targetDb = createDatabase({ path: join(tempDir, "target.db"), skipSchemaInit: true });
     targetDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -201,7 +201,7 @@ describe("Sync Integration", () => {
 
   test("sync handles cascading deletions with deletion manifest", async () => {
     // Setup: Create source database
-    sourceDb = createDatabase({ path: join(tempDir, "source.db") });
+    sourceDb = createDatabase({ path: join(tempDir, "source.db"), skipSchemaInit: true });
     sourceDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -227,7 +227,7 @@ describe("Sync Integration", () => {
     exporter1.cancel();
 
     // Create target database and import initial data
-    targetDb = createDatabase({ path: join(tempDir, "target.db") });
+    targetDb = createDatabase({ path: join(tempDir, "target.db"), skipSchemaInit: true });
     targetDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -284,7 +284,7 @@ describe("Sync Integration", () => {
 
   test("empty database exports and imports successfully", async () => {
     // Setup: Create empty source database
-    sourceDb = createDatabase({ path: join(tempDir, "source.db") });
+    sourceDb = createDatabase({ path: join(tempDir, "source.db"), skipSchemaInit: true });
     sourceDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,
@@ -298,7 +298,7 @@ describe("Sync Integration", () => {
     exporter.cancel();
 
     // Import to target
-    targetDb = createDatabase({ path: join(tempDir, "target.db") });
+    targetDb = createDatabase({ path: join(tempDir, "target.db"), skipSchemaInit: true });
     targetDb.exec(`
       CREATE TABLE repositories (
         id TEXT PRIMARY KEY,

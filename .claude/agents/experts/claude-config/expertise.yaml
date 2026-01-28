@@ -20,6 +20,7 @@ overview:
     - Tools in agent frontmatter use YAML array format (NOT comma-separated)
     - Agent-registry.json must be updated when adding agents
     - Logging uses sys.stdout.write (never print())
+    - Local-only SQLite storage (no cloud dependencies)
 
     Does NOT cover agent prompt content authoring (see agent-authoring expert).
   rationale: |
@@ -31,12 +32,13 @@ core_implementation:
   directory_structure:
     .claude/:
       agents/:
-        purpose: Agent definitions (general-purpose + branch/ + leaf/ + experts/)
+        purpose: Agent definitions (general-purpose + experts/)
         README.md: Documents agent structure, registry, tool access
         agent-template.md: Starting template for new agents
         agent-registry.json: Machine-readable agent catalog with indexes
-        branch/: Multi-agent coordination agents (plan, build, review, meta)
-        leaf/: Focused task agents (retrieval, build)
+        build-agent.md: Implementation agent with write access
+        scout-agent.md: Read-only exploration agent
+        review-agent.md: Code review agent
         experts/<domain>/:
           purpose: 4-agent pattern (plan/build/improve/question + expertise.yaml)
           pattern: Domain experts with queryable knowledge
@@ -247,10 +249,6 @@ decision_trees:
         then: Agent (.claude/agents/)
       - if: Domain expertise with plan/build/improve/question
         then: Expert domain (.claude/agents/experts/<domain>/)
-      - if: Multi-agent coordination
-        then: Branch agent (.claude/agents/branch/)
-      - if: Focused task execution
-        then: Leaf agent (.claude/agents/leaf/)
 
   agent_model_selection:
     question: Which model tier?
@@ -354,8 +352,7 @@ best_practices:
   organization:
     - Agents in .claude/agents/, commands in .claude/commands/
     - Expert domains: agents/experts/<domain>/ (4-agent + expertise.yaml)
-    - Branch agents: agents/branch/ for coordination
-    - Leaf agents: agents/leaf/ for focused tasks
+    - General agents at root level: build-agent.md, scout-agent.md, review-agent.md
     - Expertise.yaml: 400-600 lines target, 1000 hard limit
 
   commands:
@@ -418,13 +415,11 @@ stability:
     contradiction_count: 0
     new_patterns_added_this_cycle: 0
     patterns_updated_this_cycle: 0
-    last_reviewed: 2026-01-25
+    last_reviewed: 2026-01-26
     utility_ratio: 1.0
     notes: |
-      Initial creation of kotadb-specific claude-config expertise.
-      Adapted from book's claude-config expertise with KotaDB conventions:
-      - Standard Python hooks with hook_helpers.py
-      - YAML array format for tools
-      - Template Category in commands
-      - Agent registry maintenance
-      - sys.stdout.write logging standard
+      Updated for local-only v2 architecture:
+      - Removed branch/leaf hierarchy references (deleted directories)
+      - Removed cloud/Supabase references
+      - Updated to reflect flat agent structure at root level
+      - KotaDB uses local SQLite storage only

@@ -4,70 +4,63 @@
  * This module initializes the MCP server with StreamableHTTPServerTransport
  * and registers all available tools. Uses enableJsonResponse: true for
  * simple HTTP transport (no SSE streaming, no npx wrapper needed).
+ *
+ * Local-only v2.0.0: Simplified for SQLite-only operation
  */
 
 import { createLogger } from "@logging/logger.js";
 import { Server } from "@modelcontextprotocol/sdk/server/index.js";
 import { StreamableHTTPServerTransport } from "@modelcontextprotocol/sdk/server/streamableHttp.js";
 import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprotocol/sdk/types.js";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import { Sentry } from "../instrument.js";
 import {
-	ADD_REPOSITORY_TO_PROJECT_TOOL,
 	ANALYZE_CHANGE_IMPACT_TOOL,
-	CREATE_PROJECT_TOOL,
-	DELETE_PROJECT_TOOL,
-	GET_INDEX_JOB_STATUS_TOOL,
-	GET_PROJECT_TOOL,
 	INDEX_REPOSITORY_TOOL,
-	LIST_PROJECTS_TOOL,
 	LIST_RECENT_FILES_TOOL,
-	REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
 	SEARCH_CODE_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
 	SYNC_EXPORT_TOOL,
 	SYNC_IMPORT_TOOL,
-	UPDATE_PROJECT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
-	executeAddRepositoryToProject,
 	executeAnalyzeChangeImpact,
-	executeCreateProject,
-	executeDeleteProject,
-	executeGetIndexJobStatus,
-	executeGetProject,
 	executeIndexRepository,
-	executeListProjects,
 	executeListRecentFiles,
-	executeRemoveRepositoryFromProject,
 	executeSearchCode,
 	executeSearchDependencies,
 	executeSyncExport,
 	executeSyncImport,
-	executeUpdateProject,
 	executeValidateImplementationSpec,
 } from "./tools";
 
 const logger = createLogger({ module: "mcp-server" });
 
-
 /**
  * MCP Server context passed to tool handlers via closure
- * 
- * In local mode, supabase will be null as queries use SQLite directly
+ *
+ * Local-only: No Supabase, uses SQLite directly via @api/queries
  */
 export interface McpServerContext {
-	supabase: SupabaseClient | null;
 	userId: string;
 }
 
 /**
  * Create and configure MCP server instance with tool registrations
+ *
+ * Local-only tools available:
+ * - search_code: Search indexed code files
+ * - index_repository: Index a local repository
+ * - list_recent_files: List recently indexed files
+ * - search_dependencies: Query dependency graph
+ * - analyze_change_impact: Analyze impact of changes
+ * - validate_implementation_spec: Validate implementation specs
+ * - kota_sync_export: Export SQLite to JSONL
+ * - kota_sync_import: Import JSONL to SQLite
  */
 export function createMcpServer(context: McpServerContext): Server {
 	const server = new Server(
 		{
 			name: "kotadb",
-			version: "0.1.0",
+			version: "2.0.0",
 		},
 		{
 			capabilities: {
@@ -76,7 +69,7 @@ export function createMcpServer(context: McpServerContext): Server {
 		},
 	);
 
-	// Register tools/list handler
+	// Register tools/list handler - local-only tools
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
 		return {
 			tools: [
@@ -86,14 +79,6 @@ export function createMcpServer(context: McpServerContext): Server {
 				SEARCH_DEPENDENCIES_TOOL,
 				ANALYZE_CHANGE_IMPACT_TOOL,
 				VALIDATE_IMPLEMENTATION_SPEC_TOOL,
-				CREATE_PROJECT_TOOL,
-				LIST_PROJECTS_TOOL,
-				GET_PROJECT_TOOL,
-				UPDATE_PROJECT_TOOL,
-				DELETE_PROJECT_TOOL,
-				ADD_REPOSITORY_TO_PROJECT_TOOL,
-				REMOVE_REPOSITORY_FROM_PROJECT_TOOL,
-				GET_INDEX_JOB_STATUS_TOOL,
 				SYNC_EXPORT_TOOL,
 				SYNC_IMPORT_TOOL,
 			],
@@ -112,7 +97,6 @@ export function createMcpServer(context: McpServerContext): Server {
 			switch (name) {
 				case "search_code":
 					result = await executeSearchCode(
-						context.supabase,
 						toolArgs,
 						"", // requestId not used
 						context.userId,
@@ -120,7 +104,6 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "index_repository":
 					result = await executeIndexRepository(
-						context.supabase,
 						toolArgs,
 						"", // requestId not used
 						context.userId,
@@ -128,7 +111,6 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "list_recent_files":
 					result = await executeListRecentFiles(
-						context.supabase,
 						toolArgs,
 						"", // requestId not used
 						context.userId,
@@ -136,7 +118,6 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "search_dependencies":
 					result = await executeSearchDependencies(
-						context.supabase,
 						toolArgs,
 						"", // requestId not used
 						context.userId,
@@ -144,7 +125,6 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "analyze_change_impact":
 					result = await executeAnalyzeChangeImpact(
-						context.supabase,
 						toolArgs,
 						"", // requestId not used
 						context.userId,
@@ -152,71 +132,6 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "validate_implementation_spec":
 					result = await executeValidateImplementationSpec(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "create_project":
-					result = await executeCreateProject(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "list_projects":
-					result = await executeListProjects(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "get_project":
-					result = await executeGetProject(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "update_project":
-					result = await executeUpdateProject(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "delete_project":
-					result = await executeDeleteProject(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "add_repository_to_project":
-					result = await executeAddRepositoryToProject(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "remove_repository_from_project":
-					result = await executeRemoveRepositoryFromProject(
-						context.supabase,
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "get_index_job_status":
-					result = await executeGetIndexJobStatus(
-						context.supabase,
 						toolArgs,
 						"", // requestId not used
 						context.userId,

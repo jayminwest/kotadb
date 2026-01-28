@@ -22,7 +22,7 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 - Investigate impacted modules in `src/**`, `tests/**`, and any infrastructure noted in the issue before proposing changes.
 - Capture all impacted files (and any new assets) in the dedicated section so implementors have clear scope boundaries.
 - Reference the repo git flow: work from `bug/<issue-number>-<slug>` off `develop`, with `develop` promoted to `main` on release.
-- Integrate `/anti-mock` expectations: propose real Supabase test coverage, failure injection, and follow-ups for any temporary skips.
+- Integrate `/anti-mock` expectations: propose real database test coverage, failure injection, and follow-ups for any temporary skips.
 - Ensure the plan's closing tasks rerun validation and push the branch so a PR can be raised (PR titles must end with the issue number, e.g. `fix: correct row filters (#210)`).
 - Consult `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and read only the documentation whose conditions align with the defect.
 - When the remediation introduces new documentation, add or update the relevant conditional entry so future agents can discover it quickly.
@@ -65,7 +65,7 @@ Author a remediation plan for the bug described in `$ARGUMENTS` (issue metadata 
 ### Implementation
 - Ordered steps to deliver the fix
 ### Validation
-- Tests to add/update (integration/e2e hitting Supabase per `/anti-mock`)
+- Tests to add/update (integration/e2e using SQLite per `/anti-mock`)
 - Manual checks to run (record data seeded + failure cases)
 
 ## Step by Step Tasks

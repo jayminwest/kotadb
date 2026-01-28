@@ -25,7 +25,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - Highlight any data contracts, API surfaces, or tooling updates that the feature requires.
 - Think critically about risk, rollout, and validation; do not leave placeholders empty.
 - Enumerate relevant code paths and new assets in their dedicated sections.
-- Incorporate `/anti-mock` guidance: plan for real Supabase coverage, failure injection, and follow-up for any unavoidable skips.
+- Incorporate `/anti-mock` guidance: plan for real database coverage, failure injection, and follow-up for any unavoidable skips.
 - Ensure the plan's final tasks rerun validation and push the branch so a PR can be created (PR titles must end with the issue number, e.g. `feat: add search filters (#210)`).
 - If the plan introduces new documentation areas, append or update the relevant entry in `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md`.
 
@@ -73,7 +73,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - <risk> → <mitigation>
 
 ## Validation Strategy
-- Automated tests (integration/e2e hitting Supabase per `/anti-mock`)
+- Automated tests (integration/e2e using SQLite per `/anti-mock`)
 - Manual checks (document data seeded and failure scenarios exercised)
 - Release guardrails (monitoring, alerting, rollback) with real-service evidence
 

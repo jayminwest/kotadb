@@ -45,8 +45,6 @@ All expertise comes from `.claude/agents/experts/claude-config/expertise.yaml`. 
 **"Where should I put a new agent?"**
 - General agents: `.claude/agents/<agent-name>.md`
 - Expert agents: `.claude/agents/experts/<domain>/<domain>-<stage>-agent.md`
-- Coordination agents: `.claude/agents/branch/<name>.md`
-- Task agents: `.claude/agents/leaf/<name>.md`
 
 **"Where should I put a new slash command?"**
 - Create in `.claude/commands/<category>/<command-name>.md`

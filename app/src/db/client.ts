@@ -1,249 +1,72 @@
 /**
- * Supabase client configuration and RLS context management.
+ * Database client configuration for local-only mode.
  *
- * Provides service role and anon clients for different access patterns:
- * - Service role: Full access for authentication and admin operations
- * - Anon: RLS-enforced access for user-scoped queries
- * 
- * Supports both cloud mode (Supabase) and local mode (SQLite).
+ * Provides SQLite database access for all operations.
+ * Cloud mode (Supabase) has been removed for local-only v2.0.0.
  */
 
-import { type SupabaseClient, createClient } from "@supabase/supabase-js";
-import { isLocalMode } from "@config/environment";
 import { getGlobalDatabase, type KotaDatabase } from "@db/sqlite/sqlite-client";
-import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
 
 const logger = createLogger({ module: "db-client" });
 
 /**
- * Database client type (union of Supabase and SQLite clients)
+ * Database client type - SQLite only in local mode
  */
-export type DatabaseClient = SupabaseClient | KotaDatabase;
+export type DatabaseClient = KotaDatabase;
 
 /**
- * Get the appropriate database client based on environment mode.
+ * Get the SQLite database client.
  * 
- * - Local mode: Returns KotaDatabase (SQLite)
- * - Cloud mode: Returns SupabaseClient (service role)
+ * This is the primary entry point for database access in local-only mode.
  */
-export function getClient(): DatabaseClient {
-	if (isLocalMode()) {
-		logger.debug("Using local SQLite database");
-		return getGlobalDatabase();
-	}
-	
-	logger.debug("Using Supabase cloud database");
-	return getServiceClient();
+export function getClient(): KotaDatabase {
+	logger.debug("Using local SQLite database");
+	return getGlobalDatabase();
 }
 
 /**
- * Get Supabase service role client (full access, bypasses RLS).
- * Used for authentication queries and admin operations.
+ * Get Supabase service role client.
  * 
- * @throws {Error} If called in local mode - use getClient() instead
+ * @deprecated This function is not available in local-only mode.
+ * @throws {Error} Always throws - use getClient() instead
  */
-export function getServiceClient(): SupabaseClient {
-	// Error if called in local mode
-	if (isLocalMode()) {
-		throw new Error('getServiceClient() called in local mode - use getClient() instead');
-	}
-
-	try {
-		const supabaseUrl = process.env.SUPABASE_URL;
-		const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY;
-
-		if (!supabaseUrl || !supabaseServiceKey) {
-			const error = new Error(
-				"Missing Supabase credentials: SUPABASE_URL and SUPABASE_SERVICE_KEY must be set",
-			);
-			Sentry.captureException(error, {
-				contexts: {
-					environment: {
-						has_url: !!supabaseUrl,
-						has_service_key: !!supabaseServiceKey,
-					},
-				},
-			});
-			logger.error("Missing Supabase credentials", {
-				has_url: !!supabaseUrl,
-				has_service_key: !!supabaseServiceKey,
-			});
-			throw error;
-		}
-
-		logger.debug("Creating service role client", {
-			supabase_url: supabaseUrl,
-		});
-
-		return createClient(supabaseUrl, supabaseServiceKey, {
-			auth: {
-				persistSession: false,
-				autoRefreshToken: false,
-			},
-		});
-	} catch (error) {
-		if (error instanceof Error && !error.message.includes("Missing Supabase credentials")) {
-			Sentry.captureException(error);
-			logger.error("Unexpected error creating service client", {
-				error: error.message,
-			});
-		}
-		throw error;
-	}
+export function getServiceClient(): never {
+	throw new Error('getServiceClient() is not available in local-only mode - use getClient() instead');
 }
 
 /**
- * Get Supabase anon client (RLS-enforced).
- * Used for user-scoped queries with RLS policies active.
+ * Get Supabase anon client.
+ * 
+ * @deprecated This function is not available in local-only mode.
+ * @throws {Error} Always throws - use getClient() instead
  */
-export function getAnonClient(): SupabaseClient {
-	try {
-		const supabaseUrl = process.env.SUPABASE_URL;
-		const supabaseAnonKey = process.env.SUPABASE_ANON_KEY;
-
-		if (!supabaseUrl || !supabaseAnonKey) {
-			const error = new Error(
-				"Missing Supabase credentials: SUPABASE_URL and SUPABASE_ANON_KEY must be set",
-			);
-			Sentry.captureException(error, {
-				contexts: {
-					environment: {
-						has_url: !!supabaseUrl,
-						has_anon_key: !!supabaseAnonKey,
-					},
-				},
-			});
-			logger.error("Missing Supabase credentials", {
-				has_url: !!supabaseUrl,
-				has_anon_key: !!supabaseAnonKey,
-			});
-			throw error;
-		}
-
-		logger.debug("Creating anon client", {
-			supabase_url: supabaseUrl,
-		});
-
-		return createClient(supabaseUrl, supabaseAnonKey, {
-			auth: {
-				persistSession: false,
-				autoRefreshToken: false,
-			},
-		});
-	} catch (error) {
-		if (error instanceof Error && !error.message.includes("Missing Supabase credentials")) {
-			Sentry.captureException(error);
-			logger.error("Unexpected error creating anon client", {
-				error: error.message,
-			});
-		}
-		throw error;
-	}
+export function getAnonClient(): never {
+	throw new Error('getAnonClient() is not available in local-only mode - use getClient() instead');
 }
 
 /**
  * Set RLS context for user-scoped queries.
- * Sets the app.user_id session variable for RLS policy enforcement.
- *
- * IMPORTANT: This uses SET LOCAL (transaction-scoped) to prevent
- * context bleed between requests.
- *
- * @param client - Supabase client (typically anon client)
- * @param userId - User UUID to set as context
- * @returns Same client for chaining
+ * 
+ * @deprecated This function is not available in local-only mode.
+ * SQLite does not support RLS - all queries have full access.
+ * @throws {Error} Always throws - not supported in local mode
  */
 export async function setUserContext(
-	client: SupabaseClient,
-	userId: string,
-): Promise<SupabaseClient> {
-	try {
-		logger.debug("Setting user context", {
-			user_id: userId,
-		});
-
-		// Use SET LOCAL for transaction-scoped variable (safer than SET)
-		const { error } = await client.rpc("set_user_context", { user_id: userId });
-
-		if (error) {
-			Sentry.captureException(error, {
-				contexts: {
-					rls: {
-						user_id: userId,
-						operation: "set_user_context",
-					},
-				},
-			});
-			logger.error("Failed to set user context", {
-				error: error.message,
-				user_id: userId,
-			});
-			throw error;
-		}
-
-		return client;
-	} catch (error) {
-		if (error instanceof Error) {
-			Sentry.captureException(error, {
-				contexts: {
-					rls: {
-						user_id: userId,
-						operation: "set_user_context",
-					},
-				},
-			});
-			logger.error("Unexpected error setting user context", {
-				error: error.message,
-				user_id: userId,
-			});
-		}
-		throw error;
-	}
+	_client: unknown,
+	_userId: string,
+): Promise<never> {
+	throw new Error('setUserContext() is not available in local-only mode - SQLite does not support RLS');
 }
 
 /**
- * Clear RLS context (reset app.user_id).
- * Called after queries complete to prevent context bleed.
- *
- * @param client - Supabase client
- * @returns Same client for chaining
+ * Clear RLS context.
+ * 
+ * @deprecated This function is not available in local-only mode.
+ * @throws {Error} Always throws - not supported in local mode
  */
 export async function clearUserContext(
-	client: SupabaseClient,
-): Promise<SupabaseClient> {
-	try {
-		logger.debug("Clearing user context");
-
-		const { error } = await client.rpc("clear_user_context");
-
-		if (error) {
-			Sentry.captureException(error, {
-				contexts: {
-					rls: {
-						operation: "clear_user_context",
-					},
-				},
-			});
-			logger.error("Failed to clear user context", {
-				error: error.message,
-			});
-			throw error;
-		}
-
-		return client;
-	} catch (error) {
-		if (error instanceof Error) {
-			Sentry.captureException(error, {
-				contexts: {
-					rls: {
-						operation: "clear_user_context",
-					},
-				},
-			});
-			logger.error("Unexpected error clearing user context", {
-				error: error.message,
-			});
-		}
-		throw error;
-	}
+	_client: unknown,
+): Promise<never> {
+	throw new Error('clearUserContext() is not available in local-only mode - SQLite does not support RLS');
 }

@@ -3,8 +3,8 @@
  * Initial implementation uses stateless validation
  */
 
-import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { Sentry } from "../instrument.js";
 
 const logger = createLogger({ module: "mcp-session" });
 
@@ -34,7 +34,10 @@ export function validateSessionId(id: string | null): boolean {
 		}
 		return true;
 	} catch (error) {
-		logger.error("Session ID validation error", error instanceof Error ? error : new Error(String(error)));
+		logger.error(
+			"Session ID validation error",
+			error instanceof Error ? error : new Error(String(error)),
+		);
 		Sentry.captureException(error);
 		return false;
 	}

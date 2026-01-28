@@ -8,9 +8,9 @@
  * - Check branch existence and modification timestamps
  */
 
-import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
 import type { ConflictInfo } from "@shared/types";
+import { Sentry } from "../instrument.js";
 
 const logger = createLogger({ module: "mcp-github-integration" });
 
@@ -54,10 +54,7 @@ export class GitHubClient {
 	/**
 	 * Get cached data or fetch from API
 	 */
-	private async getCached<T>(
-		key: string,
-		fetcher: () => Promise<T>,
-	): Promise<T> {
+	private async getCached<T>(key: string, fetcher: () => Promise<T>): Promise<T> {
 		const cached = this.cache.get(key) as CacheEntry<T> | undefined;
 		if (cached && Date.now() - cached.timestamp < this.cacheTTL) {
 			return cached.data;
@@ -109,10 +106,14 @@ export class GitHubClient {
 
 				return (await response.json()) as PullRequest[];
 			} catch (error) {
-				logger.error("Failed to query PRs", error instanceof Error ? error : new Error(String(error)), {
-					owner,
-					repo,
-				});
+				logger.error(
+					"Failed to query PRs",
+					error instanceof Error ? error : new Error(String(error)),
+					{
+						owner,
+						repo,
+					},
+				);
 				Sentry.captureException(error, {
 					tags: { owner, repo },
 				});
@@ -129,11 +130,7 @@ export class GitHubClient {
 	 * @param prNumber - PR number
 	 * @returns List of changed files
 	 */
-	async getPRFiles(
-		owner: string,
-		repo: string,
-		prNumber: number,
-	): Promise<string[]> {
+	async getPRFiles(owner: string, repo: string, prNumber: number): Promise<string[]> {
 		if (!this.isAvailable()) {
 			return [];
 		}
@@ -152,7 +149,9 @@ export class GitHubClient {
 				});
 
 				if (!response.ok) {
-					const error = new Error(`Failed to query PR files: ${response.status} ${response.statusText}`);
+					const error = new Error(
+						`Failed to query PR files: ${response.status} ${response.statusText}`,
+					);
 					logger.error("GitHub API error when querying PR files", error, {
 						owner,
 						repo,
@@ -171,11 +170,15 @@ export class GitHubClient {
 				}>;
 				return files.map((f) => f.filename);
 			} catch (error) {
-				logger.error("Failed to query PR files", error instanceof Error ? error : new Error(String(error)), {
-					owner,
-					repo,
-					pr_number: prNumber,
-				});
+				logger.error(
+					"Failed to query PR files",
+					error instanceof Error ? error : new Error(String(error)),
+					{
+						owner,
+						repo,
+						pr_number: prNumber,
+					},
+				);
 				Sentry.captureException(error, {
 					tags: { owner, repo, pr_number: prNumber },
 				});
@@ -208,9 +211,7 @@ export class GitHubClient {
 
 			for (const pr of openPRs) {
 				const prFiles = await this.getPRFiles(owner, repo, pr.number);
-				const overlappingFiles = filePaths.filter((path) =>
-					prFiles.includes(path),
-				);
+				const overlappingFiles = filePaths.filter((path) => prFiles.includes(path));
 
 				if (overlappingFiles.length > 0) {
 					conflicts.push({
@@ -234,10 +235,14 @@ export class GitHubClient {
 
 			return conflicts;
 		} catch (error) {
-			logger.error("Error detecting conflicts", error instanceof Error ? error : new Error(String(error)), {
-				owner,
-				repo,
-			});
+			logger.error(
+				"Error detecting conflicts",
+				error instanceof Error ? error : new Error(String(error)),
+				{
+					owner,
+					repo,
+				},
+			);
 			Sentry.captureException(error, {
 				tags: { owner, repo },
 			});
@@ -253,11 +258,7 @@ export class GitHubClient {
 	 * @param branch - Branch name
 	 * @returns Whether the branch exists
 	 */
-	async checkBranchExists(
-		owner: string,
-		repo: string,
-		branch: string,
-	): Promise<boolean> {
+	async checkBranchExists(owner: string, repo: string, branch: string): Promise<boolean> {
 		if (!this.isAvailable()) {
 			return false;
 		}

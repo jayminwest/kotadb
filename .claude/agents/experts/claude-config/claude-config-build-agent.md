@@ -48,8 +48,6 @@ You are a Claude Config Expert specializing in building and updating Claude Code
 ├── agents/                          # Agent specifications
 │   ├── agent-registry.json          # Machine-readable agent catalog
 │   ├── <agent-name>.md              # Agent definitions (kebab-case)
-│   ├── branch/                      # Coordination agents
-│   ├── leaf/                        # Focused task agents
 │   └── experts/                     # Domain expert agents
 │       └── <expert-name>/           # Expert directory (kebab-case)
 │           ├── expertise.yaml

@@ -50,22 +50,14 @@ You are a Claude Config Expert specializing in planning Claude Code configuratio
 │   ├── scout-agent.md               # Read-only exploration agent
 │   ├── build-agent.md               # Implementation agent
 │   ├── review-agent.md              # Code review agent
-│   ├── orchestrator-agent.md        # Multi-agent coordination
-│   ├── branch/                      # Coordination agents
-│   │   ├── plan.md                  # Planning coordinator
-│   │   ├── build.md                 # Build coordinator
-│   │   ├── review.md                # Review coordinator
-│   │   └── meta.md                  # Meta coordinator
-│   ├── leaf/                        # Focused task agents
-│   │   ├── retrieval.md             # Search and retrieval
-│   │   └── build.md                 # Code implementation
 │   └── experts/                     # Domain expert agents
-│       └── claude-config/           # Configuration experts
-│           ├── expertise.yaml
-│           ├── claude-config-plan-agent.md
-│           ├── claude-config-build-agent.md
-│           ├── claude-config-improve-agent.md
-│           └── claude-config-question-agent.md
+│       ├── claude-config/           # Configuration experts
+│       │   ├── expertise.yaml
+│       │   ├── claude-config-plan-agent.md
+│       │   ├── claude-config-build-agent.md
+│       │   ├── claude-config-improve-agent.md
+│       │   └── claude-config-question-agent.md
+│       └── agent-authoring/         # Agent authoring experts
 ├── commands/                        # Slash commands by category
 │   ├── workflows/                   # SDLC phase commands
 │   ├── docs/                        # Documentation commands

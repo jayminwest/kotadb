@@ -7,7 +7,6 @@
       "Bash(gh *)",
       "Bash(docker *)",
       "Bash(docker-compose *)",
-      "Bash(supabase *)",
       "Bash(python3 *)",
       "Bash(pytest *)",
       "Bash(ls *)",
@@ -18,12 +17,7 @@
       "Bash(cp *)",
       "Bash(mv *)",
       "mcp__kotadb__*",
-      "mcp__kotadb-staging__*",
-      "mcp__kotadb-production__*",
       "mcp__playwright__*",
-      "mcp__supabase__*",
-      "mcp__supabase-staging__*",
-      "mcp__supabase-production__*",
       "mcp__sequential-thinking__*"
     ]
   },

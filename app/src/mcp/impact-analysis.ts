@@ -1,43 +1,37 @@
 /**
  * Impact analysis logic for analyze_change_impact MCP tool
  *
+ * Local-only v2.0.0: Uses SQLite instead of Supabase
+ *
  * Provides comprehensive change impact analysis including:
  * - Dependency aggregation (direct and indirect dependents)
  * - Test scope calculation
  * - Risk level scoring
  * - Architectural pattern detection
- * - Conflict detection with open PRs
  */
 
-import { Sentry } from "../instrument.js";
+import { queryDependents, resolveFilePath } from "@api/queries";
+import { getGlobalDatabase } from "@db/sqlite/index.js";
 import { createLogger } from "@logging/logger.js";
-import type { SupabaseClient } from "@supabase/supabase-js";
 import type {
+	AffectedFile,
 	ChangeImpactRequest,
 	ChangeImpactResponse,
-	AffectedFile,
-	TestScope,
 	ConflictInfo,
+	TestScope,
 } from "@shared/types";
-import {
-	queryDependents,
-	queryDependencies,
-	resolveFilePath,
-} from "@api/queries";
-import { getGitHubClient } from "./github-integration";
+import { Sentry } from "../instrument.js";
 
 const logger = createLogger({ module: "mcp-impact-analysis" });
 
 /**
  * Analyze change impact for proposed modifications
  *
- * @param supabase - Supabase client instance
  * @param request - Change impact request
- * @param userId - User ID for RLS context
+ * @param userId - User ID for context
  * @returns Impact analysis results
  */
 export async function analyzeChangeImpact(
-	supabase: SupabaseClient,
 	request: ChangeImpactRequest,
 	userId: string,
 ): Promise<ChangeImpactResponse> {
@@ -50,12 +44,8 @@ export async function analyzeChangeImpact(
 			files_to_delete: request.files_to_delete?.length ?? 0,
 		});
 
-		// Resolve repository ID
-		const repositoryId = await resolveRepositoryId(
-			supabase,
-			request.repository,
-			userId,
-		);
+		// Resolve repository ID from SQLite
+		const repositoryId = resolveRepositoryId(request.repository);
 
 		if (!repositoryId) {
 			logger.warn("Change impact analysis failed: no repository", {
@@ -79,76 +69,46 @@ export async function analyzeChangeImpact(
 			};
 		}
 
-	// Get last indexed timestamp
-	const lastIndexedAt = await getLastIndexedTimestamp(supabase, repositoryId);
+		// Get last indexed timestamp
+		const lastIndexedAt = getLastIndexedTimestamp(repositoryId);
 
-	// Aggregate all files to analyze
-	const filesToAnalyze = [
-		...(request.files_to_modify ?? []),
-		...(request.files_to_create ?? []),
-		...(request.files_to_delete ?? []),
-	];
+		// Aggregate all files to analyze
+		const filesToAnalyze = [
+			...(request.files_to_modify ?? []),
+			...(request.files_to_create ?? []),
+			...(request.files_to_delete ?? []),
+		];
 
-	// Aggregate dependency graph for affected files
-	const affectedFiles = await aggregateDependencyGraph(
-		supabase,
-		filesToAnalyze,
-		repositoryId,
-		userId,
-	);
+		// Aggregate dependency graph for affected files
+		const affectedFiles = aggregateDependencyGraph(filesToAnalyze, repositoryId);
 
-	// Calculate test scope
-	const testScope = await calculateTestScope(
-		supabase,
-		affectedFiles,
-		repositoryId,
-		userId,
-	);
+		// Calculate test scope
+		const testScope = calculateTestScope(affectedFiles, repositoryId);
 
-	// Calculate risk level
-	const riskLevel = calculateRiskLevel(
-		affectedFiles,
-		request.breaking_changes ?? false,
-		testScope,
-	);
+		// Calculate risk level
+		const riskLevel = calculateRiskLevel(
+			affectedFiles,
+			request.breaking_changes ?? false,
+			testScope,
+		);
 
-	// Detect architectural patterns and warnings
-	const architecturalWarnings = await detectArchitecturalPatterns(
-		supabase,
-		request,
-		filesToAnalyze,
-		repositoryId,
-	);
+		// Detect architectural patterns and warnings
+		const architecturalWarnings = detectArchitecturalPatterns(request, filesToAnalyze);
 
-	// Detect conflicts with open PRs
-	const conflicts = await detectConflicts(
-		supabase,
-		repositoryId,
-		filesToAnalyze,
-	);
+		// No PR conflict detection in local mode (no GitHub integration required)
+		const conflicts: ConflictInfo[] = [];
 
-	// Generate deployment impact estimate
-	const deploymentImpact = generateDeploymentImpact(
-		request,
-		affectedFiles,
-		riskLevel,
-	);
+		// Generate deployment impact estimate
+		const deploymentImpact = generateDeploymentImpact(request, affectedFiles, riskLevel);
 
 		// Generate summary
-		const summary = generateSummary(
-			request,
-			affectedFiles,
-			testScope,
-			riskLevel,
-			conflicts,
-		);
+		const summary = generateSummary(request, affectedFiles, testScope, riskLevel, conflicts);
 
 		logger.info("Change impact analysis completed", {
 			change_type: request.change_type,
 			user_id: userId,
 			affected_files_count: affectedFiles.length,
 			risk_level: riskLevel,
-			conflicts_count: conflicts.length,
 		});
 
 		return {
@@ -162,10 +122,14 @@ export async function analyzeChangeImpact(
 			summary,
 		};
 	} catch (error) {
-		logger.error("Change impact analysis error", error instanceof Error ? error : new Error(String(error)), {
-			change_type: request.change_type,
-			user_id: userId,
-		});
+		logger.error(
+			"Change impact analysis error",
+			error instanceof Error ? error : new Error(String(error)),
+			{
+				change_type: request.change_type,
+				user_id: userId,
+			},
+		);
 		Sentry.captureException(error, {
 			tags: { change_type: request.change_type, user_id: userId },
 		});
@@ -176,53 +140,38 @@ export async function analyzeChangeImpact(
 /**
  * Resolve repository ID from request or use first available repository
  */
-async function resolveRepositoryId(
-	supabase: SupabaseClient,
-	repositoryId: string | undefined,
-	userId: string,
-): Promise<string | null> {
+function resolveRepositoryId(repositoryId: string | undefined): string | null {
 	if (repositoryId) {
 		return repositoryId;
 	}
 
-	// Get first repository for user
-	const { data } = await supabase
-		.from("repositories")
-		.select("id")
-		.eq("user_id", userId)
-		.limit(1)
-		.maybeSingle();
+	// Get first repository from SQLite
+	const db = getGlobalDatabase();
+	const repo = db.queryOne<{ id: string }>(
+		"SELECT id FROM repositories ORDER BY created_at DESC LIMIT 1",
+		[],
+	);
 
-	return data?.id ?? null;
+	return repo?.id ?? null;
 }
 
 /**
  * Get last indexed timestamp for repository
  */
-async function getLastIndexedTimestamp(
-	supabase: SupabaseClient,
-	repositoryId: string,
-): Promise<string> {
-	const { data } = await supabase
-		.from("indexed_files")
-		.select("indexed_at")
-		.eq("repository_id", repositoryId)
-		.order("indexed_at", { ascending: false })
-		.limit(1)
-		.maybeSingle();
+function getLastIndexedTimestamp(repositoryId: string): string {
+	const db = getGlobalDatabase();
+	const result = db.queryOne<{ indexed_at: string }>(
+		"SELECT indexed_at FROM indexed_files WHERE repository_id = ? ORDER BY indexed_at DESC LIMIT 1",
+		[repositoryId],
+	);
 
-	return data?.indexed_at ?? new Date().toISOString();
+	return result?.indexed_at ?? new Date().toISOString();
 }
 
 /**
  * Aggregate dependency graph for affected files
  */
-async function aggregateDependencyGraph(
-	supabase: SupabaseClient,
-	filePaths: string[],
-	repositoryId: string,
-	userId: string,
-): Promise<AffectedFile[]> {
+function aggregateDependencyGraph(filePaths: string[], repositoryId: string): AffectedFile[] {
 	const affectedFiles: AffectedFile[] = [];
 	const processedFiles = new Set<string>();
 
@@ -231,13 +180,8 @@ async function aggregateDependencyGraph(
 		if (processedFiles.has(filePath)) continue;
 		processedFiles.add(filePath);
 
-		// Resolve file ID
-		const fileId = await resolveFilePath(
-			supabase,
-			filePath,
-			repositoryId,
-			userId,
-		);
+		// Resolve file ID using SQLite
+		const fileId = resolveFilePath(filePath, repositoryId);
 
 		if (!fileId) {
 			// File doesn't exist yet (new file)
@@ -252,13 +196,7 @@ async function aggregateDependencyGraph(
 		}
 
 		// Query dependents with depth 2 to get indirect dependents
-		const dependents = await queryDependents(
-			supabase,
-			fileId,
-			2,
-			true,
-			userId,
-		);
+		const dependents = queryDependents(fileId, 2, true);
 
 		// Add the file itself
 		affectedFiles.push({
@@ -279,7 +217,7 @@ async function aggregateDependencyGraph(
 
 			affectedFiles.push({
 				path: dependent,
-				reason: `Directly depends on ${filePath}`,
+				reason: "Directly depends on " + filePath,
 				change_requirement: "review",
 				direct_dependents_count: 0,
 				indirect_dependents_count: 0,
@@ -295,7 +233,7 @@ async function aggregateDependencyGraph(
 
 			affectedFiles.push({
 				path: dependent,
-				reason: `Indirectly depends on ${filePath}`,
+				reason: "Indirectly depends on " + filePath,
 				change_requirement: "review",
 				direct_dependents_count: 0,
 				indirect_dependents_count: 0,
@@ -309,12 +247,7 @@ async function aggregateDependencyGraph(
 /**
  * Calculate test scope for affected files
  */
-async function calculateTestScope(
-	supabase: SupabaseClient,
-	affectedFiles: AffectedFile[],
-	repositoryId: string,
-	userId: string,
-): Promise<TestScope> {
+function calculateTestScope(affectedFiles: AffectedFile[], repositoryId: string): TestScope {
 	const testFiles: string[] = [];
 	const recommendedTestFiles: string[] = [];
 
@@ -330,12 +263,7 @@ async function calculateTestScope(
 		const potentialTestFiles = generateTestFilePaths(file.path);
 
 		for (const testPath of potentialTestFiles) {
-			const fileId = await resolveFilePath(
-				supabase,
-				testPath,
-				repositoryId,
-				userId,
-			);
+			const fileId = resolveFilePath(testPath, repositoryId);
 
 			if (fileId && !testFiles.includes(testPath)) {
 				testFiles.push(testPath);
@@ -347,11 +275,8 @@ async function calculateTestScope(
 
 	// Calculate coverage impact
 	const testFileCount = testFiles.length;
-	const affectedFileCount = affectedFiles.filter(
-		(f) => !isTestFile(f.path),
-	).length;
-	const coverageRatio =
-		affectedFileCount > 0 ? testFileCount / affectedFileCount : 0;
+	const affectedFileCount = affectedFiles.filter((f) => !isTestFile(f.path)).length;
+	const coverageRatio = affectedFileCount > 0 ? testFileCount / affectedFileCount : 0;
 
 	let coverageImpact: string;
 	if (coverageRatio >= 0.8) {
@@ -373,7 +298,12 @@ async function calculateTestScope(
  * Check if a file is a test file
  */
 function isTestFile(path: string): boolean {
-	return path.includes(".test.") || path.includes(".spec.") || path.includes("/tests/") || path.includes("/__tests__/");
+	return (
+		path.includes(".test.") ||
+		path.includes(".spec.") ||
+		path.includes("/tests/") ||
+		path.includes("/__tests__/")
+	);
 }
 
 /**
@@ -384,17 +314,17 @@ function generateTestFilePaths(sourcePath: string): string[] {
 
 	// Replace .ts with .test.ts or .spec.ts
 	const withoutExt = sourcePath.replace(/\.(ts|tsx|js|jsx)$/, "");
-	paths.push(`${withoutExt}.test.ts`);
-	paths.push(`${withoutExt}.spec.ts`);
-	paths.push(`${withoutExt}.test.tsx`);
-	paths.push(`${withoutExt}.spec.tsx`);
+	paths.push(withoutExt + ".test.ts");
+	paths.push(withoutExt + ".spec.ts");
+	paths.push(withoutExt + ".test.tsx");
+	paths.push(withoutExt + ".spec.tsx");
 
 	// Check in tests directory
 	const fileName = sourcePath.split("/").pop();
 	if (fileName) {
 		const fileNameWithoutExt = fileName.replace(/\.(ts|tsx|js|jsx)$/, "");
-		paths.push(`tests/${fileNameWithoutExt}.test.ts`);
-		paths.push(`__tests__/${fileNameWithoutExt}.test.ts`);
+		paths.push("tests/" + fileNameWithoutExt + ".test.ts");
+		paths.push("__tests__/" + fileNameWithoutExt + ".test.ts");
 	}
 
 	return paths;
@@ -409,9 +339,10 @@ function calculateRiskLevel(
 	testScope: TestScope,
 ): "low" | "medium" | "high" {
 	const totalAffected = affectedFiles.length;
-	const testCoverageRatio = affectedFiles.filter((f) => !isTestFile(f.path)).length > 0
-		? testScope.test_files.length / affectedFiles.filter((f) => !isTestFile(f.path)).length
-		: 1;
+	const testCoverageRatio =
+		affectedFiles.filter((f) => !isTestFile(f.path)).length > 0
+			? testScope.test_files.length / affectedFiles.filter((f) => !isTestFile(f.path)).length
+			: 1;
 
 	// High risk conditions
 	if (breakingChanges || totalAffected > 50 || testCoverageRatio < 0.3) {
@@ -430,22 +361,16 @@ function calculateRiskLevel(
 /**
  * Detect architectural patterns and generate warnings
  */
-async function detectArchitecturalPatterns(
-	supabase: SupabaseClient,
-	request: ChangeImpactRequest,
-	filePaths: string[],
-	repositoryId: string,
-): Promise<string[]> {
+function detectArchitecturalPatterns(request: ChangeImpactRequest, filePaths: string[]): string[] {
 	const warnings: string[] = [];
 
 	// Check for database migrations
 	const hasMigrations = filePaths.some(
-		(path) =>
-			path.includes("migration") || path.includes("db/") || path.includes("database/"),
+		(path) => path.includes("migration") || path.includes("db/") || path.includes("database/"),
 	);
 	if (hasMigrations) {
 		warnings.push(
-			"Database migration detected - ensure migration sync between app/src/db/migrations and app/supabase/migrations",
+			"Database migration detected - verify SQLite schema changes in app/src/db/sqlite-schema.sql",
 		);
 	}
 
@@ -460,9 +385,7 @@ async function detectArchitecturalPatterns(
 	}
 
 	// Check for API changes
-	const hasApiChanges = filePaths.some(
-		(path) => path.includes("api/") || path.includes("routes"),
-	);
+	const hasApiChanges = filePaths.some((path) => path.includes("api/") || path.includes("routes"));
 	if (hasApiChanges) {
 		warnings.push(
 			"API changes detected - update API documentation and consider versioning if breaking",
@@ -487,46 +410,6 @@ async function detectArchitecturalPatterns(
 	}
 
 	return warnings;
-}
-
-/**
- * Detect conflicts with open PRs
- */
-async function detectConflicts(
-	supabase: SupabaseClient,
-	repositoryId: string,
-	filePaths: string[],
-): Promise<ConflictInfo[]> {
-	const conflicts: ConflictInfo[] = [];
-
-	// Get repository metadata for GitHub integration
-	const { data: repo } = await supabase
-		.from("repositories")
-		.select("full_name")
-		.eq("id", repositoryId)
-		.maybeSingle();
-
-	if (!repo || !repo.full_name) {
-		return conflicts;
-	}
-
-	// Parse owner and repo name
-	const [owner, repoName] = repo.full_name.split("/");
-	if (!owner || !repoName) {
-		return conflicts;
-	}
-
-	// Use GitHub client to detect conflicts
-	const githubClient = getGitHubClient();
-	const prConflicts = await githubClient.detectFileConflicts(
-		owner,
-		repoName,
-		filePaths,
-	);
-
-	conflicts.push(...prConflicts);
-
-	return conflicts;
 }
 
 /**
@@ -584,19 +467,24 @@ function generateSummary(
 	const parts: string[] = [];
 
 	parts.push(
-		`Change type: ${request.change_type}. ${affectedFiles.length} files affected (including dependents).`,
+		"Change type: " +
+			request.change_type +
+			". " +
+			affectedFiles.length +
+			" files affected (including dependents).",
 	);
 
 	parts.push(
-		`Test scope: ${testScope.test_files.length} test files identified. ${testScope.coverage_impact}`,
+		"Test scope: " +
+			testScope.test_files.length +
+			" test files identified. " +
+			testScope.coverage_impact,
 	);
 
-	parts.push(`Risk level: ${riskLevel.toUpperCase()}.`);
+	parts.push("Risk level: " + riskLevel.toUpperCase() + ".");
 
 	if (conflicts.length > 0) {
-		parts.push(
-			`${conflicts.length} potential conflicts detected with open PRs.`,
-		);
+		parts.push(conflicts.length + " potential conflicts detected with open PRs.");
 	}
 
 	if (request.breaking_changes) {

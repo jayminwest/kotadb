@@ -103,7 +103,7 @@ https://github.com/user/kota-db-ts/pull/123
 - ✅/❌ `bun run build` - [build output, include if Level 3]
 
 **Real-Service Evidence** (Level 2+ only):
-- Supabase integration tests: [log snippet showing DB queries or "N/A for Level 1"]
+- SQLite integration tests: [log snippet showing DB queries or "N/A for Level 1"]
 - Background jobs: [worker logs if applicable or "N/A"]
 - Webhook endpoints: [request/response samples if applicable or "N/A"]
 ```

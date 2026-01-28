@@ -252,10 +252,10 @@ Issue #38 (chore: improve test coverage):
 ### Example: Obsolete closure
 Issue #22 (feat: add SQLite persistence):
 - Category: obsolete
-- Evidence: PR #29 migrated to Supabase, superseding SQLite approach
-- Reason: "Obsolete after Postgres/Supabase migration in PR #29. SQLite removed from architecture."
+- Evidence: PR #29 refactored database layer, superseding old approach
+- Reason: "Obsolete after SQLite migration in PR #29. SQLite removed from architecture."
 - Confidence: high
-- Command: `gh issue close 22 --reason "not planned" --comment "Superseded by Supabase migration..."`
+- Command: `gh issue close 22 --reason "not planned" --comment "Superseded by SQLite migration..."`
 
 ### Example: Stale issue (medium confidence)
 Issue #15 (feat: add webhook triggers):

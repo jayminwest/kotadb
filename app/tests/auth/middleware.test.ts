@@ -1,110 +1,31 @@
 /**
- * Authentication Middleware Integration Tests
+ * Authentication Middleware Tests (Local Mode)
  *
- * Tests authentication middleware with real database connection.
- * Environment variables are loaded from .env.test in CI or default to local Supabase ports.
- *
- * Required environment variables:
- * - SUPABASE_URL (defaults to http://localhost:54322)
- * - SUPABASE_SERVICE_KEY (defaults to local demo key)
- * - SUPABASE_ANON_KEY (defaults to local demo key)
- * - DATABASE_URL (defaults to postgresql://postgres:postgres@localhost:5434/postgres)
+ * Tests the simplified authentication middleware for local-only mode.
+ * All requests are automatically authenticated with a local user context.
  */
 
-import { beforeEach, describe, expect, it } from "bun:test";
-import { clearCache } from "@auth/cache";
-import { authenticateRequest, createForbiddenResponse } from "@auth/middleware";
-import { getServiceClient } from "@db/client";
-import { getTestApiKey, resetRateLimitCounters } from "../helpers/db";
-import { RATE_LIMITS } from "@config/constants";
+import { describe, expect, it } from "bun:test";
+import { authenticateRequest, createForbiddenResponse, requireAdmin } from "@auth/middleware";
 
-describe("Authentication Middleware", () => {
-	beforeEach(async () => {
-		clearCache();
-		// Reset rate limit counters to ensure tests start with clean slate
-		await resetRateLimitCounters();
-	});
-
+describe("Authentication Middleware (Local Mode)", () => {
 	describe("authenticateRequest", () => {
-		it("returns 401 for missing Authorization header", async () => {
+		it("returns local context for any request", async () => {
 			const request = new Request("http://localhost:3000/search");
 			const result = await authenticateRequest(request);
 
-			expect(result.context).toBeUndefined();
-			expect(result.response).toBeDefined();
-			expect(result.response?.status).toBe(401);
-
-			const body = (await result.response?.json()) as {
-				error: string;
-				code: string;
-			};
-			expect(body.error).toBe("Missing API key");
-			expect(body.code).toBe("AUTH_MISSING_KEY");
+			expect(result.response).toBeUndefined();
+			expect(result.context).toBeDefined();
+			expect(result.context?.userId).toBe("local-user");
+			expect(result.context?.tier).toBe("team");
+			expect(result.context?.keyId).toBe("local-key");
+			expect(result.context?.rateLimitPerHour).toBe(Number.MAX_SAFE_INTEGER);
 		});
 
-		it("returns 401 for invalid Authorization header format", async () => {
+		it("returns local context regardless of Authorization header", async () => {
 			const request = new Request("http://localhost:3000/search", {
 				headers: {
-					Authorization: "InvalidFormat token123",
-				},
-			});
-
-			const result = await authenticateRequest(request);
-
-			expect(result.context).toBeUndefined();
-			expect(result.response).toBeDefined();
-			expect(result.response?.status).toBe(401);
-
-			const body = (await result.response?.json()) as {
-				error: string;
-				code: string;
-			};
-			expect(body.error).toBe("Invalid authorization header format");
-			expect(body.code).toBe("AUTH_INVALID_HEADER");
-		});
-
-		it("returns 401 for invalid API key format", async () => {
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: "Bearer invalid-key-format",
-				},
-			});
-
-			const result = await authenticateRequest(request);
-
-			expect(result.context).toBeUndefined();
-			expect(result.response).toBeDefined();
-			expect(result.response?.status).toBe(401);
-
-			const body = (await result.response?.json()) as {
-				error: string;
-				code: string;
-			};
-			expect(body.error).toBe("Invalid API key");
-			expect(body.code).toBe("AUTH_INVALID_KEY");
-		});
-
-		it("returns 401 for non-existent API key", async () => {
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization:
-						"Bearer kota_free_nonexistent_0123456789abcdef0123456789abcdef",
-				},
-			});
-
-			const result = await authenticateRequest(request);
-
-			expect(result.context).toBeUndefined();
-			expect(result.response).toBeDefined();
-			expect(result.response?.status).toBe(401);
-		});
-
-		it("returns context for valid API key", async () => {
-			const testApiKey = getTestApiKey("free");
-
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: `Bearer ${testApiKey}`,
+					Authorization: "Bearer some-random-token",
 				},
 			});
 
@@ -112,76 +33,17 @@ describe("Authentication Middleware", () => {
 
 			expect(result.response).toBeUndefined();
 			expect(result.context).toBeDefined();
-			expect(result.context?.userId).toBeDefined();
-			expect(result.context?.tier).toBe("free");
-			expect(result.context?.keyId).toBeDefined();
-			expect(result.context?.rateLimitPerHour).toBeGreaterThan(0);
+			expect(result.context?.userId).toBe("local-user");
+			expect(result.context?.tier).toBe("team");
 		});
 
-		it("uses cache for repeated requests with same key", async () => {
-			const testApiKey = getTestApiKey("free");
-
-			const request1 = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: `Bearer ${testApiKey}`,
-				},
-			});
-
-			const request2 = new Request("http://localhost:3000/index", {
-				headers: {
-					Authorization: `Bearer ${testApiKey}`,
-				},
-			});
-
-			const startTime = Date.now();
-			const result1 = await authenticateRequest(request1);
-			const firstDuration = Date.now() - startTime;
-
-			const startTime2 = Date.now();
-			const result2 = await authenticateRequest(request2);
-			const secondDuration = Date.now() - startTime2;
-
-			// Second request should be faster or equal (cache hit)
-			// Allow +2ms tolerance for real database timing variance
-			expect(secondDuration).toBeLessThanOrEqual(firstDuration + 2);
-
-			// Both should succeed
-			expect(result1.context).toBeDefined();
-			expect(result2.context).toBeDefined();
-
-			// Both should have same userId
-			expect(result1.context?.userId).toBe(result2.context?.userId);
-		});
-
-		it("handles Bearer prefix with extra spaces", async () => {
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: "Bearer  token123",
-				},
-			});
-
+		it("returns local context for missing Authorization header", async () => {
+			const request = new Request("http://localhost:3000/api/search");
 			const result = await authenticateRequest(request);
 
-			// Should fail due to invalid key format (extra space in token)
-			expect(result.response).toBeDefined();
-			expect(result.response?.status).toBe(401);
-		});
-
-		it("logs authentication attempts", async () => {
-			// This test verifies logging behavior
-			// In a real test, you'd capture console output
-
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization:
-						"Bearer kota_free_test_0123456789abcdef0123456789abcdef",
-				},
-			});
-
-			await authenticateRequest(request);
-
-			// Would verify console.warn was called for invalid key
-			// Requires test harness to capture console output
+			expect(result.response).toBeUndefined();
+			expect(result.context).toBeDefined();
+			expect(result.context?.userId).toBe("local-user");
 		});
 	});
 
@@ -199,149 +61,13 @@ describe("Authentication Middleware", () => {
 			expect(body.error).toBe("Insufficient permissions");
 			expect(body.code).toBe("AUTH_FORBIDDEN");
 		});
-
-		it("creates 403 response for disabled key", async () => {
-			const response = createForbiddenResponse(
-				"API key disabled",
-				"AUTH_KEY_DISABLED",
-			);
-
-			expect(response.status).toBe(403);
-
-			const body = (await response.json()) as { error: string; code: string };
-			expect(body.error).toBe("API key disabled");
-			expect(body.code).toBe("AUTH_KEY_DISABLED");
-		});
 	});
 
-	describe("Rate Limiting Integration", () => {
-		// Helper to clean up rate limit counters
-		async function cleanupRateLimitCounter(keyId: string) {
-			const supabase = getServiceClient();
-			await supabase.from("rate_limit_counters").delete().eq("key_id", keyId);
-		}
-
-		it("attaches rate limit result to auth context", async () => {
-			const testApiKey = getTestApiKey("free");
-
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: `Bearer ${testApiKey}`,
-				},
-			});
-
-			const result = await authenticateRequest(request);
-
-			expect(result.context).toBeDefined();
-			expect(result.context?.rateLimit).toBeDefined();
-			expect(result.context?.rateLimit?.allowed).toBe(true);
-			expect(result.context?.rateLimit?.limit).toBe(RATE_LIMITS.FREE.HOURLY);
-			expect(result.context?.rateLimit?.remaining).toBeLessThanOrEqual(RATE_LIMITS.FREE.HOURLY);
-			expect(result.context?.rateLimit?.resetAt).toBeGreaterThan(0);
-
-			if (result.context?.keyId) {
-				await cleanupRateLimitCounter(result.context.keyId);
-			}
-		});
-
-		it("returns 429 when rate limit exceeded", async () => {
-			// Note: This test is slow due to the 100-request loop.
-			// In production, consider using a test-specific lower limit or
-			// skipping this test in quick validation runs.
-
-			const testApiKey = getTestApiKey("free");
-
-			// Make requests to exhaust the free tier limit
-			let lastKeyId: string | undefined;
-			for (let i = 0; i < RATE_LIMITS.FREE.HOURLY; i++) {
-				const request = new Request("http://localhost:3000/search", {
-					headers: {
-						Authorization: `Bearer ${testApiKey}`,
-					},
-				});
-
-				const result = await authenticateRequest(request);
-				if (result.context?.keyId) {
-					lastKeyId = result.context.keyId;
-				}
-			}
-
-			// 101st request should be rate limited
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: `Bearer ${testApiKey}`,
-				},
-			});
-
-			const result = await authenticateRequest(request);
-
-			expect(result.context).toBeUndefined();
-			expect(result.response).toBeDefined();
-			expect(result.response?.status).toBe(429);
-
-			// Check response headers
-			expect(result.response?.headers.get("X-RateLimit-Limit")).toBe(String(RATE_LIMITS.FREE.HOURLY));
-			expect(result.response?.headers.get("X-RateLimit-Remaining")).toBe("0");
-			expect(result.response?.headers.get("X-RateLimit-Reset")).toBeDefined();
-			expect(result.response?.headers.get("Retry-After")).toBeDefined();
-
-			// Check response body
-			const body = (await result.response?.json()) as {
-				error: string;
-				retryAfter: number;
-			};
-			expect(body.error).toBe("Rate limit exceeded");
-			expect(body.retryAfter).toBeGreaterThan(0);
-			expect(body.retryAfter).toBeLessThanOrEqual(3600);
-
-			if (lastKeyId) {
-				await cleanupRateLimitCounter(lastKeyId);
-			}
-		}, 120000); // Increase timeout to 120 seconds for this test
-
-		it("enforces different limits for different tiers", async () => {
-			const freeApiKey = getTestApiKey("free");
-			const soloApiKey = getTestApiKey("solo");
-
-			const freeRequest = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: `Bearer ${freeApiKey}`,
-				},
-			});
-
-			const soloRequest = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization: `Bearer ${soloApiKey}`,
-				},
-			});
-
-			const freeResult = await authenticateRequest(freeRequest);
-			const soloResult = await authenticateRequest(soloRequest);
-
-			expect(freeResult.context?.rateLimit?.limit).toBe(RATE_LIMITS.FREE.HOURLY);
-			expect(soloResult.context?.rateLimit?.limit).toBe(RATE_LIMITS.SOLO.HOURLY);
-
-			if (freeResult.context?.keyId) {
-				await cleanupRateLimitCounter(freeResult.context.keyId);
-			}
-			if (soloResult.context?.keyId) {
-				await cleanupRateLimitCounter(soloResult.context.keyId);
-			}
-		});
-
-		it("rate limit check happens after successful authentication", async () => {
-			// Invalid API key should fail auth before rate limiting
-			const request = new Request("http://localhost:3000/search", {
-				headers: {
-					Authorization:
-						"Bearer kota_free_invalid_0123456789abcdef0123456789abcdef",
-				},
-			});
-
-			const result = await authenticateRequest(request);
-
-			expect(result.response).toBeDefined();
-			expect(result.response?.status).toBe(401); // Auth failure, not 429
+	describe("requireAdmin", () => {
+		it("always returns true in local mode", () => {
+			expect(requireAdmin(null)).toBe(true);
+			expect(requireAdmin("")).toBe(true);
+			expect(requireAdmin("Bearer some-token")).toBe(true);
 		});
 	});
 });

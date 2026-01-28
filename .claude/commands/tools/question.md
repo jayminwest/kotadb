@@ -74,7 +74,7 @@ The project is organized as follows:
 - `apps/` - Application packages (app, web)
 - `packages/` - Shared libraries (ui, config)
 - `docs/` - Documentation
-- `supabase/` - Database and edge functions
+- `data/` - SQLite database files
 ...
 ```
 

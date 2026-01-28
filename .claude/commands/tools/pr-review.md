@@ -21,7 +21,7 @@ Review another contributor's pull request. Provide the PR number via `$ARGUMENTS
 ## Tests & Tooling
 - Execute the validation level appropriate to the changes (Level 2 from `/validate-implementation` minimum; Level 3 for high-risk work).
 - Record outcomes and failures with logs, calling out any deviations from the contributor’s reported results.
-- Confirm integration suites hit real services (Supabase logs, command output) and request evidence if missing.
+- Confirm integration suites hit real services (SQLite database, command output) and request evidence if missing.
 
 ## Documentation & Release Notes
 - Verify docs updated where behaviour changes (README, CLAUDE.md, `docs/specs/**`).

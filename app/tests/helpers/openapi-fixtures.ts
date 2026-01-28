@@ -3,6 +3,9 @@
  * 
  * Provides minimal valid OpenAPI 3.1 spec as reference,
  * sample schemas, and expected security scheme definitions.
+ * 
+ * NOTE: Updated for local-only v2.0.0 (Issue #591)
+ * Cloud-only endpoints (subscriptions, API keys) have been removed.
  */
 
 /**
@@ -19,6 +22,9 @@ export const minimalValidSpec = {
 
 /**
  * Expected core endpoints that must be documented
+ * 
+ * NOTE: Local-only mode - subscription and API key endpoints removed.
+ * Project endpoints remain but use local SQLite storage.
  */
 export const expectedCoreEndpoints = [
 	{ path: '/health', method: 'get' },
@@ -31,12 +37,13 @@ export const expectedCoreEndpoints = [
 	{ path: '/api/projects/{id}', method: 'get' },
 	{ path: '/api/projects/{id}', method: 'patch' },
 	{ path: '/api/projects/{id}', method: 'delete' },
-	{ path: '/api/keys/generate', method: 'post' },
-	{ path: '/api/keys/current', method: 'get' },
-	{ path: '/api/keys/reset', method: 'post' },
-	{ path: '/api/subscriptions/create-checkout-session', method: 'post' },
-	{ path: '/api/subscriptions/create-portal-session', method: 'post' },
-	{ path: '/api/subscriptions/current', method: 'get' },
+	// Cloud-only endpoints removed for v2.0.0:
+	// - /api/keys/generate
+	// - /api/keys/current
+	// - /api/keys/reset
+	// - /api/subscriptions/create-checkout-session
+	// - /api/subscriptions/create-portal-session
+	// - /api/subscriptions/current
 ];
 
 /**
