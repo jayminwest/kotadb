@@ -1,0 +1,493 @@
+# KotaDB API Expert Knowledge
+# Target: 400-600 lines | Domain: Operational knowledge for API development
+# Adapted for KotaDB local-only architecture
+
+overview:
+  description: |
+    KotaDB API expertise covering Express HTTP server patterns, MCP SDK integration with
+    StreamableHTTPServerTransport, OpenAPI specification generation, route organization,
+    and query layer patterns. This expertise enables correct API endpoint and MCP tool
+    implementation within KotaDB's local-only, SQLite-based architecture.
+  scope: |
+    Covers Express app structure (app/src/api/), route patterns, MCP server and transport
+    configuration, MCP tool definitions and executors, OpenAPI spec generation with Zod schemas,
+    query layer functions for SQLite, middleware patterns (CORS, logging, error handling), and
+    authentication bypass in local mode.
+
+    KOTADB ADAPTATIONS:
+    - Local-only mode (no Supabase, no cloud auth)
+    - SQLite database via getGlobalDatabase()
+    - Authentication bypassed in local mode
+    - Synchronous operations (no queue)
+    - MCP uses StreamableHTTPServerTransport with JSON mode
+    - Path aliases (@api/*, @mcp/*, @db/*, @logging/*, etc.)
+    - Logging via process.stdout.write (never console.*)
+
+    Does NOT cover frontend/web UI (no frontend in local mode) or orchestration patterns.
+  rationale: |
+    Consistent API implementation enables reliable MCP tool usage, proper HTTP endpoint design,
+    and maintainable query patterns. Poor API structure leads to inconsistent responses,
+    broken tool contracts, and difficult debugging.
+
+core_implementation:
+  directory_structure:
+    app/src/:
+      api/:
+        purpose: HTTP routes and Express app factory
+        routes.ts: Express app factory with all routes registered
+        queries.ts: SQLite query layer for all data operations
+        openapi/:
+          builder.ts: OpenAPI 3.1 spec generator
+          paths.ts: Path operation registrations
+          schemas.ts: Zod schemas for request/response validation
+        auto-reindex.ts: Auto-reindex functionality for file watching
+      mcp/:
+        purpose: MCP server and tool implementations
+        server.ts: MCP Server factory and StreamableHTTPServerTransport
+        tools.ts: Tool definitions (ToolDefinition) and execute* functions
+        impact-analysis.ts: Change impact analysis logic
+        spec-validation.ts: Implementation spec validation
+        jsonrpc.ts: JSON-RPC error helpers
+        lifecycle.ts: Session lifecycle management
+        headers.ts: MCP header utilities
+        session.ts: Session management
+      auth/:
+        middleware.ts: Authentication middleware (bypassed in local mode)
+      logging/:
+        logger.ts: Structured logger factory
+        middleware.ts: Request/error logging middleware
+        context.ts: Logging context management
+      db/:
+        client.ts: Database client factory
+        sqlite/:
+          index.ts: SQLite database exports
+          sqlite-client.ts: KotaDatabase class implementation
+
+  key_files:
+    - path: app/src/api/routes.ts
+      purpose: Express app factory - createExpressApp()
+      exports: createExpressApp
+    - path: app/src/api/queries.ts
+      purpose: SQLite query functions - searchFiles, listRecentFiles, runIndexingWorkflow
+      exports: searchFiles, listRecentFiles, ensureRepository, saveIndexedFiles, etc.
+    - path: app/src/mcp/server.ts
+      purpose: MCP Server factory - createMcpServer(), createMcpTransport()
+      exports: createMcpServer, createMcpTransport
+    - path: app/src/mcp/tools.ts
+      purpose: MCP tool definitions and executors
+      exports: SEARCH_CODE_TOOL, executeSearchCode, handleToolCall, etc.
+    - path: app/src/api/openapi/builder.ts
+      purpose: OpenAPI spec generator
+      exports: buildOpenAPISpec, clearSpecCache
+
+key_operations:
+  add_express_route:
+    when: Adding new HTTP endpoint to the API
+    approach: |
+      1. Open app/src/api/routes.ts
+      2. Add route inside createExpressApp() function after existing routes
+      3. Pattern for authenticated route:
+         ```typescript
+         app.get("/endpoint", async (req: AuthenticatedRequest, res: Response) => {
+             const context = req.authContext!;
+             // Validate query params
+             // Call query function from @api/queries
+             addRateLimitHeaders(res, context.rateLimit);
+             res.json({ results });
+         });
+         ```
+      4. Pattern for public route (health, openapi):
+         ```typescript
+         app.get("/public-endpoint", (_req: Request, res: Response) => {
+             res.json({ data });
+         });
+         ```
+      5. Register in OpenAPI spec via app/src/api/openapi/paths.ts
+    examples:
+      - endpoint: GET /search
+        location: routes.ts line 146
+      - endpoint: POST /mcp
+        location: routes.ts line 220
+    pitfalls:
+      - what: "Forgetting addRateLimitHeaders call"
+        instead: "Always call addRateLimitHeaders with context.rateLimit"
+        reason: "Clients expect rate limit headers on all authenticated endpoints"
+      - what: "Using console.log instead of logger"
+        instead: "Use createLogger from @logging/logger"
+        reason: "Logging standard requires structured JSON output"
+
+  register_mcp_tool:
+    when: Adding new MCP tool for Claude Code integration
+    approach: |
+      1. Define tool in app/src/mcp/tools.ts:
+         ```typescript
+         export const NEW_TOOL: ToolDefinition = {
+             name: "tool_name",
+             description: "Tool description for LLM",
+             inputSchema: {
+                 type: "object",
+                 properties: {
+                     param: { type: "string", description: "..." },
+                 },
+                 required: ["param"],
+             },
+         };
+         ```
+      2. Create executor function:
+         ```typescript
+         export async function executeNewTool(
+             params: unknown,
+             requestId: string | number,
+             userId: string,
+         ): Promise<unknown> {
+             // Validate params structure
+             if (typeof params !== "object" || params === null) {
+                 throw new Error("Parameters must be an object");
+             }
+             const p = params as Record<string, unknown>;
+             // Validate required params
+             // Call query functions from @api/queries
+             return { result };
+         }
+         ```
+      3. Register in createMcpServer (app/src/mcp/server.ts):
+         - Add to ListToolsRequestSchema handler
+         - Add case to CallToolRequestSchema handler switch
+      4. Export tool and executor from tools.ts
+      5. Add to getToolDefinitions() return array
+    examples:
+      - tool: search_code
+        definition: SEARCH_CODE_TOOL
+        executor: executeSearchCode
+      - tool: index_repository
+        definition: INDEX_REPOSITORY_TOOL
+        executor: executeIndexRepository
+    pitfalls:
+      - what: "Returning raw objects instead of content blocks"
+        instead: "MCP response must be { content: [{ type: 'text', text: JSON.stringify(result) }] }"
+        reason: "SDK expects content blocks format"
+      - what: "Missing validation of required parameters"
+        instead: "Always check for undefined/null and correct types"
+        reason: "LLM may pass incorrect parameters"
+
+  update_openapi_schema:
+    when: Documenting new endpoint or updating existing
+    approach: |
+      1. Define Zod schemas in app/src/api/openapi/schemas.ts:
+         ```typescript
+         export const NewResponseSchema = z.object({
+             results: z.array(z.object({
+                 field: z.string(),
+             })),
+         });
+         ```
+      2. Register path in app/src/api/openapi/paths.ts:
+         ```typescript
+         registry.registerPath({
+             method: "get",
+             path: "/endpoint",
+             tags: ["Category"],
+             summary: "Short summary",
+             description: "Longer description",
+             security: [{ apiKey: [] }],
+             responses: {
+                 200: {
+                     description: "Success",
+                     content: {
+                         "application/json": {
+                             schema: NewResponseSchema,
+                         },
+                     },
+                 },
+             },
+         });
+         ```
+      3. Clear cached spec after changes: clearSpecCache()
+    examples:
+      - schema: SearchResponseSchema
+        location: schemas.ts
+    pitfalls:
+      - what: "Forgetting to clear spec cache during development"
+        instead: "Call clearSpecCache() or restart server"
+        reason: "OpenAPI spec is cached at startup"
+
+  add_query_function:
+    when: Adding new database query operation
+    approach: |
+      1. Open app/src/api/queries.ts
+      2. Create internal function with db parameter:
+         ```typescript
+         function queryInternal(
+             db: KotaDatabase,
+             param: string,
+         ): Result[] {
+             const sql = `SELECT ... FROM ... WHERE ...`;
+             const rows = db.query<ResultRow>(sql, [param]);
+             return rows.map(transformRow);
+         }
+         ```
+      3. Create public function using getGlobalDatabase():
+         ```typescript
+         export function query(param: string): Result[] {
+             return queryInternal(getGlobalDatabase(), param);
+         }
+         ```
+      4. Optionally add backward-compatible Local variant for tests:
+         ```typescript
+         export function queryLocal(db: KotaDatabase, param: string): Result[] {
+             return queryInternal(db, param);
+         }
+         ```
+    kotadb_conventions:
+      - Use getGlobalDatabase() from @db/sqlite/index.js for public functions
+      - Internal functions take db parameter for testability
+      - Transaction wrapper via db.transaction(() => { ... })
+      - Prepared statements via db.prepare() for bulk operations
+      - FTS5 search with escapeFts5Term() for user input
+    examples:
+      - function: searchFiles
+        internal: searchFilesInternal
+        public: searchFiles
+        local: searchFilesLocal
+
+decision_trees:
+  endpoint_vs_mcp_tool:
+    question: Should this be an HTTP endpoint or MCP tool?
+    options:
+      - if: Direct user-facing API consumption (REST clients, web apps)
+        then: HTTP endpoint in routes.ts
+      - if: LLM/Claude Code integration for agentic use
+        then: MCP tool in tools.ts
+      - if: Both human and LLM consumers needed
+        then: Both - HTTP endpoint calls same query function as MCP tool
+
+  auth_placement:
+    question: Does this endpoint need authentication?
+    options:
+      - if: Health check, OpenAPI spec, public info
+        then: No auth - check path in middleware skip list
+      - if: Any data access or mutation
+        then: Yes auth - uses AuthenticatedRequest type
+      - note: In local mode, all auth is bypassed (returns local-user context)
+
+  query_vs_mcp:
+    question: Where should business logic live?
+    options:
+      - if: Pure database query (search, list, fetch)
+        then: queries.ts - reusable by both routes and MCP
+      - if: Complex analysis (impact, validation)
+        then: Dedicated module in mcp/ (impact-analysis.ts, spec-validation.ts)
+      - if: Indexing workflow
+        then: queries.ts - runIndexingWorkflow orchestrates parsers
+
+patterns:
+  express_route_pattern:
+    structure: |
+      app.METHOD("/path", async (req: AuthenticatedRequest, res: Response) => {
+          const context = req.authContext!;
+          // 1. Extract and validate query params
+          const param = req.query.param as string;
+          if (!param) {
+              addRateLimitHeaders(res, context.rateLimit);
+              return res.status(400).json({ error: "Missing param" });
+          }
+          // 2. Call query function
+          try {
+              const results = queryFunction(param);
+              addRateLimitHeaders(res, context.rateLimit);
+              res.json({ results });
+          } catch (error) {
+              addRateLimitHeaders(res, context.rateLimit);
+              res.status(500).json({ error: (error as Error).message });
+          }
+      });
+    notes:
+      - AuthenticatedRequest for authenticated routes
+      - Request for public routes
+      - Always call addRateLimitHeaders before response
+      - Return early with status code on validation failure
+
+  mcp_tool_pattern:
+    structure: |
+      // 1. Tool Definition (tools.ts)
+      export const TOOL_NAME: ToolDefinition = {
+          name: "tool_name",
+          description: "LLM-oriented description",
+          inputSchema: {
+              type: "object",
+              properties: { param: { type: "string" } },
+              required: ["param"],
+          },
+      };
+
+      // 2. Executor Function (tools.ts)
+      export async function executeTool(
+          params: unknown,
+          requestId: string | number,
+          userId: string,
+      ): Promise<unknown> {
+          // Validate params
+          if (typeof params !== "object" || params === null) {
+              throw new Error("Parameters must be an object");
+          }
+          const p = params as Record<string, unknown>;
+          if (p.param === undefined) {
+              throw new Error("Missing required parameter: param");
+          }
+          // Call query functions
+          const result = await queryFunction(p.param as string);
+          return { result };
+      }
+
+      // 3. Register in server.ts
+      // In ListToolsRequestSchema handler:
+      return { tools: [..., TOOL_NAME] };
+      // In CallToolRequestSchema handler:
+      case "tool_name":
+          result = await executeTool(toolArgs, "", context.userId);
+          break;
+    notes:
+      - Tool description should guide LLM on when/how to use
+      - Input schema properties need descriptions for LLM
+      - Executor validates all params before processing
+      - Server wraps result in content blocks format
+
+  sqlite_query_pattern:
+    structure: |
+      // Internal function (testable)
+      function queryInternal(
+          db: KotaDatabase,
+          param: string,
+          options: QueryOptions = {},
+      ): Result[] {
+          const sql = `
+              SELECT column1, column2
+              FROM table
+              WHERE condition = ?
+              LIMIT ?
+          `;
+          const limit = options.limit ?? 20;
+          const rows = db.query<RowType>(sql, [param, limit]);
+          return rows.map(row => ({ ...row }));
+      }
+
+      // Public function (uses global db)
+      export function query(param: string, options?: QueryOptions): Result[] {
+          return queryInternal(getGlobalDatabase(), param, options);
+      }
+    notes:
+      - KotaDatabase type from @db/sqlite/sqlite-client.js
+      - db.query<T>() for SELECT returning rows
+      - db.queryOne<T>() for single row or null
+      - db.run() for INSERT/UPDATE/DELETE
+      - db.transaction(() => {}) for atomic operations
+      - db.prepare() for bulk prepared statements
+
+  fts5_search_pattern:
+    structure: |
+      function escapeFts5Term(term: string): string {
+          const escaped = term.replace(/"/g, '""');
+          return `"${escaped}"`;
+      }
+
+      function searchInternal(db: KotaDatabase, term: string): Result[] {
+          const sql = `
+              SELECT f.*, snippet(table_fts, 1, '<mark>', '</mark>', '...', 32) AS snippet
+              FROM table_fts fts
+              JOIN table f ON fts.rowid = f.rowid
+              WHERE table_fts MATCH ?
+              ORDER BY bm25(table_fts)
+              LIMIT ?
+          `;
+          const escapedTerm = escapeFts5Term(term);
+          return db.query<Result>(sql, [escapedTerm, 100]);
+      }
+    notes:
+      - Always escape user input with escapeFts5Term
+      - FTS5 MATCH for full-text search
+      - bm25() for relevance ranking
+      - snippet() for context around matches
+
+best_practices:
+  routes:
+    - Always use addRateLimitHeaders before sending response
+    - Extract and validate all query parameters early
+    - Use typed AuthenticatedRequest for authenticated routes
+    - Return JSON errors with { error: "message" } format
+    - Log errors with createLogger before returning 500
+
+  mcp:
+    - Tool descriptions should explain when/why to use the tool
+    - Input schema properties need clear descriptions
+    - Validate ALL parameters including types and ranges
+    - Return structured objects that serialize well to JSON
+    - Log tool calls with tool_name and user_id
+
+  queries:
+    - Use internal functions with db param for testability
+    - Public functions use getGlobalDatabase()
+    - Use transactions for multi-statement operations
+    - Use prepared statements for bulk inserts
+    - Always escape FTS5 search terms
+
+  openapi:
+    - Define Zod schemas for all request/response bodies
+    - Include security requirements for authenticated endpoints
+    - Use descriptive summaries and longer descriptions
+    - Tag endpoints by category (Health, Search, Indexing, etc.)
+
+  logging:
+    - Use createLogger({ module: "module-name" })
+    - Never use console.log/error/warn
+    - Include context (userId, requestId, params) in log objects
+    - Use logger.info for operations, logger.error for failures
+
+known_issues:
+  - issue: MCP Accept header requires both application/json AND text/event-stream
+    impact: Clients missing Accept header get 406 errors
+    resolution: Log warning but continue (SDK validates internally)
+    prevention: Document Accept header requirement for MCP clients
+    status: ongoing vigilance required
+
+  - issue: OpenAPI spec is cached at startup
+    impact: Changes to schemas/paths not reflected until restart
+    resolution: Call clearSpecCache() during development
+    status: by-design for performance
+
+  - issue: Local mode authentication always succeeds
+    impact: No real auth in local development
+    resolution: Expected behavior for local-only mode
+    status: by-design
+
+potential_enhancements:
+  - enhancement: OpenAPI spec hot reload in development mode
+    rationale: Avoid restarts when updating API docs
+    effort: low
+
+  - enhancement: Automated MCP tool registration
+    rationale: Reduce boilerplate when adding tools
+    effort: medium
+
+  - enhancement: Request validation middleware using Zod schemas
+    rationale: DRY validation between OpenAPI and routes
+    effort: medium
+
+  - enhancement: Response compression middleware
+    rationale: Reduce bandwidth for large search results
+    effort: low
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: initial
+    contradiction_count: 0
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
+    last_reviewed: 2026-01-28
+    utility_ratio: 1.0
+    notes: |
+      Initial expertise for local-only v2 architecture:
+      - Express HTTP server (not Bun/Hono)
+      - MCP SDK with StreamableHTTPServerTransport
+      - No auth middleware in local mode
+      - Synchronous operations (no queue)
+      - SQLite via getGlobalDatabase()

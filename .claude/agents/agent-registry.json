@@ -9,7 +9,12 @@
       "description": "Read-only codebase exploration and research agent",
       "file": "scout-agent.md",
       "model": "haiku",
-      "capabilities": ["explore", "search", "analyze", "research"],
+      "capabilities": [
+        "explore",
+        "search",
+        "analyze",
+        "research"
+      ],
       "tools": [
         "Glob",
         "Grep",
@@ -26,7 +31,13 @@
       "description": "File implementation and modification specialist",
       "file": "build-agent.md",
       "model": "sonnet",
-      "capabilities": ["implement", "modify", "execute", "create", "fix"],
+      "capabilities": [
+        "implement",
+        "modify",
+        "execute",
+        "create",
+        "fix"
+      ],
       "tools": [
         "Glob",
         "Grep",
@@ -48,7 +59,13 @@
       "description": "Code review and quality analysis specialist",
       "file": "review-agent.md",
       "model": "haiku",
-      "capabilities": ["review", "audit", "quality", "security", "feedback"],
+      "capabilities": [
+        "review",
+        "audit",
+        "quality",
+        "security",
+        "feedback"
+      ],
       "tools": [
         "Glob",
         "Grep",
@@ -66,7 +83,11 @@
       "description": "Documentation scraping specialist for fetching and saving docs as markdown",
       "file": "docs-scraper.md",
       "model": "sonnet",
-      "capabilities": ["scrape", "fetch", "document"],
+      "capabilities": [
+        "scrape",
+        "fetch",
+        "document"
+      ],
       "tools": [
         "mcp__firecrawl-mcp__firecrawl_scrape",
         "WebFetch",
@@ -80,8 +101,16 @@
       "description": "Claude configuration planning and spec generation specialist",
       "file": "experts/claude-config/claude-config-plan-agent.md",
       "model": "sonnet",
-      "capabilities": ["claude-config-planning", "spec-generation"],
-      "tools": ["Read", "Glob", "Grep", "Write"],
+      "capabilities": [
+        "claude-config-planning",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
       "readOnly": false
     },
     "claude-config-build-agent": {
@@ -89,8 +118,16 @@
       "description": "Claude configuration implementation specialist",
       "file": "experts/claude-config/claude-config-build-agent.md",
       "model": "sonnet",
-      "capabilities": ["claude-config-implementation"],
-      "tools": ["Read", "Write", "Edit", "Glob", "Grep"],
+      "capabilities": [
+        "claude-config-implementation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ],
       "readOnly": false
     },
     "claude-config-improve-agent": {
@@ -98,8 +135,17 @@
       "description": "Claude configuration expertise evolution specialist",
       "file": "experts/claude-config/claude-config-improve-agent.md",
       "model": "sonnet",
-      "capabilities": ["claude-config-expertise-evolution"],
-      "tools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
+      "capabilities": [
+        "claude-config-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash"
+      ],
       "readOnly": false
     },
     "claude-config-question-agent": {
@@ -107,8 +153,14 @@
       "description": "Claude configuration Q&A specialist",
       "file": "experts/claude-config/claude-config-question-agent.md",
       "model": "haiku",
-      "capabilities": ["claude-config-qa"],
-      "tools": ["Read", "Glob", "Grep"],
+      "capabilities": [
+        "claude-config-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
       "readOnly": true
     },
     "agent-authoring-plan-agent": {
@@ -116,8 +168,16 @@
       "description": "Agent authoring planning and spec generation specialist",
       "file": "experts/agent-authoring/agent-authoring-plan-agent.md",
       "model": "sonnet",
-      "capabilities": ["agent-authoring-planning", "spec-generation"],
-      "tools": ["Read", "Glob", "Grep", "Write"],
+      "capabilities": [
+        "agent-authoring-planning",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
       "readOnly": false
     },
     "agent-authoring-build-agent": {
@@ -125,8 +185,16 @@
       "description": "Agent authoring implementation specialist",
       "file": "experts/agent-authoring/agent-authoring-build-agent.md",
       "model": "sonnet",
-      "capabilities": ["agent-authoring-implementation"],
-      "tools": ["Read", "Write", "Edit", "Glob", "Grep"],
+      "capabilities": [
+        "agent-authoring-implementation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ],
       "readOnly": false
     },
     "agent-authoring-improve-agent": {
@@ -134,8 +202,17 @@
       "description": "Agent authoring expertise evolution specialist",
       "file": "experts/agent-authoring/agent-authoring-improve-agent.md",
       "model": "sonnet",
-      "capabilities": ["agent-authoring-expertise-evolution"],
-      "tools": ["Read", "Write", "Edit", "Glob", "Grep", "Bash"],
+      "capabilities": [
+        "agent-authoring-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash"
+      ],
       "readOnly": false
     },
     "agent-authoring-question-agent": {
@@ -143,58 +220,634 @@
       "description": "Agent authoring Q&A specialist",
       "file": "experts/agent-authoring/agent-authoring-question-agent.md",
       "model": "haiku",
-      "capabilities": ["agent-authoring-qa"],
-      "tools": ["Read", "Glob", "Grep"],
+      "capabilities": [
+        "agent-authoring-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": true
+    },
+    "api-plan-agent": {
+      "name": "api-plan-agent",
+      "description": "API endpoint planning and spec generation specialist",
+      "file": "experts/api/api-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "api-planning",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "readOnly": false
+    },
+    "api-build-agent": {
+      "name": "api-build-agent",
+      "description": "API endpoint and MCP tool implementation specialist",
+      "file": "experts/api/api-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "api-implementation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": false
+    },
+    "api-improve-agent": {
+      "name": "api-improve-agent",
+      "description": "API expertise evolution specialist",
+      "file": "experts/api/api-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "api-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash"
+      ],
+      "readOnly": false
+    },
+    "api-question-agent": {
+      "name": "api-question-agent",
+      "description": "API patterns Q&A specialist",
+      "file": "experts/api/api-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "api-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": true
+    },
+    "indexer-plan-agent": {
+      "name": "indexer-plan-agent",
+      "description": "Code indexing planning and spec generation specialist",
+      "file": "experts/indexer/indexer-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "indexer-planning",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "readOnly": false
+    },
+    "indexer-build-agent": {
+      "name": "indexer-build-agent",
+      "description": "Code indexing implementation specialist",
+      "file": "experts/indexer/indexer-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "indexer-implementation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": false
+    },
+    "indexer-improve-agent": {
+      "name": "indexer-improve-agent",
+      "description": "Indexer expertise evolution specialist",
+      "file": "experts/indexer/indexer-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "indexer-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash"
+      ],
+      "readOnly": false
+    },
+    "indexer-question-agent": {
+      "name": "indexer-question-agent",
+      "description": "Code indexing Q&A specialist",
+      "file": "experts/indexer/indexer-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "indexer-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": true
+    },
+    "database-plan-agent": {
+      "name": "database-plan-agent",
+      "description": "Database planning and schema design specialist for KotaDB SQLite",
+      "file": "experts/database/database-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "database-planning",
+        "schema-design",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "readOnly": false
+    },
+    "database-build-agent": {
+      "name": "database-build-agent",
+      "description": "Database implementation specialist for KotaDB SQLite",
+      "file": "experts/database/database-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "database-implementation",
+        "schema-changes",
+        "query-optimization"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": false
+    },
+    "database-improve-agent": {
+      "name": "database-improve-agent",
+      "description": "Database expertise evolution specialist",
+      "file": "experts/database/database-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "database-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash"
+      ],
+      "readOnly": false
+    },
+    "database-question-agent": {
+      "name": "database-question-agent",
+      "description": "Database Q&A specialist for KotaDB SQLite and FTS5",
+      "file": "experts/database/database-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "database-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": true
+    },
+    "testing-plan-agent": {
+      "name": "testing-plan-agent",
+      "description": "Plans test implementations for KotaDB using antimocking and SQLite patterns. Expects USER_PROMPT (test requirement)",
+      "file": "experts/testing/testing-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "testing-planning",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write"
+      ],
+      "readOnly": false
+    },
+    "testing-build-agent": {
+      "name": "testing-build-agent",
+      "description": "Implements tests from specs using Bun test runner and SQLite patterns. Expects SPEC (path to spec file)",
+      "file": "experts/testing/testing-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "testing-implementation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep"
+      ],
+      "readOnly": false
+    },
+    "testing-improve-agent": {
+      "name": "testing-improve-agent",
+      "description": "Evolves testing expertise based on new patterns and test learnings. Expects FOCUS_AREA (optional)",
+      "file": "experts/testing/testing-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "testing-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash"
+      ],
+      "readOnly": false
+    },
+    "testing-question-agent": {
+      "name": "testing-question-agent",
+      "description": "Answers testing questions using KotaDB testing expertise. Expects USER_PROMPT (question)",
+      "file": "experts/testing/testing-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "testing-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep"
+      ],
       "readOnly": true
     }
   },
   "capabilityIndex": {
-    "explore": ["scout-agent"],
-    "search": ["scout-agent"],
-    "analyze": ["scout-agent", "review-agent"],
-    "research": ["scout-agent"],
-    "implement": ["build-agent"],
-    "modify": ["build-agent"],
-    "execute": ["build-agent"],
-    "create": ["build-agent"],
-    "fix": ["build-agent"],
-    "review": ["review-agent"],
-    "audit": ["review-agent"],
-    "quality": ["review-agent"],
-    "security": ["review-agent"],
-    "feedback": ["review-agent"],
-    "scrape": ["docs-scraper"],
-    "fetch": ["docs-scraper"],
-    "document": ["docs-scraper"],
-    "claude-config-planning": ["claude-config-plan-agent"],
-    "claude-config-implementation": ["claude-config-build-agent"],
-    "claude-config-expertise-evolution": ["claude-config-improve-agent"],
-    "claude-config-qa": ["claude-config-question-agent"],
-    "agent-authoring-planning": ["agent-authoring-plan-agent"],
-    "agent-authoring-implementation": ["agent-authoring-build-agent"],
-    "agent-authoring-expertise-evolution": ["agent-authoring-improve-agent"],
-    "agent-authoring-qa": ["agent-authoring-question-agent"],
-    "spec-generation": ["claude-config-plan-agent", "agent-authoring-plan-agent"]
+    "explore": [
+      "scout-agent"
+    ],
+    "search": [
+      "scout-agent"
+    ],
+    "analyze": [
+      "scout-agent",
+      "review-agent"
+    ],
+    "research": [
+      "scout-agent"
+    ],
+    "implement": [
+      "build-agent"
+    ],
+    "modify": [
+      "build-agent"
+    ],
+    "execute": [
+      "build-agent"
+    ],
+    "create": [
+      "build-agent"
+    ],
+    "fix": [
+      "build-agent"
+    ],
+    "review": [
+      "review-agent"
+    ],
+    "audit": [
+      "review-agent"
+    ],
+    "quality": [
+      "review-agent"
+    ],
+    "security": [
+      "review-agent"
+    ],
+    "feedback": [
+      "review-agent"
+    ],
+    "scrape": [
+      "docs-scraper"
+    ],
+    "fetch": [
+      "docs-scraper"
+    ],
+    "document": [
+      "docs-scraper"
+    ],
+    "claude-config-planning": [
+      "claude-config-plan-agent"
+    ],
+    "claude-config-implementation": [
+      "claude-config-build-agent"
+    ],
+    "claude-config-expertise-evolution": [
+      "claude-config-improve-agent"
+    ],
+    "claude-config-qa": [
+      "claude-config-question-agent"
+    ],
+    "agent-authoring-planning": [
+      "agent-authoring-plan-agent"
+    ],
+    "agent-authoring-implementation": [
+      "agent-authoring-build-agent"
+    ],
+    "agent-authoring-expertise-evolution": [
+      "agent-authoring-improve-agent"
+    ],
+    "agent-authoring-qa": [
+      "agent-authoring-question-agent"
+    ],
+    "api-planning": [
+      "api-plan-agent"
+    ],
+    "api-implementation": [
+      "api-build-agent"
+    ],
+    "api-expertise-evolution": [
+      "api-improve-agent"
+    ],
+    "api-qa": [
+      "api-question-agent"
+    ],
+    "indexer-planning": [
+      "indexer-plan-agent"
+    ],
+    "indexer-implementation": [
+      "indexer-build-agent"
+    ],
+    "indexer-expertise-evolution": [
+      "indexer-improve-agent"
+    ],
+    "indexer-qa": [
+      "indexer-question-agent"
+    ],
+    "spec-generation": [
+      "claude-config-plan-agent",
+      "agent-authoring-plan-agent",
+      "api-plan-agent",
+      "indexer-plan-agent",
+      "database-plan-agent",
+      "testing-plan-agent"
+    ],
+    "database-planning": [
+      "database-plan-agent"
+    ],
+    "schema-design": [
+      "database-plan-agent"
+    ],
+    "database-implementation": [
+      "database-build-agent"
+    ],
+    "schema-changes": [
+      "database-build-agent"
+    ],
+    "query-optimization": [
+      "database-build-agent"
+    ],
+    "database-expertise-evolution": [
+      "database-improve-agent"
+    ],
+    "database-qa": [
+      "database-question-agent"
+    ],
+    "testing-planning": [
+      "testing-plan-agent"
+    ],
+    "testing-implementation": [
+      "testing-build-agent"
+    ],
+    "testing-expertise-evolution": [
+      "testing-improve-agent"
+    ],
+    "testing-qa": [
+      "testing-question-agent"
+    ]
   },
   "modelIndex": {
-    "haiku": ["scout-agent", "review-agent", "claude-config-question-agent", "agent-authoring-question-agent"],
-    "sonnet": ["build-agent", "docs-scraper", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"]
+    "haiku": [
+      "scout-agent",
+      "review-agent",
+      "claude-config-question-agent",
+      "agent-authoring-question-agent",
+      "api-question-agent",
+      "indexer-question-agent",
+      "database-question-agent",
+      "testing-question-agent"
+    ],
+    "sonnet": [
+      "build-agent",
+      "docs-scraper",
+      "claude-config-plan-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "agent-authoring-plan-agent",
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "api-plan-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "indexer-plan-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "database-plan-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "testing-plan-agent",
+      "testing-build-agent",
+      "testing-improve-agent"
+    ]
   },
   "toolMatrix": {
-    "Glob": ["scout-agent", "build-agent", "review-agent", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
-    "Grep": ["scout-agent", "build-agent", "review-agent", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
-    "Read": ["scout-agent", "build-agent", "review-agent", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "claude-config-question-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent", "agent-authoring-question-agent"],
-    "Edit": ["build-agent", "docs-scraper", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
-    "Write": ["build-agent", "docs-scraper", "claude-config-plan-agent", "claude-config-build-agent", "claude-config-improve-agent", "agent-authoring-plan-agent", "agent-authoring-build-agent", "agent-authoring-improve-agent"],
-    "Bash": ["build-agent", "claude-config-improve-agent", "agent-authoring-improve-agent"],
-    "NotebookEdit": ["build-agent"],
-    "Task": ["scout-agent", "build-agent", "review-agent"],
-    "TodoWrite": ["build-agent"],
-    "WebFetch": ["review-agent", "docs-scraper"],
-    "mcp__kotadb__search_code": ["scout-agent", "build-agent", "review-agent"],
-    "mcp__kotadb__search_dependencies": ["scout-agent", "build-agent", "review-agent"],
-    "mcp__kotadb__list_recent_files": ["scout-agent"],
-    "mcp__kotadb__analyze_change_impact": ["build-agent", "review-agent"],
-    "mcp__firecrawl-mcp__firecrawl_scrape": ["docs-scraper"]
+    "Glob": [
+      "scout-agent",
+      "build-agent",
+      "review-agent",
+      "claude-config-plan-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-question-agent",
+      "agent-authoring-plan-agent",
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "agent-authoring-question-agent",
+      "api-plan-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "api-question-agent",
+      "indexer-plan-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-question-agent",
+      "database-plan-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "database-question-agent",
+      "testing-plan-agent",
+      "testing-build-agent",
+      "testing-improve-agent",
+      "testing-question-agent"
+    ],
+    "Grep": [
+      "scout-agent",
+      "build-agent",
+      "review-agent",
+      "claude-config-plan-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-question-agent",
+      "agent-authoring-plan-agent",
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "agent-authoring-question-agent",
+      "api-plan-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "api-question-agent",
+      "indexer-plan-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-question-agent",
+      "database-plan-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "database-question-agent",
+      "testing-plan-agent",
+      "testing-build-agent",
+      "testing-improve-agent",
+      "testing-question-agent"
+    ],
+    "Read": [
+      "scout-agent",
+      "build-agent",
+      "review-agent",
+      "claude-config-plan-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-question-agent",
+      "agent-authoring-plan-agent",
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "agent-authoring-question-agent",
+      "api-plan-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "api-question-agent",
+      "indexer-plan-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-question-agent",
+      "database-plan-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "database-question-agent",
+      "testing-plan-agent",
+      "testing-build-agent",
+      "testing-improve-agent",
+      "testing-question-agent"
+    ],
+    "Edit": [
+      "build-agent",
+      "docs-scraper",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "testing-build-agent",
+      "testing-improve-agent"
+    ],
+    "Write": [
+      "build-agent",
+      "docs-scraper",
+      "claude-config-plan-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "agent-authoring-plan-agent",
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "api-plan-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "indexer-plan-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "database-plan-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "testing-plan-agent",
+      "testing-build-agent",
+      "testing-improve-agent"
+    ],
+    "Bash": [
+      "build-agent",
+      "claude-config-improve-agent",
+      "agent-authoring-improve-agent",
+      "api-improve-agent",
+      "indexer-improve-agent",
+      "database-improve-agent",
+      "testing-improve-agent"
+    ],
+    "NotebookEdit": [
+      "build-agent"
+    ],
+    "Task": [
+      "scout-agent",
+      "build-agent",
+      "review-agent"
+    ],
+    "TodoWrite": [
+      "build-agent"
+    ],
+    "WebFetch": [
+      "review-agent",
+      "docs-scraper"
+    ],
+    "mcp__kotadb__search_code": [
+      "scout-agent",
+      "build-agent",
+      "review-agent"
+    ],
+    "mcp__kotadb__search_dependencies": [
+      "scout-agent",
+      "build-agent",
+      "review-agent"
+    ],
+    "mcp__kotadb__list_recent_files": [
+      "scout-agent"
+    ],
+    "mcp__kotadb__analyze_change_impact": [
+      "build-agent",
+      "review-agent"
+    ],
+    "mcp__firecrawl-mcp__firecrawl_scrape": [
+      "docs-scraper"
+    ]
   }
 }

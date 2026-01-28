@@ -1,0 +1,523 @@
+# Testing Expertise for KotaDB
+# Target: 400-600 lines | Domain: Operational knowledge for Bun test runner and antimocking patterns
+# Adapted for KotaDB project conventions
+
+overview:
+  description: |
+    Testing expertise for KotaDB—Bun test runner (Jest-compatible API), antimocking philosophy
+    with real SQLite databases, in-memory database patterns, and test lifecycle management.
+    This expertise enables correct test implementation within the KotaDB codebase conventions.
+  scope: |
+    Covers Bun test runner configuration and usage, antimocking philosophy (real SQLite, no mocks),
+    in-memory SQLite database patterns (":memory:"), test lifecycle hooks (beforeAll, beforeEach,
+    afterEach, afterAll), test organization patterns, and KotaDB-specific testing conventions.
+
+    KOTADB ADAPTATIONS:
+    - Uses Bun test runner with Jest-compatible API (describe, test, expect)
+    - Antimocking philosophy - always use real implementations over mocks
+    - In-memory SQLite via createDatabase({ path: ":memory:" })
+    - Schema auto-initialization from sqlite-schema.sql
+    - Logging uses process.stdout.write (never console.*)
+    - Local-only SQLite storage (no cloud dependencies)
+    - Path aliases (@api/*, @db/*, @indexer/*, etc.) in imports
+
+    Does NOT cover agent prompt content authoring (see agent-authoring expert).
+  rationale: |
+    The antimocking philosophy produces more reliable tests by exercising real code paths.
+    In-memory SQLite provides fast, isolated test environments without filesystem overhead.
+    Consistent lifecycle management ensures proper setup and cleanup across test suites.
+
+core_implementation:
+  test_structure:
+    app/tests/:
+      purpose: Application-level tests
+      unit/: Unit tests for isolated functions
+      integration/: Cross-module integration tests
+      api/: API endpoint tests
+      indexer/: Indexing functionality tests
+      validation/: Schema and validation tests
+    app/src/**/__tests__/:
+      purpose: Colocated tests next to source files
+      pattern: Tests live alongside the modules they test
+    packages/core/tests/:
+      purpose: Core package tests
+      pattern: Indexer core functionality tests
+
+  key_patterns:
+    - pattern: describe/test blocks
+      usage: Group related tests with describe, individual tests with test or it
+    - pattern: In-memory SQLite
+      usage: createDatabase({ path: ":memory:" }) for fast isolated tests
+    - pattern: beforeEach/afterEach
+      usage: Setup and cleanup per test for isolation
+    - pattern: Real implementations
+      usage: Never mock - use actual SQLite, actual functions
+
+  test_file_naming:
+    convention: "<module-name>.test.ts"
+    examples:
+      - queries-sqlite.test.ts
+      - sqlite-client.test.ts
+      - symbol-extractor.test.ts
+    location_patterns:
+      colocated: "src/<module>/__tests__/<name>.test.ts"
+      centralized: "tests/<category>/<name>.test.ts"
+
+key_operations:
+  write_sqlite_test:
+    when: Testing any code that interacts with the database
+    approach: |
+      1. Import test utilities from bun:test
+         ```typescript
+         import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+         ```
+      2. Import database factory
+         ```typescript
+         import { createDatabase, type KotaDatabase } from "@db/sqlite/index.js";
+         ```
+      3. Set up test lifecycle
+         ```typescript
+         describe("Feature Name", () => {
+           let db: KotaDatabase;
+           const testRepoId = "test-repo-123";
+
+           beforeEach(() => {
+             // Create fresh in-memory database for each test
+             db = createDatabase({ path: ":memory:" });
+             // Insert test data as needed
+             db.run("INSERT INTO repositories (id, name, full_name) VALUES (?, ?, ?)",
+               [testRepoId, "test-repo", "owner/test-repo"]);
+           });
+
+           afterEach(() => {
+             if (db) {
+               db.close();
+             }
+           });
+
+           test("should do something", () => {
+             // Test implementation
+           });
+         });
+         ```
+      4. Use real database operations in tests
+      5. Assert on actual database state
+    pitfalls:
+      - what: "Forgetting to close database in afterEach"
+        instead: "Always close db in afterEach to prevent resource leaks"
+        reason: "Memory leaks and potential test interference"
+      - what: "Using beforeAll for database setup"
+        instead: "Use beforeEach for per-test isolation"
+        reason: "Tests should not share database state"
+      - what: "Mocking the database"
+        instead: "Use real in-memory SQLite"
+        reason: "Antimocking philosophy ensures real code paths tested"
+
+  apply_antimocking_philosophy:
+    when: Writing any test in KotaDB
+    principles:
+      - name: Real over Mock
+        description: |
+          Always prefer real implementations over mocks. If testing database code,
+          use real SQLite. If testing API handlers, use real database state.
+      - name: In-memory for Speed
+        description: |
+          Use in-memory SQLite (":memory:") for fast test execution without
+          filesystem overhead. Each test gets a fresh database.
+      - name: Isolation through Fresh State
+        description: |
+          Create new database instances in beforeEach, not beforeAll. This ensures
+          complete isolation between tests without complex cleanup logic.
+      - name: Real Schema
+        description: |
+          The createDatabase() function auto-initializes the schema from sqlite-schema.sql.
+          Tests exercise the real schema, catching schema-related bugs.
+    examples:
+      bad: |
+        // DON'T DO THIS - mocking violates antimocking philosophy
+        const mockDb = {
+          query: jest.fn().mockReturnValue([{ id: 1 }]),
+          run: jest.fn(),
+        };
+      good: |
+        // DO THIS - use real in-memory database
+        const db = createDatabase({ path: ":memory:" });
+        db.run("INSERT INTO users (id, name) VALUES (?, ?)", ["1", "Alice"]);
+        const result = db.query("SELECT * FROM users WHERE id = ?", ["1"]);
+        expect(result).toHaveLength(1);
+
+  manage_test_lifecycle:
+    when: Setting up test suites
+    hooks:
+      beforeAll: |
+        Use sparingly. Good for one-time expensive setup that doesn't affect test isolation.
+        Example: Creating temporary directories for file-based tests.
+        ```typescript
+        let tempDir: string;
+        beforeAll(() => {
+          tempDir = mkdtempSync(join(tmpdir(), "kota-test-"));
+        });
+        ```
+      beforeEach: |
+        Primary hook for test setup. Use for per-test isolation.
+        Example: Creating fresh in-memory database.
+        ```typescript
+        let db: KotaDatabase;
+        beforeEach(() => {
+          db = createDatabase({ path: ":memory:" });
+        });
+        ```
+      afterEach: |
+        Cleanup after each test. Essential for resource management.
+        Example: Closing database connections.
+        ```typescript
+        afterEach(() => {
+          if (db) db.close();
+        });
+        ```
+      afterAll: |
+        Final cleanup. Good for removing temp directories.
+        Example: Removing temporary test directories.
+        ```typescript
+        afterAll(() => {
+          rmSync(tempDir, { recursive: true, force: true });
+        });
+        ```
+    lifecycle_order:
+      - beforeAll (once per describe block)
+      - beforeEach (before each test)
+      - test execution
+      - afterEach (after each test)
+      - afterAll (once per describe block)
+
+  write_api_test:
+    when: Testing API endpoints or handlers
+    approach: |
+      1. Create in-memory database with test data
+      2. Import and call handler functions directly
+      3. Assert on responses and database state
+      ```typescript
+      describe("API Handler", () => {
+        let db: KotaDatabase;
+
+        beforeEach(() => {
+          db = createDatabase({ path: ":memory:" });
+          // Seed test data
+        });
+
+        afterEach(() => {
+          db?.close();
+        });
+
+        test("should return expected response", async () => {
+          // Call handler directly with test database
+          const result = await handlerFunction(db, testInput);
+          expect(result.status).toBe(200);
+          // Verify database state changed correctly
+        });
+      });
+      ```
+
+  write_indexer_test:
+    when: Testing symbol extraction, reference extraction, or parsing
+    approach: |
+      1. Use real parsers with test source code
+      2. Create inline test fixtures
+      3. Assert on extracted data structures
+      ```typescript
+      describe("Symbol Extractor", () => {
+        test("should extract function symbols", () => {
+          const source = `
+            export function greet(name: string): string {
+              return \`Hello, \${name}!\`;
+            }
+          `;
+          const symbols = extractSymbols(source, "test.ts");
+          expect(symbols).toContainEqual(
+            expect.objectContaining({
+              name: "greet",
+              kind: "function",
+            })
+          );
+        });
+      });
+      ```
+
+decision_trees:
+  test_type_selection:
+    question: What type of test should I write?
+    options:
+      - if: Testing a single function in isolation
+        then: Unit test with minimal setup
+      - if: Testing database queries or mutations
+        then: SQLite test with in-memory database
+      - if: Testing multiple modules working together
+        then: Integration test with full database setup
+      - if: Testing API endpoint behavior
+        then: API test with seeded database state
+      - if: Testing file parsing or extraction
+        then: Indexer test with inline fixtures
+
+  sqlite_database_choice:
+    question: How should I set up the database?
+    options:
+      - if: Testing database interactions
+        then: |
+          Use in-memory database with beforeEach
+          ```typescript
+          db = createDatabase({ path: ":memory:" });
+          ```
+      - if: Testing file persistence or WAL mode
+        then: |
+          Use temp directory with file-based database
+          ```typescript
+          const dbPath = join(tempDir, "test.db");
+          db = createDatabase({ path: dbPath });
+          ```
+      - if: Testing concurrent access
+        then: |
+          Use file-based database with multiple connections
+          Ensure proper cleanup in afterAll
+
+  assertion_strategy:
+    question: How should I assert test results?
+    options:
+      - if: Checking exact values
+        then: "expect(value).toBe(expected)"
+      - if: Checking object properties
+        then: "expect(obj).toEqual({ key: value })"
+      - if: Checking array contains item
+        then: "expect(arr).toContainEqual(expected)"
+      - if: Checking object has property
+        then: "expect(obj).toHaveProperty('key')"
+      - if: Checking async throws
+        then: "expect(async () => await fn()).rejects.toThrow()"
+      - if: Checking null/undefined
+        then: "expect(value).toBeNull() or expect(value).toBeDefined()"
+
+patterns:
+  sqlite_test_pattern:
+    structure: |
+      import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+      import { createDatabase, type KotaDatabase } from "@db/sqlite/index.js";
+
+      describe("Feature", () => {
+        let db: KotaDatabase;
+
+        beforeEach(() => {
+          db = createDatabase({ path: ":memory:" });
+          // Seed data
+        });
+
+        afterEach(() => {
+          db?.close();
+        });
+
+        test("should work", () => {
+          // Arrange, Act, Assert
+        });
+      });
+    trade_offs:
+      pros: [Fast execution, Complete isolation, Real code paths, Schema validation]
+      cons: [No persistence between tests, Must seed data each test]
+
+  file_based_test_pattern:
+    structure: |
+      import { describe, expect, it, beforeAll, beforeEach, afterEach, afterAll } from "bun:test";
+      import { mkdtempSync, rmSync } from "node:fs";
+      import { join } from "node:path";
+      import { tmpdir } from "node:os";
+
+      describe("File-based Feature", () => {
+        let tempDir: string;
+        let db: KotaDatabase;
+
+        beforeAll(() => {
+          tempDir = mkdtempSync(join(tmpdir(), "kota-test-"));
+        });
+
+        beforeEach(() => {
+          const dbPath = join(tempDir, "test.db");
+          db = createDatabase({ path: dbPath });
+        });
+
+        afterEach(() => {
+          db?.close();
+        });
+
+        afterAll(() => {
+          rmSync(tempDir, { recursive: true, force: true });
+        });
+
+        it("should persist data", () => {
+          // Test file persistence
+        });
+      });
+    use_when:
+      - Testing WAL mode behavior
+      - Testing file path resolution
+      - Testing concurrent database access
+      - Testing database migration scenarios
+
+  nested_describe_pattern:
+    structure: |
+      describe("Module", () => {
+        let db: KotaDatabase;
+
+        beforeEach(() => {
+          db = createDatabase({ path: ":memory:" });
+        });
+
+        afterEach(() => {
+          db?.close();
+        });
+
+        describe("method1()", () => {
+          test("should handle case A", () => {});
+          test("should handle case B", () => {});
+        });
+
+        describe("method2()", () => {
+          test("should handle case A", () => {});
+          test("should handle case B", () => {});
+        });
+      });
+    trade_offs:
+      pros: [Clear organization, Shared setup, Readable output]
+      cons: [Deep nesting can reduce clarity]
+
+  data_driven_test_pattern:
+    structure: |
+      describe("Language Detection", () => {
+        const cases = [
+          { file: "app.ts", expected: "typescript" },
+          { file: "app.js", expected: "javascript" },
+          { file: "app.py", expected: "python" },
+          { file: "app.go", expected: "go" },
+        ];
+
+        test.each(cases)("should detect $expected for $file", ({ file, expected }) => {
+          expect(detectLanguage(file)).toBe(expected);
+        });
+      });
+    use_when:
+      - Testing many similar cases with different inputs
+      - Mapping file extensions to languages
+      - Validating multiple input/output pairs
+
+best_practices:
+  organization:
+    - Group related tests with describe blocks
+    - Use descriptive test names that explain expected behavior
+    - Follow "should do X when Y" naming pattern
+    - Keep test files colocated with source or in centralized tests/ directory
+
+  isolation:
+    - Create fresh database in beforeEach, not beforeAll
+    - Close database connections in afterEach
+    - Never rely on test execution order
+    - Each test should be independently runnable
+
+  antimocking:
+    - NEVER mock database operations - use real in-memory SQLite
+    - NEVER mock file system for database tests - use temp directories
+    - NEVER mock module imports - use real implementations
+    - EXCEPTION - External services (if any) may use controlled test doubles
+
+  assertions:
+    - Assert on actual database state, not just return values
+    - Use specific assertions (toBe, toEqual) over generic (toBeTruthy)
+    - Check error conditions with expect().rejects or try/catch
+    - Verify side effects (database changes) after operations
+
+  performance:
+    - In-memory SQLite provides fast test execution
+    - Avoid unnecessary setup in beforeEach
+    - Use beforeAll only for truly shared, immutable setup
+    - Parallelize independent test suites
+
+  kotadb_conventions:
+    - Import from path aliases (@api/*, @db/*, @indexer/*, @shared/*)
+    - Use process.stdout.write for any logging (never console.*)
+    - Include JSDoc comment at top of test file describing coverage
+    - Follow existing test patterns in the codebase
+
+known_issues:
+  - issue: Database connection not closed in test
+    impact: Resource leaks, potential test interference
+    resolution: Always close db in afterEach
+    prevention: Use the standard test pattern with afterEach cleanup
+    status: enforce via code review
+
+  - issue: Tests depend on execution order
+    impact: Flaky tests that pass/fail inconsistently
+    resolution: Use beforeEach for all state setup
+    prevention: Each test creates its own fresh state
+    status: enforce via code review
+
+  - issue: Mocking database operations
+    impact: Tests pass but production code fails
+    resolution: Use real in-memory SQLite
+    prevention: Antimocking philosophy is mandatory
+    status: enforced via code review
+
+  - issue: Schema changes not reflected in tests
+    impact: Tests use outdated schema
+    resolution: createDatabase() auto-initializes from sqlite-schema.sql
+    prevention: Always use createDatabase() helper
+    status: automatic via factory function
+
+  - issue: Temp files not cleaned up
+    impact: Disk space accumulation, stale test artifacts
+    resolution: Use afterAll to clean temp directories
+    prevention: Use mkdtempSync/rmSync pattern
+    status: enforce via code review
+
+potential_enhancements:
+  - Custom test reporter for antimocking compliance
+  - Schema validation assertions
+  - Test coverage tracking per module
+  - Performance benchmarking for database operations
+  - Test data factory helpers for common entities
+
+bun_test_api:
+  imports: |
+    import { describe, expect, test, it, beforeAll, beforeEach, afterEach, afterAll } from "bun:test";
+  assertions:
+    toBe: Strict equality (===)
+    toEqual: Deep equality for objects/arrays
+    toBeTruthy: Value is truthy
+    toBeFalsy: Value is falsy
+    toBeNull: Value is null
+    toBeDefined: Value is not undefined
+    toBeUndefined: Value is undefined
+    toContain: Array/string contains value
+    toContainEqual: Array contains matching object
+    toHaveLength: Array/string has length
+    toHaveProperty: Object has property
+    toThrow: Function throws error
+    toMatchObject: Object matches subset
+    toBeGreaterThan: Number comparison
+    toBeLessThan: Number comparison
+  async:
+    await_in_test: "test('async', async () => { await fn(); })"
+    rejects: "expect(async () => await fn()).rejects.toThrow()"
+  skip_and_focus:
+    skip: "test.skip('skipped', () => {})"
+    only: "test.only('focused', () => {})"
+    todo: "test.todo('not yet implemented')"
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: initial
+    contradiction_count: 0
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
+    last_reviewed: 2026-01-28
+    utility_ratio: 1.0
+    notes: |
+      Initial creation of testing expertise domain.
+      - Antimocking philosophy as core principle
+      - In-memory SQLite patterns from existing codebase
+      - Bun test runner Jest-compatible API
+      - KotaDB-specific conventions integrated

@@ -1,0 +1,547 @@
+# KotaDB Indexer Expertise
+# Target: 400-600 lines | Domain: Operational knowledge for code indexing subsystem
+# Adapted for KotaDB local-only architecture with SQLite storage
+
+overview:
+  description: |
+    Code indexing subsystem for KotaDB—AST parsing with @typescript-eslint/parser, visitor pattern
+    for symbol and reference extraction, import path resolution, dependency graph construction,
+    and SQLite storage with transactional writes. This expertise enables correct implementation
+    of indexing features within KotaDB's local-only architecture.
+  scope: |
+    Covers AST parsing (parseFile, isSupportedForAST), symbol extraction (extractSymbols with
+    visitor pattern), reference extraction (imports, calls, property access, type references),
+    import resolution (resolveImport, handleIndexFiles), dependency graph construction
+    (buildFileDependencies, buildSymbolDependencies), and SQLite storage (storeIndexedData).
+
+    KOTADB ADAPTATIONS:
+    - Uses @typescript-eslint/parser (NOT Babel or TypeScript compiler API)
+    - Graceful error handling (return null on parse errors, log warnings)
+    - Local SQLite storage with single-transaction atomicity
+    - Path aliases (@api/*, @indexer/*, @shared/*, etc.)
+    - Logging via createLogger (never console.*)
+    - TSESTree types from @typescript-eslint/types
+
+    Does NOT cover MCP tool implementation (see MCP expert) or API routes.
+  rationale: |
+    Correct indexing enables code intelligence features (search, find usages, dependency analysis).
+    Poor AST handling causes silent failures. KotaDB uses @typescript-eslint/parser for modern
+    TypeScript support and consistent AST structure across the codebase.
+
+core_implementation:
+  directory_structure:
+    app/src/indexer/:
+      purpose: Core indexing modules
+      ast-parser.ts: AST parsing wrapper using @typescript-eslint/parser
+      ast-types.ts: TypeScript type definitions for AST nodes
+      symbol-extractor.ts: Visitor pattern for symbol extraction
+      reference-extractor.ts: Visitor pattern for reference extraction
+      import-resolver.ts: Import path resolution utilities
+      dependency-extractor.ts: Dependency graph construction
+      circular-detector.ts: Circular dependency detection algorithms
+      storage.ts: SQLite storage layer with transactional writes
+      repos.ts: Repository management functions
+      extractors.ts: High-level extraction orchestration
+      parsers.ts: File type detection and parsing coordination
+
+  key_files:
+    - path: app/src/indexer/ast-parser.ts
+      purpose: AST parsing with graceful error handling
+      exports: parseFile, isSupportedForAST
+    - path: app/src/indexer/symbol-extractor.ts
+      purpose: Symbol extraction from AST
+      exports: extractSymbols, Symbol, SymbolKind
+    - path: app/src/indexer/reference-extractor.ts
+      purpose: Reference extraction from AST
+      exports: extractReferences, Reference, ReferenceType
+    - path: app/src/indexer/import-resolver.ts
+      purpose: Import path resolution
+      exports: resolveImport, resolveExtensions, handleIndexFiles
+    - path: app/src/indexer/dependency-extractor.ts
+      purpose: Dependency graph construction
+      exports: extractDependencies, DependencyEdge
+    - path: app/src/indexer/storage.ts
+      purpose: SQLite storage with atomic transactions
+      exports: storeIndexedData, StorageResult
+
+key_operations:
+  parse_ast:
+    when: Parsing TypeScript/JavaScript source code to AST
+    approach: |
+      1. Check if file is supported using isSupportedForAST(filePath)
+         - Supported extensions: .ts, .tsx, .js, .jsx, .cjs, .mjs
+         - JSON files are NOT parsed (data files, not code)
+      2. Call parseFile(filePath, content)
+         - Uses @typescript-eslint/parser with modern settings
+         - Returns TSESTree.Program on success
+         - Returns null on parse error (graceful failure)
+      3. Handle null result gracefully
+         - Log warning with file path
+         - Continue processing other files
+         - Never throw on parse errors
+
+      Parser configuration:
+      ```typescript
+      parse(content, {
+        ecmaVersion: "latest",
+        sourceType: "module",
+        loc: true,        // Line/column information
+        range: true,      // Character range
+        comment: true,    // Preserve comments (for JSDoc)
+        tokens: true,     // Preserve tokens
+        filePath,         // For error messages
+      });
+      ```
+    examples:
+      - parseFile("src/utils.ts", content) -> TSESTree.Program | null
+      - isSupportedForAST("data.json") -> false
+    pitfalls:
+      - what: Throwing on parse errors
+        instead: Return null and log error
+        reason: Single bad file should not halt indexing
+      - what: Parsing JSON files
+        instead: Skip JSON files in isSupportedForAST
+        reason: JSON is not valid JavaScript program
+
+  extract_symbols:
+    when: Extracting functions, classes, interfaces, types from AST
+    approach: |
+      1. Call extractSymbols(ast, filePath)
+      2. Visitor pattern traverses AST
+      3. Dispatch based on node.type
+         - FunctionDeclaration -> function symbol
+         - ClassDeclaration -> class symbol + methods/properties
+         - TSInterfaceDeclaration -> interface symbol
+         - TSTypeAliasDeclaration -> type symbol
+         - TSEnumDeclaration -> enum symbol
+         - VariableDeclaration -> variable/constant (if exported)
+         - ExportNamedDeclaration -> recurse into declaration
+      4. Extract metadata for each symbol
+         - name, kind, lineStart, lineEnd, columnStart, columnEnd
+         - signature (for functions)
+         - documentation (JSDoc extraction)
+         - isExported (public API tracking)
+         - isAsync, accessModifier (TypeScript features)
+
+      VisitorContext tracks:
+      - comments: TSESTree.Comment[] (for JSDoc extraction)
+      - parent: TSESTree.Node | null (for export detection)
+      - isExported: boolean (current export context)
+
+      Symbol kinds:
+      - function, class, interface, type, variable, constant, method, property, enum
+    examples:
+      - FunctionDeclaration with async -> isAsync: true
+      - Class method with private -> accessModifier: "private"
+    pitfalls:
+      - what: Missing location data (node.loc undefined)
+        instead: Guard with if (!node.loc) return
+        reason: Some synthetic nodes lack position info
+      - what: Extracting non-exported variables
+        instead: Only extract exported variables
+        reason: Reduces noise in symbol table
+
+  extract_references:
+    when: Extracting imports, calls, property access, type references from AST
+    approach: |
+      1. Call extractReferences(ast, filePath)
+      2. Visitor pattern traverses all nodes recursively
+      3. Dispatch based on node.type
+         - ImportDeclaration -> import references
+         - CallExpression -> function/method call references
+         - MemberExpression -> property access references
+         - TSTypeReference -> TypeScript type references
+      4. Extract metadata for each reference
+         - targetName, referenceType, lineNumber, columnNumber
+         - metadata (importSource, importAlias, isMethodCall, etc.)
+
+      Reference types:
+      - import: Named, default, namespace, side-effect imports
+      - call: Function calls, method calls
+      - property_access: Member expressions (non-call)
+      - type_reference: TypeScript type references
+
+      Import handling:
+      - Named: import { foo } from './module'
+      - Default: import foo from './module'
+      - Namespace: import * as foo from './module'
+      - Side-effect: import './module'
+      - Aliased: import { foo as bar } from './module'
+    examples:
+      - ImportDeclaration -> multiple Reference objects (one per specifier)
+      - CallExpression with MemberExpression -> isMethodCall: true
+    pitfalls:
+      - what: Not visiting children after extracting reference
+        instead: Always call visitChildren for nested references
+        reason: Chained calls (obj.foo().bar()) have nested structures
+      - what: Extracting computed properties
+        instead: Skip computed properties (return null)
+        reason: Cannot resolve obj[key] statically
+
+  resolve_imports:
+    when: Resolving import paths to absolute file paths
+    approach: |
+      1. Call resolveImport(importSource, fromFilePath, files)
+      2. Skip non-relative imports (node_modules, absolute paths)
+         - Only handle imports starting with ./ or ../
+      3. Resolve relative to importing file's directory
+      4. Try extension resolution
+         - Check .ts, .tsx, .js, .jsx, .mjs, .cjs in order
+      5. Try index file resolution
+         - Check index.ts, index.tsx, index.js, index.jsx
+      6. Return null if not found (graceful failure)
+
+      Resolution priority:
+      1. Exact path (if has extension)
+      2. Path + .ts, .tsx, .js, .jsx, .mjs, .cjs
+      3. Directory + index.ts, index.tsx, index.js, index.jsx
+
+      Non-goals (out of scope):
+      - tsconfig.json path mapping (paths, baseUrl)
+      - node_modules resolution
+      - Absolute imports (/foo, @scope/pkg)
+      - Dynamic imports
+    examples:
+      - "./utils" -> "/repo/src/utils.ts"
+      - "./api" -> "/repo/src/api/index.ts"
+      - "lodash" -> null (node_modules, skip)
+    pitfalls:
+      - what: Resolving node_modules imports
+        instead: Return null for non-relative imports
+        reason: External dependencies handled separately
+      - what: Using path.resolve (creates absolute paths)
+        instead: Use path.join + path.normalize
+        reason: Preserves relative path structure
+
+  build_dependencies:
+    when: Constructing file-to-file and symbol-to-symbol dependency graph
+    approach: |
+      1. Call extractDependencies(files, symbols, references, repositoryId)
+      2. Build file dependencies from import references
+         - Match importSource to resolved file path
+         - Create DependencyEdge with fromFileId, toFileId
+         - dependencyType: "file_import"
+      3. Build symbol dependencies from call references
+         - Find caller symbol (containing the call expression)
+         - Find callee symbol (function being called)
+         - Create DependencyEdge with fromSymbolId, toSymbolId
+         - dependencyType: "symbol_usage"
+
+      Helper functions:
+      - buildFileDependencies: Import references -> file edges
+      - buildSymbolDependencies: Call references -> symbol edges
+      - findSymbolByLineNumber: Match line to enclosing symbol
+
+      Ambiguous match handling:
+      - Multiple symbols with same name -> prefer same-file match
+      - No match found -> log debug, skip edge
+      - Missing target -> log warning, continue
+    examples:
+      - import { foo } from './utils' -> file_import edge
+      - foo() inside bar() -> symbol_usage edge from bar to foo
+    pitfalls:
+      - what: Failing on unresolved references
+        instead: Log debug/warning and continue
+        reason: External functions, built-ins won't resolve
+      - what: Creating self-references
+        instead: Skip if fromSymbolId === toSymbolId
+        reason: Recursive calls are not useful dependencies
+
+  store_indexed_data:
+    when: Persisting extracted data to SQLite database
+    approach: |
+      1. Call storeIndexedData(repositoryId, files, symbols, references, dependencies)
+      2. Single transaction wraps all operations (atomicity)
+      3. Insert files and build file_path -> file_id mapping
+      4. Insert symbols and build symbol_key -> symbol_id mapping
+         - symbol_key format: "file_path::symbol_name::line_start"
+      5. Insert references using file/symbol mappings
+      6. Return StorageResult with counts
+
+      Storage interface:
+      - FileData: path, content, language, size_bytes, metadata
+      - SymbolData: file_path, name, kind, line_start, line_end, signature, documentation
+      - ReferenceData: source_file_path, target_symbol_key, line_number, reference_type
+      - DependencyGraphEntry: from_file_path, to_file_path, dependency_type
+
+      Transaction pattern:
+      ```typescript
+      db.transaction(() => {
+        // All inserts here are atomic
+        // Rollback on any failure
+      });
+      ```
+    examples:
+      - storeIndexedData(repoId, files, symbols, refs, deps) -> { files_indexed: 10, ... }
+    pitfalls:
+      - what: Multiple separate transactions
+        instead: Single transaction for all operations
+        reason: Atomicity guarantees consistency
+      - what: Missing file_id lookup for symbol
+        instead: Log warning and skip symbol
+        reason: Orphan symbols without file reference are useless
+
+decision_trees:
+  ast_parsing_strategy:
+    question: How should I parse this file?
+    options:
+      - if: File extension is .ts, .tsx, .js, .jsx, .cjs, .mjs
+        then: Use parseFile() to get AST
+      - if: File extension is .json
+        then: Skip AST parsing (data file)
+      - if: File extension is unknown
+        then: Check isSupportedForAST(), skip if false
+      - if: parseFile() returns null
+        then: Log warning, continue with other files
+
+  symbol_extraction_approach:
+    question: What kind of symbol is this AST node?
+    options:
+      - if: FunctionDeclaration
+        then: Extract function symbol with signature
+      - if: ClassDeclaration
+        then: Extract class symbol, recurse into methods/properties
+      - if: TSInterfaceDeclaration
+        then: Extract interface symbol
+      - if: TSTypeAliasDeclaration
+        then: Extract type symbol
+      - if: TSEnumDeclaration
+        then: Extract enum symbol
+      - if: VariableDeclaration and isExported
+        then: Extract variable/constant/function symbol
+      - if: ExportNamedDeclaration or ExportDefaultDeclaration
+        then: Recurse into declaration with isExported: true
+      - if: Other node type
+        then: Skip (no symbol to extract)
+
+  reference_extraction_approach:
+    question: What kind of reference is this AST node?
+    options:
+      - if: ImportDeclaration
+        then: Extract import reference per specifier
+      - if: CallExpression with Identifier callee
+        then: Extract function call reference
+      - if: CallExpression with MemberExpression callee
+        then: Extract method call reference
+      - if: MemberExpression (not callee of CallExpression)
+        then: Extract property access reference
+      - if: TSTypeReference
+        then: Extract type reference
+      - if: Other node type
+        then: Visit children recursively
+
+  import_resolution_strategy:
+    question: How should I resolve this import path?
+    options:
+      - if: Starts with ./ or ../
+        then: Relative import, resolve with extensions/index files
+      - if: Starts with / or @ scope
+        then: Absolute import, return null (out of scope)
+      - if: No prefix (bare module)
+        then: Node modules import, return null (out of scope)
+      - if: Has extension already
+        then: Check exact path in files Set
+      - if: No extension
+        then: Try SUPPORTED_EXTENSIONS in order
+      - if: Still not found
+        then: Try index file resolution
+
+patterns:
+  visitor_pattern:
+    structure: |
+      function visitNode(node, results, context): void {
+        // Update context for children
+        const childContext = { ...context, parent: node };
+
+        // Dispatch based on node type
+        switch (node.type) {
+          case "SpecificNodeType":
+            extractFromNode(node, results, context);
+            break;
+          default:
+            visitChildren(node, results, childContext);
+        }
+      }
+
+      function visitChildren(node, results, context): void {
+        for (const key of Object.keys(node)) {
+          const value = node[key];
+          if (isNode(value)) {
+            visitNode(value, results, context);
+          } else if (Array.isArray(value)) {
+            for (const child of value) {
+              if (isNode(child)) {
+                visitNode(child, results, context);
+              }
+            }
+          }
+        }
+      }
+    trade_offs:
+      pros: [Flexible traversal, Easy to extend, Clear dispatch logic]
+      cons: [Recursive stack depth, Manual child handling]
+
+  graceful_error_handling:
+    structure: |
+      try {
+        const result = parse(content, options);
+        return result;
+      } catch (error) {
+        logger.error("Failed to parse", error, {
+          file_path: filePath,
+          parse_error: error.message,
+        });
+        Sentry.captureException(error, { tags: { module: "ast-parser" } });
+        return null;  // Graceful failure
+      }
+    trade_offs:
+      pros: [Resilient indexing, Observability via logs/Sentry]
+      cons: [Some files not indexed, Potential silent failures]
+
+  transactional_storage:
+    structure: |
+      db.transaction(() => {
+        // Build lookup maps
+        const pathToId = new Map();
+
+        // Insert files, populate map
+        for (const file of files) {
+          const id = insert(file);
+          pathToId.set(file.path, id);
+        }
+
+        // Insert symbols using file map
+        for (const symbol of symbols) {
+          const fileId = pathToId.get(symbol.file_path);
+          insert({ ...symbol, file_id: fileId });
+        }
+
+        // All or nothing - rollback on failure
+      });
+    trade_offs:
+      pros: [Atomicity, Consistency, No partial state]
+      cons: [All-or-nothing (large batch failures)]
+
+  jsdoc_extraction:
+    structure: |
+      function extractLeadingComment(node, comments): string | null {
+        // Find last block comment before node within 5 lines
+        for (const comment of comments) {
+          if (comment.type !== "Block") continue;
+          if (comment.loc.end.line >= node.loc.start.line) continue;
+          if (node.loc.start.line - comment.loc.end.line > 5) continue;
+          // Keep closest match
+        }
+        // Strip /** */ and leading * from each line
+        return cleanedText;
+      }
+    trade_offs:
+      pros: [Preserves documentation, Position-based matching]
+      cons: [5-line heuristic may miss some comments]
+
+best_practices:
+  ast_parsing:
+    - Use @typescript-eslint/parser for modern TypeScript support
+    - Always enable loc, range, comment, tokens options
+    - Return null on parse error (never throw)
+    - Log errors with file path for debugging
+    - Check isSupportedForAST before parsing
+
+  symbol_extraction:
+    - Use visitor pattern for consistent traversal
+    - Track export context through visitor context
+    - Extract JSDoc comments for documentation
+    - Include position info (line/column) for navigation
+    - Handle anonymous functions gracefully (<anonymous>)
+
+  reference_extraction:
+    - Visit children after extracting reference (for nested references)
+    - Skip computed properties (cannot resolve statically)
+    - Distinguish function calls from method calls
+    - Track optional chaining (?.) in metadata
+
+  import_resolution:
+    - Only resolve relative imports (./ and ../)
+    - Try extensions in priority order (.ts first)
+    - Handle index file resolution
+    - Return null for unresolvable imports (graceful)
+
+  storage:
+    - Use single transaction for atomicity
+    - Build lookup maps for efficient foreign key resolution
+    - Generate UUIDs for primary keys
+    - Log storage results for observability
+
+  logging:
+    - Use createLogger({ module: "indexer-<name>" })
+    - Log errors with structured metadata
+    - Use debug level for expected failures (unresolved imports)
+    - Use warn level for unexpected but recoverable failures
+    - Never use console.* (use process.stdout.write for raw output)
+
+known_issues:
+  - issue: tsconfig.json path mapping not supported
+    impact: Absolute imports with path aliases not resolved
+    resolution: Only relative imports currently supported
+    prevention: Document limitation, plan future enhancement
+    status: known limitation
+
+  - issue: Dynamic imports not tracked
+    impact: import() expressions not in dependency graph
+    resolution: Could add CallExpression with import callee handling
+    prevention: Document limitation
+    status: known limitation
+
+  - issue: Type-only imports not distinguished
+    impact: import type { Foo } treated same as import { Foo }
+    resolution: Could check importKind in TSESTree
+    prevention: Minor impact on dependency analysis
+    status: low priority
+
+  - issue: Overloaded functions create multiple symbols
+    impact: Same name appears multiple times in symbol table
+    resolution: Could merge by name and deduplicate
+    prevention: Acceptable for now, may confuse "find usages"
+    status: known limitation
+
+potential_enhancements:
+  - enhancement: tsconfig.json path mapping support
+    rationale: Enable resolution of @alias/* imports
+    effort: medium
+    approach: Parse tsconfig.json, apply paths mapping in resolveImport
+
+  - enhancement: Dynamic import tracking
+    rationale: Complete dependency graph for code splitting
+    effort: low
+    approach: Handle CallExpression with import callee
+
+  - enhancement: Call graph visualization
+    rationale: Visual dependency analysis
+    effort: medium
+    approach: Generate DOT format from dependency graph
+
+  - enhancement: Incremental indexing
+    rationale: Faster re-indexing for changed files only
+    effort: high
+    approach: Track file hashes, re-index only changed files
+
+  - enhancement: Cross-repository symbol resolution
+    rationale: Find usages across multiple repositories
+    effort: high
+    approach: Global symbol index with repository context
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: initial
+    contradiction_count: 0
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
+    last_reviewed: 2026-01-28
+    utility_ratio: 1.0
+    notes: |
+      Initial expertise for local-only v2 architecture:
+      - Uses @typescript-eslint/parser for AST parsing
+      - Visitor pattern for symbol/reference extraction
+      - SQLite storage with transactional writes
+      - Graceful error handling throughout
+      - Path alias support via @indexer/* imports

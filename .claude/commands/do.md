@@ -229,6 +229,36 @@ Analyze the requirement to determine type and pattern. **Expert domains take pri
 - Indicators: Agent file creation, tool set decisions, model selection for agents
 - Examples: "Create a new scout agent", "Configure tools for the build agent", "Add new expert domain"
 
+**Database Expert**
+- Keywords: "schema", "migration", "SQLite", "FTS5", "database", "query", "index", "table"
+- Locations: References to app/src/db/, sqlite-schema.sql
+- Indicators: Database schema changes, migrations, query optimization
+- Examples: "Create migration for X", "Optimize query for Y", "Add FTS5 search"
+
+**API Expert**
+- Keywords: "endpoint", "route", "MCP tool", "API", "HTTP", "server", "OpenAPI"
+- Locations: References to app/src/api/, app/src/mcp/
+- Indicators: API endpoint creation, MCP tool implementation, server routes
+- Examples: "Add endpoint for X", "Create MCP tool for Y", "Update OpenAPI spec"
+
+**Testing Expert**
+- Keywords: "test", "antimocking", "Bun test", "sqlite test", "test lifecycle"
+- Locations: References to app/tests/, __tests__/
+- Indicators: Test creation, test fixes, testing strategy
+- Examples: "Write tests for X", "How do I test Y", "Add integration test"
+
+**Indexer Expert**
+- Keywords: "AST", "parser", "symbol", "reference", "indexing", "code analysis"
+- Locations: References to app/src/indexer/
+- Indicators: Code indexing, symbol extraction, AST parsing
+- Examples: "Extract symbols from X", "Index repository", "Parse AST for Y"
+
+**GitHub Expert**
+- Keywords: "issue", "PR", "pull request", "branch", "commit", "gh CLI", "GitHub"
+- Locations: References to .github/, issues commands
+- Indicators: GitHub workflow operations, issue management, PR creation
+- Examples: "Classify issue", "Create PR for X", "Branch naming for Y"
+
 ### Pattern Classification (After Domain Identified)
 
 Once expert domain is identified, determine which pattern:
@@ -260,12 +290,12 @@ Based on classification, determine which orchestration pattern to use:
 
 **Pattern A: Expert Implementation (Plan-Build-Improve)**
 - Triggers: Expert domain + implementation request
-- Examples: "Create new slash command for X", "Add hook for logging", "Create new agent"
+- Examples: "Create new slash command for X", "Add hook for logging", "Create new agent", "Create migration for X", "Add MCP tool for Y", "Write tests for X", "Index repository", "Create PR for X"
 - Flow: Spawn plan-agent - user approval - build-agent - improve-agent
 
 **Pattern B: Expert Question (Direct Answer)**
 - Triggers: Expert domain + question phrasing
-- Examples: "How do I structure frontmatter?", "What model for coordinators?"
+- Examples: "How do I structure frontmatter?", "What model for coordinators?", "How do I test Y?", "What is the indexing strategy?"
 - Flow: Spawn question-agent - report answer
 
 **Pattern C: Simple Workflow (Single Agent)**
@@ -350,6 +380,11 @@ If improve-agent fails:
 **Domains Using This Pattern:**
 - claude-config
 - agent-authoring
+- database
+- api
+- testing
+- indexer
+- github
 
 ---
 
@@ -372,6 +407,11 @@ Proceed to Report.
 **Domains Using This Pattern:**
 - claude-config
 - agent-authoring
+- database
+- api
+- testing
+- indexer
+- github
 
 ---
 
@@ -437,7 +477,7 @@ Generate pattern-appropriate report:
 ## `/do` - Plan Complete, Awaiting Review
 
 **Requirement:** {requirement}
-**Domain:** {claude-config|agent-authoring}
+**Domain:** {claude-config|agent-authoring|database|api|testing|indexer|github}
 **Status:** Plan Complete - User Review Requested
 
 ### Specification
@@ -461,7 +501,7 @@ Review the specification and when ready, resume with:
 ## `/do` - Complete
 
 **Requirement:** {requirement}
-**Domain:** {claude-config|agent-authoring}
+**Domain:** {claude-config|agent-authoring|database|api|testing|indexer|github}
 **Status:** Success
 
 ### Workflow Stages
@@ -498,7 +538,7 @@ This can be used for future reference or to re-run build stage.
 ## `/do` - Build Failed
 
 **Requirement:** {requirement}
-**Domain:** {claude-config|agent-authoring}
+**Domain:** {claude-config|agent-authoring|database|api|testing|indexer|github}
 **Status:** Build Failed (Plan Preserved)
 
 ### What Happened
@@ -535,7 +575,7 @@ You can:
 ## `/do` - Complete
 
 **Requirement:** {requirement}
-**Domain:** {claude-config|agent-authoring}
+**Domain:** {claude-config|agent-authoring|database|api|testing|indexer|github}
 **Type:** Question
 
 ### Answer
@@ -593,6 +633,46 @@ Use these patterns to classify requirements:
 - Locations: .claude/agents/, agent file names, agent-registry.json
 - Pattern: Agent creation or configuration tasks
 
+**Database Expert (High Confidence):**
+- Keywords: schema, migration, SQLite, FTS5, database, query, index, table
+- Locations: app/src/db/, sqlite-schema.sql
+- Verbs: create, optimize, add, migrate, update
+- Objects: migration, schema, query, index, table, FTS5 search
+- Pattern: Database schema changes, migrations, query optimization
+- Examples: "Create migration for X", "Optimize query for Y", "Add FTS5 search"
+
+**API Expert (High Confidence):**
+- Keywords: endpoint, route, MCP tool, API, HTTP, server, OpenAPI
+- Locations: app/src/api/, app/src/mcp/
+- Verbs: add, create, update, implement
+- Objects: endpoint, route, MCP tool, API, OpenAPI spec
+- Pattern: API endpoint creation, MCP tool implementation, server routes
+- Examples: "Add endpoint for X", "Create MCP tool for Y", "Update OpenAPI spec"
+
+**Testing Expert (High Confidence):**
+- Keywords: test, antimocking, Bun test, sqlite test, test lifecycle
+- Locations: app/tests/, __tests__/
+- Verbs: write, add, create, fix
+- Objects: test, tests, integration test, unit test
+- Pattern: Test creation, test fixes, testing strategy
+- Examples: "Write tests for X", "How do I test Y", "Add integration test"
+
+**Indexer Expert (High Confidence):**
+- Keywords: AST, parser, symbol, reference, indexing, code analysis
+- Locations: app/src/indexer/
+- Verbs: extract, parse, index, analyze
+- Objects: symbols, references, AST, code analysis
+- Pattern: Code indexing, symbol extraction, AST parsing
+- Examples: "Extract symbols from X", "Index repository", "Parse AST for Y"
+
+**GitHub Expert (High Confidence):**
+- Keywords: issue, PR, pull request, branch, commit, gh CLI, GitHub
+- Locations: .github/, issues commands
+- Verbs: create, classify, open, close, review
+- Objects: issue, PR, pull request, branch, commit
+- Pattern: GitHub workflow operations, issue management, PR creation
+- Examples: "Classify issue", "Create PR for X", "Branch naming for Y"
+
 **Expert Question Detection:**
 - Phrasing: "How do I...", "What is the pattern for...", "Explain...", "Why..."
 - Action: Route to `<domain>-question-agent` instead of `<domain>-plan-agent`
@@ -630,7 +710,14 @@ Once expert domain is identified, determine which pattern:
 
 **Classification unclear:**
 - Use AskUserQuestion to disambiguate
-- Provide options: "Claude config (commands/hooks/settings)" vs "Agent authoring (agents/registry)"
+- Provide options for all available expert domains:
+  - "Claude config (commands/hooks/settings)"
+  - "Agent authoring (agents/registry)"
+  - "Database (schema/migrations/queries)"
+  - "API (endpoints/MCP tools/routes)"
+  - "Testing (tests/test strategy)"
+  - "Indexer (AST/symbols/parsing)"
+  - "GitHub (issues/PRs/branches)"
 - Never guess when multiple patterns could apply
 
 **Empty requirement:**
@@ -804,6 +891,66 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 # /do executes Pattern B with agent-authoring-question-agent
 ```
 
+### Database - Implementation (Pattern A)
+
+```bash
+/do "Create migration for user preferences table"
+
+# /do executes Pattern A with database domain:
+# 1. database-plan-agent creates spec
+# 2. User approval gate
+# 3. database-build-agent implements migration
+# 4. database-improve-agent updates expertise
+```
+
+### API - Implementation (Pattern A)
+
+```bash
+/do "Add MCP tool for repository search"
+
+# /do executes Pattern A with api domain:
+# 1. api-plan-agent creates spec
+# 2. User approval gate
+# 3. api-build-agent implements MCP tool
+# 4. api-improve-agent updates expertise
+```
+
+### Testing - Implementation (Pattern A)
+
+```bash
+/do "Write tests for the indexer module"
+
+# /do executes Pattern A with testing domain:
+# 1. testing-plan-agent creates spec
+# 2. User approval gate
+# 3. testing-build-agent writes tests
+# 4. testing-improve-agent updates expertise
+```
+
+### Indexer - Implementation (Pattern A)
+
+```bash
+/do "Index repository symbols"
+
+# /do executes Pattern A with indexer domain:
+# 1. indexer-plan-agent creates spec
+# 2. User approval gate
+# 3. indexer-build-agent implements indexing
+# 4. indexer-improve-agent updates expertise
+```
+
+### GitHub - Implementation (Pattern A)
+
+```bash
+/do "Create PR for feature branch"
+
+# /do executes Pattern A with github domain:
+# 1. github-plan-agent creates spec
+# 2. User approval gate
+# 3. github-build-agent creates PR
+# 4. github-improve-agent updates expertise
+```
+
 ### User Declining at Approval Gate
 
 ```bash
@@ -831,6 +978,11 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 #   Options:
 #     - "Claude config (commands, hooks, settings)"
 #     - "Agent authoring (agents, registry, expert domains)"
+#     - "Database (schema, migrations, queries)"
+#     - "API (endpoints, MCP tools, routes)"
+#     - "Testing (tests, test strategy)"
+#     - "Indexer (AST, symbols, parsing)"
+#     - "GitHub (issues, PRs, branches)"
 # Route based on response
 ```
 
@@ -869,6 +1021,16 @@ Spec files are stored locally:
     session-logging-hook-spec.md
   agent-authoring/
     validation-agent-spec.md
+  database/
+    user-preferences-migration-spec.md
+  api/
+    repository-search-tool-spec.md
+  testing/
+    indexer-tests-spec.md
+  indexer/
+    symbol-extraction-spec.md
+  github/
+    feature-pr-spec.md
 ```
 
 **Reading Specs**:
@@ -885,7 +1047,7 @@ cat .claude/.cache/specs/claude-config/code-review-command-spec.md
 ## Implementation Notes
 
 **Current State:**
-- 2 expert domains active: claude-config, agent-authoring
+- 7 expert domains active: claude-config, agent-authoring, database, api, testing, indexer, github
 - 3 orchestration patterns: Expert Implementation (A), Expert Question (B), Simple Workflow (C)
 - Expert domains use plan-build-improve cycle with user approval gates
 - Classification uses keyword matching + pattern detection with fallback to user questions

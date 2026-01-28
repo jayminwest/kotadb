@@ -38,16 +38,26 @@ For specific operations, these commands remain available:
 
 ## Expert Domains
 
-Two expert domains provide specialized knowledge with plan, build, improve, and question agents:
+Seven expert domains provide specialized knowledge with plan, build, improve, and question agents:
 
 | Domain | Purpose | Location |
 |--------|---------|----------|
 | `claude-config` | .claude/ configuration (commands, hooks, settings) | `.claude/agents/experts/claude-config/` |
 | `agent-authoring` | Agent creation (frontmatter, tools, registry) | `.claude/agents/experts/agent-authoring/` |
+| `database` | SQLite schema, FTS5, migrations, queries | `.claude/agents/experts/database/` |
+| `api` | HTTP endpoints, MCP tools, Express patterns | `.claude/agents/experts/api/` |
+| `testing` | Antimocking, Bun tests, SQLite test patterns | `.claude/agents/experts/testing/` |
+| `indexer` | AST parsing, symbol extraction, code analysis | `.claude/agents/experts/indexer/` |
+| `github` | Issues, PRs, branches, GitHub CLI workflows | `.claude/agents/experts/github/` |
 
 **Usage via /do:**
 - Implementation: `/do "Add new hook for X"` (plan -> approval -> build -> improve)
 - Questions: `/do "How do I create a slash command?"` (direct answer)
+- Database: `/do "Create migration for user table"` (database expert)
+- API: `/do "Add MCP tool for search"` (api expert)
+- Testing: `/do "Write tests for indexer"` (testing expert)
+- Indexer: `/do "How does AST parsing work?"` (indexer expert)
+- GitHub: `/do "Create PR for this branch"` (github expert)
 
 ## Critical Conventions
 

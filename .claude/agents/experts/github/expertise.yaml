@@ -1,0 +1,519 @@
+# GitHub Workflow Expertise
+# Target: 400-600 lines | Domain: Operational knowledge for GitHub workflows
+# Adapted for KotaDB project conventions
+
+overview:
+  description: |
+    GitHub workflow management for KotaDB—issue classification and lifecycle, pull request
+    creation with validation levels, branch naming conventions, and GitHub CLI (gh) patterns.
+    This expertise enables correct GitHub operations within the KotaDB codebase conventions.
+  scope: |
+    Covers GitHub issue management (classification, labeling, prioritization), pull request
+    workflows (creation, validation levels 1/2/3, review process), branch naming conventions
+    (feat/*, bug/*, chore/* -> develop -> main), and GitHub CLI (gh) command patterns.
+
+    KOTADB ADAPTATIONS:
+    - Issues follow four-type classification (feature, bug, chore, refactor)
+    - PRs require validation evidence at appropriate levels
+    - Branch naming follows strict type-based prefixes
+    - All PRs target develop branch (not main)
+    - Anti-mock philosophy applies to PR descriptions
+    - Conventional Commits format required for commit messages
+    - Local-only SQLite storage (no cloud dependencies)
+
+    Does NOT cover Claude Code configuration (see claude-config expert) or agent authoring
+    (see agent-authoring expert).
+  rationale: |
+    Consistent GitHub workflows enable predictable issue tracking, code review, and release
+    management. Poor workflow practices create confusion, missed requirements, and integration
+    issues. KotaDB has established conventions that differ from generic GitHub workflows and
+    must be followed.
+
+core_implementation:
+  issue_types:
+    feature:
+      purpose: Net-new capability or enhancement delivering user value
+      command: /issues:feature
+      branch_prefix: feat/
+      label: type:feature
+      examples:
+        - "Add MCP tool for dependency analysis"
+        - "Implement rate limiting for API endpoints"
+        - "Create search ranking algorithm"
+    bug:
+      purpose: Incorrect behavior, regressions, failing tests, or outages
+      command: /issues:bug
+      branch_prefix: bug/
+      label: type:bug
+      examples:
+        - "Fix SQLite connection pool exhaustion"
+        - "Resolve indexing race condition"
+        - "Correct malformed JSON response"
+    chore:
+      purpose: Maintenance, refactors, dependency upgrades, tooling changes, docs-only work
+      command: /issues:chore
+      branch_prefix: chore/
+      label: type:chore
+      examples:
+        - "Update Bun to latest version"
+        - "Refactor database module structure"
+        - "Add documentation for MCP tools"
+    refactor:
+      purpose: Code restructuring without changing external behavior
+      command: /issues:refactor
+      branch_prefix: refactor/
+      label: type:refactor
+      examples:
+        - "Extract shared utilities from handlers"
+        - "Simplify query builder interface"
+        - "Consolidate error handling patterns"
+
+  branch_naming:
+    convention: "<type>/<issue-number>-<short-description>"
+    types:
+      - feat: New features and enhancements
+      - bug: Bug fixes and corrections
+      - chore: Maintenance and tooling
+      - refactor: Code restructuring
+      - docs: Documentation-only changes
+      - test: Test-only changes
+    flow: "feature branch -> develop -> main"
+    examples:
+      - "feat/123-add-mcp-search-tool"
+      - "bug/456-fix-connection-timeout"
+      - "chore/789-update-dependencies"
+      - "refactor/101-simplify-indexer"
+    rules:
+      - All lowercase letters and numbers
+      - Hyphens for word separation (not underscores)
+      - Include issue number after type prefix
+      - Keep description concise (3-5 words)
+
+  validation_levels:
+    level_1:
+      name: "Level 1 - Basic"
+      when: "Docs-only changes, configuration updates, trivial fixes"
+      checks:
+        - "bun run lint"
+        - "bun run typecheck"
+      duration: "< 30 seconds"
+      evidence: "Lint and typecheck pass output"
+    level_2:
+      name: "Level 2 - Standard"
+      when: "Feature implementations, bug fixes, code changes"
+      checks:
+        - "bun run lint"
+        - "bun run typecheck"
+        - "bun test --filter integration"
+      duration: "1-5 minutes"
+      evidence: "Lint, typecheck, and integration test output"
+    level_3:
+      name: "Level 3 - Comprehensive"
+      when: "Schema migrations, breaking changes, releases"
+      checks:
+        - "bun run lint"
+        - "bun run typecheck"
+        - "bun test"
+        - "bun run build"
+      duration: "5-15 minutes"
+      evidence: "Full test suite and build output"
+
+  pr_workflow:
+    target_branch: develop
+    title_format:
+      planning: "<type>: add [specification|plan] for <feature> (#<issue>)"
+      implementation: "<type>: <imperative verb> <feature> (#<issue>)"
+    body_sections:
+      - summary: Brief description of changes
+      - validation_evidence: Commands run and their output
+      - anti_mock_statement: Confirmation no new mocks introduced
+      - plan_link: Link to spec file if exists
+      - closes: "Closes #<issue_number>"
+      - adw_id: "ADW ID: <id>" if applicable
+
+  key_files:
+    - path: .claude/commands/issues/feature.md
+      purpose: Create feature issue
+    - path: .claude/commands/issues/bug.md
+      purpose: Create bug issue
+    - path: .claude/commands/issues/chore.md
+      purpose: Create chore issue
+    - path: .claude/commands/issues/refactor.md
+      purpose: Create refactor issue
+    - path: .claude/commands/issues/classify_issue.md
+      purpose: Classify issue by type
+    - path: .claude/commands/git/commit.md
+      purpose: Create conventional commit
+    - path: .claude/commands/git/pull_request.md
+      purpose: Create validated pull request
+
+key_operations:
+  classify_issue:
+    when: Determining issue type from description or requirements
+    approach: |
+      1. Read the issue description or requirements
+      2. Identify the primary outcome:
+         - New capability for users -> feature
+         - Fixing broken behavior -> bug
+         - Maintenance without user impact -> chore
+         - Code restructuring -> refactor
+      3. Apply the corresponding command:
+         - /issues:feature for features
+         - /issues:bug for bugs
+         - /issues:chore for chores
+         - /issues:refactor for refactors
+      4. Create appropriate branch with naming convention
+    examples:
+      - input: "Add search ranking algorithm"
+        classification: feature
+        reason: "Net-new capability"
+      - input: "SQLite connection fails under load"
+        classification: bug
+        reason: "Incorrect behavior"
+      - input: "Update Bun to v1.2"
+        classification: chore
+        reason: "Dependency maintenance"
+    pitfalls:
+      - what: "Classifying refactors as features"
+        instead: "Use refactor for code restructuring without behavior change"
+        reason: "Features imply user-visible changes"
+      - what: "Classifying docs updates as features"
+        instead: "Use chore for documentation-only changes"
+        reason: "Docs don't deliver new capability"
+
+  create_pull_request:
+    when: Implementation is complete and validated
+    approach: |
+      1. Verify preconditions:
+         - Working tree is clean (git status --short empty)
+         - On correct branch (git branch --show-current)
+         - Commits follow Conventional Commits format
+         - Validation level appropriate for changes
+      2. Run validation commands:
+         - Level 1: lint + typecheck
+         - Level 2: lint + typecheck + integration tests
+         - Level 3: lint + typecheck + all tests + build
+      3. Prepare PR metadata:
+         - Determine if planning PR or implementation PR
+         - Format title according to type
+         - Compose body with validation evidence
+      4. Create PR:
+         - git push -u origin HEAD
+         - gh pr create --base develop --title "<title>" --body "<body>"
+      5. Verify creation:
+         - gh pr view --web (optional)
+         - Share link with reviewers
+    validation_evidence_template: |
+      ## Validation Evidence
+
+      ### Validation Level: [1/2/3]
+      **Justification**: [Why this level was selected]
+
+      **Commands Run**:
+      - [pass/fail] `bun run lint` - [output snippet]
+      - [pass/fail] `bun run typecheck` - [output snippet]
+      - [pass/fail] `bun test --filter integration` - [if Level 2+]
+      - [pass/fail] `bun test` - [if Level 3]
+      - [pass/fail] `bun run build` - [if Level 3]
+    pitfalls:
+      - what: "Creating PR without validation evidence"
+        instead: "Always run and document validation commands"
+        reason: "Evidence required for review"
+      - what: "Targeting main instead of develop"
+        instead: "Always target develop branch"
+        reason: "KotaDB uses develop as integration branch"
+      - what: "Missing anti-mock statement"
+        instead: "Confirm no new mocks in PR body"
+        reason: "Anti-mock philosophy is core to KotaDB"
+
+  apply_issue_labels:
+    when: Categorizing issues for tracking and filtering
+    approach: |
+      1. Apply type label based on classification:
+         - type:feature
+         - type:bug
+         - type:chore
+         - type:refactor
+      2. Apply priority label if known:
+         - priority:high
+         - priority:medium
+         - priority:low
+      3. Apply area labels if applicable:
+         - area:api
+         - area:indexer
+         - area:mcp
+         - area:database
+      4. Use gh CLI to apply:
+         gh issue edit <number> --add-label "<labels>"
+    examples:
+      - "gh issue edit 123 --add-label 'type:feature,priority:high,area:api'"
+      - "gh issue edit 456 --add-label 'type:bug,area:database'"
+
+  create_branch:
+    when: Starting work on an issue
+    approach: |
+      1. Fetch latest from remote:
+         git fetch --all --prune
+      2. Create branch from develop:
+         git checkout -b <type>/<issue>-<description> origin/develop
+      3. Verify branch name follows convention:
+         - Correct type prefix (feat/bug/chore/refactor/docs/test)
+         - Issue number present
+         - Lowercase with hyphens
+    examples:
+      - "git checkout -b feat/123-add-search-ranking origin/develop"
+      - "git checkout -b bug/456-fix-timeout origin/develop"
+
+  commit_changes:
+    when: Creating commits for changes
+    approach: |
+      1. Stage specific files (avoid git add -A):
+         git add <specific-files>
+      2. Verify staged changes:
+         git diff --cached
+      3. Create commit with Conventional Commits format:
+         git commit -m "<type>(<scope>): <description>"
+      4. Include Co-Authored-By when AI-assisted:
+         Co-Authored-By: Claude <noreply@anthropic.com>
+    conventional_commits_format:
+      structure: "<type>(<scope>): <description>"
+      types:
+        - feat: New feature
+        - fix: Bug fix
+        - chore: Maintenance
+        - refactor: Code restructuring
+        - docs: Documentation
+        - test: Tests
+        - ci: CI/CD changes
+      examples:
+        - "feat(api): add rate limiting to search endpoint"
+        - "fix(indexer): resolve race condition in file watcher"
+        - "chore(deps): update bun to v1.2.0"
+        - "refactor(db): simplify connection pool logic"
+
+decision_trees:
+  issue_type_selection:
+    question: What is the primary outcome of this work?
+    options:
+      - if: Adds new capability visible to users
+        then: feature (use /issues:feature, branch feat/*)
+      - if: Fixes incorrect or broken behavior
+        then: bug (use /issues:bug, branch bug/*)
+      - if: Maintenance, deps, docs, or tooling
+        then: chore (use /issues:chore, branch chore/*)
+      - if: Restructures code without behavior change
+        then: refactor (use /issues:refactor, branch refactor/*)
+
+  pr_validation_level:
+    question: What type of changes does the PR contain?
+    options:
+      - if: Documentation-only, config, trivial fixes
+        then: Level 1 (lint + typecheck)
+      - if: Feature implementation, bug fixes, code changes
+        then: Level 2 (lint + typecheck + integration tests)
+      - if: Schema migration, breaking changes, releases
+        then: Level 3 (full test suite + build)
+
+  branch_naming:
+    question: What type of work is being done?
+    options:
+      - if: New feature or enhancement
+        then: "feat/<issue>-<description>"
+      - if: Bug fix
+        then: "bug/<issue>-<description>"
+      - if: Maintenance or tooling
+        then: "chore/<issue>-<description>"
+      - if: Code restructuring
+        then: "refactor/<issue>-<description>"
+      - if: Documentation only
+        then: "docs/<issue>-<description>"
+      - if: Tests only
+        then: "test/<issue>-<description>"
+
+  pr_type_determination:
+    question: What files are being changed?
+    options:
+      - if: Only docs/specs/*.md files
+        then: Planning PR (title uses "add specification/plan for")
+      - if: app/src/, automation/, or >50 lines outside docs/
+        then: Implementation PR (title uses imperative verb)
+
+patterns:
+  gh_cli_common_commands:
+    issue_operations:
+      - "gh issue create --title '<title>' --body '<body>'"
+      - "gh issue edit <number> --add-label '<labels>'"
+      - "gh issue view <number>"
+      - "gh issue list --label '<label>'"
+      - "gh issue close <number>"
+    pr_operations:
+      - "gh pr create --base develop --title '<title>' --body '<body>'"
+      - "gh pr view <number>"
+      - "gh pr status"
+      - "gh pr merge <number> --squash"
+      - "gh pr checks <number>"
+    api_operations:
+      - "gh api repos/{owner}/{repo}/issues/<number>"
+      - "gh api repos/{owner}/{repo}/pulls/<number>/comments"
+
+  pr_body_structure:
+    template: |
+      ## Summary
+      <1-3 bullet points describing changes>
+
+      ## Validation Evidence
+      ### Validation Level: [1/2/3]
+      **Justification**: [reason for level selection]
+      **Commands Run**:
+      - [status] `command` - [output]
+
+      ## Anti-Mock Statement
+      - No new mocks introduced
+      - [or] Temporary exception: [description] - follow-up: #<issue>
+
+      ## References
+      - [Plan](./docs/specs/<spec-file>.md) (if applicable)
+      - Closes #<issue_number>
+      - ADW ID: <id> (if applicable)
+
+  conventional_commits:
+    format: "<type>(<scope>): <description>"
+    body_format: |
+      <type>(<scope>): <description>
+
+      <optional body explaining why>
+
+      Co-Authored-By: Claude <noreply@anthropic.com>
+    scope_examples:
+      - api: API routes and handlers
+      - db: Database operations
+      - indexer: Code indexing
+      - mcp: MCP tools
+      - cli: CLI commands
+
+  issue_templates:
+    feature: |
+      ## Summary
+      Brief description of the feature.
+
+      ## Motivation
+      Why this feature is needed.
+
+      ## Acceptance Criteria
+      - [ ] Criterion 1
+      - [ ] Criterion 2
+
+      ## Technical Notes
+      Implementation considerations.
+    bug: |
+      ## Description
+      What is broken.
+
+      ## Steps to Reproduce
+      1. Step 1
+      2. Step 2
+
+      ## Expected Behavior
+      What should happen.
+
+      ## Actual Behavior
+      What actually happens.
+
+      ## Environment
+      - Bun version:
+      - OS:
+    chore: |
+      ## Summary
+      What maintenance work is needed.
+
+      ## Rationale
+      Why this work is necessary.
+
+      ## Tasks
+      - [ ] Task 1
+      - [ ] Task 2
+
+best_practices:
+  issue_management:
+    - Classify issues immediately upon creation
+    - Apply type and area labels consistently
+    - Link related issues with references
+    - Keep issue descriptions concise and actionable
+    - Update issue status as work progresses
+
+  branch_workflow:
+    - Always branch from latest develop
+    - Use descriptive branch names with issue numbers
+    - Keep branches focused on single issues
+    - Delete branches after PR merge
+    - Avoid long-lived feature branches
+
+  pull_requests:
+    - Run validation before creating PR
+    - Include all required body sections
+    - Target develop branch (never main directly)
+    - Request appropriate reviewers
+    - Respond to review comments promptly
+    - Squash merge for clean history
+
+  commits:
+    - Follow Conventional Commits format
+    - Keep commits atomic and focused
+    - Write meaningful commit messages
+    - Include issue references in commits
+    - Add Co-Authored-By for AI assistance
+
+  gh_cli_usage:
+    - Use gh for all GitHub operations
+    - Prefer gh over web UI for consistency
+    - Use --json flag for scripting
+    - Check gh auth status before operations
+    - Use environment variables for tokens
+
+known_issues:
+  - issue: gh auth may expire during long sessions
+    impact: GitHub operations fail with 401 errors
+    resolution: Run gh auth refresh or gh auth login
+    prevention: Check auth status at session start
+    status: operational guidance
+
+  - issue: Branch naming inconsistency across issues
+    impact: Difficult to track which branches belong to which issues
+    resolution: Always include issue number in branch name
+    prevention: Follow naming convention strictly
+    status: enforce via code review
+
+  - issue: Validation evidence missing from PRs
+    impact: Reviewers cannot verify implementation quality
+    resolution: Add validation evidence section to PR body
+    prevention: Use PR body template
+    status: enforce via checklist
+
+  - issue: PRs targeting main instead of develop
+    impact: Bypasses integration testing
+    resolution: Change base branch to develop
+    prevention: Default to develop in gh pr create
+    status: operational guidance
+
+potential_enhancements:
+  - Automated issue classification via webhook
+  - Branch naming validation hook
+  - PR body template enforcement
+  - Validation level auto-detection from changed files
+  - Commit message format validation hook
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: initial
+    contradiction_count: 0
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
+    last_reviewed: 2026-01-28
+    utility_ratio: 1.0
+    notes: |
+      Initial creation for github expert domain:
+      - Issue classification (feature, bug, chore, refactor)
+      - PR validation levels (1/2/3)
+      - Branch naming conventions
+      - GitHub CLI patterns
+      - KotaDB-specific adaptations
