@@ -40,9 +40,6 @@
       "@validation/*": [
         "src/validation/*"
       ],
-      "@github/*": [
-        "src/github/*"
-      ],
       "@app-types/*": [
         "src/types/*"
       ],

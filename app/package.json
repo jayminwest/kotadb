@@ -19,8 +19,6 @@
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.2.0",
     "@modelcontextprotocol/sdk": "^1.20.0",
-    "@octokit/app": "^16.1.1",
-    "@octokit/rest": "^22.0.0",
     "@sentry/node": "^10.25.0",
     "@typescript-eslint/parser": "^8.0.0",
     "@typescript-eslint/types": "^8.0.0",

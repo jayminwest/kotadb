@@ -1,8 +1,21 @@
+/**
+ * Repository preparation for local-only indexing.
+ *
+ * This module prepares local repository paths for indexing in KotaDB v2.0.0.
+ * Remote cloning and GitHub App authentication have been removed - users now
+ * pass local directory paths directly via the localPath parameter.
+ *
+ * Key features:
+ * - Validates local path existence
+ * - Resolves absolute paths
+ * - Maintains git utility functions for potential local git repository support
+ *
+ * @see app/src/api/queries.ts - Index query implementation
+ */
+
 import { existsSync } from "node:fs";
-import { mkdir } from "node:fs/promises";
-import { dirname, join, resolve } from "node:path";
+import { resolve } from "node:path";
 import type { IndexRequest } from "@shared/types";
-import { getInstallationToken } from "@github/app-auth";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
 
@@ -14,136 +27,90 @@ export interface RepositoryContext {
 	localPath: string;
 }
 
-const WORKSPACE_ROOT = resolve("data", "workspace");
-
+/**
+ * Prepare a repository for indexing by resolving and validating its local path.
+ *
+ * In KotaDB v2.0.0, all repositories are accessed via local paths. Remote cloning
+ * and GitHub App authentication have been removed. This function validates that
+ * the localPath is provided and exists on the filesystem.
+ *
+ * @param request - Index request containing repository name and local path
+ * @returns Repository context with validated local path
+ * @throws Error if localPath is missing or does not exist
+ *
+ * @example
+ * const context = await prepareRepository({
+ *   repository: "my-project",
+ *   localPath: "/path/to/repo",
+ *   ref: "HEAD"
+ * });
+ */
 export async function prepareRepository(
 	request: IndexRequest,
-	installationId?: number,
 ): Promise<RepositoryContext> {
 	const desiredRef = request.ref ?? "HEAD";
 
-	if (request.localPath) {
-		return {
+	// Validate localPath is provided
+	if (!request.localPath) {
+		const error = new Error(
+			"localPath is required for repository indexing in v2.0.0",
+		);
+		logger.error("Missing localPath in IndexRequest", error, {
 			repository: request.repository,
 			ref: desiredRef,
-			localPath: resolve(request.localPath),
-		};
+		});
+		throw error;
 	}
 
-	const remoteUrl = resolveRemoteUrl(request.repository);
-	const repoPath = resolve(WORKSPACE_ROOT, sanitizeRepoName(remoteUrl));
-
-	await ensureRepository(remoteUrl, repoPath, installationId);
-	const revision = await checkoutRef(repoPath, desiredRef);
+	// Validate localPath exists
+	const absolutePath = resolve(request.localPath);
+	if (!existsSync(absolutePath)) {
+		const error = new Error(`Local path does not exist: ${absolutePath}`);
+		logger.error("Invalid localPath in IndexRequest", error, {
+			repository: request.repository,
+			local_path: absolutePath,
+		});
+		throw error;
+	}
 
 	return {
 		repository: request.repository,
-		ref: revision,
-		localPath: repoPath,
+		ref: desiredRef,
+		localPath: absolutePath,
 	};
 }
 
-async function ensureRepository(
-	remoteUrl: string,
-	destination: string,
-	installationId?: number,
-): Promise<void> {
-	if (!existsSync(destination) || !existsSync(join(destination, ".git"))) {
-		await cloneRepository(remoteUrl, destination, installationId);
-		return;
-	}
-
-	// Keep remote URL in sync in case it changed.
-	const authenticatedUrl = installationId
-		? await injectInstallationToken(remoteUrl, installationId)
-		: remoteUrl;
-
-	await runGit(["remote", "set-url", "origin", authenticatedUrl], {
-		cwd: destination,
-		allowFailure: true,
-	});
-	await runGit(["fetch", "origin", "--prune", "--tags"], { cwd: destination });
+/**
+ * Get the current git revision (commit SHA) for a local repository.
+ *
+ * This utility function is kept for potential local git repository support.
+ * It runs git rev-parse HEAD to get the current commit hash.
+ *
+ * @param repositoryPath - Absolute path to the git repository
+ * @returns Current commit SHA as a string
+ * @throws Error if git command fails
+ */
+export async function currentRevision(repositoryPath: string): Promise<string> {
+	const result = await runGit(["rev-parse", "HEAD"], { cwd: repositoryPath });
+	return result.stdout.trim();
 }
 
-async function cloneRepository(
-	remoteUrl: string,
-	destination: string,
-	installationId?: number,
-): Promise<void> {
-	await mkdir(dirname(destination), { recursive: true });
-
-	const authenticatedUrl = installationId
-		? await injectInstallationToken(remoteUrl, installationId)
-		: remoteUrl;
-
-	await runGit(["clone", authenticatedUrl, destination], {
-		cwd: dirname(destination),
-	});
-}
-
-async function checkoutRef(
+/**
+ * Resolve the default branch name for a local git repository.
+ *
+ * This utility function is kept for potential local git repository support.
+ * It attempts to determine the default branch by checking:
+ * 1. Remote HEAD symbolic reference
+ * 2. Current branch name
+ * 3. Common branch names (main, master)
+ *
+ * @param repositoryPath - Absolute path to the git repository
+ * @returns Default branch name (e.g., "main", "master")
+ * @throws Error if unable to determine default branch
+ */
+export async function resolveDefaultBranch(
 	repositoryPath: string,
-	ref: string,
 ): Promise<string> {
-	await runGit(["fetch", "origin", "--prune", "--tags"], {
-		cwd: repositoryPath,
-	});
-
-	if (!ref || ref === "HEAD") {
-		const branch = await resolveDefaultBranch(repositoryPath);
-		await runGit(["checkout", branch], { cwd: repositoryPath });
-		await runGit(["reset", "--hard", `origin/${branch}`], {
-			cwd: repositoryPath,
-		});
-		return await currentRevision(repositoryPath);
-	}
-
-	const direct = await runGit(["checkout", "--force", ref], {
-		cwd: repositoryPath,
-		allowFailure: true,
-	});
-
-	if (direct.exitCode === 0) {
-		await runGit(["reset", "--hard", ref], {
-			cwd: repositoryPath,
-			allowFailure: true,
-		});
-		return await currentRevision(repositoryPath);
-	}
-
-	const remoteRef = `origin/${ref}`;
-	const remote = await runGit(["rev-parse", "--verify", remoteRef], {
-		cwd: repositoryPath,
-		allowFailure: true,
-	});
-
-	if (remote.exitCode === 0) {
-		await runGit(["checkout", "-B", ref, remoteRef], { cwd: repositoryPath });
-		return await currentRevision(repositoryPath);
-	}
-
-	const fetched = await runGit(["fetch", "origin", ref], {
-		cwd: repositoryPath,
-		allowFailure: true,
-	});
-
-	if (fetched.exitCode === 0) {
-		const finalCheckout = await runGit(["checkout", "--force", ref], {
-			cwd: repositoryPath,
-			allowFailure: true,
-		});
-
-		if (finalCheckout.exitCode === 0) {
-			return await currentRevision(repositoryPath);
-		}
-	}
-
-	throw new Error(
-		`Unable to checkout ref '${ref}' for repository at ${repositoryPath}`,
-	);
-}
-
-async function resolveDefaultBranch(repositoryPath: string): Promise<string> {
 	const remoteHead = await runGit(
 		["symbolic-ref", "--short", "refs/remotes/origin/HEAD"],
 		{
@@ -199,11 +166,6 @@ async function resolveDefaultBranch(repositoryPath: string): Promise<string> {
 	);
 }
 
-async function currentRevision(repositoryPath: string): Promise<string> {
-	const result = await runGit(["rev-parse", "HEAD"], { cwd: repositoryPath });
-	return result.stdout.trim();
-}
-
 interface GitCommandOptions {
 	cwd?: string;
 	allowFailure?: boolean;
@@ -215,6 +177,17 @@ interface GitCommandResult {
 	exitCode: number;
 }
 
+/**
+ * Run a git command in a specified directory.
+ *
+ * This utility function executes git commands and handles errors appropriately.
+ * It logs failures to Sentry and throws errors unless allowFailure is true.
+ *
+ * @param args - Git command arguments (e.g., ["status", "--porcelain"])
+ * @param options - Command options (working directory, failure handling)
+ * @returns Command result with stdout, stderr, and exit code
+ * @throws Error if command fails and allowFailure is false
+ */
 async function runGit(
 	args: string[],
 	options: GitCommandOptions = {},
@@ -269,75 +242,4 @@ async function runGit(
 		stderr,
 		exitCode,
 	};
-}
-
-/**
- * Inject GitHub App installation token into a git remote URL
- * @param remoteUrl - Original git remote URL
- * @param installationId - GitHub App installation ID
- * @returns Authenticated URL with token embedded
- *
- * @example
- * injectInstallationToken('https://github.com/foo/bar.git', 123)
- * // Returns: 'https://x-access-token:ghs_TOKEN@github.com/foo/bar.git'
- */
-async function injectInstallationToken(
-	remoteUrl: string,
-	installationId: number,
-): Promise<string> {
-	try {
-		const token = await getInstallationToken(installationId);
-
-		// Parse the URL to inject credentials
-		const url = new URL(remoteUrl);
-
-		// Use 'x-access-token' as username with token as password
-		// This is the standard format for GitHub App installation tokens
-		url.username = "x-access-token";
-		url.password = token;
-
-		return url.toString();
-	} catch (error) {
-		logger.warn("Failed to inject installation token, falling back to unauthenticated cloning", {
-			installation_id: installationId,
-			remote_url: remoteUrl,
-			error_message: error instanceof Error ? error.message : String(error),
-		});
-
-		if (error instanceof Error) {
-			Sentry.captureException(error, {
-				tags: {
-					module: "repos",
-					operation: "injectInstallationToken",
-				},
-				contexts: {
-					github: {
-						installation_id: installationId,
-						remote_url: remoteUrl,
-					},
-				},
-			});
-		}
-
-		return remoteUrl;
-	}
-}
-
-function resolveRemoteUrl(repository: string): string {
-	if (
-		/^(?:https?|git|ssh):\/\//.test(repository) ||
-		repository.startsWith("git@")
-	) {
-		return repository;
-	}
-
-	const base = process.env.KOTA_GIT_BASE_URL ?? "https://github.com";
-	const normalizedBase = base.endsWith("/") ? base.slice(0, -1) : base;
-	const normalizedRepo = repository.replace(/^\/+/, "");
-
-	return `${normalizedBase}/${normalizedRepo}${normalizedRepo.endsWith(".git") ? "" : ".git"}`;
-}
-
-function sanitizeRepoName(name: string): string {
-	return name.replace(/[^a-zA-Z0-9._-]/g, "-");
 }
