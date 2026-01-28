@@ -42,6 +42,7 @@ core_implementation:
         experts/<domain>/:
           purpose: 4-agent pattern (plan/build/improve/question + expertise.yaml)
           pattern: Domain experts with queryable knowledge
+          active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github]
       commands/:
         purpose: Slash commands by category
         workflows/: SDLC phase commands (prime, plan, implement, validate)
@@ -180,6 +181,8 @@ key_operations:
          - color: cyan
          - tools: [Read, Glob, Grep]
       7. Update agent-registry.json with all new agents
+      8. Update CLAUDE.md Expert Domains section
+      9. Update /do command with domain detection patterns
     kotadb_adaptations:
       - Use YAML array format for tools (NOT comma-separated)
       - Add MCP tools where appropriate (mcp__kotadb__*)
@@ -191,6 +194,11 @@ key_operations:
       - what: "Forgetting to update agent-registry.json"
         instead: "Always add new agents to registry with capabilities and tools"
         reason: "Registry enables programmatic agent discovery"
+      - what: "Missing CLAUDE.md updates"
+        instead: "Update expert domain table and usage examples"
+        reason: "Users discover experts via CLAUDE.md"
+        timestamp: 2026-01-28
+        evidence: commit 902c49a CLAUDE.md updates
 
   update_agent_registry:
     when: Adding, modifying, or removing agents
@@ -203,8 +211,14 @@ key_operations:
            "description": "Brief description",
            "file": "path/to/agent.md",
            "model": "haiku|sonnet|opus",
-           "capabilities": ["capability1", "capability2"],
-           "tools": ["Tool1", "Tool2"],
+           "capabilities": [
+             "capability1",
+             "capability2"
+           ],
+           "tools": [
+             "Tool1",
+             "Tool2"
+           ],
            "readOnly": true|false
          }
          ```
@@ -215,6 +229,23 @@ key_operations:
       - Ensure file path matches actual agent location
       - Verify all tools listed exist
       - Confirm capabilities align with agent purpose
+    formatting_convention:
+      timestamp: 2026-01-28
+      evidence: commit 902c49a agent-registry.json formatting
+      pattern: |
+        Use multi-line array format for readability:
+        ```json
+        "capabilities": [
+          "capability1",
+          "capability2"
+        ],
+        "tools": [
+          "Tool1",
+          "Tool2"
+        ]
+        ```
+        NOT inline: "capabilities": ["capability1", "capability2"]
+      rationale: Improves git diff readability and reduces merge conflicts when adding items
 
   configure_settings:
     when: Configuring permissions, hooks, or project behavior
@@ -238,6 +269,28 @@ key_operations:
       - Matcher enables tool-specific hooks (e.g., PostToolUse only for Edit)
       - Valid JSON (no trailing commas)
       - Hook commands use python3, not uv
+
+  update_do_command_for_expert:
+    when: Adding new expert domain to /do orchestration
+    timestamp: 2026-01-28
+    evidence: commit 902c49a do.md updates for 5 new domains
+    approach: |
+      1. Add domain to Domain Detection section with:
+         - Keywords: domain-specific terms (e.g., "schema", "migration" for database)
+         - Locations: relevant file paths (e.g., app/src/db/)
+         - Indicators: what triggers this domain
+         - Examples: sample user requests
+      2. Update Pattern Classification with domain in Pattern A and B lists
+      3. Add domain to orchestration pattern "Domains Using This Pattern" lists
+      4. Update report templates to include new domain option
+      5. Add Classification Cheat Sheet entries with verb-object patterns
+      6. Add disambiguation options to include new domain
+      7. Add example usage in Examples section
+      8. Update Spec File Storage with new domain directory
+      9. Update Implementation Notes current state count
+    rationale: |
+      /do command uses keyword-based classification to route to correct expert.
+      Each domain needs detection patterns, examples, and orchestration updates.
 
 decision_trees:
   command_vs_agent_vs_expert:
@@ -287,6 +340,16 @@ patterns:
     trade_offs:
       pros: [Plan-build-improve lifecycle, Color-coded roles, Queryable expertise]
       cons: [5 files per domain, Requires registry updates]
+    active_domains:
+      timestamp: 2026-01-28
+      list:
+        - claude-config: .claude/ configuration management
+        - agent-authoring: Agent creation and modification
+        - database: SQLite schema, FTS5, migrations, queries
+        - api: HTTP endpoints, MCP tools, Express patterns
+        - testing: Antimocking, Bun tests, SQLite test patterns
+        - indexer: AST parsing, symbol extraction, code analysis
+        - github: Issues, PRs, branches, GitHub CLI workflows
 
   agent_frontmatter_format:
     kotadb_style: |
@@ -348,6 +411,26 @@ patterns:
       - Find agents by model: registry.modelIndex["sonnet"]
       - Find agents using tool: registry.toolMatrix["Bash"]
 
+  expert_domain_expansion:
+    timestamp: 2026-01-28
+    evidence: commits 902c49a (docs updates), agent-registry.json changes
+    pattern: |
+      When scaling from 2 to 7 expert domains, updates required:
+      1. Create 4 agent files per domain (.claude/agents/experts/<domain>/)
+      2. Create expertise.yaml per domain
+      3. Update agent-registry.json (24+ new entries, indexes)
+      4. Update CLAUDE.md expert domains table and examples
+      5. Update /do command domain detection (9 sections)
+      6. Maintain consistency across all domains
+    challenges:
+      - Registry file grows large (agent-registry.json now 873 lines)
+      - /do command complexity increases with domain count
+      - Multi-line JSON formatting essential for diff readability
+    best_practices:
+      - Use consistent capability naming pattern (<domain>-planning, <domain>-implementation)
+      - Keep domain keywords non-overlapping for routing accuracy
+      - Document all domains in single CLAUDE.md table for discoverability
+
 best_practices:
   organization:
     - Agents in .claude/agents/, commands in .claude/commands/
@@ -381,6 +464,13 @@ best_practices:
     - Valid JSON (no trailing commas)
     - Hook commands use python3
 
+  expert_expansion:
+    timestamp: 2026-01-28
+    - Document all expert domains in CLAUDE.md for discoverability
+    - Use multi-line JSON arrays in agent-registry.json for git diffs
+    - Keep /do domain detection patterns specific and non-overlapping
+    - Update all 3 files (CLAUDE.md, do.md, agent-registry.json) atomically
+
 known_issues:
   - issue: Colons in frontmatter description values break YAML parsing
     impact: Agents/commands with colons in description fail discovery silently
@@ -408,18 +498,21 @@ potential_enhancements:
   - Frontmatter linting for description colons
   - Template Category validation
   - Hook output validation
+  - Expert domain registry validation (ensure CLAUDE.md, do.md, agent-registry.json in sync)
 
 stability:
   convergence_indicators:
-    insight_rate_trend: initial
+    insight_rate_trend: growing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 0
-    patterns_updated_this_cycle: 0
-    last_reviewed: 2026-01-26
+    new_patterns_added_this_cycle: 2
+    patterns_updated_this_cycle: 3
+    last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Updated for local-only v2 architecture:
-      - Removed branch/leaf hierarchy references (deleted directories)
-      - Removed cloud/Supabase references
-      - Updated to reflect flat agent structure at root level
-      - KotaDB uses local SQLite storage only
+      Expert domain expansion cycle (2 -> 7 domains):
+      - Added expert_domain_expansion pattern documenting scaling challenges
+      - Added update_do_command_for_expert operation for routing updates
+      - Updated create_expert_domain to include CLAUDE.md and /do updates
+      - Added active_domains tracking to core_implementation and patterns
+      - Added formatting_convention to update_agent_registry for JSON arrays
+      - Multi-domain architecture now stable with clear expansion playbook

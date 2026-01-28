@@ -250,97 +250,6 @@ key_operations:
         public: searchFiles
         local: searchFilesLocal
 
-  implement_fts5_search:
-    when: Adding or modifying FTS5 full-text search operations
-    approach: |
-      1. Define escapeFts5Term() helper if not present:
-         ```typescript
-         function escapeFts5Term(term: string): string {
-             // Escape internal double quotes by doubling them
-             const escaped = term.replace(/"/g, '""');
-             // Wrap in double quotes for exact phrase matching
-             return `"${escaped}"`;
-         }
-         ```
-      2. Use FTS5 table with MATCH operator and escaped terms:
-         ```typescript
-         function searchInternal(db: KotaDatabase, term: string): Result[] {
-             const sql = `
-                 SELECT f.*, snippet(table_fts, 1, '<mark>', '</mark>', '...', 32) AS snippet
-                 FROM table_fts fts
-                 JOIN table f ON fts.rowid = f.rowid
-                 WHERE table_fts MATCH ?
-                 ORDER BY bm25(table_fts)
-                 LIMIT ?
-             `;
-             const escapedTerm = escapeFts5Term(term);
-             return db.query<Result>(sql, [escapedTerm, 100]);
-         }
-         ```
-      3. Test edge cases:
-         - Hyphenated terms: "pre-commit", "mom-and-pop"
-         - Multi-word phrases: "planType smb"
-         - FTS5 keywords as literals: "search and find", "OR", "NOT"
-         - Embedded quotes: 'say "hello"'
-         - Operator-like terms: "AND", "NEAR"
-    timestamp: 2026-01-28
-    evidence: commit 5af086f
-    rationale: |
-      Prevents SQL errors when users search for multi-word phrases, hyphenated terms,
-      or FTS5 reserved keywords. Without escaping, FTS5 interprets:
-      - Spaces as AND operators (e.g., "planType smb" becomes planType AND smb)
-      - Hyphens as NOT operators (e.g., "pre-commit" becomes pre NOT commit)
-      - Keywords (AND, OR, NOT) as query syntax instead of literals
-      
-      Wrapping in double quotes forces exact phrase matching and treats all input as literals.
-    pitfalls:
-      - what: "Passing raw user input directly to FTS5 MATCH"
-        instead: "Always use escapeFts5Term() before MATCH"
-        reason: "FTS5 syntax errors break search functionality"
-      - what: "Using single quotes for FTS5 escaping"
-        instead: "Use double quotes - they're the FTS5 standard"
-        reason: "Single quotes don't prevent operator interpretation"
-
-  validate_local_file_paths:
-    when: Accepting file paths in local mode API operations
-    approach: |
-      1. Import path and fs modules
-      2. Validate path is within workspace:
-         ```typescript
-         import path from "node:path";
-         
-         function validateLocalPath(localPath: string): void {
-             const workspaceRoot = process.cwd();
-             const resolvedPath = path.resolve(localPath);
-             
-             if (!resolvedPath.startsWith(workspaceRoot)) {
-                 throw new Error(`Path traversal detected: ${localPath} is outside workspace`);
-             }
-         }
-         ```
-      3. Check directory/file existence if needed:
-         ```typescript
-         import fs from "node:fs";
-         
-         if (!fs.existsSync(resolvedPath)) {
-             throw new Error(`Path does not exist: ${localPath}`);
-         }
-         ```
-      4. Use validated path for indexing/reading operations
-    timestamp: 2026-01-28
-    evidence: commit efecf9c (PR #589 review feedback)
-    rationale: |
-      Local mode indexing accepts user-provided file paths. Without validation,
-      malicious paths like "../../../etc/passwd" could expose sensitive files.
-      Restrict all paths to within process.cwd() workspace directory.
-    pitfalls:
-      - what: "Trusting user-provided paths without validation"
-        instead: "Always validate with path.resolve() and startsWith()"
-        reason: "Path traversal attacks can read arbitrary files"
-      - what: "Using relative paths directly"
-        instead: "Resolve to absolute paths before validation"
-        reason: "Relative paths can bypass naive validation"
-
 decision_trees:
   endpoint_vs_mcp_tool:
     question: Should this be an HTTP endpoint or MCP tool?
@@ -498,34 +407,6 @@ patterns:
       - FTS5 MATCH for full-text search
       - bm25() for relevance ranking
       - snippet() for context around matches
-    timestamp: 2026-01-28
-    evidence: app/src/api/queries.ts lines 257-262, 304
-
-  local_auth_bypass_pattern:
-    structure: |
-      // app/src/auth/middleware.ts
-      const LOCAL_AUTH_CONTEXT: AuthContext = {
-          userId: "local-user",
-          tier: "team", // Full access in local mode
-          keyId: "local-key",
-          rateLimitPerHour: Number.MAX_SAFE_INTEGER, // No rate limits
-      };
-
-      export async function authenticateRequest(_request: Request): Promise<AuthResult> {
-          logger.debug("Local mode: Bypassing authentication");
-          return { context: LOCAL_AUTH_CONTEXT };
-      }
-    notes:
-      - All requests in local mode receive full-access context
-      - No API key validation or JWT verification
-      - Rate limits set to MAX_SAFE_INTEGER (effectively unlimited)
-      - requireAdmin() always returns true
-    timestamp: 2026-01-28
-    evidence: commit d669841 (local-only v2 refactor)
-    rationale: |
-      Local-only architecture eliminates cloud authentication complexity.
-      Simplifies development and dogfooding while maintaining security boundary
-      (local access = trusted access).
 
 best_practices:
   routes:
@@ -547,7 +428,8 @@ best_practices:
     - Public functions use getGlobalDatabase()
     - Use transactions for multi-statement operations
     - Use prepared statements for bulk inserts
-    - Always escape FTS5 search terms with escapeFts5Term()
+    - Always escape FTS5 search terms
+
   openapi:
     - Define Zod schemas for all request/response bodies
     - Include security requirements for authenticated endpoints
@@ -559,12 +441,6 @@ best_practices:
     - Never use console.log/error/warn
     - Include context (userId, requestId, params) in log objects
     - Use logger.info for operations, logger.error for failures
-
-  security:
-    - Validate all file paths with path.resolve() and startsWith(process.cwd())
-    - Escape all user input for FTS5 queries
-    - Use prepared statements for all SQL queries
-    - Never expose raw error stack traces to API responses
 
 known_issues:
   - issue: MCP Accept header requires both application/json AND text/event-stream
@@ -583,14 +459,6 @@ known_issues:
     resolution: Expected behavior for local-only mode
     status: by-design
 
-
-  - issue: FTS5 syntax errors from unescaped user input
-    impact: "no such column" errors on hyphenated/multi-word/keyword searches
-    resolution: Use escapeFts5Term() before all MATCH operations
-    prevention: Add FTS5 edge case tests for each search endpoint
-    status: resolved (2026-01-28, commit 5af086f)
-    timestamp: 2026-01-28
-
 potential_enhancements:
   - enhancement: OpenAPI spec hot reload in development mode
     rationale: Avoid restarts when updating API docs
@@ -608,30 +476,18 @@ potential_enhancements:
     rationale: Reduce bandwidth for large search results
     effort: low
 
-
 stability:
   convergence_indicators:
-    insight_rate_trend: growing
+    insight_rate_trend: initial
     contradiction_count: 0
-    new_patterns_added_this_cycle: 3
-    patterns_updated_this_cycle: 1
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Second review cycle after local-only v2 refactor (d669841):
-      
-      New patterns added:
-      1. FTS5 search term escaping (implement_fts5_search operation)
-      2. Local file path validation (validate_local_file_paths operation)
-      3. Local auth bypass pattern
-      
-      Updated patterns:
-      - FTS5 search pattern with escapeFts5Term() implementation details
-      
-      Key learnings from commits 5af086f, d669841, efecf9c:
-      - FTS5 requires double-quote escaping to prevent operator interpretation
-      - Path traversal validation critical for local mode file operations
-      - Local auth bypass simplifies development while maintaining security model
-      
-      Architecture stability: High (local-only v2 patterns converging)
-      Next review: After next 5-10 API-related commits
+      Initial expertise for local-only v2 architecture:
+      - Express HTTP server (not Bun/Hono)
+      - MCP SDK with StreamableHTTPServerTransport
+      - No auth middleware in local mode
+      - Synchronous operations (no queue)
+      - SQLite via getGlobalDatabase()

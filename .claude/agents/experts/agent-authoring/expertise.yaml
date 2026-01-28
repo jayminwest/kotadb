@@ -1,16 +1,16 @@
 # Agent Authoring & Configuration Expertise
-# Target: 400-600 lines | Domain: Operational knowledge for kotadb agent creation
+# Target: 500 lines (optimal) | WARNING: 600 lines | HARD LIMIT: 700 lines
 
 overview:
   description: |
     Agent authoring and configuration for kotadb—frontmatter schema with tools[], constraints[],
-    readOnly, expertDomain, and modes[]; flat agent structure with general-purpose and expert agents;
+    readOnly, expertDomain, and color fields; flat agent structure with general-purpose and expert agents;
     agent-registry.json integration; MCP tool selection (mcp__kotadb__*); and system prompt
     structure. This expertise enables correct agent configuration for discoverability, capability,
     and appropriate model selection within kotadb's local-only architecture.
   scope: |
     Covers agent.md frontmatter (name, description, tools[], model, constraints[], readOnly,
-    expertDomain, modes[]), flat agent organization (root-level + experts/), agent-registry.json
+    expertDomain, color), flat agent organization (root-level + experts/), agent-registry.json
     with capability/model/tool indexes, MCP tool patterns, and system prompt organization.
     Does NOT cover prompt content specifics or orchestration patterns (see orchestration expert).
   rationale: |
@@ -42,7 +42,7 @@ core_implementation:
       summary: Standard agent frontmatter with tools list and model
     - name: Expert Agent Frontmatter
       location: .claude/agents/experts/claude-config/claude-config-plan-agent.md
-      summary: Expert agent frontmatter with expertDomain field
+      summary: Expert agent frontmatter with expertDomain and color fields
     - name: Agent Registry Structure
       location: .claude/agents/agent-registry.json
       summary: agents, capabilityIndex, modelIndex, toolMatrix structure
@@ -65,8 +65,7 @@ key_operations:
       5. constraints: List of behavioral boundaries
       6. readOnly: true|false (explicit flag for read-only agents)
       7. expertDomain: Domain name for expert agents
-      8. modes: [plan, build, review] for multi-mode experts
-      9. color: Visual identifier for expert agents
+      8. color: Visual identifier for expert agents (yellow=plan, green=build, purple=improve, cyan=question)
 
       Format (kotadb style):
       ---
@@ -85,6 +84,8 @@ key_operations:
       CRITICAL: NEVER use colons in description values. Colons break Claude Code's
       agent discovery parser. Use "Plans agent creation for kotadb" not
       "Plans agent creation: for kotadb".
+      
+      Expert agent descriptions document expected input: "Plans X for kotadb. Expects USER_PROMPT"
     examples:
       - agent: scout-agent
         frontmatter: "name: scout-agent | tools: [Read, Glob, Grep] | model: haiku | readOnly: true"
@@ -109,11 +110,11 @@ key_operations:
       - build-agent (Implementation): Read, Write, Edit, Bash, Glob, Grep
       - review-agent (Code review): Read, Glob, Grep
 
-      Expert Domain Agents:
+      Expert Domain Agents (7 domains: claude-config, agent-authoring, database, api, testing, indexer, github):
       - Plan: Read, Glob, Grep, Write (Write for spec caching)
       - Build: Read, Write, Edit, Glob, Grep
       - Improve: Read, Write, Edit, Glob, Grep, Bash
-      - Question: Read, Glob, Grep (read-only)
+      - Question: Read, Glob, Grep (read-only, haiku model)
 
       KotaDB MCP tools (for codebase analysis):
       - mcp__kotadb__search_code (term)
@@ -137,47 +138,51 @@ key_operations:
 
       haiku (fast, cheap):
       - Scout agents (read-only exploration)
-      - Question agents (fast Q&A)
+      - Question agents (fast Q&A) - ALL 7 expert question agents use haiku
       - Review agents (read-only analysis)
       - Test first before downgrading from sonnet
 
       sonnet (balanced, default):
       - Build agents (implementation)
-      - Expert plan/build/improve agents
+      - Expert plan/build/improve agents - ALL use sonnet
       - Most general agents use sonnet
 
       opus (powerful, expensive):
-      - Orchestrator agent (complex multi-agent coordination)
-      - Meta-agent operations
+      - Reserved for future complex orchestration needs
       - Only when complexity justifies cost
     examples:
       - agent: scout-agent | model: haiku | reason: Fast read-only search
       - agent: build-agent | model: sonnet | reason: Balanced implementation work
-      - agent: orchestrator-agent | model: opus | reason: Complex multi-agent coordination
+      - agent: testing-question-agent | model: haiku | reason: Fast Q&A
 
   write_agent_description:
     name: Write Effective Agent Description
     description: Create description that aids discoverability and invocation
     when_to_use: Writing description field in frontmatter
     approach: |
-      Pattern: [Action Verb] + [Domain/Object] + [Context/Purpose]
+      Pattern: [Action Verb] + [Domain/Object] + [Context/Purpose] + [Expected Input]
 
       Components:
-      1. Action verb: Explore, Plan, Implement, Review, Coordinate, Orchestrate
-      2. Domain/Object: What it acts on (codebase, specs, files, agents)
-      3. Context: When/why to invoke (optional but valuable)
+      1. Action verb: Plans, Implements, Reviews, Explores, Answers
+      2. Domain/Object: What it acts on (agent creation, database, API)
+      3. Context: "for kotadb" or "for KotaDB" (consistency across domains)
+      4. Expected Input: "Expects USER_PROMPT" or "Expects SPEC"
 
-      Character limit: Keep under 100 characters
-      NEVER USE COLONS: Replace with dashes or commas
+      Character limit: Keep under 120 characters
+      NEVER USE COLONS: Replace with periods or remove
 
       Description patterns by agent type:
       - General: "{Action} agent - {capability summary}"
-      - Expert: "{Domain} expert - {specific focus}"
+      - Expert Plan: "Plans {domain} tasks for kotadb. Expects USER_PROMPT ({requirement})"
+      - Expert Build: "Implements {domain} from specs. Expects SPEC (path to spec file)"
+      - Expert Improve: "{Domain} expertise evolution specialist"
+      - Expert Question: "{Domain} Q&A specialist" or "Answers {domain} questions..."
     examples:
-      - good: "Read-only exploration agent - searches codebase and reads files"
-      - good: "Code implementation agent - writes, edits, and executes code changes"
+      - good: "Plans agent creation for kotadb. Expects USER_PROMPT (requirement)"
+      - good: "Plans database changes for KotaDB. Expects USER_PROMPT (schema or query requirement)"
+      - good: "Testing expertise evolution specialist"
       - bad: "Plans: implementation" (colon breaks parser)
-      - bad: "Helper for code" (vague, no action verb)
+      - bad: "Helper for code" (vague, no action verb, no expected input)
 
   structure_agent_prompt:
     name: Structure Agent System Prompt Content (kotadb)
@@ -186,29 +191,34 @@ key_operations:
     approach: |
       Standard sections for kotadb agents (in order):
       1. # Agent Name - H1 header
-      2. Brief intro paragraph (1-2 sentences)
-      3. ## Input Format - Expected task format
-      4. ## Capabilities - What the agent can do
-      5. ## Workflow - Numbered steps with phase boundaries
-      6. ## KotaDB Conventions - MANDATORY for build agents
+      2. Brief intro paragraph (1-2 sentences describing role)
+      3. ## Variables - Expected inputs (expert agents) OR ## Input Format (general agents)
+      4. ## Instructions - High-level guidance bullets
+      5. ## Expertise - Domain-specific knowledge (expert agents only)
+         - Reference expertise.yaml as canonical source
+         - Include timestamped learnings [YYYY-MM-DD]
+      6. ## Workflow - Numbered steps with clear phases
+      7. ## KotaDB Conventions - MANDATORY for build agents
          - Path aliases (@api/*, @db/*, @shared/*, etc.)
          - Logging (process.stdout.write, never console.*)
-         - Testing (real SQLite Local)
-      7. ## Output Format - Success/failure templates
-      8. ## Error Handling - Recovery patterns
-      9. ## Constraints - Behavioral boundaries
+         - Testing (real SQLite)
+      8. ## Report - Structured output template (use markdown code block)
+      9. ## Constraints - Behavioral boundaries (if needed)
 
-      Expert agents add:
-      - ## Expertise section for domain knowledge
-      - ## Variables section for required inputs
+      Expert agent pattern includes:
+      - Reference to expertise.yaml at top of Expertise section
+      - Timestamped learnings in Expertise section
+      - Variables section documenting USER_PROMPT or SPEC
 
       Build agents emphasize:
-      - Task format
-      - Concise output format
+      - Clear input/output formats
       - Convention compliance
+      - Structured report templates
     examples:
       - location: .claude/agents/build-agent.md
         sections: Purpose, Capabilities, KotaDB Conventions, Workflow, Output Format, Constraints
+      - location: .claude/agents/experts/database/database-plan-agent.md
+        sections: Variables, Instructions, Expertise (with yaml reference), Workflow, Report
 
   update_agent_registry:
     name: Update agent-registry.json
@@ -233,8 +243,7 @@ key_operations:
         },
         "modelIndex": {
           "haiku": ["agent-id-1"],
-          "sonnet": ["agent-id-2"],
-          "opus": ["agent-id-3"]
+          "sonnet": ["agent-id-2"]
         },
         "toolMatrix": {
           "ToolName": ["agent-id-1", "agent-id-2"]
@@ -246,9 +255,11 @@ key_operations:
       2. Add capabilities to capabilityIndex (verb -> agent mapping)
       3. Add to modelIndex under appropriate tier
       4. Add each tool to toolMatrix
+      
+      Registry v2.0.0 contains 27+ agents across 7 expert domains.
     examples:
       - agent: agent-authoring-plan-agent
-        registry_entry: "capabilities: ['plan', 'analyze', 'create'], tools: ['Read', 'Glob', 'Grep', 'Write']"
+        registry_entry: "capabilities: ['agent-authoring-planning', 'spec-generation'], tools: ['Read', 'Glob', 'Grep', 'Write']"
 
 decision_trees:
   agent_type_selection:
@@ -288,23 +299,29 @@ decision_trees:
       - condition: Planning, building, implementation
         action: sonnet (build-agent, expert plan/build/improve)
       - condition: Complex multi-agent orchestration
-        action: opus (orchestrator-agent only)
+        action: opus (future use only)
 
 patterns:
   flat_agent_structure:
     name: Flat Agent Structure
     context: kotadb uses a flat agent structure with general and expert agents
     implementation: |
-      Structure:
+      Structure (as of v2.0.0):
       .claude/agents/
-      ├── agent-registry.json       # Machine-readable registry
+      ├── agent-registry.json       # Machine-readable registry (27+ agents)
       ├── agent-template.md         # Template for new agents
       ├── build-agent.md            # Implementation agent
       ├── scout-agent.md            # Read-only exploration
       ├── review-agent.md           # Code review
-      └── experts/                  # Domain expert agents
-          ├── claude-config/        # Configuration experts
-          └── agent-authoring/      # Agent authoring experts
+      ├── docs-scraper.md           # Documentation scraping
+      └── experts/                  # 7 domain expert patterns
+          ├── agent-authoring/      # Agent creation (this domain)
+          ├── claude-config/        # .claude/ configuration
+          ├── database/             # SQLite schema and queries
+          ├── api/                  # HTTP endpoints and MCP
+          ├── testing/              # Antimocking test patterns
+          ├── indexer/              # AST parsing and symbols
+          └── github/               # Issues, PRs, workflows
 
       General agents:
       - Located at root .claude/agents/ level
@@ -319,13 +336,13 @@ patterns:
       - advantage: Simple, flat structure easy to navigate
         cost: Less hierarchical organization
       - advantage: Clear separation of general vs expert
-        cost: Multiple files per expert domain
+        cost: Multiple files per expert domain (4 agents + expertise.yaml)
 
   expert_4agent_pattern:
-    name: Expert 4-Agent Pattern (kotadb adaptation)
+    name: Expert 4-Agent Pattern (kotadb standard)
     context: Domain experts with plan/build/improve/question workflow
     implementation: |
-      Standard 4-Agent Pattern for kotadb:
+      Standard 4-Agent Pattern for kotadb (validated across 7 domains):
       .claude/agents/experts/<domain>/
       ├── expertise.yaml                   # 400-600 line structured knowledge
       ├── <domain>-plan-agent.md          # Analyzes requirements, writes spec
@@ -333,45 +350,54 @@ patterns:
       ├── <domain>-improve-agent.md       # Updates expertise from changes
       └── <domain>-question-agent.md      # Read-only Q&A about domain
 
-      kotadb frontmatter for expert agents:
+      kotadb frontmatter for expert agents (consistent across all 7 domains):
       ---
       name: <domain>-plan-agent
-      description: Plans <domain> tasks for kotadb. Expects USER_PROMPT
+      description: Plans <domain> tasks for kotadb. Expects USER_PROMPT (requirement)
       tools:
         - Read
         - Glob
         - Grep
         - Write
       model: sonnet
+      color: yellow
       expertDomain: <domain>
       ---
 
-      Tool sets by agent role:
+      Tool sets by agent role (standardized):
       - Plan: Read, Glob, Grep, Write (Write for spec caching)
       - Build: Read, Write, Edit, Glob, Grep
       - Improve: Read, Write, Edit, Glob, Grep, Bash
       - Question: Read, Glob, Grep (read-only, haiku)
 
-      Color scheme (optional, for visual identification):
+      Color scheme (universal across all expert domains):
       - Plan: yellow (analysis)
       - Build: green (creation)
       - Improve: purple (learning)
       - Question: cyan (advisory)
     trade_offs:
       - advantage: Clear phase separation, expertise evolves independently
-        cost: Multiple agent files per domain
+        cost: Multiple agent files per domain (5 files total)
     real_examples:
       - location: .claude/agents/experts/agent-authoring/
-        note: This domain - 4-agent pattern with expertise.yaml
+        note: This domain - original 4-agent pattern
+      - location: .claude/agents/experts/database/
+        note: Database schema and queries
+      - location: .claude/agents/experts/testing/
+        note: Antimocking test patterns
 
   agent_registry_integration:
     name: Agent Registry Integration Pattern
     context: Machine-readable registry enables programmatic agent selection
     implementation: |
-      agent-registry.json enables:
-      1. Capability-based selection (capabilityIndex)
-      2. Model tier filtering (modelIndex)
+      agent-registry.json v2.0.0 enables:
+      1. Capability-based selection (capabilityIndex with 40+ capabilities)
+      2. Model tier filtering (modelIndex: haiku/sonnet)
       3. Tool availability checking (toolMatrix)
+
+      Registry expansion:
+      - v1.0.0: 5 agents (branch/leaf hierarchy)
+      - v2.0.0: 27+ agents (flat structure with 7 expert domains)
 
       Usage in orchestration:
       - Query capabilityIndex to find agents for "implement"
@@ -407,87 +433,145 @@ best_practices:
   - category: Frontmatter
     practices:
       - practice: Use YAML list format for tools (not comma-separated)
-        evidence: All kotadb agents use tools list format
-        timestamp: 2026-01-26
+        evidence: All 27+ agents in registry use YAML list format consistently
+        timestamp: 2026-01-28
       - practice: NEVER use colons in description field values
-        evidence: Colons break Claude Code agent discovery parser
-        timestamp: 2026-01-26
+        evidence: Colons break Claude Code agent discovery parser - validated across all domains
+        timestamp: 2026-01-28
       - practice: Include readOnly field for read-only agents
-        evidence: Enables clear capability identification
-        timestamp: 2026-01-26
-      - practice: Use constraints[] for behavioral boundaries
-        evidence: kotadb agent-template.md pattern
-        timestamp: 2026-01-26
+        evidence: scout-agent, review-agent, all 7 question agents have explicit readOnly flag
+        timestamp: 2026-01-28
+      - practice: Expert agents include expertDomain field
+        evidence: All 7 expert domains use expertDomain consistently
+        timestamp: 2026-01-28
+      - practice: Use color field for expert agents (yellow=plan, green=build, purple=improve, cyan=question)
+        evidence: Consistent across all 7 expert domains for visual identification
+        timestamp: 2026-01-28
+      - practice: Description follows "Action + domain + context. Expects INPUT" pattern for expert agents
+        evidence: All expert agents document expected input in description
+        timestamp: 2026-01-28
 
   - category: Tool Selection
     practices:
-      - practice: Scout and question agents are strictly read-only (no Write/Edit/Bash)
-        evidence: scout-agent.md has readOnly: true
-        timestamp: 2026-01-26
-      - practice: Expert plan agents get Write for spec caching only
-        evidence: Spec files written to docs/specs/
-        timestamp: 2026-01-26
+      - practice: Scout and question agents are strictly read-only (Read, Glob, Grep only)
+        evidence: scout-agent and all 7 expert question agents have readOnly true with no Write/Edit/Bash
+        timestamp: 2026-01-28
+      - practice: Expert plan agents get Write tool for spec caching
+        evidence: All 7 expert plan agents include Write alongside Read, Glob, Grep
+        timestamp: 2026-01-28
       - practice: Build agents get full write access
-        evidence: build-agent.md has Write, Edit, Bash
-        timestamp: 2026-01-26
+        evidence: build-agent and all expert build agents have Read, Write, Edit, Glob, Grep
+        timestamp: 2026-01-28
+      - practice: Improve agents add Bash for git operations
+        evidence: All 7 expert improve agents include Bash for git log/diff analysis
+        timestamp: 2026-01-28
+      - practice: Question agents use haiku model with read-only tools
+        evidence: All 7 expert question agents are haiku with Read, Glob, Grep
+        timestamp: 2026-01-28
 
   - category: Naming
     practices:
       - practice: General agents use descriptive kebab-case naming
-        evidence: build-agent, scout-agent, review-agent
-        timestamp: 2026-01-26
+        evidence: build-agent, scout-agent, review-agent, docs-scraper
+        timestamp: 2026-01-28
       - practice: Expert agents use <domain>-{phase}-agent naming
-        evidence: 4-agent pattern convention
-        timestamp: 2026-01-26
+        evidence: All 7 domains follow pattern consistently (database-plan-agent, testing-build-agent, etc.)
+        timestamp: 2026-01-28
 
   - category: Prompt Structure
     practices:
-      - practice: Include KotaDB Conventions section in all build agents
-        evidence: Path aliases, logging are mandatory
-        timestamp: 2026-01-26
-      - practice: Define Input Format section for all agents
-        evidence: Structured task format expected
-        timestamp: 2026-01-26
-      - practice: Include Output Format with success/failure templates
-        evidence: All kotadb agents have structured output
-        timestamp: 2026-01-26
+      - practice: Expert agents reference expertise.yaml as canonical source
+        evidence: All 7 expert domains include "Note canonical source is expertise.yaml" in Expertise section
+        timestamp: 2026-01-28
+      - practice: Expert agents include ## Expertise section with timestamped learnings
+        evidence: All expert agents have Expertise section with [YYYY-MM-DD] timestamps on entries
+        timestamp: 2026-01-28
+      - practice: Include Variables section documenting expected inputs
+        evidence: All expert agents document USER_PROMPT, SPEC, or other inputs
+        timestamp: 2026-01-28
+      - practice: Include Report section with structured markdown template
+        evidence: All agents include markdown code block templates for output
+        timestamp: 2026-01-28
 
   - category: Registry
     practices:
       - practice: Update agent-registry.json when adding/modifying agents
-        evidence: Registry enables programmatic agent selection
-        timestamp: 2026-01-26
-      - practice: Include capabilities as action verbs
-        evidence: capabilityIndex uses verbs (explore, implement, review)
-        timestamp: 2026-01-26
+        evidence: Registry updated from v1.0.0 (5 agents) to v2.0.0 (27+ agents)
+        timestamp: 2026-01-28
+      - practice: Include domain-specific capabilities
+        evidence: capabilityIndex includes 40+ capabilities like database-planning, testing-qa, api-implementation
+        timestamp: 2026-01-28
+      - practice: Maintain capabilityIndex, modelIndex, and toolMatrix consistency
+        evidence: Registry v2.0.0 has complete indexes for all 27+ agents
+        timestamp: 2026-01-28
+
+  - category: Expert Domain Organization
+    practices:
+      - practice: All expert domains follow 4-agent pattern (plan/build/improve/question)
+        evidence: 7 expert domains all have complete 4-agent structure
+        timestamp: 2026-01-28
+      - practice: Expert domains include expertise.yaml with 400-600 line target
+        evidence: Domain knowledge documented in structured YAML format
+        timestamp: 2026-01-28
 
 known_issues:
-  - issue: Expert agents cannot use Task tool
-    workaround: Expert agents are advisory, orchestrator handles spawning
-    status: by-design
-    timestamp: 2026-01-26
+  - issue: Branch/leaf hierarchy removed in v2 refactor
+    workaround: Flat agent structure with general + experts/ organization
+    status: resolved
+    timestamp: 2026-01-28
 
 potential_enhancements:
   - enhancement: Automated agent-registry.json validation on agent changes
     rationale: Catch missing registry entries early
     effort: low
-    timestamp: 2026-01-26
+    timestamp: 2026-01-28
 
   - enhancement: Tool set templates by agent type
     rationale: Reduce configuration errors
     effort: low
-    timestamp: 2026-01-26
+    timestamp: 2026-01-28
+
+  - enhancement: Automated description colon detection
+    rationale: Prevent silent agent discovery failures
+    effort: low
+    timestamp: 2026-01-28
+
+recent_changes:
+  - change: Removed branch/leaf hierarchy (commit d669841)
+    impact: Major architectural shift to flat structure
+    learnings: |
+      - Branch agents (branch-plan, branch-build, branch-review, branch-meta) removed
+      - Leaf agents (leaf-retrieval, leaf-build, leaf-review) removed
+      - mcp__leaf_spawner__ tools no longer used
+      - Simplified to general agents + experts/ domains
+      - No more branch coordinator pattern
+      - Orchestration now handled at /do command level
+    timestamp: 2026-01-28
+
+  - change: Added 5 new expert domains (commits 902c49a, d669841)
+    impact: Expanded from 2 to 7 expert domains
+    learnings: |
+      - database, api, testing, indexer, github experts added
+      - All follow 4-agent pattern consistently
+      - All include expertise.yaml reference in Expertise section
+      - Color coding (yellow/green/purple/cyan) adopted universally
+      - Description pattern "Action + domain. Expects INPUT" standardized
+      - Registry v2.0.0 with 40+ domain-specific capabilities
+    timestamp: 2026-01-28
 
 stability:
   convergence_indicators:
-    insight_rate_trend: "initial-high"
+    insight_rate_trend: "stabilizing"
     contradiction_count: 0
-    last_reviewed: 2026-01-26
+    last_reviewed: 2026-01-28
     notes: |
-      Updated for local-only v2 architecture:
-      - Removed branch/leaf hierarchy (directories deleted)
-      - Removed mcp__leaf_spawner__ references
+      Major v2 refactor completed:
+      - Flat agent structure validated across 7 expert domains
+      - Description patterns consistent (no colons, explicit inputs)
+      - Tool selection patterns consistent across all 28 agent roles
+      - Color scheme universal (yellow/green/purple/cyan)
+      - expertDomain field standard across all expert agents
+      - Registry v2.0.0 with comprehensive indexes
+      - Removed branch/leaf references completely
       - Removed Supabase references (now SQLite only)
-      - Updated to flat agent structure (root + experts/)
-      - agent-registry.json integration maintained
       - MCP tools limited to mcp__kotadb__* for local search

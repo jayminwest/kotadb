@@ -105,7 +105,7 @@ key_operations:
          ORDER BY bm25(indexed_files_fts)
          LIMIT ?
          ```
-      4. Escape user input for FTS5 (wrap in quotes, escape internal quotes)
+      4. CRITICAL: Escape user input for FTS5 using escapeFts5Term()
     pitfalls:
       - what: "Using FTS5 without external content table"
         instead: "Use content='' to avoid duplicate storage"
@@ -113,6 +113,86 @@ key_operations:
       - what: "Not escaping FTS5 queries"
         instead: "Use escapeFts5Term() wrapper for user input"
         reason: "Hyphens and FTS5 keywords cause syntax errors"
+    timestamp: 2026-01-28
+    evidence: Commit 5af086f (fix #595)
+
+  escape_fts5_search_terms:
+    when: Processing user input for FTS5 MATCH queries
+    approach: |
+      Always escape user input before passing to FTS5 MATCH clause:
+      
+      ```typescript
+      /**
+       * Escape a search term for use in SQLite FTS5 MATCH clause.
+       * Wraps the entire term in double quotes for exact phrase matching.
+       * Escapes internal double quotes by doubling them.
+       */
+      function escapeFts5Term(term: string): string {
+        // Escape internal double quotes by doubling them
+        const escaped = term.replace(/"/g, '""');
+        // Wrap in double quotes for exact phrase matching
+        return \`"\${escaped}"\`;
+      }
+      
+      // Usage in query
+      const escapedTerm = escapeFts5Term(userInput);
+      const results = db.query(
+        'SELECT * FROM indexed_files_fts WHERE indexed_files_fts MATCH ?',
+        [escapedTerm]
+      );
+      ```
+      
+      This prevents:
+      - Multi-word searches being interpreted as AND operators ("hello world")
+      - Hyphens triggering NOT operator parsing ("mom-and-pop")
+      - FTS5 keywords (AND, OR, NOT, NEAR) treated as operators instead of literals
+      - Syntax errors on operator-like terms
+    test_coverage: |
+      Essential test cases (from queries-sqlite.test.ts):
+      1. Hyphenated terms: "pre-commit" should not parse as "pre NOT commit"
+      2. Multi-word phrases: "planType smb" should match adjacent words
+      3. FTS keywords as literals: "search and find" treats "and" as text
+      4. Embedded quotes: 'say "hello"' properly escapes internal quotes
+      5. Operator-like terms: "OR", "AND", "NOT", "NEAR" as search text
+    timestamp: 2026-01-28
+    evidence: Commit 5af086f, app/src/api/queries.ts lines 241-262
+    related_issue: "#595 - FTS5 search fails on multi-word/hyphenated queries"
+
+  auto_initialize_schema:
+    when: Creating KotaDatabase instance for the first time
+    approach: |
+      Implement automatic schema initialization in KotaDatabase constructor:
+      
+      ```typescript
+      // In KotaDatabase constructor (after configurePragmas)
+      if (!this.config.readonly) {
+        if (!this.tableExists("indexed_files")) {
+          const schemaPath = join(__dirname, "../sqlite-schema.sql");
+          const schema = readFileSync(schemaPath, "utf-8");
+          this.exec(schema);
+          logger.info("SQLite schema initialized", {
+            path: this.config.path,
+          });
+        } else {
+          logger.debug("SQLite schema already initialized");
+        }
+      }
+      ```
+      
+      Key patterns:
+      - Check for representative table existence (indexed_files)
+      - Only run for write-mode connections (skip readonly)
+      - Read schema from sqlite-schema.sql (single source of truth)
+      - Log appropriately (info for init, debug for existing)
+      - Execute entire schema in single operation (atomic)
+    benefits:
+      - Eliminates "no such table" errors for first-time users
+      - No manual schema setup required in local mode
+      - Idempotent initialization (safe to run multiple times)
+      - Consistent schema across all environments
+    timestamp: 2026-01-28
+    evidence: Commit 2032801, app/src/db/sqlite/sqlite-client.ts
+    related_issue: "#574 - auto-initialize SQLite schema on local mode startup"
 
   create_migration:
     when: Adding new tables, columns, or indexes
@@ -376,7 +456,7 @@ best_practices:
     - Prepare statements for repeated queries
     - Batch inserts within transactions
     - Use IMMEDIATE transactions for writes
-    - Escape FTS5 queries before MATCH
+    - ALWAYS escape FTS5 queries using escapeFts5Term() before MATCH
 
   connection_management:
     - Use connection pool for concurrent access
@@ -400,10 +480,12 @@ best_practices:
     - Avoid data-destructive migrations
 
 known_issues:
-  - issue: FTS5 MATCH syntax errors with hyphens
-    impact: Queries like "mom-and-pop" fail with syntax error
-    resolution: Wrap user input in quotes via escapeFts5Term()
-    status: Implemented in queries.ts
+  - issue: FTS5 MATCH syntax errors with hyphens and multi-word queries
+    impact: Queries like "mom-and-pop" or "planType smb" fail with SQL syntax error
+    resolution: Wrap ALL user input in double quotes via escapeFts5Term()
+    status: Implemented in queries.ts (commit 5af086f)
+    timestamp: 2026-01-28
+    test_coverage: 5 test cases in queries-sqlite.test.ts
 
   - issue: SQLite column type changes not supported
     impact: Cannot ALTER COLUMN type in SQLite
@@ -430,14 +512,22 @@ potential_enhancements:
 
 stability:
   convergence_indicators:
-    insight_rate_trend: initial
+    insight_rate_trend: increasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 0
-    patterns_updated_this_cycle: 0
+    new_patterns_added_this_cycle: 2
+    patterns_updated_this_cycle: 1
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Initial expertise creation for database domain.
-      Based on KotaDB v2 local-only architecture.
-      SQLite schema finalized in feature-532 (local-first).
-      Query layer implemented in feature-539 (Phase 2b).
+      Cycle 2026-01-28: Added 2 new patterns, updated 1 existing.
+      
+      New patterns added:
+      1. escape_fts5_search_terms - Critical FTS5 escaping function (commit 5af086f)
+      2. auto_initialize_schema - Automatic schema initialization (commit 2032801)
+      
+      Updated patterns:
+      1. design_fts5_search - Added CRITICAL note about escapeFts5Term() requirement
+      
+      Evidence: Real production bugs solved (issue #595, #574)
+      Test coverage: 5 new tests for FTS5 edge cases
+      Domain stability: Increasing - local-only patterns converging

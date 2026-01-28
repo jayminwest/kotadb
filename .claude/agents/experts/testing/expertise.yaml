@@ -242,7 +242,167 @@ key_operations:
         });
       });
       ```
+  test_fts5_search_queries:
+    when: Testing FTS5 search functionality
+    approach: |
+      1. Always test edge cases with special characters and FTS5 operators
+      2. Cover hyphenated terms, multi-word phrases, FTS keywords as literals
+      3. Verify proper escaping of user input
+      ```typescript
+      describe("searchFilesLocal - FTS edge cases", () => {
+        test("should search hyphenated terms without SQL errors", () => {
+          // Tests like "pre-commit" that can be misinterpreted as "pre NOT commit"
+          const results = searchFilesLocal(db, "pre-commit", testRepoId, 10);
+          expect(Array.isArray(results)).toBe(true);
+        });
+        
+        test("should search FTS keywords (AND, OR, NOT) as literals", () => {
+          // FTS5 keywords should be treated as literal search terms
+          const resultsAnd = searchFilesLocal(db, "search and find", testRepoId, 10);
+          expect(Array.isArray(resultsAnd)).toBe(true);
+        });
+      });
+      ```
+    timestamp: 2026-01-28
+    evidence: commit 5af086f (Issue #595)
+    rationale: |
+      FTS5 interprets hyphens as NOT operators and keywords like "and/or/not" as
+      query syntax. Tests must verify proper escaping to prevent SQL errors on
+      user-provided search terms.
 
+  test_environment_variable_restoration:
+    when: Testing code that depends on environment variables
+    approach: |
+      1. Store original environment variables before modification
+      2. Restore them in afterAll, even if test fails
+      3. Delete variables that weren't originally set (avoid undefined pollution)
+      ```typescript
+      describe("Local Mode Tests", () => {
+        const originalEnv = {
+          KOTADB_PATH: process.env.KOTADB_PATH,
+          KOTA_LOCAL_MODE: process.env.KOTA_LOCAL_MODE,
+        };
+        
+        beforeAll(() => {
+          process.env.KOTADB_PATH = testDbPath;
+          process.env.KOTA_LOCAL_MODE = "true";
+        });
+        
+        afterAll(() => {
+          // Restore or delete to prevent pollution
+          if (originalEnv.KOTADB_PATH !== undefined) {
+            process.env.KOTADB_PATH = originalEnv.KOTADB_PATH;
+          } else {
+            delete process.env.KOTADB_PATH;
+          }
+        });
+      });
+      ```
+    timestamp: 2026-01-28
+    evidence: app/src/api/__tests__/local-indexing.test.ts
+    rationale: |
+      Environment pollution between test suites causes unpredictable failures.
+      Proper restoration ensures test isolation at the process environment level.
+
+  test_filesystem_workflows:
+    when: Testing indexing or file-based workflows end-to-end
+    approach: |
+      1. Create isolated temp directories with unique identifiers (randomUUID)
+      2. Test with real file operations (writeFileSync, mkdirSync)
+      3. Clean up with closeGlobalConnections() before directory removal
+      4. Use existsSync guard before rmSync to handle cleanup errors gracefully
+      ```typescript
+      describe("Local Indexing Workflow", () => {
+        const testId = randomUUID().slice(0, 8);
+        const testDir = join(process.cwd(), \`.test-indexing-temp-\${testId}\`);
+        
+        beforeAll(() => {
+          mkdirSync(testDir, { recursive: true });
+        });
+        
+        afterAll(() => {
+          closeGlobalConnections(); // Critical before directory removal
+          if (existsSync(testDir)) {
+            rmSync(testDir, { recursive: true, force: true });
+          }
+        });
+        
+        test("indexes local directory successfully", async () => {
+          const projectDir = join(testDir, "sample-project");
+          mkdirSync(projectDir, { recursive: true });
+          writeFileSync(join(projectDir, "sample.ts"), sampleContent);
+          
+          const result = await runIndexingWorkflowLocal({
+            repository: "test-project",
+            localPath: projectDir,
+          });
+          
+          expect(result.filesIndexed).toBeGreaterThanOrEqual(1);
+        });
+      });
+      ```
+    timestamp: 2026-01-28
+    evidence: app/src/api/__tests__/local-indexing.test.ts
+    rationale: |
+      Real filesystem operations test the full indexing workflow including file
+      discovery, parsing, and database storage. Unique temp directories prevent
+      test interference. Global connection cleanup prevents EBUSY errors.
+
+  test_security_boundaries:
+    when: Testing path-based operations with security implications
+    approach: |
+      1. Write explicit security tests for path traversal attempts
+      2. Document acceptable security outcomes (error vs zero results)
+      3. Verify the attack path actually escapes the intended boundary
+      ```typescript
+      test("rejects path traversal attempts", async () => {
+        const workspaceRoot = resolve(testDir);
+        const traversalPath = join(testDir, "..", "..", "..", "..", "tmp");
+        const resolvedTraversal = resolve(traversalPath);
+        
+        // Sanity check: path actually escapes workspace
+        expect(resolvedTraversal.startsWith(workspaceRoot)).toBe(false);
+        
+        let threw = false;
+        let filesIndexed = -1;
+        try {
+          const result = await runIndexingWorkflowLocal({
+            repository: "traversal-attempt",
+            localPath: traversalPath,
+          });
+          filesIndexed = result.filesIndexed;
+        } catch {
+          threw = true;
+        }
+        
+        // Either throw OR index 0 files (both acceptable)
+        expect(threw || filesIndexed === 0).toBe(true);
+      });
+      ```
+    timestamp: 2026-01-28
+    evidence: app/src/api/__tests__/local-indexing.test.ts
+    rationale: |
+      Security tests must explicitly verify that attack vectors fail safely.
+      Document acceptable outcomes to prevent false positives during refactoring.
+
+  skip_schema_initialization_for_custom_schemas:
+    when: Tests need to manage their own schema (migrations, sync tests)
+    approach: |
+      Use skipSchemaInit option to prevent auto-initialization conflicts:
+      ```typescript
+      db = createDatabase({ 
+        path: join(tempDir, "test.db"), 
+        skipSchemaInit: true 
+      });
+      // Apply custom schema
+      db.exec(customSchemaSQL);
+      ```
+    timestamp: 2026-01-28
+    evidence: commit d669841, sync integration tests
+    rationale: |
+      Some tests need to control schema initialization timing (migrations,
+      sync tests with custom schemas). skipSchemaInit prevents conflicts
+      with auto-initialization from sqlite-schema.sql.
 decision_trees:
   test_type_selection:
     question: What type of test should I write?
@@ -473,6 +633,13 @@ known_issues:
     prevention: Use mkdtempSync/rmSync pattern
     status: enforce via code review
 
+
+  - issue: FTS5 search terms with special characters cause SQL errors
+    impact: User searches with hyphens or FTS keywords fail with SQL syntax errors
+    resolution: Escape search terms by wrapping in double quotes and doubling internal quotes
+    prevention: Test FTS5 edge cases - hyphens, multi-word, FTS keywords, embedded quotes
+    status: resolved via escapeFts5Term() (commit 5af086f)
+    timestamp: 2026-01-28
 potential_enhancements:
   - Custom test reporter for antimocking compliance
   - Schema validation assertions
@@ -509,15 +676,18 @@ bun_test_api:
 
 stability:
   convergence_indicators:
-    insight_rate_trend: initial
+    insight_rate_trend: increasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 0
-    patterns_updated_this_cycle: 0
+    new_patterns_added_this_cycle: 5
+    patterns_updated_this_cycle: 1
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Initial creation of testing expertise domain.
-      - Antimocking philosophy as core principle
-      - In-memory SQLite patterns from existing codebase
-      - Bun test runner Jest-compatible API
-      - KotaDB-specific conventions integrated
+      First improve cycle after initial creation.
+      - Added 5 new key_operations from recent commits (5af086f, d669841)
+      - FTS5 edge case testing patterns (Issue #595)
+      - Environment variable restoration for test isolation
+      - Filesystem workflow testing with real file operations
+      - Security boundary testing for path traversal
+      - skipSchemaInit option for custom schema tests
+      - Updated known_issues with FTS5 resolution

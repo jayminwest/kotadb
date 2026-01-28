@@ -12,18 +12,15 @@ overview:
     Covers AST parsing (parseFile, isSupportedForAST), symbol extraction (extractSymbols with
     visitor pattern), reference extraction (imports, calls, property access, type references),
     import resolution (resolveImport, handleIndexFiles), dependency graph construction
-    (buildFileDependencies, buildSymbolDependencies), SQLite storage (storeIndexedData),
-    and FTS5 full-text search (searchFilesLocal with escapeFts5Term).
+    (buildFileDependencies, buildSymbolDependencies), and SQLite storage (storeIndexedData).
 
     KOTADB ADAPTATIONS:
     - Uses @typescript-eslint/parser (NOT Babel or TypeScript compiler API)
     - Graceful error handling (return null on parse errors, log warnings)
     - Local SQLite storage with single-transaction atomicity
-    - FTS5 full-text search with proper escaping for special characters
     - Path aliases (@api/*, @indexer/*, @shared/*, etc.)
     - Logging via createLogger (never console.*)
     - TSESTree types from @typescript-eslint/types
-    - Storage abstraction pattern for portability (@kotadb/core package)
 
     Does NOT cover MCP tool implementation (see MCP expert) or API routes.
   rationale: |
@@ -46,14 +43,6 @@ core_implementation:
       repos.ts: Repository management functions
       extractors.ts: High-level extraction orchestration
       parsers.ts: File type detection and parsing coordination
-    
-    packages/core/:
-      purpose: Standalone @kotadb/core package (zero DB dependencies)
-      src/parsers/: AST parsing modules
-      src/analysis/: Symbol, reference, dependency extraction
-      src/storage/: Storage abstraction (Memory + SQLite adapters)
-      src/types/: Type definitions for symbols, references, dependencies
-      tests/: Comprehensive test suite with real fixtures
 
   key_files:
     - path: app/src/indexer/ast-parser.ts
@@ -74,12 +63,6 @@ core_implementation:
     - path: app/src/indexer/storage.ts
       purpose: SQLite storage with atomic transactions
       exports: storeIndexedData, StorageResult
-    - path: app/src/api/queries.ts
-      purpose: FTS5 search with proper term escaping
-      exports: searchFilesLocal, escapeFts5Term
-    - path: packages/core/src/storage/sqlite-adapter.ts
-      purpose: Storage abstraction for portability
-      exports: SqliteStorageAdapter, MemoryStorageAdapter
 
 key_operations:
   parse_ast:
@@ -298,45 +281,6 @@ key_operations:
         instead: Log warning and skip symbol
         reason: Orphan symbols without file reference are useless
 
-  search_indexed_content:
-    when: Searching indexed file content with FTS5 full-text search
-    approach: |
-      1. Accept raw search term from user input
-      2. Call escapeFts5Term(term) to sanitize for FTS5 MATCH
-         - Escapes internal double quotes by doubling them
-         - Wraps entire term in double quotes for exact phrase matching
-      3. Use escaped term in FTS5 MATCH clause
-         - Prevents operator interpretation (-, AND, OR, NOT)
-         - Ensures multi-word phrases match as exact phrase
-      4. Return search results with file path, content, and metadata
-      
-      Escaping pattern:
-      ```typescript
-      function escapeFts5Term(term: string): string {
-        const escaped = term.replace(/"/g, '""');
-        return `"${escaped}"`;
-      }
-      ```
-      
-      Common edge cases:
-      - "pre-commit" → escaped prevents "no such column: commit" error
-      - "planType smb" → matches exact phrase, not "planType AND smb"
-      - "search and find" → "and" treated as literal, not AND operator
-      - 'say "hello"' → embedded quotes doubled to 'say ""hello""'
-    examples:
-      - escapeFts5Term("pre-commit") → '"pre-commit"'
-      - escapeFts5Term("planType smb") → '"planType smb"'
-      - FTS5 MATCH with escaped term returns exact phrase matches
-    pitfalls:
-      - what: Using raw user input directly in MATCH clause
-        instead: Always escape with escapeFts5Term
-        reason: Hyphens interpreted as NOT, spaces as AND
-      - what: Escaping with backslashes (\")
-        instead: Double internal quotes ("")
-        reason: SQLite FTS5 uses doubling for quote escaping
-    timestamp: 2026-01-28
-    evidence: commit 5af086f, app/src/api/queries.ts
-
 decision_trees:
   ast_parsing_strategy:
     question: How should I parse this file?
@@ -495,30 +439,6 @@ patterns:
       pros: [Preserves documentation, Position-based matching]
       cons: [5-line heuristic may miss some comments]
 
-  storage_abstraction:
-    structure: |
-      // Define interface for storage operations
-      interface StorageAdapter {
-        storeSymbols(symbols: Symbol[]): Promise<void>;
-        storeReferences(refs: Reference[]): Promise<void>;
-        storeDependencies(deps: DependencyEdge[]): Promise<void>;
-      }
-      
-      // Implement concrete adapters
-      class MemoryStorageAdapter implements StorageAdapter { ... }
-      class SqliteStorageAdapter implements StorageAdapter { ... }
-      
-      // Use dependency injection
-      function analyzeCode(files: File[], storage: StorageAdapter) {
-        const symbols = extractSymbols(files);
-        await storage.storeSymbols(symbols);
-      }
-    trade_offs:
-      pros: [Zero infrastructure dependencies, Testable with in-memory storage, Portable across environments]
-      cons: [Additional abstraction layer, Interface evolution complexity]
-    timestamp: 2026-01-28
-    evidence: commit 1eab8bc, packages/core/src/storage/
-
 best_practices:
   ast_parsing:
     - Use @typescript-eslint/parser for modern TypeScript support
@@ -552,15 +472,6 @@ best_practices:
     - Generate UUIDs for primary keys
     - Log storage results for observability
 
-  fts5_search:
-    - Always escape user search terms before FTS5 MATCH queries
-    - Wrap terms in double quotes for exact phrase matching
-    - Escape internal quotes by doubling them ("" not \")
-    - Prevents SQL errors on hyphens, spaces, AND/OR/NOT keywords
-    - Test with: hyphenated-terms, multi-word phrases, FTS keywords
-    timestamp: 2026-01-28
-    evidence: commit 5af086f
-
   logging:
     - Use createLogger({ module: "indexer-<name>" })
     - Log errors with structured metadata
@@ -593,18 +504,6 @@ known_issues:
     prevention: Acceptable for now, may confuse "find usages"
     status: known limitation
 
-  - issue: Schema CHECK constraint must match all reference types
-    impact: Insertion failures when reference extractor produces new types
-    resolution: property_access was missing from CHECK constraint list
-    prevention: |
-      When adding new reference types:
-      1. Update reference extractor enum/type
-      2. Update SQLite schema CHECK constraint
-      3. Add integration test for new type
-    status: resolved
-    timestamp: 2026-01-28
-    evidence: commit 91415ad
-
 potential_enhancements:
   - enhancement: tsconfig.json path mapping support
     rationale: Enable resolution of @alias/* imports
@@ -631,25 +530,18 @@ potential_enhancements:
     effort: high
     approach: Global symbol index with repository context
 
-  - enhancement: Extract @kotadb/core as standalone package
-    rationale: Enable code analysis in other tools without DB dependencies
-    effort: completed
-    approach: Storage abstraction with MemoryAdapter and SqliteAdapter
-    status: implemented
-    timestamp: 2026-01-28
-    evidence: commit 1eab8bc, packages/core/
-
 stability:
   convergence_indicators:
-    insight_rate_trend: stable
+    insight_rate_trend: initial
     contradiction_count: 0
-    new_patterns_added_this_cycle: 2
-    patterns_updated_this_cycle: 3
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Cycle 1 update - added FTS5 search patterns and storage abstraction:
-      - FTS5 term escaping for special characters (hyphens, AND/OR/NOT)
-      - Storage abstraction pattern from @kotadb/core extraction
-      - Schema constraint validation alignment
-      - Updated local-only v2 architecture patterns
+      Initial expertise for local-only v2 architecture:
+      - Uses @typescript-eslint/parser for AST parsing
+      - Visitor pattern for symbol/reference extraction
+      - SQLite storage with transactional writes
+      - Graceful error handling throughout
+      - Path alias support via @indexer/* imports
