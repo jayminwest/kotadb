@@ -1,0 +1,31 @@
+--- a/app/src/db/sqlite/__tests__/sqlite-client.test.ts
++++ b/app/src/db/sqlite/__tests__/sqlite-client.test.ts
+@@ -231,18 +231,25 @@ describe("resolveDbPath", () => {
+ 		expect(path).toBe("/env/path/db.db");
+ 	});
+ 
+-	it("should use default path as fallback", () => {
+-		process.env = { ...originalEnv, HOME: "/home/test" };
++	it("should use project-local default path as fallback", () => {
+ 		delete process.env.KOTADB_PATH;
+ 		const path = resolveDbPath();
+-		expect(path).toBe("/home/test/.kotadb/kota.db");
++		// Should return project-local path (finds .git in kotadb repo)
++		expect(path).toContain(".kotadb");
++		expect(path).toContain("kota.db");
++		expect(path).toContain("kotadb"); // Repo name
++		expect(path.endsWith("/.kotadb/kota.db")).toBe(true);
+ 	});
+ });
+ 
+ describe("getDefaultDbPath", () => {
+-	it("should return path under HOME/.kotadb", () => {
++	it("should return project-local path under .kotadb/", () => {
+ 		const path = getDefaultDbPath();
+ 		expect(path).toContain(".kotadb");
+ 		expect(path).toContain("kota.db");
++		expect(path).toContain("kotadb"); // Repo name
++		// Should be project-local, not global
++		expect(path.endsWith("/.kotadb/kota.db")).toBe(true);
+ 	});
+ });

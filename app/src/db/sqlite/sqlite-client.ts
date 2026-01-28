@@ -17,6 +17,8 @@ import { existsSync, mkdirSync, readFileSync } from "node:fs";
 import { join, dirname } from "node:path";
 import { cpus } from "node:os";
 import { createLogger } from "@logging/logger.js";
+import { findProjectRoot } from "@config/project-root.js";
+import { ensureKotadbIgnored } from "@config/gitignore.js";
 
 const logger = createLogger({ module: "sqlite-client" });
 
@@ -54,14 +56,28 @@ export const DEFAULT_CONFIG: DatabaseConfig = {
 };
 
 /**
- * Get the default database path (~/.kotadb/kota.db)
+ * Get the default database path (project-local .kotadb/kota.db).
+ * Falls back to error if no project root found and no explicit path configured.
+ * 
+ * @returns Absolute path to database file
+ * @throws Error if no project root found and no explicit config
  */
 export function getDefaultDbPath(): string {
-	const home = process.env.HOME;
-	if (!home) {
-		throw new Error("HOME environment variable not set");
+	const projectRoot = findProjectRoot();
+	
+	if (!projectRoot) {
+		throw new Error(
+			"Unable to determine project root. Please either:\n" +
+			"  1. Run KotaDB from within a project directory (containing .git)\n" +
+			"  2. Set KOTADB_PATH environment variable\n" +
+			"  3. Provide explicit path via config.path parameter"
+		);
 	}
-	return join(home, ".kotadb", "kota.db");
+	
+	// Ensure .kotadb/ is in .gitignore (non-fatal)
+	ensureKotadbIgnored(projectRoot);
+	
+	return join(projectRoot, ".kotadb", "kota.db");
 }
 
 /**

@@ -88,3 +88,5 @@ supabase/
 .mcp.json
 
 .vscode/
+# KotaDB local storage
+.kotadb/

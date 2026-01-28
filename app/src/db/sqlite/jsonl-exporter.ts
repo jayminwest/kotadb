@@ -20,6 +20,7 @@ import { createHash } from "node:crypto";
 import { createLogger } from "@logging/logger.js";
 import type { KotaDatabase } from "./sqlite-client.js";
 import { clearDeletionManifest } from "@sync/deletion-manifest.js";
+import { findProjectRoot } from "@config/project-root.js";
 
 const logger = createLogger({ module: "jsonl-exporter" });
 
@@ -63,14 +64,29 @@ const DEFAULT_TABLES: TableExportConfig[] = [
 ];
 
 /**
- * Get the default export directory (~/.kotadb/export)
+ * Get the default export directory (project-local .kotadb/export/).
+ * 
+ * @returns Absolute path to export directory
+ * @throws Error if no project root found and no explicit config
  */
 export function getDefaultExportDir(): string {
-	const home = process.env.HOME;
-	if (!home) {
-		throw new Error("HOME environment variable not set");
+	// Check for explicit env var override first
+	const envPath = process.env.KOTADB_EXPORT_PATH;
+	if (envPath) {
+		return envPath;
 	}
-	return join(home, ".kotadb", "export");
+	
+	const projectRoot = findProjectRoot();
+	
+	if (!projectRoot) {
+		throw new Error(
+			"Unable to determine project root for export directory. Please either:\n" +
+			"  1. Run KotaDB from within a project directory (containing .git)\n" +
+			"  2. Set KOTADB_EXPORT_PATH environment variable"
+		);
+	}
+	
+	return join(projectRoot, ".kotadb", "export");
 }
 
 /**

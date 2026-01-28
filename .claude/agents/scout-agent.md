@@ -6,6 +6,7 @@ tools:
   - Grep
   - Read
   - Task
+  - Bash
   - mcp__kotadb__search_code
   - mcp__kotadb__search_dependencies
   - mcp__kotadb__list_recent_files
