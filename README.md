@@ -179,13 +179,6 @@ See `docs/guides/multi-repo-best-practices.md` for detailed guidance on working 
 
 By default, KotaDB only accepts requests from localhost origins. Configure `KOTA_ALLOWED_ORIGINS` environment variable (comma-separated list of allowed origins) if needed.
 
-## Docker & Compose
-
-Build and run the service in a container:
-
-```bash
-docker compose up dev
-```
 
 ## Project Layout
 
@@ -200,12 +193,10 @@ app/                   # Application layer (TypeScript/Bun API service)
   tests/               # Test suite
   package.json         # Bun dependencies and scripts
   tsconfig.json        # TypeScript configuration
-  Dockerfile           # Bun runtime image
   scripts/             # Application-specific bash scripts
 
 automation/            # Agentic layer (Python AI developer workflows)
   adws/                # ADW automation scripts and modules
-  docker/              # ADW-specific Docker images
 
 .claude/commands/      # Claude Code slash commands
 .github/workflows/     # CI workflows
