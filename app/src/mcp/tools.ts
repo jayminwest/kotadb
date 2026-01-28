@@ -284,7 +284,7 @@ export const VALIDATE_IMPLEMENTATION_SPEC_TOOL: ToolDefinition = {
 export const SYNC_EXPORT_TOOL: ToolDefinition = {
 	name: "kota_sync_export",
 	description:
-		"Export local SQLite database to JSONL files for git sync. Uses hash-based change detection to skip unchanged tables. Exports to ~/.kotadb/export/ by default.",
+		"Export local SQLite database to JSONL files for git sync. Uses hash-based change detection to skip unchanged tables. Exports to .kotadb/export/ by default.",
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -312,7 +312,7 @@ export const SYNC_IMPORT_TOOL: ToolDefinition = {
 		properties: {
 			import_dir: {
 				type: "string",
-				description: "Optional: Custom import directory path (default: ~/.kotadb/export)",
+				description: "Optional: Custom import directory path (default: .kotadb/export)",
 			},
 		},
 	},
@@ -800,7 +800,7 @@ export async function executeSyncExport(
 		tables_skipped: result.tablesSkipped,
 		total_rows: result.totalRows,
 		duration_ms: result.durationMs,
-		export_dir: exportDir || "~/.kotadb/export",
+		export_dir: exportDir || ".kotadb/export (project-local)",
 	};
 }
 

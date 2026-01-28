@@ -1,7 +1,7 @@
 /**
  * File watcher for automatic JSONL import on git pull
  * 
- * Watches ~/.kotadb/export/*.jsonl for changes and triggers
+ * Watches .kotadb/export/*.jsonl (project-local) for changes and triggers
  * import when modifications are detected (e.g., after git pull).
  * 
  * Features:

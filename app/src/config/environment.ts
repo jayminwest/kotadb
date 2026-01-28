@@ -31,14 +31,14 @@ let cachedConfig: EnvironmentConfig | null = null;
  * Get environment configuration for local-only mode.
  *
  * Returns local configuration with optional KOTADB_PATH override.
- * Default database location: ~/.kotadb/kota.db
+ * Default database location: .kotadb/kota.db (project-local)
  *
  * @returns {EnvironmentConfig} Environment configuration object
  *
  * @example
  * ```typescript
  * const config = getEnvironmentConfig();
- * // { mode: 'local', localDbPath: '~/.kotadb/kota.db' }
+ * // { mode: 'local' }  // uses project-local .kotadb/kota.db by default
  *
  * // With custom path
  * process.env.KOTADB_PATH = '/custom/path/kota.db';
@@ -53,7 +53,7 @@ export function getEnvironmentConfig(): EnvironmentConfig {
 	}
 
 	logger.info('Environment configured for local-only mode (v2.0.0)', {
-		localDbPath: process.env.KOTADB_PATH || 'default (~/.kotadb/kota.db)',
+		localDbPath: process.env.KOTADB_PATH || 'default (project-local .kotadb/kota.db)',
 	});
 
 	cachedConfig = {
