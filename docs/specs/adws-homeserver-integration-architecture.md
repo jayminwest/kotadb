@@ -60,7 +60,7 @@ This document specifies the complete architecture for integrating KotaDB's AI De
 ```python
 class HomeServerCronConfig(BaseModel):
     polling_interval: int = 15  # seconds
-    home_server_url: str = "https://jaymins-mac-pro.tail1b7f44.ts.net"
+    home_server_url: str = "https://<YOUR_HOMESERVER>.ts.net"
     tasks_endpoint: str = "/api/tasks/kotadb"
     dry_run: bool = False
     max_concurrent_tasks: int = 3
@@ -364,7 +364,7 @@ KotaDB ADWs can be triggered from a custom home server endpoint via Tailscale.
 
 1. Configure home server URL:
    ```bash
-   export HOMESERVER_URL="https://jaymins-mac-pro.tail1b7f44.ts.net"
+   export HOMESERVER_URL="https://<YOUR_HOMESERVER>.ts.net"
    export HOMESERVER_TASKS_ENDPOINT="/api/tasks/kotadb"
    ```
 
@@ -563,7 +563,7 @@ table.add_column()
 
 table.add_row("Status", "[green]Running[/green]")
 table.add_row("Polling Interval", "15 seconds")
-table.add_row("Home Server", "jaymins-mac-pro.tail1b7f44.ts.net")
+table.add_row("Home Server", "<YOUR_HOMESERVER>.ts.net")
 table.add_row("Tasks Started", "12")
 table.add_row("Errors", "0")
 
@@ -669,7 +669,7 @@ If you encounter errors:
 You are tasked with fetching eligible tasks from the home server API.
 
 **Inputs:**
-- Base URL: $1 (e.g., https://jaymins-mac-pro.tail1b7f44.ts.net)
+- Base URL: $1 (e.g., https://<YOUR_HOMESERVER>.ts.net)
 - Status Filter: $2 (JSON array of statuses to fetch)
 - Limit: $3 (maximum number of tasks to fetch)
 
@@ -899,7 +899,7 @@ kota-db-ts/
 # .env or automation/adws/.env
 ANTHROPIC_API_KEY=sk-ant-...
 CLAUDE_CODE_PATH=claude  # Default
-HOMESERVER_URL=https://jaymins-mac-pro.tail1b7f44.ts.net
+HOMESERVER_URL=https://<YOUR_HOMESERVER>.ts.net
 HOMESERVER_TASKS_ENDPOINT=/api/tasks/kotadb
 ```
 

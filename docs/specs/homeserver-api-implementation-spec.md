@@ -10,7 +10,7 @@
 
 This document specifies the exact API endpoints needed on your home server to enable fully automated AI Developer Workflows (ADWs) from KotaDB. The KotaDB trigger script will poll these endpoints, claim tasks, and report progress/completion.
 
-**Base URL**: `https://jaymins-mac-pro.tail1b7f44.ts.net`
+**Base URL**: `https://<YOUR_HOMESERVER>.ts.net`
 **Base Endpoint**: `/api/tasks/kotadb`
 
 ---
@@ -28,7 +28,7 @@ This document specifies the exact API endpoints needed on your home server to en
 **Request Example**:
 ```http
 GET /api/tasks/kotadb?status=pending&limit=3
-Host: jaymins-mac-pro.tail1b7f44.ts.net
+Host: <YOUR_HOMESERVER>.ts.net
 ```
 
 **Response**: `200 OK`
@@ -115,7 +115,7 @@ Host: jaymins-mac-pro.tail1b7f44.ts.net
 **Request Example**:
 ```http
 POST /api/tasks/kotadb/issue-47-fulltext-search/claim
-Host: jaymins-mac-pro.tail1b7f44.ts.net
+Host: <YOUR_HOMESERVER>.ts.net
 Content-Type: application/json
 
 {
@@ -175,7 +175,7 @@ Content-Type: application/json
 **Request Example**:
 ```http
 POST /api/tasks/kotadb/issue-47-fulltext-search/start
-Host: jaymins-mac-pro.tail1b7f44.ts.net
+Host: <YOUR_HOMESERVER>.ts.net
 Content-Type: application/json
 
 {
@@ -247,7 +247,7 @@ Content-Type: application/json
 **Request Example**:
 ```http
 POST /api/tasks/kotadb/issue-47-fulltext-search/complete
-Host: jaymins-mac-pro.tail1b7f44.ts.net
+Host: <YOUR_HOMESERVER>.ts.net
 Content-Type: application/json
 
 {
@@ -315,7 +315,7 @@ Content-Type: application/json
 **Request Example**:
 ```http
 POST /api/tasks/kotadb/issue-47-fulltext-search/fail
-Host: jaymins-mac-pro.tail1b7f44.ts.net
+Host: <YOUR_HOMESERVER>.ts.net
 Content-Type: application/json
 
 {

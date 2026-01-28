@@ -751,7 +751,7 @@ class HomeServerCronTrigger:
 @click.command()
 @click.option(
     "--home-server-url",
-    default=os.getenv("HOMESERVER_URL", "https://jaymins-mac-pro.tail1b7f44.ts.net"),
+    default=os.getenv("HOMESERVER_URL", "https://<YOUR_HOMESERVER>.ts.net"),
     help="Base URL of the home server",
 )
 @click.option(

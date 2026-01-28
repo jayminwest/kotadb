@@ -12,13 +12,13 @@ Successfully reproduced issue #366 in the staging environment. **Root cause iden
 
 ### 1. Environment Setup
 - Created test user via dev-session endpoint: `pwtest1761936500@example.com`
-- Generated API key: `kota_free_ukG0FdCly68e_c8c4bd679f6bfde063b922da414150add640`
+- Generated API key: `kota_free_REDACTED_EXAMPLEKEY123456789abcdef`
 - Backend URL: `https://kotadb-staging.fly.dev`
 
 ### 2. Trigger Indexing Job
 ```bash
 curl -X POST https://kotadb-staging.fly.dev/index \
-  -H "Authorization: Bearer kota_free_ukG0FdCly68e_c8c4bd679f6bfde063b922da414150add640" \
+  -H "Authorization: Bearer kota_free_REDACTED_EXAMPLEKEY123456789abcdef" \
   -H "Content-Type: application/json" \
   -d '{"repository":"jayminwest/jayminwest.com"}'
 ```

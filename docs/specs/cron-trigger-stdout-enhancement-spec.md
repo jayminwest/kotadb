@@ -30,7 +30,7 @@ Currently, the trigger script (`adw_trigger_cron_homeserver.py`) spawns workflow
 ╭─────────────────────────── 🔄 Home Server Multi-Agent Cron ────────────────────────────╮
 │                  Status             Running                                            │
 │                  Polling Interval   15 seconds                                         │
-│                  Home Server        jaymins-mac-pro.tail1b7f44.ts.net                  │
+│                  Home Server        <YOUR_HOMESERVER>.ts.net                  │
 │                  Checks Performed   5                                                  │
 │                  Tasks Started      3                                                  │
 │                  Worktrees Created  2                                                  │
@@ -329,7 +329,7 @@ self._log_event("task_completed", task_id=task.task_id, adw_id=adw_id, duration=
 ╭───────────────────────────── 🔄 Home Server Multi-Agent Cron ──────────────────────────────╮
 │                     Status             Running                                             │
 │                     Polling Interval   15 seconds                                          │
-│                     Home Server        jaymins-mac-pro.tail1b7f44.ts.net                   │
+│                     Home Server        <YOUR_HOMESERVER>.ts.net                   │
 │                     Endpoint           /api/tasks/kotadb                                   │
 │                     Max Concurrent     3 tasks                                             │
 │                     Worktree Base      trees/                                              │

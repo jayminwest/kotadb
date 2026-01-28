@@ -3,7 +3,7 @@
 **Version**: 1.0
 **Date**: 2025-10-11
 **Status**: Design Specification
-**Server**: jaymins-mac-pro.tail1b7f44.ts.net (Tailscale)
+**Server**: <YOUR_HOMESERVER>.ts.net (Tailscale)
 
 ---
 
@@ -11,7 +11,7 @@
 
 This document specifies the REST API contract for the home server task management system that integrates with KotaDB's AI Developer Workflows (ADWs). The API provides endpoints for task lifecycle management (create, read, update) and is accessed securely via Tailscale without requiring authentication.
 
-**Base URL**: `https://jaymins-mac-pro.tail1b7f44.ts.net`
+**Base URL**: `https://<YOUR_HOMESERVER>.ts.net`
 **API Prefix**: `/api/tasks/kotadb`
 **Authentication**: None (Tailscale network security)
 **Protocol**: HTTPS
@@ -657,7 +657,7 @@ pending → in_progress  (must be claimed first)
 
 ### Example 1: Fetch Pending Tasks
 ```bash
-curl -X GET "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb?status=pending&limit=5"
+curl -X GET "https://<YOUR_HOMESERVER>.ts.net/api/tasks/kotadb?status=pending&limit=5"
 ```
 
 **Response**:
@@ -685,7 +685,7 @@ curl -X GET "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb?status=p
 
 ### Example 2: Claim Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-001/claim" \
+curl -X POST "https://<YOUR_HOMESERVER>.ts.net/api/tasks/kotadb/task-001/claim" \
   -H "Content-Type: application/json" \
   -d '{
     "adw_id": "abc12345",
@@ -709,7 +709,7 @@ curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-00
 
 ### Example 3: Complete Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-001/complete" \
+curl -X POST "https://<YOUR_HOMESERVER>.ts.net/api/tasks/kotadb/task-001/complete" \
   -H "Content-Type: application/json" \
   -d '{
     "adw_id": "abc12345",
@@ -745,7 +745,7 @@ curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-00
 
 ### Example 4: Fail Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-001/fail" \
+curl -X POST "https://<YOUR_HOMESERVER>.ts.net/api/tasks/kotadb/task-001/fail" \
   -H "Content-Type: application/json" \
   -d '{
     "adw_id": "abc12345",
@@ -769,7 +769,7 @@ curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb/task-00
 
 ### Example 5: Create New Task
 ```bash
-curl -X POST "https://jaymins-mac-pro.tail1b7f44.ts.net/api/tasks/kotadb" \
+curl -X POST "https://<YOUR_HOMESERVER>.ts.net/api/tasks/kotadb" \
   -H "Content-Type: application/json" \
   -d '{
     "title": "Fix typo in README",

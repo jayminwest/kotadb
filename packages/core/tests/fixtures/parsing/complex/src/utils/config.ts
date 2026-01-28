@@ -49,7 +49,7 @@ export const defaultConfig: AppConfig = {
 		port: 5432,
 		database: "test_db",
 		user: "postgres",
-		password: "postgres",
+		password: "postgres", // Example only - use environment variables in production
 		ssl: false,
 		poolSize: 10,
 	},

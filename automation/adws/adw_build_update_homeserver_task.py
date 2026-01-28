@@ -71,7 +71,7 @@ def update_homeserver_task(
 ) -> bool:
     """Update task status on home server."""
     try:
-        home_server_url = os.getenv("HOMESERVER_URL", "https://jaymins-mac-pro.tail1b7f44.ts.net")
+        home_server_url = os.getenv("HOMESERVER_URL", "https://<YOUR_HOMESERVER>.ts.net")
         tasks_endpoint = os.getenv("HOMESERVER_TASKS_ENDPOINT", "/api/tasks/kotadb")
 
         # Map status to appropriate endpoint

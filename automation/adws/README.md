@@ -877,7 +877,7 @@ KotaDB ADWs can be triggered from a custom home server endpoint via Tailscale, e
 
 1. Configure home server URL (in `.env` or environment):
    ```bash
-   export HOMESERVER_URL="https://jaymins-mac-pro.tail1b7f44.ts.net"
+   export HOMESERVER_URL="https://<YOUR_HOMESERVER>.ts.net"
    export HOMESERVER_TASKS_ENDPOINT="/api/tasks/kotadb"
    ```
 
@@ -1152,7 +1152,7 @@ Example output:
 ┌─────────────────── 🔄 Home Server Multi-Agent Cron ───────────────────┐
 │  Status             Running                                            │
 │  Polling Interval   15 seconds                                        │
-│  Home Server        jaymins-mac-pro.tail1b7f44.ts.net                 │
+│  Home Server        <YOUR_HOMESERVER>.ts.net                 │
 │  Checks Performed   42                                                │
 │  Tasks Started      12                                                │
 │  Worktrees Created  8                                                 │
@@ -1219,7 +1219,7 @@ uv run adws/adw_triggers/adw_trigger_cron_homeserver.py --no-stats-enabled
 **Manual Testing**:
 ```bash
 # Test stats endpoint with curl
-curl -X POST https://jaymins-mac-pro.tail1b7f44.ts.net/api/kota-tasks/stats \
+curl -X POST https://<YOUR_HOMESERVER>.ts.net/api/kota-tasks/stats \
   -H "Content-Type: application/json" \
   -d '{
     "trigger_id": "test-trigger-001",
