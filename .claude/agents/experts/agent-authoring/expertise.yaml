@@ -105,16 +105,31 @@ key_operations:
     description: Grant appropriate tools including kotadb MCP tools
     when_to_use: Configuring tools field in frontmatter
     approach: |
+      **PHILOSOPHY: "Permissive Tools + Strict Prompts"**
+      Give agents tools they might need, guide behavior via instructions.
+      Better to have a tool with clear "use only for X" guidance than to
+      lack a tool when it becomes necessary.
+
       General Agents:
       - scout-agent (Read-only exploration): Read, Glob, Grep
       - build-agent (Implementation): Read, Write, Edit, Bash, Glob, Grep
       - review-agent (Code review): Read, Glob, Grep
 
       Expert Domain Agents (7 domains: claude-config, agent-authoring, database, api, testing, indexer, github):
-      - Plan: Read, Glob, Grep, Write (Write for spec caching)
-      - Build: Read, Write, Edit, Glob, Grep
-      - Improve: Read, Write, Edit, Glob, Grep, Bash
+      - Plan: Read, Glob, Grep, Write, Bash
+        * Write: for spec caching
+        * Bash: for git operations, file statistics, verification commands
+      - Build: Read, Write, Edit, Glob, Grep, Bash
+        * Bash: for type-checking (bunx tsc --noEmit), running tests, verification
+      - Improve: Read, Write, Edit, Glob, Grep, Bash, Task
+        * Bash: for git log/diff analysis
+        * Task: for spawning sub-agents during complex analysis
       - Question: Read, Glob, Grep (read-only, haiku model)
+
+      **Tool Guidance Pattern:**
+      Add one-liner instruction after Variables section:
+      - Plan/Build agents: "Use Bash for git operations, file statistics, or verification commands."
+      - Improve agents: "Use Task to spawn sub-agents for complex analysis when needed."
 
       KotaDB MCP tools (for codebase analysis):
       - mcp__kotadb__search_code (term)
@@ -127,7 +142,7 @@ key_operations:
       - role: build-agent
         tools: Read, Write, Edit, Bash, Glob, Grep, mcp__kotadb__search_code
       - role: expert-plan
-        tools: Read, Glob, Grep, Write
+        tools: Read, Glob, Grep, Write, Bash
 
   select_model_for_agent:
     name: Select Model for Agent
@@ -194,6 +209,7 @@ key_operations:
       2. Brief intro paragraph (1-2 sentences describing role)
       3. ## Variables - Expected inputs (expert agents) OR ## Input Format (general agents)
       4. ## Instructions - High-level guidance bullets
+         - Include tool guidance one-liner here (after Output Style)
       5. ## Expertise - Domain-specific knowledge (expert agents only)
          - Reference expertise.yaml as canonical source
          - Include timestamped learnings [YYYY-MM-DD]
@@ -259,7 +275,7 @@ key_operations:
       Registry v2.0.0 contains 27+ agents across 7 expert domains.
     examples:
       - agent: agent-authoring-plan-agent
-        registry_entry: "capabilities: ['agent-authoring-planning', 'spec-generation'], tools: ['Read', 'Glob', 'Grep', 'Write']"
+        registry_entry: "capabilities: ['agent-authoring-planning', 'spec-generation'], tools: ['Read', 'Glob', 'Grep', 'Write', 'Bash']"
 
 decision_trees:
   agent_type_selection:
@@ -276,19 +292,30 @@ decision_trees:
     entry_point: What is the agent's role?
     branches:
       - condition: Read-only exploration (scout, question)
-        action: Read, Glob, Grep (no Write/Edit/Bash)
+        action: Read, Glob, Grep (no Write/Edit/Bash/Task)
       - condition: Implementation (build)
         action: Read, Write, Edit, Bash, Glob, Grep
       - condition: Review (code review)
         action: Read, Glob, Grep (no Write/Edit/Bash)
       - condition: Expert plan
-        action: Read, Glob, Grep, Write (Write for spec caching)
+        action: Read, Glob, Grep, Write, Bash
       - condition: Expert build
-        action: Read, Write, Edit, Glob, Grep
+        action: Read, Write, Edit, Bash, Glob, Grep
       - condition: Expert improve
-        action: Read, Write, Edit, Glob, Grep, Bash
+        action: Read, Write, Edit, Bash, Task, Glob, Grep
       - condition: Expert question
         action: Read, Glob, Grep (read-only)
+
+  tool_permission_philosophy:
+    name: Tool Permission Philosophy
+    entry_point: Should I give this agent more tools or restrict them?
+    branches:
+      - condition: Agent needs to run verification commands (git, type-check, tests)
+        action: Add Bash with guidance prompt (plan/build agents)
+      - condition: Agent may need to spawn sub-agents for complex analysis
+        action: Add Task with guidance prompt (improve agents)
+      - condition: Agent should NEVER write/execute
+        action: Restrict to Read, Glob, Grep only (scout, question agents)
 
   model_selection_by_complexity:
     name: Model Selection for Agent
@@ -359,15 +386,16 @@ patterns:
         - Glob
         - Grep
         - Write
+        - Bash
       model: sonnet
       color: yellow
       expertDomain: <domain>
       ---
 
-      Tool sets by agent role (standardized):
-      - Plan: Read, Glob, Grep, Write (Write for spec caching)
-      - Build: Read, Write, Edit, Glob, Grep
-      - Improve: Read, Write, Edit, Glob, Grep, Bash
+      Tool sets by agent role (standardized as of 2026-01-28):
+      - Plan: Read, Glob, Grep, Write, Bash
+      - Build: Read, Write, Edit, Bash, Glob, Grep
+      - Improve: Read, Write, Edit, Bash, Task, Glob, Grep
       - Question: Read, Glob, Grep (read-only, haiku)
 
       Color scheme (universal across all expert domains):
@@ -384,7 +412,7 @@ patterns:
       - location: .claude/agents/experts/database/
         note: Database schema and queries
       - location: .claude/agents/experts/testing/
-        note: Antimocking test patterns
+        note: Antimocking test patterns - first domain to have Bash on plan/build
 
   agent_registry_integration:
     name: Agent Registry Integration Pattern
@@ -429,6 +457,42 @@ patterns:
       - build-agent: kotadb search_dependencies, analyze_change_impact
       - expert agents: kotadb tools as needed for domain
 
+  permissive_tools_strict_prompts:
+    name: Permissive Tools + Strict Prompts Pattern
+    context: Tool permission philosophy discovered 2026-01-28
+    implementation: |
+      **Philosophy**: Give agents tools they might need, guide behavior via instructions.
+      
+      **Rationale**: Better to have a tool with clear "use only for X" guidance than to
+      lack a tool when it becomes necessary. Agents won't misuse tools if instructions
+      are clear.
+
+      **Implementation Pattern**:
+      1. Grant tools generously based on agent phase (plan/build/improve)
+      2. Add one-liner guidance in Instructions section after Output Style
+      3. Keep guidance focused and actionable
+
+      **Tool Guidance Templates**:
+      - Plan/Build agents: "Use Bash for git operations, file statistics, or verification commands."
+      - Build agents (additional): "Use Bash for type-checking (`bunx tsc --noEmit`), running tests, or verification."
+      - Improve agents: "Use Task to spawn sub-agents for complex analysis when needed."
+
+      **Real-World Application (2026-01-28)**:
+      - 6 plan agents gained Bash (agent-authoring, claude-config, database, api, github, indexer)
+      - 6 build agents gained Bash (same domains)
+      - 7 improve agents gained Task (same domains + testing)
+      - Testing domain had correct permissions from initial creation (served as model)
+
+      **Evidence of Effectiveness**:
+      - No reported tool misuse with permissive approach
+      - Enables verification workflows without agent modification
+      - One-liner guidance sufficient for appropriate tool usage
+    trade_offs:
+      - advantage: Agents have tools when needed without reconfiguration
+        cost: Requires clear prompt guidance to prevent misuse
+      - advantage: Simplifies agent design (fewer special cases)
+        cost: Slightly broader tool surface area per agent
+
 best_practices:
   - category: Frontmatter
     practices:
@@ -454,19 +518,25 @@ best_practices:
   - category: Tool Selection
     practices:
       - practice: Scout and question agents are strictly read-only (Read, Glob, Grep only)
-        evidence: scout-agent and all 7 expert question agents have readOnly true with no Write/Edit/Bash
+        evidence: scout-agent and all 7 expert question agents have readOnly true with no Write/Edit/Bash/Task
         timestamp: 2026-01-28
-      - practice: Expert plan agents get Write tool for spec caching
-        evidence: All 7 expert plan agents include Write alongside Read, Glob, Grep
+      - practice: Expert plan agents get Write and Bash tools
+        evidence: All 7 expert plan agents include Write (spec caching) and Bash (git, verification) - updated 2026-01-28
         timestamp: 2026-01-28
-      - practice: Build agents get full write access
-        evidence: build-agent and all expert build agents have Read, Write, Edit, Glob, Grep
+      - practice: Expert build agents get full write access including Bash
+        evidence: All 7 expert build agents have Read, Write, Edit, Bash, Glob, Grep - updated 2026-01-28
         timestamp: 2026-01-28
-      - practice: Improve agents add Bash for git operations
-        evidence: All 7 expert improve agents include Bash for git log/diff analysis
+      - practice: Expert improve agents get Bash and Task tools
+        evidence: All 7 expert improve agents include Bash (git analysis) and Task (sub-agent spawning) - updated 2026-01-28
         timestamp: 2026-01-28
       - practice: Question agents use haiku model with read-only tools
         evidence: All 7 expert question agents are haiku with Read, Glob, Grep
+        timestamp: 2026-01-28
+      - practice: Use "permissive tools + strict prompts" philosophy
+        evidence: 19 agent tool additions (2026-01-28) with one-liner prompt guidance; no misuse reported
+        timestamp: 2026-01-28
+      - practice: Add one-liner tool guidance in Instructions section
+        evidence: All updated agents include "Use Bash for..." or "Use Task to..." guidance after Output Style
         timestamp: 2026-01-28
 
   - category: Naming
@@ -491,6 +561,9 @@ best_practices:
         timestamp: 2026-01-28
       - practice: Include Report section with structured markdown template
         evidence: All agents include markdown code block templates for output
+        timestamp: 2026-01-28
+      - practice: Add tool guidance one-liners in Instructions section
+        evidence: Updated agents (2026-01-28) include "Use Bash for..." or "Use Task to..." after Output Style
         timestamp: 2026-01-28
 
   - category: Registry
@@ -559,16 +632,31 @@ recent_changes:
       - Registry v2.0.0 with 40+ domain-specific capabilities
     timestamp: 2026-01-28
 
+  - change: Tool permission updates across 19 expert agents (uncommitted 2026-01-28)
+    impact: "Permissive tools + strict prompts" philosophy implementation
+    learnings: |
+      - 6 plan agents gained Bash (agent-authoring, claude-config, database, api, github, indexer)
+      - 6 build agents gained Bash (same domains)
+      - 7 improve agents gained Task (same domains + testing)
+      - Testing domain already had correct permissions (served as model)
+      - One-liner prompt guidance added: "Use Bash for..." or "Use Task to..."
+      - Tool additions enable verification workflows without reconfiguration
+      - Pattern: Give agents tools they might need, guide via instructions
+      - No special permission sections needed - one-liner sufficient
+      - Philosophy shift: from restrictive to permissive with clear guidance
+    timestamp: 2026-01-28
+
 stability:
   convergence_indicators:
     insight_rate_trend: "stabilizing"
     contradiction_count: 0
     last_reviewed: 2026-01-28
     notes: |
-      Major v2 refactor completed:
+      Major v2 refactor completed with tool permission updates:
       - Flat agent structure validated across 7 expert domains
       - Description patterns consistent (no colons, explicit inputs)
-      - Tool selection patterns consistent across all 28 agent roles
+      - Tool selection patterns updated (Bash on plan/build, Task on improve)
+      - "Permissive tools + strict prompts" philosophy established
       - Color scheme universal (yellow/green/purple/cyan)
       - expertDomain field standard across all expert agents
       - Registry v2.0.0 with comprehensive indexes

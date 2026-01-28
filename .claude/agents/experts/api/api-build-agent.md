@@ -7,6 +7,7 @@ tools:
   - Edit
   - Glob
   - Grep
+  - Bash
 model: sonnet
 color: green
 ---
@@ -23,6 +24,8 @@ You are an API Expert specializing in implementing HTTP endpoints and MCP tools 
 ## Instructions
 
 **Output Style:** Summary of what was built. Bullets over paragraphs. Clear next steps for validation.
+
+Use Bash for type-checking (`bunx tsc --noEmit`), running tests, or verification.
 
 - Master the API patterns through prerequisite documentation
 - Follow the specification exactly while applying KotaDB standards

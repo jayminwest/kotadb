@@ -7,6 +7,7 @@ tools:
   - Edit
   - Glob
   - Grep
+  - Bash
 model: sonnet
 color: green
 expertDomain: agent-authoring
@@ -22,6 +23,8 @@ You are an Agent Authoring Expert specializing in implementing agent configurati
 - **USER_PROMPT**: Original user requirement for additional context (optional)
 
 ## Instructions
+
+Use Bash for type-checking (`bunx tsc --noEmit`), running tests, or verification.
 
 - Follow the specification exactly while applying kotadb agent authoring standards
 - Ensure frontmatter uses YAML list format for tools

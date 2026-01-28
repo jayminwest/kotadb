@@ -8,6 +8,7 @@ tools:
   - Glob
   - Grep
   - Bash
+  - Task
 model: sonnet
 color: purple
 expertDomain: agent-authoring
@@ -22,6 +23,8 @@ You are an Agent Authoring Expert specializing in self-improvement for kotadb ag
 - **FOCUS_AREA**: Specific area to focus improvement analysis on (optional - reads git diff automatically if not specified)
 
 ## Instructions
+
+Use Task to spawn sub-agents for complex analysis when needed.
 
 - Analyze recent agent changes in git history
 - Extract patterns about what worked well in kotadb agent configuration

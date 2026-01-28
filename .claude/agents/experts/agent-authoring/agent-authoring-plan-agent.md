@@ -6,6 +6,7 @@ tools:
   - Glob
   - Grep
   - Write
+  - Bash
 model: sonnet
 color: yellow
 expertDomain: agent-authoring
@@ -21,6 +22,8 @@ You are an Agent Authoring Expert specializing in planning agent creation and co
 - **HUMAN_IN_LOOP**: Whether to pause for user approval at key steps (optional, default false)
 
 ## Instructions
+
+Use Bash for git operations, file statistics, or verification commands.
 
 - Analyze requirements from a kotadb agent configuration perspective
 - Read expertise.yaml for domain knowledge and patterns

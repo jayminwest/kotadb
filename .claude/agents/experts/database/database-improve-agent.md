@@ -8,6 +8,7 @@ tools:
   - Glob
   - Grep
   - Bash
+  - Task
 model: sonnet
 color: purple
 ---
@@ -31,6 +32,8 @@ as appropriate.
 ## Instructions
 
 **Output Style:** Structured improvement report. Bullets for learnings. Metrics and convergence data.
+
+Use Task to spawn sub-agents for complex analysis when needed.
 
 - Review all recent changes to database-related files
 - Identify successful patterns and potential improvements

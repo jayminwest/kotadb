@@ -6,6 +6,7 @@ tools:
   - Glob
   - Grep
   - Write
+  - Bash
 model: sonnet
 color: yellow
 ---
@@ -22,6 +23,8 @@ You are an API Expert specializing in planning HTTP endpoint and MCP tool implem
 ## Instructions
 
 **Output Style:** Structured specs with clear next steps. Bullets over paragraphs. Implementation-ready guidance.
+
+Use Bash for git operations, file statistics, or verification commands.
 
 - Read all prerequisite documentation to establish expertise
 - Analyze existing route and MCP tool patterns
