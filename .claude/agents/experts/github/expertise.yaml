@@ -291,6 +291,69 @@ key_operations:
         - "chore(deps): update bun to v1.2.0"
         - "refactor(db): simplify connection pool logic"
 
+  release_workflow:
+    when: Publishing package to npm registry with automated GitHub Release
+    approach: |
+      Release workflows provide automated publishing triggered by semantic version tags.
+      Unlike PR workflows, releases run comprehensive validation and publish to registries.
+      
+      1. Tag trigger mechanism:
+         - Create annotated tag: git tag -a v<major>.<minor>.<patch>
+         - Push tag to trigger workflow: git push origin v<major>.<minor>.<patch>
+      
+      2. Version verification (prevents mismatches):
+         - Extract version from git tag: ${GITHUB_REF#refs/tags/v}
+         - Extract version from package.json: grep '"version"' | awk
+         - Compare and fail if versions don't match
+      
+      3. Full validation chain (Level 3 + publishing):
+         - bun run lint
+         - bun run typecheck
+         - bun install --frozen-lockfile
+         - bun test --coverage
+         - bun run build
+      
+      4. Package metadata verification:
+         - Check 'bin' field exists in package.json
+         - Warn if 'files' field missing (will publish everything)
+         - Validates publishability before attempting push
+      
+      5. Publishing to npm:
+         - Use NODE_AUTH_TOKEN secret for authentication
+         - Command: bun publish --access public
+         - Respects package.json version and bin configuration
+      
+      6. GitHub Release creation:
+         - Use gh CLI: gh release create "${TAG}" --verify-tag
+         - Include release notes with npm registry link
+         - Automatic release discovery for user notifications
+    
+    considerations:
+      - Version must be in semver format (v<major>.<minor>.<patch>)
+      - Tag version MUST match package.json version exactly
+      - Use semantic versioning for all releases
+      - Include release notes URL in GitHub Release
+      - Verify uv is installed (required for MCP tools in test phase)
+    
+    example_commands:
+      - "git tag -a v2.1.0 -m 'Release v2.1.0'"
+      - "git push origin v2.1.0"
+      - "gh release create v2.1.0 --verify-tag"
+    
+    pitfalls:
+      - what: "Version mismatch between tag and package.json"
+        instead: "Update package.json version before creating tag"
+        reason: "Workflow fails if versions don't match, prevents accidental misversioning"
+      - what: "Missing NODE_AUTH_TOKEN secret"
+        instead: "Configure NPM_TOKEN secret in GitHub Actions secrets"
+        reason: "Publishing fails without authentication token"
+      - what: "Skipping validation before publishing"
+        instead: "Release workflow runs full Level 3 validation automatically"
+        reason: "Published packages must pass all checks to prevent broken releases"
+      - what: "Creating release without --verify-tag flag"
+        instead: "Always use --verify-tag to ensure release is properly signed"
+        reason: "Verification ensures release integrity and discoverability"
+
 decision_trees:
   issue_type_selection:
     question: What is the primary outcome of this work?
@@ -355,6 +418,13 @@ patterns:
     api_operations:
       - "gh api repos/{owner}/{repo}/issues/<number>"
       - "gh api repos/{owner}/{repo}/pulls/<number>/comments"
+
+    release_operations:
+      - "git tag -a v<major>.<minor>.<patch> -m 'Release v<major>.<minor>.<patch>'"
+      - "git push origin v<major>.<minor>.<patch>"
+      - "gh release create v<major>.<minor>.<patch> --verify-tag"
+      - "gh release list --limit 10"
+      - "bun publish --access public"
 
   pr_body_structure:
     template: |
@@ -470,6 +540,16 @@ best_practices:
     - Check gh auth status before operations
     - Use environment variables for tokens
 
+  release_management:
+    - Tag releases with semantic versioning (v<major>.<minor>.<patch>)
+    - Always verify version matches between git tag and package.json
+    - Run full Level 3 validation before publishing
+    - Include release notes with npm registry URL
+    - Use --verify-tag flag when creating GitHub Releases
+    - Ensure NODE_AUTH_TOKEN secret is configured in GitHub Actions
+    - Test package.json bin and files fields before release
+    - Create GitHub Release after successful npm publish
+
 known_issues:
   - issue: gh auth may expire during long sessions
     impact: GitHub operations fail with 401 errors
@@ -504,16 +584,17 @@ potential_enhancements:
 
 stability:
   convergence_indicators:
-    insight_rate_trend: initial
+    insight_rate_trend: growing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 0
-    patterns_updated_this_cycle: 0
+    new_patterns_added_this_cycle: 1
+    patterns_updated_this_cycle: 1
     last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Initial creation for github expert domain:
-      - Issue classification (feature, bug, chore, refactor)
-      - PR validation levels (1/2/3)
-      - Branch naming conventions
-      - GitHub CLI patterns
-      - KotaDB-specific adaptations
+      Cycle 2 additions from npm-publish.yml workflow implementation:
+      - Added release_workflow operation for tag-triggered npm publishing
+      - Added release_management best practices section
+      - Discovered patterns: version verification, Level 3 + publishing, metadata validation
+      - Implementation example: .github/workflows/npm-publish.yml (untracked)
+      - Key learning: Bun 1.1.29 consistency across workflows, uv dependency for tests
+      - No contradictions with existing patterns found

@@ -1,10 +1,40 @@
 {
-  "name": "kota-db",
+  "name": "kotadb",
   "version": "2.0.0",
-  "description": "KotaDB indexing and API service built with Bun + TypeScript.",
-  "private": true,
+  "description": "Local-only code intelligence tool for CLI agents. SQLite-backed repository indexing and code search via MCP.",
   "type": "module",
   "module": "src/index.ts",
+  "bin": {
+    "kotadb": "./src/cli.ts"
+  },
+  "files": [
+    "src/**/*.ts",
+    "src/**/*.js",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts"
+  ],
+  "keywords": [
+    "mcp",
+    "code-search",
+    "code-intelligence",
+    "sqlite",
+    "cli",
+    "claude-code",
+    "model-context-protocol"
+  ],
+  "author": "Jaymin West",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jayminwest/kotadb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jayminwest/kotadb/issues"
+  },
+  "homepage": "https://github.com/jayminwest/kotadb#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
@@ -14,7 +44,8 @@
     "build": "bun run typecheck",
     "lint": "bunx biome lint",
     "test:validate-env": "! grep -rn 'process\\.env\\.\\(SUPABASE_URL\\|DATABASE_URL\\)\\s*=\\s*[\"\\x27]' tests/ || (echo 'ERROR: Found hardcoded environment variable string assignments in tests/' && exit 1)",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "prepublishOnly": "bun run typecheck && bun run lint"
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.2.0",

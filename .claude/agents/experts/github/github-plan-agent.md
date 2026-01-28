@@ -86,6 +86,15 @@ Use Bash for git operations, file statistics, or verification commands.
 - Include Co-Authored-By for AI-assisted commits
 - Types match issue types: feat, fix, chore, refactor, docs, test
 
+**Release Workflows:**
+- Trigger: Semantic version tags (v<major>.<minor>.<patch>)
+- Location: .github/workflows/npm-publish.yml
+- Validation: Full Level 3 (lint, typecheck, test, build) before publishing
+- Version verification: Tag version must match package.json version
+- Publishing: Uses bun publish --access public with NODE_AUTH_TOKEN secret
+- Release creation: Automatic GitHub Release with gh CLI, includes npm registry URL
+- Runtime consistency: Bun 1.1.29 across all workflows
+
 ### Planning Standards
 
 **Specification Structure:**

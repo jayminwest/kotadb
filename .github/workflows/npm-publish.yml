@@ -1,0 +1,109 @@
+name: Publish to npm
+
+on:
+  push:
+    tags:
+      - 'v*.*.*'
+
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    defaults:
+      run:
+        working-directory: app
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Bun
+        uses: oven-sh/setup-bun@v1
+        with:
+          bun-version: 1.1.29
+
+      - name: Verify tag matches package version
+        run: |
+          TAG_VERSION=${GITHUB_REF#refs/tags/v}
+          PKG_VERSION=$(cat package.json | grep '"version"' | head -1 | awk -F: '{ print $2 }' | sed 's/[", ]//g')
+          if [ "${TAG_VERSION}" != "${PKG_VERSION}" ]; then
+            echo "Tag version (${TAG_VERSION}) does not match package.json version (${PKG_VERSION})"
+            exit 1
+          fi
+          echo "Version verified: ${TAG_VERSION}"
+
+      - name: Cache dependencies
+        uses: actions/cache@v4
+        with:
+          path: app/node_modules
+          key: bun-${{ hashFiles('**/bun.lockb') }}
+          restore-keys: |
+            bun-
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Type check shared types
+        working-directory: ../shared
+        run: bunx tsc --noEmit
+
+      - name: Type check application
+        run: bunx tsc --noEmit
+
+      - name: Lint
+        run: bun run lint
+
+      - name: Install uv (required for ADW MCP tools)
+        uses: astral-sh/setup-uv@v5
+        with:
+          enable-cache: true
+
+      - name: Run tests
+        run: bun test --coverage --coverage-reporter=text
+
+      - name: Build
+        run: bun run build
+
+      - name: Verify package metadata
+        run: |
+          echo "Verifying package.json structure..."
+          if ! cat package.json | grep -q '"bin"'; then
+            echo "Missing 'bin' field in package.json"
+            exit 1
+          fi
+          if ! cat package.json | grep -q '"files"'; then
+            echo "Warning: No 'files' field in package.json (will publish everything)"
+          fi
+          echo "Package metadata verified"
+
+      - name: Publish to npm
+        run: bun publish --access public
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          TAG=${GITHUB_REF#refs/tags/}
+          gh release create "${TAG}" \
+            --title "Release ${TAG}" \
+            --notes "Published to npm: https://www.npmjs.com/package/kotadb/v/${TAG#v}" \
+            --verify-tag
+
+      - name: Generate publish summary
+        if: always()
+        run: |
+          echo "## npm Publish Summary" >> ${GITHUB_STEP_SUMMARY}
+          echo "" >> ${GITHUB_STEP_SUMMARY}
+          echo "**Tag**: ${{ github.ref_name }}" >> ${GITHUB_STEP_SUMMARY}
+          echo "**Package**: kotadb" >> ${GITHUB_STEP_SUMMARY}
+          echo "**Registry**: https://www.npmjs.com/package/kotadb" >> ${GITHUB_STEP_SUMMARY}
+          echo "" >> ${GITHUB_STEP_SUMMARY}
+          if [ "${{ job.status }}" == "success" ]; then
+            echo "Successfully published to npm" >> ${GITHUB_STEP_SUMMARY}
+          else
+            echo "Publish failed - check logs above" >> ${GITHUB_STEP_SUMMARY}
+          fi

@@ -176,7 +176,34 @@ gh pr create --base develop --title "<title>" --body "<body>"
 # Check PR status
 gh pr status
 gh pr checks <number>
+
+# Release management
+gh release create v<major>.<minor>.<patch> --verify-tag
+gh release list --limit 10
 ```
+
+### Release Workflow Patterns
+
+**Bun Publishing:**
+- Bun runtime version: 1.1.29 (consistent across app-ci and npm-publish workflows)
+- Publishing command: `bun publish --access public`
+- Authentication: Uses NODE_AUTH_TOKEN secret (maps to NPM_TOKEN)
+- Validation: Full Level 3 validation (lint, typecheck, test, build) before publishing
+
+**Version Management:**
+- Git tag format: v<major>.<minor>.<patch> (semantic versioning)
+- Version verification: Tag version must match package.json version exactly
+- Failure prevention: Workflow exits with error if versions don't match
+
+**Package Metadata:**
+- Required fields: bin field in package.json must exist
+- Optional warning: files field should be present (else publishes everything)
+- Pre-publish validation: Metadata checked before npm push attempt
+
+**Release Creation:**
+- GitHub Release: Created automatically with gh release create --verify-tag
+- Release notes: Include npm registry URL for discoverability
+- Workflow summary: Auto-generated publish status reported in job summary
 
 ## Workflow
 

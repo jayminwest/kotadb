@@ -8,7 +8,55 @@ KotaDB is a local-only code intelligence tool for CLI Agents like Claude Code an
 
 - [Bun](https://bun.sh) v1.1+
 
-### Install dependencies
+### Installation via npm
+
+KotaDB can be installed globally or run directly with npx/bunx:
+
+```bash
+# Run directly (recommended)
+bunx kotadb
+
+# Or with npx
+npx kotadb
+
+# Or install globally
+bun add -g kotadb
+kotadb
+```
+
+**Configure Claude Code:**
+
+Add to your `.mcp.json` or Claude settings:
+
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2025-06-18"
+      }
+    }
+  }
+}
+```
+
+Or use the bunx integration:
+
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "command": "bunx",
+      "args": ["kotadb"]
+    }
+  }
+}
+```
+
+### Install dependencies (for development)
 
 ```bash
 cd app && bun install
@@ -118,6 +166,10 @@ curl -X POST http://localhost:3000/mcp \
 - `index_repository`: Index a git repository by cloning/updating it
 - `list_recent_files`: List recently indexed files
 - `search_dependencies`: Search the dependency graph for impact analysis
+- `analyze_change_impact`: Analyze impact of proposed code changes
+- `validate_implementation_spec`: Validate implementation specification files
+- `kota_sync_export`: Export SQLite database to JSONL format
+- `kota_sync_import`: Import JSONL data into SQLite database
 
 **Tool: `search_dependencies`**
 
@@ -204,4 +256,3 @@ docs/                  # Documentation
 ```
 
 See `app/README.md` for application-specific quickstart and `automation/adws/README.md` for automation workflows.
-
