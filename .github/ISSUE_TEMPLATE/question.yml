@@ -1,0 +1,44 @@
+name: Question
+description: Ask a question about KotaDB
+title: "question: "
+labels: ["question"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for your interest in KotaDB! Before asking, please:
+        - 📖 Check the [README](https://github.com/jayminwest/kotadb#readme)
+        - 🔍 Search [existing issues](https://github.com/jayminwest/kotadb/issues?q=is%3Aissue)
+
+  - type: checkboxes
+    id: prerequisites
+    attributes:
+      label: Prerequisites
+      description: Please confirm the following before submitting
+      options:
+        - label: I have read the README and documentation
+          required: true
+        - label: I have searched existing issues and this question hasn't been asked before
+          required: true
+        - label: I agree to follow the project's Code of Conduct
+          required: true
+
+  - type: textarea
+    id: question
+    attributes:
+      label: Question
+      description: What would you like to know?
+      placeholder: Your question here...
+    validations:
+      required: true
+
+  - type: textarea
+    id: context
+    attributes:
+      label: Context (Optional)
+      description: Any additional context that might help us answer your question
+      placeholder: |
+        - What are you trying to accomplish?
+        - What have you already tried?
+    validations:
+      required: false
