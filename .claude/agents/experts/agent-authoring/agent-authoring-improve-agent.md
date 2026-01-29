@@ -9,6 +9,8 @@ tools:
   - Grep
   - Bash
   - Task
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
 model: sonnet
 color: purple
 expertDomain: agent-authoring

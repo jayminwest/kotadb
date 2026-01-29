@@ -5,6 +5,9 @@ tools:
   - Read
   - Glob
   - Grep
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: haiku
 color: cyan
 ---
