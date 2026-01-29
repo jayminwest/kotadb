@@ -11,6 +11,9 @@ jobs:
   publish:
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    permissions:
+      contents: read
+      id-token: write
 
     steps:
       - name: Checkout repository
@@ -101,13 +104,11 @@ jobs:
         run: |
           if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
             echo "Publishing to 'next' tag..."
-            npm publish --access public --tag next
+            npm publish --access public --tag next --provenance
           else
             echo "Publishing to 'latest' tag..."
-            npm publish --access public
+            npm publish --access public --provenance
           fi
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/')
