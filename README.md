@@ -14,19 +14,38 @@ KotaDB can be installed globally or run directly with npx/bunx:
 
 ```bash
 # Run directly (recommended)
-bunx kotadb
+bunx kotadb --stdio
 
 # Or with npx
-npx kotadb
+npx kotadb --stdio
 
 # Or install globally
 bun add -g kotadb
-kotadb
+kotadb --stdio
 ```
 
-**Configure Claude Code:**
+## MCP Configuration
 
-Add to your `.mcp.json` or Claude settings:
+### Stdio Transport (Recommended)
+
+For Claude Code integration, use stdio transport to avoid port conflicts:
+
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "command": "bunx",
+      "args": ["kotadb@next", "--stdio"]
+    }
+  }
+}
+```
+
+This is the recommended approach for local development. The `--stdio` flag tells kotadb to use standard input/output instead of HTTP, eliminating port conflicts.
+
+### HTTP Transport (Legacy)
+
+For multi-client scenarios or remote access:
 
 ```json
 {
@@ -43,18 +62,20 @@ Add to your `.mcp.json` or Claude settings:
 }
 ```
 
-Or use the bunx integration:
+You can customize the port with the `PORT` environment variable or `--port` flag:
 
-```json
-{
-  "mcpServers": {
-    "kotadb": {
-      "command": "bunx",
-      "args": ["kotadb"]
-    }
-  }
-}
+```bash
+kotadb --port 4000
 ```
+
+### Why Stdio?
+
+- **No port conflicts**: Uses stdin/stdout instead of TCP ports
+- **Simpler setup**: No URL configuration needed
+- **Better isolation**: Claude Code manages process lifecycle
+- **Recommended by MCP**: Official pattern for local tools
+
+## Development
 
 ### Install dependencies (for development)
 

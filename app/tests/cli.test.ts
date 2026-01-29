@@ -6,6 +6,7 @@
  * Test Coverage:
  * - --version and -v flags
  * - --help and -h flags
+ * - --stdio flag
  * - Unknown option error handling
  * - --port validation
  *
@@ -57,15 +58,23 @@ describe("CLI", () => {
     expect(exitCode).toBe(0);
     expect(stdout).toContain("USAGE:");
     expect(stdout).toContain("--port");
+    expect(stdout).toContain("--stdio");
     expect(stdout).toContain("--version");
     expect(stdout).toContain("--help");
-    expect(stdout).toContain("MCP CONFIGURATION:");
+    expect(stdout).toContain("MCP CONFIGURATION");
   });
 
   test("-h is alias for --help", async () => {
     const { stdout, exitCode } = await runCli(["-h"]);
     expect(exitCode).toBe(0);
     expect(stdout).toContain("USAGE:");
+  });
+
+  test("--help mentions stdio mode", async () => {
+    const { stdout, exitCode } = await runCli(["--help"]);
+    expect(exitCode).toBe(0);
+    expect(stdout).toContain("--stdio");
+    expect(stdout).toContain("Use stdio transport");
   });
 
   test("unknown option exits with error", async () => {
