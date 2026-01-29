@@ -79,7 +79,6 @@ Use Task to spawn sub-agents for complex analysis when needed.
    - Focus on indexer-related files:
      - `app/src/indexer/**/*.ts` - Core indexer modules
      - `app/tests/indexer/**/*.ts` - Indexer tests
-     - `packages/core/src/parsers/**/*.ts` - Core parser package
 
 2. **Determine Relevance**
    Evaluate if changes contain new expertise worth capturing:
