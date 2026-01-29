@@ -4,7 +4,15 @@
       "type": "http",
       "url": "http://localhost:3000/mcp",
       "headers": {
-        "Authorization": "Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef"
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2025-06-18"
+      }
+    },
+    "kotadb-bunx": {
+      "command": "bunx",
+      "args": ["kotadb"],
+      "env": {
+        "PORT": "3000"
       }
     }
   }

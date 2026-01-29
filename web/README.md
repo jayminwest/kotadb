@@ -70,15 +70,6 @@ cd web && bun run build
 cd web && bun run start
 ```
 
-### Docker
-
-```bash
-# Start web service with Docker Compose
-docker compose up web
-
-# Build web service container
-docker compose build web
-```
 
 ## Architecture
 

@@ -13,6 +13,23 @@ KotaDB provides an MCP server endpoint that allows Claude Code to search indexed
 - Claude Code CLI installed (`claude` command available)
 - KotaDB server running locally
 
+## Quick Start with bunx
+
+The fastest way to use KotaDB with Claude Code:
+
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "command": "bunx",
+      "args": ["kotadb"]
+    }
+  }
+}
+```
+
+This automatically downloads and runs KotaDB when Claude Code starts.
+
 ## Registering KotaDB with Claude Code
 
 Use the `claude mcp add` command to register KotaDB as an MCP server:
@@ -65,7 +82,7 @@ Claude Code stores MCP server configurations in `.mcp.json` in your project root
 
 ## Available Tools
 
-KotaDB exposes the following MCP tools:
+KotaDB exposes the following 8 MCP tools:
 
 ### 1. search_code
 
@@ -74,7 +91,7 @@ Search for code across indexed repositories.
 **Parameters:**
 - `term` (required): Search term or pattern
 - `repository` (optional): Filter by repository ID
-- `limit` (optional): Maximum results (default: 10, max: 100)
+- `limit` (optional): Maximum results (default: 20, max: 100)
 
 **Example usage in Claude Code:**
 ```
@@ -119,6 +136,43 @@ Find files that depend on or are depended on by a target file.
 - `include_tests` (optional): Include test files (default: `true`)
 - `repository` (optional): Repository ID
 
+### 5. analyze_change_impact
+
+Analyze the impact of proposed code changes.
+
+**Parameters:**
+- `change_type` (required): Type of change (`"feature"`, `"refactor"`, `"fix"`, `"chore"`)
+- `description` (required): Brief description of the proposed change
+- `files_to_modify` (optional): List of files to be modified
+- `files_to_create` (optional): List of files to be created
+- `files_to_delete` (optional): List of files to be deleted
+- `breaking_changes` (optional): Whether this includes breaking changes
+- `repository` (optional): Repository ID
+
+### 6. validate_implementation_spec
+
+Validate an implementation specification file.
+
+**Parameters:**
+- `spec_path` (required): Path to the specification file
+- `repository` (optional): Repository ID for context
+
+### 7. kota_sync_export
+
+Export the SQLite database to JSONL format for backup or transfer.
+
+**Parameters:**
+- `output_path` (required): Path for the output JSONL file
+- `tables` (optional): Array of table names to export (default: all tables)
+
+### 8. kota_sync_import
+
+Import JSONL data into the SQLite database.
+
+**Parameters:**
+- `input_path` (required): Path to the JSONL file to import
+- `mode` (optional): Import mode - `"merge"` or `"replace"` (default: `"merge"`)
+
 ## Testing MCP Tools from Claude Code
 
 ### Test Connection
@@ -128,11 +182,15 @@ Open a Claude Code session and ask:
 "List the available MCP tools from kotadb"
 ```
 
-Expected response:
+Expected response (8 tools):
 - search_code
 - index_repository
 - list_recent_files
 - search_dependencies
+- analyze_change_impact
+- validate_implementation_spec
+- kota_sync_export
+- kota_sync_import
 
 ### Test search_code
 
@@ -250,6 +308,6 @@ Errors follow JSON-RPC 2.0 error codes:
 
 ---
 
-**Last Verified**: 2026-01-25
+**Last Verified**: 2026-01-28
 **KotaDB Version**: 2.0.0
 **MCP Protocol Version**: 2025-06-18

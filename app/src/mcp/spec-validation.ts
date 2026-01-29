@@ -55,7 +55,7 @@ export async function validateImplementationSpec(
 				errors,
 				warnings,
 				approval_conditions: [],
-				risk_assessment: "Cannot assess - no repository data",
+				risk_assessment: "UNKNOWN RISK - Cannot assess without repository data",
 				summary: "Validation failed: No repository indexed",
 			};
 		}

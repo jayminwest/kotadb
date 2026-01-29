@@ -14,7 +14,7 @@ Location: `app/src/mcp/`
 MCP server factory using official `@modelcontextprotocol/sdk` (v1.20+):
 
 - Creates per-request Server instances for user isolation (stateless mode)
-- Registers 14 tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`, `analyze_change_impact`, `validate_implementation_spec`, `create_project`, `list_projects`, `get_project`, `update_project`, `delete_project`, `add_repository_to_project`, `remove_repository_from_project`, `get_index_job_status`
+- Registers 8 tools: `search_code`, `index_repository`, `list_recent_files`, `search_dependencies`, `analyze_change_impact`, `validate_implementation_spec`, `kota_sync_export`, `kota_sync_import`
 - Uses `StreamableHTTPServerTransport` with `enableJsonResponse: true` for simple JSON-RPC over HTTP
 - No SSE streaming or session management (stateless design)
 
@@ -55,61 +55,7 @@ Index a git repository by cloning/updating and extracting code files.
 - `ref` (optional): Git ref/branch to checkout (default: main/master)
 - `localPath` (optional): Use local directory instead of cloning
 
-**Returns:** Run ID to track progress
-
-### get_index_job_status
-
-Query the status of an indexing job by runId. Use this to poll progress after calling `index_repository`.
-
-**Parameters:**
-- `runId` (required): The UUID of the indexing job (returned by `index_repository`)
-
-**Returns:** Job status with progress details:
-- `runId`: Job UUID
-- `status`: Current status ('pending' | 'running' | 'completed' | 'failed' | 'skipped')
-- `repository_id`: Repository UUID being indexed
-- `ref`: Git ref being indexed
-- `started_at`: ISO timestamp when job started (null if pending)
-- `completed_at`: ISO timestamp when job finished (null if still running)
-- `error_message`: Error details if status is 'failed'
-- `stats`: Indexing statistics object:
-  - `files_indexed`: Number of files processed
-  - `symbols_extracted`: Number of symbols extracted
-  - `references_extracted`: Number of references found
-  - `dependencies_extracted`: Number of dependencies mapped
-  - `circular_dependencies_detected`: Number of circular dependencies found
-- `retry_count`: Number of retry attempts
-- `created_at`: ISO timestamp when job was created
-
-**Polling Best Practices:**
-- Poll every 5-10 seconds to track job progress
-- Stop polling when status is 'completed', 'failed', or 'skipped'
-- Typical indexing times:
-  - Small repos (<100 files): 10-30 seconds
-  - Medium repos (100-1000 files): 30-120 seconds
-  - Large repos (>1000 files): 2-10 minutes
-
-**Example Workflow:**
-```json
-// 1. Start indexing
-{
-  "name": "index_repository",
-  "arguments": { "repository": "owner/repo" }
-}
-// Returns: { "runId": "550e8400-...", "status": "pending" }
-
-// 2. Poll for status
-{
-  "name": "get_index_job_status",
-  "arguments": { "runId": "550e8400-..." }
-}
-// Returns: { "runId": "...", "status": "running", "stats": {...} }
-
-// 3. Continue polling until completed/failed/skipped
-// 4. Once completed, use search_code to query the indexed repository
-```
-
-**RLS enforced:** Users can only query jobs for repositories they own.
+**Returns:** Indexing result with file count and status
 
 ### list_recent_files
 
@@ -117,6 +63,7 @@ List recently indexed files, ordered by indexing timestamp.
 
 **Parameters:**
 - `limit` (optional): Maximum files to return (default: 10)
+- `repository` (optional): Filter by repository ID
 
 **Returns:** Recently indexed files with metadata
 
@@ -139,153 +86,50 @@ Search dependency graph to find files that depend on (dependents) or are depende
 - Detects circular dependencies during graph traversal
 - Optional test file filtering
 
-## Project Management Tools
+### analyze_change_impact
 
-### create_project
-
-Create a new project with optional repository associations.
+Analyze the impact of proposed code changes.
 
 **Parameters:**
-- `name` (required): Project name
-- `description` (optional): Project description
-- `repository_ids` (optional): Array of repository UUIDs to associate
+- `change_type` (required): Type of change ('feature', 'refactor', 'fix', 'chore')
+- `description` (required): Brief description of the proposed change
+- `files_to_modify` (optional): List of files to be modified
+- `files_to_create` (optional): List of files to be created
+- `files_to_delete` (optional): List of files to be deleted
+- `breaking_changes` (optional): Whether this includes breaking changes
+- `repository` (optional): Repository ID
 
-**Returns:** Project UUID and name
+**Returns:** Impact analysis with affected files, test recommendations, and risk assessment
 
-**Example:**
-```json
-{
-  "name": "create_project",
-  "arguments": {
-    "name": "frontend-repos",
-    "description": "All React and Next.js repositories",
-    "repository_ids": ["550e8400-e29b-41d4-a716-446655440000"]
-  }
-}
-```
+### validate_implementation_spec
 
-### list_projects
-
-List all projects for the authenticated user with repository counts.
+Validate an implementation specification file.
 
 **Parameters:**
-- `limit` (optional): Maximum projects to return
+- `spec_path` (required): Path to the specification file
+- `repository` (optional): Repository ID for context
 
-**Returns:** Array of projects with metadata
+**Returns:** Validation result with errors and warnings
 
-**Example:**
-```json
-{
-  "name": "list_projects",
-  "arguments": {
-    "limit": 20
-  }
-}
-```
+### kota_sync_export
 
-### get_project
-
-Get project details with full repository list. Accepts project UUID or name.
+Export the SQLite database to JSONL format for backup or transfer.
 
 **Parameters:**
-- `project` (required): Project UUID or name (case-insensitive)
+- `output_path` (required): Path for the output JSONL file
+- `tables` (optional): Array of table names to export (default: all tables)
 
-**Returns:** Project details with repositories array
+**Returns:** Export status with row counts
 
-**Example:**
-```json
-{
-  "name": "get_project",
-  "arguments": {
-    "project": "frontend-repos"
-  }
-}
-```
+### kota_sync_import
 
-### update_project
-
-Update project name, description, and/or repository associations.
+Import JSONL data into the SQLite database.
 
 **Parameters:**
-- `project` (required): Project UUID or name
-- `name` (optional): New project name
-- `description` (optional): New project description
-- `repository_ids` (optional): Repository UUIDs (replaces all associations)
+- `input_path` (required): Path to the JSONL file to import
+- `mode` (optional): Import mode - 'merge' or 'replace' (default: 'merge')
 
-**Returns:** Success status and message
-
-**Example:**
-```json
-{
-  "name": "update_project",
-  "arguments": {
-    "project": "frontend-repos",
-    "name": "frontend-web-apps",
-    "description": "Updated description"
-  }
-}
-```
-
-### delete_project
-
-Delete project (cascade deletes associations, repositories remain indexed).
-
-**Parameters:**
-- `project` (required): Project UUID or name
-
-**Returns:** Success status and message
-
-**Example:**
-```json
-{
-  "name": "delete_project",
-  "arguments": {
-    "project": "old-project"
-  }
-}
-```
-
-### add_repository_to_project
-
-Add a repository to a project (idempotent operation).
-
-**Parameters:**
-- `project` (required): Project UUID or name
-- `repository_id` (required): Repository UUID to add
-
-**Returns:** Success status and message
-
-**Example:**
-```json
-{
-  "name": "add_repository_to_project",
-  "arguments": {
-    "project": "frontend-repos",
-    "repository_id": "550e8400-e29b-41d4-a716-446655440000"
-  }
-}
-```
-
-### remove_repository_from_project
-
-Remove a repository from a project (idempotent operation).
-
-**Parameters:**
-- `project` (required): Project UUID or name
-- `repository_id` (required): Repository UUID to remove
-
-**Returns:** Success status and message
-
-**Example:**
-```json
-{
-  "name": "remove_repository_from_project",
-  "arguments": {
-    "project": "frontend-repos",
-    "repository_id": "550e8400-e29b-41d4-a716-446655440000"
-  }
-}
-```
+**Returns:** Import status with row counts
 
 ## MCP SDK Behavior Notes
 
