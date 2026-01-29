@@ -37,16 +37,17 @@ jobs:
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
+          path: node_modules
+          key: bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             bun-
 
       - name: Install dependencies
+        working-directory: .
         run: bun install --frozen-lockfile
 
       - name: Type check shared types
-        working-directory: ../shared
+        working-directory: shared
         run: bunx tsc --noEmit
 
       - name: Type check application
