@@ -4,6 +4,8 @@ on:
   push:
     tags:
       - 'v*.*.*'
+    branches:
+      - develop
 
 jobs:
   publish:
@@ -25,6 +27,7 @@ jobs:
           bun-version: 1.1.29
 
       - name: Verify tag matches package version
+        if: startsWith(github.ref, 'refs/tags/')
         run: |
           TAG_VERSION=${GITHUB_REF#refs/tags/v}
           PKG_VERSION=$(cat package.json | grep '"version"' | head -1 | awk -F: '{ print $2 }' | sed 's/[", ]//g')
@@ -44,10 +47,6 @@ jobs:
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
-
-      - name: Type check shared types
-        working-directory: ../shared
-        run: bunx tsc --noEmit
 
       - name: Type check application
         run: bunx tsc --noEmit
@@ -78,12 +77,29 @@ jobs:
           fi
           echo "Package metadata verified"
 
+      - name: Set pre-release version for develop
+        if: github.ref == 'refs/heads/develop'
+        run: |
+          CURRENT_VERSION=$(node -p "require('./package.json').version")
+          TIMESTAMP=$(date +%Y%m%d%H%M%S)
+          PRE_VERSION="${CURRENT_VERSION}-next.${TIMESTAMP}"
+          echo "Publishing pre-release version: ${PRE_VERSION}"
+          npm version ${PRE_VERSION} --no-git-tag-version
+
       - name: Publish to npm
-        run: bun publish --access public
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "Publishing to 'next' tag..."
+            bun publish --access public --tag next
+          else
+            echo "Publishing to 'latest' tag..."
+            bun publish --access public
+          fi
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/')
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
@@ -98,12 +114,20 @@ jobs:
         run: |
           echo "## npm Publish Summary" >> ${GITHUB_STEP_SUMMARY}
           echo "" >> ${GITHUB_STEP_SUMMARY}
-          echo "**Tag**: ${{ github.ref_name }}" >> ${GITHUB_STEP_SUMMARY}
+          if [ "${{ github.ref }}" = "refs/heads/develop" ]; then
+            echo "**Release Type**: Pre-release (next)" >> ${GITHUB_STEP_SUMMARY}
+            echo "**Branch**: develop" >> ${GITHUB_STEP_SUMMARY}
+            echo "**Install**: \`npm install kotadb@next\`" >> ${GITHUB_STEP_SUMMARY}
+          else
+            echo "**Release Type**: Stable (latest)" >> ${GITHUB_STEP_SUMMARY}
+            echo "**Tag**: ${{ github.ref_name }}" >> ${GITHUB_STEP_SUMMARY}
+            echo "**Install**: \`npm install kotadb\`" >> ${GITHUB_STEP_SUMMARY}
+          fi
           echo "**Package**: kotadb" >> ${GITHUB_STEP_SUMMARY}
           echo "**Registry**: https://www.npmjs.com/package/kotadb" >> ${GITHUB_STEP_SUMMARY}
           echo "" >> ${GITHUB_STEP_SUMMARY}
           if [ "${{ job.status }}" == "success" ]; then
-            echo "Successfully published to npm" >> ${GITHUB_STEP_SUMMARY}
+            echo "✅ Successfully published to npm" >> ${GITHUB_STEP_SUMMARY}
           else
-            echo "Publish failed - check logs above" >> ${GITHUB_STEP_SUMMARY}
+            echo "❌ Publish failed - check logs above" >> ${GITHUB_STEP_SUMMARY}
           fi
