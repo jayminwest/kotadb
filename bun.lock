@@ -7,7 +7,7 @@
     },
     "app": {
       "name": "kotadb",
-      "version": "2.0.0",
+      "version": "2.0.1",
       "bin": {
         "kotadb": "./src/cli.ts",
       },
@@ -37,20 +37,16 @@
         "typescript": "^5.9.3",
       },
     },
-    "shared": {
-      "name": "@kotadb/shared",
-      "version": "2.0.0",
-    },
     "web": {
       "name": "kotadb-web",
       "version": "2.0.0",
       "dependencies": {
-        "@kotadb/shared": "workspace:*",
         "@stripe/stripe-js": "^8.1.0",
         "@supabase/ssr": "^0.7.0",
         "@supabase/supabase-js": "^2.76.1",
         "@vercel/analytics": "^1.5.0",
         "@vercel/speed-insights": "^1.2.0",
+        "kotadb": "workspace:*",
         "next": "^14.2.0",
         "react": "^18.3.0",
         "react-dom": "^18.3.0",
@@ -135,8 +131,6 @@
     "@jridgewell/sourcemap-codec": ["@jridgewell/sourcemap-codec@1.5.5", "", {}, "sha512-cYQ9310grqxueWbl+WuIUIaiUaDcj7WOq5fVhEljNVgRfOUhY9fy2zTvfoqWsnebh8Sl70VScFbICvJnLKB0Og=="],
 
     "@jridgewell/trace-mapping": ["@jridgewell/trace-mapping@0.3.31", "", { "dependencies": { "@jridgewell/resolve-uri": "^3.1.0", "@jridgewell/sourcemap-codec": "^1.4.14" } }, "sha512-zzNR+SdQSDJzc8joaeP8QQoCQr8NuYx2dIIytl1QeBEZHJ9uW6hebsrYgbz8hJwUQao3TWCMtmfV8Nu1twOLAw=="],
-
-    "@kotadb/shared": ["@kotadb/shared@workspace:shared"],
 
     "@modelcontextprotocol/sdk": ["@modelcontextprotocol/sdk@1.25.3", "", { "dependencies": { "@hono/node-server": "^1.19.9", "ajv": "^8.17.1", "ajv-formats": "^3.0.1", "content-type": "^1.0.5", "cors": "^2.8.5", "cross-spawn": "^7.0.5", "eventsource": "^3.0.2", "eventsource-parser": "^3.0.0", "express": "^5.0.1", "express-rate-limit": "^7.5.0", "jose": "^6.1.1", "json-schema-typed": "^8.0.2", "pkce-challenge": "^5.0.0", "raw-body": "^3.0.0", "zod": "^3.25 || ^4.0", "zod-to-json-schema": "^3.25.0" }, "peerDependencies": { "@cfworker/json-schema": "^4.1.1" }, "optionalPeers": ["@cfworker/json-schema"] }, "sha512-vsAMBMERybvYgKbg/l4L1rhS7VXV1c0CtyJg72vwxONVX0l4ZfKVAnZEWTQixJGTzKnELjQ59e4NbdFDALRiAQ=="],
 
