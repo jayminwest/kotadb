@@ -195,6 +195,50 @@ key_operations:
         instead: "Use KOTADB_PATH env var for file-based test database"
         reason: "Global singleton needs file path for proper isolation"
 
+
+  configure_npm_package_distribution:
+    when: Publishing TypeScript package with path aliases for direct execution (Bun/ts-node)
+    approach: |
+      1. Include tsconfig.json in package.json files array (required for alias resolution)
+      2. Relocate shared dependencies from external monorepo siblings into package root
+      3. Update path aliases in tsconfig.json to reference internal paths
+      4. Add all aliased directories to files array (e.g., "shared/**/*.ts")
+      5. Add all aliased directories to tsconfig.json include array
+      6. Update monorepo workspace configuration to remove relocated packages
+      7. Update CI workflows to remove separate type-checking steps for relocated code
+      8. Test locally: npm pack -> bunx <tarball> to verify module resolution
+    timestamp: 2026-01-29
+    evidence: Issue #39, pending changes for v2.0.1
+    rationale: |
+      When Bun executes TypeScript directly (not transpiled), it uses tsconfig.json to
+      resolve path aliases at runtime. Without this file in the published package, imports
+      like @api/routes fail with "Cannot find module" errors. External path aliases
+      (../shared/*) break because npm only publishes files within package directory.
+    key_patterns:
+      - tsconfig.json MUST be in files array for runtime alias resolution
+      - Path aliases must reference internal paths (./shared/*, not ../shared/*)
+      - All aliased directories must be included in both files array AND include array
+      - Test with npm pack + bunx before publishing to catch resolution issues
+    pitfalls:
+      - what: "Excluding tsconfig.json from published package"
+        instead: "Always include tsconfig.json in files array"
+        reason: "Bun needs it to resolve path aliases at runtime"
+      - what: "Path aliases pointing outside package root (../shared/*)"
+        instead: "Relocate dependencies into package or reference internally (./shared/*)"
+        reason: "npm only publishes files within package directory"
+      - what: "Adding to files array but not include array"
+        instead: "Add aliased directories to BOTH files and include arrays"
+        reason: "Type-checking needs include, runtime needs files"
+      - what: "Publishing without local testing"
+        instead: "Always test with npm pack + bunx <tarball> first"
+        reason: "Catches module resolution issues before public publish"
+    affected_files: |
+      When restructuring for npm distribution:
+      - app/package.json (files array, version bump)
+      - app/tsconfig.json (paths, include array)
+      - package.json (workspaces array if monorepo)
+      - .github/workflows/npm-publish.yml (CI adjustments)
+
 patterns:
   cli_entry_point_pattern:
     structure: |
@@ -319,6 +363,50 @@ patterns:
       - Use bm25() for relevance, snippet() for context
       - Test: hyphens, phrases, FTS5 keywords, quotes
 
+  npm_package_files_pattern:
+    structure: |
+      // app/package.json (TypeScript package with path aliases for Bun)
+      {
+        "name": "kotadb",
+        "version": "2.0.1",
+        "bin": {
+          "kotadb": "./src/cli.ts"
+        },
+        "files": [
+          "src/**/*.ts",
+          "src/**/*.js",
+          "!src/**/*.test.ts",
+          "!src/**/*.spec.ts",
+          "tsconfig.json",        // Required for path alias resolution
+          "shared/**/*.ts"        // Include all aliased dependencies
+        ]
+      }
+      
+      // app/tsconfig.json
+      {
+        "compilerOptions": {
+          "baseUrl": ".",
+          "paths": {
+            "@api/*": ["src/api/*"],
+            "@shared/*": ["./shared/*"]  // Internal reference, not ../shared/*
+          }
+        },
+        "include": [
+          "src/**/*.ts",
+          "tests/**/*.ts",
+          "shared/**/*.ts"  // Must include aliased directories
+        ]
+      }
+    notes:
+      - tsconfig.json in files array enables runtime path alias resolution
+      - All path aliases must reference internal paths relative to package root
+      - Aliased directories must appear in BOTH files and include arrays
+      - Test with npm pack + bunx before publishing
+      - Alternative: transpile to JS with resolved imports (different trade-offs)
+    timestamp: 2026-01-29
+    evidence: Issue #39 fix for v2.0.1
+
+
 best_practices:
   cli: |
     - Include #!/usr/bin/env bun shebang on first line (no BOM)
@@ -350,6 +438,14 @@ best_practices:
     - Integration tests: database operations with KOTADB_PATH
     - Aim for 5-8 tests per tool covering all paths
     - Clear test data in afterEach
+  
+  npm_distribution: |
+    - Include tsconfig.json in files array for path alias resolution
+    - Relocate external dependencies into package root (./shared/*, not ../shared/*)
+    - Add aliased directories to BOTH files and include arrays
+    - Test with npm pack + bunx <tarball> before publishing
+    - Update CI workflows when restructuring monorepo packages
+
 
 known_issues:
   - issue: OpenAPI spec cached at startup
@@ -362,21 +458,31 @@ known_issues:
     status: resolved (2026-01-28, commit 5af086f)
     resolution: Always use escapeFts5Term() before MATCH
 
+  - issue: npm package missing tsconfig.json and shared types
+    impact: bunx kotadb fails with "Cannot find module @api/routes" 
+    status: resolved (2026-01-29, Issue #39)
+    resolution: Include tsconfig.json and shared/**/*.ts in files array, relocate shared/ into app/
+
 stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 1
-    patterns_updated_this_cycle: 1
-    last_reviewed: 2026-01-28
+    new_patterns_added_this_cycle: 2
+    patterns_updated_this_cycle: 0
+    last_reviewed: 2026-01-29
     utility_ratio: 1.0
     notes: |
-      Fifth review cycle - CLI entry point for npm distribution:
+      Sixth review cycle - npm package distribution patterns:
       
-      New pattern: CLI entry point (create_cli_entry_point operation)
-      - #!/usr/bin/env bun shebang, version resolution, graceful shutdown
+      New operation: configure_npm_package_distribution
+      - Complete guidance on TypeScript package publishing with Bun
+      - tsconfig.json inclusion, path alias management, monorepo restructuring
+      
+      New pattern: npm_package_files_pattern
+      - Template for package.json files array and tsconfig.json configuration
       
       Previously stable patterns:
+      - CLI entry point (Issue #19)
       - Optional parameter filtering (Issue #608)
       - MCP tool testing patterns
       - FTS5 search term escaping
@@ -384,10 +490,11 @@ stability:
       - Local auth bypass
       
       Architecture stability: Very High
-      - Zero contradictions across 5 cycles
+      - Zero contradictions across 6 cycles
       - All core operations documented
       - All 8 MCP tools with comprehensive tests
       - CLI deployment pattern established
+      - npm distribution patterns now comprehensive
       
-      Next review: After 10-15 API commits
+      Next review: After 10-15 API commits or next npm distribution issue
 

@@ -45,9 +45,6 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      - name: Type check shared types
-        working-directory: ../shared
-        run: bunx tsc --noEmit
 
       - name: Type check application
         run: bunx tsc --noEmit
