@@ -621,14 +621,27 @@ export interface DependencyResult {
  * @param includeTests - Whether to include test files
  * @returns Dependency result with direct/indirect relationships and cycles
  */
+/**
+ * Query files that depend on the given file (reverse lookup).
+ *
+ * Uses recursive CTE on indexed_references table to traverse the dependency graph.
+ * Supports depth limiting, cycle detection, and test file filtering.
+ *
+ * @param fileId - Target file UUID
+ * @param depth - Recursion depth (1-5)
+ * @param includeTests - Whether to include test files
+ * @returns Dependency result with direct/indirect relationships and cycles
+ */
 export function queryDependents(
 	fileId: string,
 	depth: number,
 	includeTests: boolean,
 ): DependencyResult {
 	const db = getGlobalDatabase();
-	const fileRecord = db.queryOne<{ repository_id: string }>(
-		"SELECT repository_id FROM indexed_files WHERE id = ?",
+	
+	// Get repository_id and path for target file
+	const fileRecord = db.queryOne<{ repository_id: string; path: string }>(
+		"SELECT repository_id, path FROM indexed_files WHERE id = ?",
 		[fileId]
 	);
 	
@@ -636,12 +649,63 @@ export function queryDependents(
 		throw new Error(`File not found: ${fileId}`);
 	}
 	
-	const results = queryDependentsRaw(db, fileRecord.repository_id, fileId, null, depth);
+	const sql = `
+		WITH RECURSIVE dependents AS (
+			SELECT
+				f.id AS file_id,
+				f.path AS file_path,
+				1 AS depth,
+				'/' || f.id || '/' AS path_tracker
+			FROM indexed_references r
+			JOIN indexed_files f ON r.file_id = f.id
+			WHERE r.reference_type = 'import'
+				AND r.repository_id = ?
+				AND r.target_file_path = ?
+			
+			UNION ALL
+			
+			SELECT
+				f2.id AS file_id,
+				f2.path AS file_path,
+				d.depth + 1 AS depth,
+				d.path_tracker || f2.id || '/' AS path_tracker
+			FROM indexed_references r2
+			JOIN indexed_files f2 ON r2.file_id = f2.id
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependents d ON target2.id = d.file_id
+			WHERE r2.reference_type = 'import'
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '/' || f2.id || '/') = 0
+		)
+		SELECT DISTINCT
+			file_path,
+			depth
+		FROM dependents
+		ORDER BY depth ASC, file_path ASC
+	`;
+	
+	const results = db.query<{
+		file_path: string;
+		depth: number;
+	}>(sql, [fileRecord.repository_id, fileRecord.path, fileRecord.repository_id, depth]);
+	
 	return processDepthResults(results, includeTests);
 }
 
+
 /**
  * Query files that the given file depends on (forward lookup).
+ *
+ * @param fileId - Source file UUID
+ * @param depth - Recursion depth (1-5)
+ * @returns Dependency result with direct/indirect relationships and cycles
+ */
+/**
+ * Query files that the given file depends on (forward lookup).
+ *
+ * Uses recursive CTE on indexed_references table to traverse the dependency graph.
+ * Supports depth limiting and cycle detection.
  *
  * @param fileId - Source file UUID
  * @param depth - Recursion depth (1-5)
@@ -652,6 +716,8 @@ export function queryDependencies(
 	depth: number,
 ): DependencyResult {
 	const db = getGlobalDatabase();
+	
+	// Get repository_id for source file
 	const fileRecord = db.queryOne<{ repository_id: string }>(
 		"SELECT repository_id FROM indexed_files WHERE id = ?",
 		[fileId]
@@ -661,13 +727,53 @@ export function queryDependencies(
 		throw new Error(`File not found: ${fileId}`);
 	}
 	
-	const results = queryDependenciesRaw(db, fileRecord.repository_id, fileId, null, depth);
-	return processDepthResults(results, true);
+	const sql = `
+		WITH RECURSIVE dependencies AS (
+			SELECT
+				target.id AS file_id,
+				target.path AS file_path,
+				1 AS depth,
+				'/' || target.id || '/' AS path_tracker
+			FROM indexed_references r
+			JOIN indexed_files target ON r.target_file_path = target.path
+			WHERE r.reference_type = 'import'
+				AND r.repository_id = ?
+				AND r.file_id = ?
+			
+			UNION ALL
+			
+			SELECT
+				target2.id AS file_id,
+				target2.path AS file_path,
+				d.depth + 1 AS depth,
+				d.path_tracker || target2.id || '/' AS path_tracker
+			FROM indexed_references r2
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependencies d ON r2.file_id = d.file_id
+			WHERE r2.reference_type = 'import'
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '/' || target2.id || '/') = 0
+		)
+		SELECT DISTINCT
+			file_path,
+			depth
+		FROM dependencies
+		ORDER BY depth ASC, file_path ASC
+	`;
+	
+	const results = db.query<{
+		file_path: string;
+		depth: number;
+	}>(sql, [fileRecord.repository_id, fileId, fileRecord.repository_id, depth]);
+	
+	return processDepthResults(results, true); // Always include tests for dependencies
 }
+
 
 function processDepthResults(
 	results: Array<{
-		file_path: string | null;
+		file_path: string;
 		depth: number;
 	}>,
 	includeTests: boolean
@@ -677,9 +783,7 @@ function processDepthResults(
 	const cycles: string[][] = [];
 	
 	for (const result of results) {
-		if (!result.file_path) continue;
-		
-		if (!includeTests && (result.file_path.includes("test") || result.file_path.includes("spec"))) {
+				if (!includeTests && (result.file_path.includes("test") || result.file_path.includes("spec"))) {
 			continue;
 		}
 		
