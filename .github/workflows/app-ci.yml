@@ -28,9 +28,6 @@ on:
 jobs:
   setup:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -44,8 +41,8 @@ jobs:
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
+          path: node_modules
+          key: bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             bun-
 
@@ -55,9 +52,6 @@ jobs:
   typecheck:
     runs-on: ubuntu-latest
     needs: setup
-    defaults:
-      run:
-        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -71,8 +65,8 @@ jobs:
       - name: Restore dependencies
         uses: actions/cache@v4
         with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
+          path: node_modules
+          key: bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             bun-
 
@@ -84,14 +78,12 @@ jobs:
         run: bunx tsc --noEmit
 
       - name: Type check application
+        working-directory: app
         run: bunx tsc --noEmit
 
   lint:
     runs-on: ubuntu-latest
     needs: setup
-    defaults:
-      run:
-        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -105,8 +97,8 @@ jobs:
       - name: Restore dependencies
         uses: actions/cache@v4
         with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
+          path: node_modules
+          key: bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             bun-
 
@@ -114,14 +106,12 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Lint
+        working-directory: app
         run: bun run lint
 
   test:
     runs-on: ubuntu-latest
     needs: [typecheck, lint]
-    defaults:
-      run:
-        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -135,8 +125,8 @@ jobs:
       - name: Restore dependencies
         uses: actions/cache@v4
         with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
+          path: node_modules
+          key: bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             bun-
 
@@ -154,10 +144,12 @@ jobs:
           uv --version
 
       - name: Test
+        working-directory: app
         run: bun run test --coverage --coverage-reporter=text --coverage-reporter=lcov
 
       - name: Generate coverage summary
         if: always()
+        working-directory: app
         run: |
           echo "## Application Coverage Report" >> $GITHUB_STEP_SUMMARY
           echo "" >> $GITHUB_STEP_SUMMARY
@@ -182,9 +174,6 @@ jobs:
   build:
     runs-on: ubuntu-latest
     needs: test
-    defaults:
-      run:
-        working-directory: app
 
     steps:
       - name: Checkout repository
@@ -198,8 +187,8 @@ jobs:
       - name: Restore dependencies
         uses: actions/cache@v4
         with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lockb') }}
+          path: node_modules
+          key: bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             bun-
 
@@ -207,4 +196,5 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Build application
+        working-directory: app
         run: bun run build
