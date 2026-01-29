@@ -187,6 +187,19 @@ CREATE INDEX IF NOT EXISTS idx_indexed_references_symbol_name ON indexed_referen
 CREATE INDEX IF NOT EXISTS idx_indexed_references_target_symbol ON indexed_references(target_symbol_id);
 CREATE INDEX IF NOT EXISTS idx_indexed_references_type ON indexed_references(reference_type);
 
+-- Phase 1 (Issue #37): Additional indexes for dependency queries
+-- Partial index for target file path lookups (only where target_file_path IS NOT NULL)
+CREATE INDEX IF NOT EXISTS idx_indexed_references_target_file_path 
+ON indexed_references(target_file_path) 
+WHERE target_file_path IS NOT NULL;
+
+-- Composite index for import reference queries (CRITICAL for performance)
+-- Optimizes the common query pattern: filter by type + join on path
+CREATE INDEX IF NOT EXISTS idx_refs_import_target 
+ON indexed_references(reference_type, target_file_path)
+WHERE reference_type = 'import';
+
+
 -- ============================================================================
 -- 7. Projects Table
 -- ============================================================================
