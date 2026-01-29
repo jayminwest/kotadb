@@ -326,7 +326,7 @@ describe("SQLite Query Layer - queries.ts", () => {
 				},
 			];
 
-			const count = storeReferencesLocal(db, references, testFileId);
+			const count = storeReferencesLocal(db, testFileId, "test/file.ts", references, []);
 
 			expect(count).toBe(1);
 
@@ -345,7 +345,7 @@ describe("SQLite Query Layer - queries.ts", () => {
 				{ targetName: "bar", lineNumber: 2, columnNumber: 0, referenceType: "import", metadata: {} },
 			];
 
-			storeReferencesLocal(db, firstRefs, testFileId);
+			storeReferencesLocal(db, testFileId, "test/file.ts", firstRefs, []);
 
 			const firstCount = db.queryOne<{ count: number }>(
 				"SELECT COUNT(*) as count FROM indexed_references WHERE file_id = ?",
@@ -358,7 +358,7 @@ describe("SQLite Query Layer - queries.ts", () => {
 				{ targetName: "baz", lineNumber: 10, columnNumber: 0, referenceType: "call", metadata: {} },
 			];
 
-			storeReferencesLocal(db, newRefs, testFileId);
+			storeReferencesLocal(db, testFileId, "test/file.ts", newRefs, []);
 
 			const secondCount = db.queryOne<{ count: number }>(
 				"SELECT COUNT(*) as count FROM indexed_references WHERE file_id = ?",
@@ -374,7 +374,7 @@ describe("SQLite Query Layer - queries.ts", () => {
 		});
 
 		test("should handle empty references array", () => {
-			const count = storeReferencesLocal(db, [], testFileId);
+			const count = storeReferencesLocal(db, testFileId, "test/file.ts", [], []);
 			expect(count).toBe(0);
 		});
 
@@ -386,7 +386,7 @@ describe("SQLite Query Layer - queries.ts", () => {
 			const nonExistentFileId = randomUUID();
 
 			expect(() => {
-				storeReferencesLocal(db, references, nonExistentFileId);
+				storeReferencesLocal(db, nonExistentFileId, "test/file.ts", references, []);
 			}).toThrow("File not found");
 		});
 
@@ -401,7 +401,7 @@ describe("SQLite Query Layer - queries.ts", () => {
 				},
 			];
 
-			storeReferencesLocal(db, references, testFileId);
+			storeReferencesLocal(db, testFileId, "test/file.ts", references, []);
 
 			const result = db.queryOne<{ metadata: string }>(
 				"SELECT metadata FROM indexed_references WHERE symbol_name = ?",

@@ -13,8 +13,41 @@ import { createLogger } from "@logging/logger.js";
 import type { IndexRequest, IndexedFile } from "@shared/types";
 import { detectLanguage } from "@shared/language-utils";
 import { getGlobalDatabase, type KotaDatabase } from "@db/sqlite/index.js";
+import { resolveImport } from "@indexer/import-resolver.js";
 
 const logger = createLogger({ module: "api-queries" });
+
+
+/**
+ * Normalize file path to consistent format for database storage.
+ * 
+ * Rules:
+ * - No leading slashes
+ * - Forward slashes only (replace backslashes)
+ * - No ./ prefix
+ * - Consistent relative-to-repo-root format
+ * 
+ * @param filePath - Absolute or relative file path
+ * @returns Normalized relative path
+ */
+function normalizePath(filePath: string): string {
+	let normalized = filePath;
+	
+	// Replace backslashes with forward slashes
+	normalized = normalized.replace(/\\/g, '/');
+	
+	// Remove leading slash if present
+	if (normalized.startsWith('/')) {
+		normalized = normalized.slice(1);
+	}
+	
+	// Remove ./ prefix
+	if (normalized.startsWith('./')) {
+		normalized = normalized.slice(2);
+	}
+	
+	return normalized;
+}
 
 export interface SearchOptions {
 	repositoryId?: string;
@@ -134,24 +167,16 @@ function storeSymbolsInternal(
 
 function storeReferencesInternal(
 	db: KotaDatabase,
-	references: Reference[],
 	fileId: string,
+	repositoryId: string,
+	filePath: string,
+	references: Reference[],
+	allFiles: Array<{ path: string }>,
 ): number {
 	if (references.length === 0) {
 		return 0;
 	}
 
-	// Get repository_id from the file
-	const fileResult = db.queryOne<{ repository_id: string }>(
-		"SELECT repository_id FROM indexed_files WHERE id = ?",
-		[fileId]
-	);
-
-	if (!fileResult) {
-		throw new Error(`File not found: ${fileId}`);
-	}
-
-	const repositoryId = fileResult.repository_id;
 	let count = 0;
 
 	db.transaction(() => {
@@ -172,6 +197,21 @@ function storeReferencesInternal(
 				column_number: ref.columnNumber,
 				...ref.metadata,
 			});
+			
+			// Resolve target_file_path for import references
+			let targetFilePath: string | null = null;
+			if (ref.referenceType === 'import' && ref.metadata?.importSource) {
+				const resolved = resolveImport(
+					ref.metadata.importSource,
+					filePath,
+					allFiles
+				);
+				
+				// Normalize path if resolved
+				if (resolved) {
+					targetFilePath = normalizePath(resolved);
+				}
+			}
 
 			stmt.run([
 				id,
@@ -179,7 +219,7 @@ function storeReferencesInternal(
 				repositoryId,
 				ref.targetName || "unknown",
 				null, // target_symbol_id - deferred
-				null, // target_file_path - deferred
+				targetFilePath, // NOW RESOLVED for imports
 				ref.lineNumber,
 				ref.columnNumber || 0,
 				ref.referenceType,
@@ -478,10 +518,31 @@ export function storeSymbols(
  * @returns Number of references stored
  */
 export function storeReferences(
-	references: Reference[],
 	fileId: string,
+	filePath: string,
+	references: Reference[],
+	allFiles: Array<{ path: string }>
 ): number {
-	return storeReferencesInternal(getGlobalDatabase(), references, fileId);
+	const db = getGlobalDatabase();
+
+	// Get repository_id from file
+	const result = db.queryOne<{ repository_id: string }>(
+		"SELECT repository_id FROM indexed_files WHERE id = ?",
+		[fileId]
+	);
+
+	if (!result) {
+		throw new Error(`File not found: ${fileId}`);
+	}
+
+	return storeReferencesInternal(
+		db, 
+		fileId, 
+		result.repository_id, 
+		filePath,
+		references,
+		allFiles
+	);
 }
 
 /**
@@ -934,7 +995,7 @@ export async function runIndexingWorkflow(
 		filesWithId.push({ ...file, id: fileRecord.id, repository_id: repositoryId });
 
 		const symbolCount = storeSymbols(symbols, fileRecord.id);
-		const referenceCount = storeReferences(references, fileRecord.id);
+		const referenceCount = storeReferences(fileRecord.id, file.path, references, filesWithId);
 
 		totalSymbols += symbolCount;
 		totalReferences += referenceCount;
@@ -1059,10 +1120,21 @@ export function storeSymbolsLocal(
  */
 export function storeReferencesLocal(
 	db: KotaDatabase,
+	fileId: string,
+	filePath: string,
 	references: Reference[],
-	fileId: string
+	allFiles: Array<{ path: string }>
 ): number {
-	return storeReferencesInternal(db, references, fileId);
+	const repositoryId = db.queryOne<{ repository_id: string }>(
+		"SELECT repository_id FROM indexed_files WHERE id = ?",
+		[fileId]
+	)?.repository_id;
+	
+	if (!repositoryId) {
+		throw new Error(`File not found: ${fileId}`);
+	}
+	
+	return storeReferencesInternal(db, fileId, repositoryId, filePath, references, allFiles);
 }
 
 /**
