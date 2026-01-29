@@ -7,6 +7,9 @@ tools:
   - Grep
   - Write
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
 expertDomain: agent-authoring
@@ -147,6 +150,9 @@ description: <action verb + domain + context - NO COLONS>
 tools:
   - <Tool1>
   - <Tool2>
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: <haiku|sonnet|opus>
 constraints:
   - <constraint 1>

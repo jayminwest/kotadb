@@ -443,20 +443,38 @@ patterns:
         cost: Registry must be kept in sync with agent files
 
   mcp_tool_patterns:
-    name: MCP Tool Selection Patterns
+    name: MCP Tool Selection Patterns (kotadb naming convention)
     context: kotadb uses MCP tools for codebase search and analysis
     implementation: |
+      **MCP Tool Naming Convention** [2026-01-29]:
+      Format: mcp__{SERVER_NAME}__toolName
+      
+      The server name comes from .mcp.json mcpServers key.
+      Current .mcp.json: "kotadb-bunx" (bunx stdio transport, commit 30173e6)
+      Therefore tool prefix MUST be: mcp__kotadb-bunx__
+      
+      Do NOT use: mcp__kotadb__ (deprecated old prefix from HTTP era)
+      Use instead: mcp__kotadb-bunx__ (current standard, expert agents updated)
+      
+      Status as of 2026-01-29:
+      - Expert agents (80+ refs): Updated to mcp__kotadb-bunx__ ✓
+      - agent-registry.json: Updated to mcp__kotadb-bunx__ ✓
+      - General agents: Still use mcp__kotadb__ (scout, build, review - pending)
+      
       KotaDB MCP tools (search and analysis):
-      - mcp__kotadb__search_code(term)
-      - mcp__kotadb__search_dependencies(file_path, direction, depth)
-      - mcp__kotadb__analyze_change_impact(files)
-      - mcp__kotadb__list_recent_files()
+      - mcp__kotadb-bunx__search_code(term) - Semantic code search
+      - mcp__kotadb-bunx__search_dependencies(file_path, direction, depth) - Dependency graph
+      - mcp__kotadb-bunx__analyze_change_impact(files) - Change impact assessment
+      - mcp__kotadb-bunx__list_recent_files() - Recent file discovery
 
-      Tool selection by agent type:
-      - scout-agent: Optional kotadb search tools
-      - build-agent: kotadb search_dependencies, analyze_change_impact
-      - expert agents: kotadb tools as needed for domain
-
+      Tool assignment patterns by agent type:
+      - scout-agent: search_code, search_dependencies, list_recent_files (read-only)
+      - build-agent: search_code, search_dependencies, analyze_change_impact (implementation)
+      - review-agent: search_code, search_dependencies, analyze_change_impact (analysis)
+      - expert plan agents: search_code, search_dependencies, list_recent_files
+      - expert build agents: search_code, search_dependencies, analyze_change_impact
+      - expert improve agents: search_code, search_dependencies (sub-agent analysis)
+      - expert question agents: search_code, search_dependencies, list_recent_files
   permissive_tools_strict_prompts:
     name: Permissive Tools + Strict Prompts Pattern
     context: Tool permission philosophy discovered 2026-01-28
@@ -539,6 +557,13 @@ best_practices:
         evidence: All updated agents include "Use Bash for..." or "Use Task to..." guidance after Output Style
         timestamp: 2026-01-28
 
+      - practice: MCP tool prefix derives from .mcp.json server name
+        evidence: Server "kotadb-bunx" -> tools must use "mcp__kotadb-bunx__" prefix (commit 30173e6)
+        timestamp: 2026-01-29
+      - practice: Keep agent files and registry in sync for MCP tool names
+        evidence: Expert agents (80+ refs) updated to mcp__kotadb-bunx__; registry updated; general agents pending
+        timestamp: 2026-01-29
+
   - category: Naming
     practices:
       - practice: General agents use descriptive kebab-case naming
@@ -577,6 +602,12 @@ best_practices:
       - practice: Maintain capabilityIndex, modelIndex, and toolMatrix consistency
         evidence: Registry v2.0.0 has complete indexes for all 27+ agents
         timestamp: 2026-01-28
+      - practice: MCP tool prefixes in registry must match .mcp.json server names
+        evidence: Expert agents and registry updated to use mcp__kotadb-bunx__ (2026-01-29)
+        timestamp: 2026-01-29
+      - practice: Update agent-registry.json toolMatrix when changing MCP tool prefixes
+        evidence: Registry toolMatrix updated alongside agent frontmatter changes
+        timestamp: 2026-01-29
 
   - category: Expert Domain Organization
     practices:
@@ -610,17 +641,6 @@ potential_enhancements:
     timestamp: 2026-01-28
 
 recent_changes:
-  - change: Removed branch/leaf hierarchy (commit d669841)
-    impact: Major architectural shift to flat structure
-    learnings: |
-      - Branch agents (branch-plan, branch-build, branch-review, branch-meta) removed
-      - Leaf agents (leaf-retrieval, leaf-build, leaf-review) removed
-      - mcp__leaf_spawner__ tools no longer used
-      - Simplified to general agents + experts/ domains
-      - No more branch coordinator pattern
-      - Orchestration now handled at /do command level
-    timestamp: 2026-01-28
-
   - change: Added 5 new expert domains (commits 902c49a, d669841)
     impact: Expanded from 2 to 7 expert domains
     learnings: |
@@ -632,19 +652,29 @@ recent_changes:
       - Registry v2.0.0 with 40+ domain-specific capabilities
     timestamp: 2026-01-28
 
-  - change: Tool permission updates across 19 expert agents (uncommitted 2026-01-28)
+  - change: Tool permission updates across expert agents (2026-01-28)
     impact: "Permissive tools + strict prompts" philosophy implementation
     learnings: |
-      - 6 plan agents gained Bash (agent-authoring, claude-config, database, api, github, indexer)
-      - 6 build agents gained Bash (same domains)
-      - 7 improve agents gained Task (same domains + testing)
-      - Testing domain already had correct permissions (served as model)
-      - One-liner prompt guidance added: "Use Bash for..." or "Use Task to..."
-      - Tool additions enable verification workflows without reconfiguration
-      - Pattern: Give agents tools they might need, guide via instructions
-      - No special permission sections needed - one-liner sufficient
-      - Philosophy shift: from restrictive to permissive with clear guidance
+      - 6 plan agents gained Bash for git/verification operations
+      - 6 build agents gained Bash for type-checking and tests
+      - 7 improve agents gained Task for sub-agent spawning
+      - One-liner prompt guidance ensures appropriate tool usage
+      - Philosophy: Give tools that might be needed, guide via instructions
     timestamp: 2026-01-28
+
+  - change: MCP tool naming convention established and partial migration (2026-01-29)
+    impact: Tools must use prefix derived from .mcp.json server name
+    learnings: |
+      - MCP tool prefix format: mcp__{serverName}__toolName
+      - Server name "kotadb-bunx" from .mcp.json (stdio transport, commit 30173e6)
+      - Tool prefix must be: mcp__kotadb-bunx__
+      - Expert agents (80+ refs) updated to use mcp__kotadb-bunx__ ✓
+      - agent-registry.json updated to use mcp__kotadb-bunx__ ✓
+      - General agents still use mcp__kotadb__ (scout, build, review - deprecated prefix)
+      - Registry toolMatrix must stay in sync with agent frontmatter tools
+      - Convention: Always derive prefix from active .mcp.json configuration
+      - Pattern applies to all MCP servers (kotadb, firecrawl, etc.)
+    timestamp: 2026-01-29
 
 stability:
   convergence_indicators:
@@ -662,4 +692,6 @@ stability:
       - Registry v2.0.0 with comprehensive indexes
       - Removed branch/leaf references completely
       - Removed Supabase references (now SQLite only)
-      - MCP tools limited to mcp__kotadb__* for local search
+      - MCP tool naming convention established (mcp__kotadb-bunx__ from .mcp.json)
+      - Expert agents updated to mcp__kotadb-bunx__, general agents pending migration
+      - Registry toolMatrix kept in sync with agent frontmatter

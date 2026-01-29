@@ -7,6 +7,9 @@ tools:
   - Grep
   - Write
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
 ---

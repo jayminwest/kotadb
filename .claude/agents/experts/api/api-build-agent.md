@@ -8,6 +8,9 @@ tools:
   - Glob
   - Grep
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__analyze_change_impact
 model: sonnet
 color: green
 ---
