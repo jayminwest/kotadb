@@ -39,9 +39,6 @@ core_implementation:
     app/src/**/__tests__/:
       purpose: Colocated tests next to source files
       pattern: Tests live alongside the modules they test
-    packages/core/tests/:
-      purpose: Core package tests
-      pattern: Indexer core functionality tests
 
   key_patterns:
     - pattern: describe/test blocks

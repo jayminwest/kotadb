@@ -79,7 +79,6 @@ Use Task to spawn sub-agents for complex analysis when needed.
    - Focus on test-related files:
      - `app/tests/**/*.test.ts` - Centralized tests
      - `app/src/**/__tests__/*.test.ts` - Colocated tests
-     - `packages/core/tests/*.test.ts` - Core package tests
      - Database setup patterns
      - Lifecycle hook usage
 

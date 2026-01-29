@@ -23,7 +23,6 @@ overview:
     - Path aliases (@api/*, @indexer/*, @shared/*, etc.)
     - Logging via createLogger (never console.*)
     - TSESTree types from @typescript-eslint/types
-    - Storage abstraction pattern for portability (@kotadb/core package)
 
     Does NOT cover MCP tool implementation (see MCP expert) or API routes.
   rationale: |
@@ -47,13 +46,6 @@ core_implementation:
       extractors.ts: High-level extraction orchestration
       parsers.ts: File type detection and parsing coordination
     
-    packages/core/:
-      purpose: Standalone @kotadb/core package (zero DB dependencies)
-      src/parsers/: AST parsing modules
-      src/analysis/: Symbol, reference, dependency extraction
-      src/storage/: Storage abstraction (Memory + SQLite adapters)
-      src/types/: Type definitions for symbols, references, dependencies
-      tests/: Comprehensive test suite with real fixtures
 
   key_files:
     - path: app/src/indexer/ast-parser.ts
@@ -77,9 +69,6 @@ core_implementation:
     - path: app/src/api/queries.ts
       purpose: FTS5 search with proper term escaping
       exports: searchFilesLocal, escapeFts5Term
-    - path: packages/core/src/storage/sqlite-adapter.ts
-      purpose: Storage abstraction for portability
-      exports: SqliteStorageAdapter, MemoryStorageAdapter
 
 key_operations:
   parse_ast:
@@ -623,7 +612,7 @@ patterns:
       pros: [Zero infrastructure dependencies, Testable with in-memory storage, Portable across environments]
       cons: [Additional abstraction layer, Interface evolution complexity]
     timestamp: 2026-01-28
-    evidence: commit 1eab8bc, packages/core/src/storage/
+    evidence: commit 1eab8bc
 
 
   batch_transaction_pattern:
@@ -787,13 +776,6 @@ potential_enhancements:
     effort: high
     approach: Global symbol index with repository context
 
-  - enhancement: Extract @kotadb/core as standalone package
-    rationale: Enable code analysis in other tools without DB dependencies
-    effort: completed
-    approach: Storage abstraction with MemoryAdapter and SqliteAdapter
-    status: implemented
-    timestamp: 2026-01-28
-    evidence: commit 1eab8bc, packages/core/
 
 stability:
   convergence_indicators:
@@ -808,7 +790,5 @@ stability:
       - Previous: FTS5 term escaping, storage abstraction, schema validation
       - New: Batch processing for large repos, build artifact filtering (27 dirs)
       - New: Path resolution fix (path.join + normalize vs resolve)
-      - Updated: @kotadb/core extraction completed with storage abstraction
-      - Storage abstraction pattern from @kotadb/core extraction
       - Schema constraint validation alignment
       - Updated local-only v2 architecture patterns
