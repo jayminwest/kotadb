@@ -6,18 +6,17 @@ KotaDB is a local-only code intelligence tool for CLI Agents like Claude Code an
 
 ### Prerequisites
 
-- [Bun](https://bun.sh) v1.1+
+- [Bun](https://bun.sh) v1.1+ (required for both development and runtime)
 
-### Installation via npm
+> **Note:** KotaDB requires Bun to run. The package uses TypeScript path aliases that Bun resolves at runtime. Node.js/npx is not supported.
 
-KotaDB can be installed globally or run directly with npx/bunx:
+### Installation
+
+KotaDB can be installed globally or run directly with bunx:
 
 ```bash
 # Run directly (recommended)
 bunx kotadb --stdio
-
-# Or with npx
-npx kotadb --stdio
 
 # Or install globally
 bun add -g kotadb
