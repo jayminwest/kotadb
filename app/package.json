@@ -10,6 +10,7 @@
   "files": [
     "src/**/*.ts",
     "src/**/*.js",
+    "src/**/*.sql",
     "!src/**/*.test.ts",
     "!src/**/*.spec.ts",
     "tsconfig.json",
