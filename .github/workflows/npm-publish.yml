@@ -38,13 +38,12 @@ jobs:
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: app/node_modules
-          key: bun-${{ hashFiles('**/bun.lock') }}
+          path: node_modules
+          key: bun-npm-publish-${{ hashFiles('bun.lock') }}
           restore-keys: |
-            bun-
+            bun-npm-publish-
 
       - name: Install dependencies
-        working-directory: app
         run: bun install --frozen-lockfile
 
       - name: Type check application
@@ -89,7 +88,7 @@ jobs:
           TIMESTAMP=$(date +%Y%m%d%H%M%S)
           PRE_VERSION="${CURRENT_VERSION}-next.${TIMESTAMP}"
           echo "Publishing pre-release version: ${PRE_VERSION}"
-          npm version ${PRE_VERSION} --no-git-tag-version
+          node -e "const fs=require('fs');const p=JSON.parse(fs.readFileSync('package.json'));p.version='${PRE_VERSION}';fs.writeFileSync('package.json',JSON.stringify(p,null,2)+'\n');"
 
       - name: Publish to npm
         working-directory: app
