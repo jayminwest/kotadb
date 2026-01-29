@@ -1,0 +1,363 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="KotaDB Documentation - Learn how to install, configure, and use KotaDB for local code intelligence.">
+  <meta name="keywords" content="KotaDB, documentation, code search, code intelligence, SQLite, local-first">
+  <meta name="author" content="KotaDB">
+  <meta property="og:title" content="KotaDB Documentation">
+  <meta property="og:description" content="Learn how to install, configure, and use KotaDB for local code intelligence.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="KotaDB Documentation">
+  <meta name="twitter:description" content="Learn how to install, configure, and use KotaDB for local code intelligence.">
+  <title>Documentation - KotaDB</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <link rel="stylesheet" href="../css/syntax.css">
+  <style>
+    /* Documentation-specific styles */
+    .docs-layout {
+      display: grid;
+      grid-template-columns: 16rem 1fr;
+      gap: var(--space-xl);
+      max-width: var(--max-width);
+      margin: 0 auto;
+      padding: var(--space-xl) var(--space-lg);
+      min-height: calc(100vh - var(--header-height) - 8rem);
+    }
+
+    /* Sidebar */
+    .docs-sidebar {
+      position: sticky;
+      top: calc(var(--header-height) + var(--space-lg));
+      height: fit-content;
+      max-height: calc(100vh - var(--header-height) - var(--space-xl));
+      overflow-y: auto;
+      padding-right: var(--space-md);
+    }
+
+    .docs-sidebar h2 {
+      font-size: var(--font-size-sm);
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-md);
+    }
+
+    .docs-nav {
+      list-style: none;
+      padding: 0;
+      margin: 0;
+    }
+
+    .docs-nav li {
+      margin-bottom: var(--space-xs);
+    }
+
+    .docs-nav a {
+      display: block;
+      padding: var(--space-sm) var(--space-md);
+      color: var(--color-text-muted);
+      font-size: var(--font-size-sm);
+      border-radius: var(--border-radius);
+      transition: all 0.15s ease;
+    }
+
+    .docs-nav a:hover {
+      color: var(--color-text);
+      background-color: var(--color-bg-alt);
+    }
+
+    .docs-nav a.is-active {
+      color: var(--color-primary);
+      background-color: var(--color-bg-alt);
+      font-weight: 500;
+    }
+
+    /* Content area */
+    .docs-content {
+      min-width: 0;
+      max-width: 48rem;
+    }
+
+    .docs-content h1 {
+      margin-bottom: var(--space-lg);
+      padding-bottom: var(--space-md);
+      border-bottom: 1px solid var(--color-border);
+    }
+
+    .docs-content h2 {
+      margin-top: var(--space-2xl);
+      margin-bottom: var(--space-md);
+    }
+
+    .docs-content h3 {
+      margin-top: var(--space-xl);
+      margin-bottom: var(--space-sm);
+    }
+
+    .docs-content p {
+      color: var(--color-text);
+      line-height: 1.7;
+    }
+
+    .docs-content ul,
+    .docs-content ol {
+      margin-bottom: var(--space-md);
+      padding-left: var(--space-lg);
+    }
+
+    .docs-content li {
+      margin-bottom: var(--space-sm);
+      line-height: 1.6;
+    }
+
+    .docs-content a {
+      text-decoration: underline;
+      text-decoration-color: var(--color-border);
+      text-underline-offset: 2px;
+    }
+
+    .docs-content a:hover {
+      text-decoration-color: var(--color-primary);
+    }
+
+    /* Heading anchors */
+    .docs-content .heading-anchor {
+      color: var(--color-text-muted);
+      text-decoration: none;
+      margin-right: var(--space-sm);
+      opacity: 0;
+      transition: opacity 0.15s ease;
+    }
+
+    .docs-content h2:hover .heading-anchor,
+    .docs-content h3:hover .heading-anchor,
+    .docs-content h4:hover .heading-anchor {
+      opacity: 1;
+    }
+
+    /* Loading state */
+    .loading {
+      color: var(--color-text-muted);
+      font-style: italic;
+      padding: var(--space-xl);
+    }
+
+    /* Error state */
+    .error-message {
+      padding: var(--space-xl);
+      background-color: var(--color-bg-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--border-radius);
+    }
+
+    .error-message h2 {
+      color: var(--color-text);
+      margin-top: 0;
+    }
+
+    /* Mobile responsive */
+    @media (max-width: 768px) {
+      .docs-layout {
+        grid-template-columns: 1fr;
+        padding: var(--space-md);
+      }
+
+      .docs-sidebar {
+        position: relative;
+        top: 0;
+        max-height: none;
+        padding-right: 0;
+        padding-bottom: var(--space-lg);
+        border-bottom: 1px solid var(--color-border);
+        margin-bottom: var(--space-lg);
+      }
+
+      .docs-nav {
+        display: flex;
+        flex-wrap: wrap;
+        gap: var(--space-sm);
+      }
+
+      .docs-nav li {
+        margin-bottom: 0;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="logo">KotaDB</a>
+      <nav class="main-nav">
+        <a href="/docs/">Docs</a>
+        <a href="/blog/">Blog</a>
+        <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="docs-layout">
+    <aside class="docs-sidebar">
+      <h2>Documentation</h2>
+      <ul class="docs-nav" id="docs-nav">
+        <li><a href="#installation" data-page="installation">Installation</a></li>
+        <li><a href="#configuration" data-page="configuration">Configuration</a></li>
+        <li><a href="#api-reference" data-page="api-reference">API Reference</a></li>
+        <li><a href="#architecture" data-page="architecture">Architecture</a></li>
+      </ul>
+    </aside>
+
+    <article class="docs-content" id="docs-content">
+      <div class="loading">Loading documentation...</div>
+    </article>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+        <p>&copy; 2026 KotaDB. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
+        <nav class="footer-nav">
+          <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
+
+  <script src="../assets/lib/marked.min.js"></script>
+  <script type="module">
+    import { initMarked, loadMarkdownInto } from '../js/render.js';
+
+    // Documentation pages configuration
+    const DOCS_PAGES = {
+      'installation': {
+        file: 'content/installation.md',
+        title: 'Installation - KotaDB Documentation'
+      },
+      'configuration': {
+        file: 'content/configuration.md',
+        title: 'Configuration - KotaDB Documentation'
+      },
+      'api-reference': {
+        file: 'content/api-reference.md',
+        title: 'API Reference - KotaDB Documentation'
+      },
+      'architecture': {
+        file: 'content/architecture.md',
+        title: 'Architecture - KotaDB Documentation'
+      }
+    };
+
+    const DEFAULT_PAGE = 'installation';
+
+    /**
+     * Get current page from URL
+     */
+    function getCurrentPage() {
+      // Check hash first (e.g., /docs/#installation)
+      const hash = window.location.hash.slice(1);
+      if (hash && DOCS_PAGES[hash]) {
+        return hash;
+      }
+
+      // Check query parameter (e.g., /docs/?page=installation)
+      const params = new URLSearchParams(window.location.search);
+      const queryPage = params.get('page');
+      if (queryPage && DOCS_PAGES[queryPage]) {
+        return queryPage;
+      }
+
+      return DEFAULT_PAGE;
+    }
+
+    /**
+     * Update active sidebar link
+     */
+    function updateActiveLink(page) {
+      const navLinks = document.querySelectorAll('#docs-nav a');
+      navLinks.forEach(link => {
+        const linkPage = link.dataset.page;
+        if (linkPage === page) {
+          link.classList.add('is-active');
+          link.setAttribute('aria-current', 'page');
+        } else {
+          link.classList.remove('is-active');
+          link.removeAttribute('aria-current');
+        }
+      });
+    }
+
+    /**
+     * Load a documentation page
+     */
+    async function loadPage(page) {
+      const pageConfig = DOCS_PAGES[page];
+      if (!pageConfig) {
+        page = DEFAULT_PAGE;
+      }
+
+      const config = DOCS_PAGES[page];
+      
+      // Update URL without reload
+      const newUrl = `${window.location.pathname}#${page}`;
+      if (window.location.hash !== `#${page}`) {
+        history.pushState({ page }, config.title, newUrl);
+      }
+
+      // Update page title
+      document.title = config.title;
+
+      // Update active link
+      updateActiveLink(page);
+
+      // Load the markdown content
+      try {
+        await loadMarkdownInto(config.file, '#docs-content', {
+          updateTitle: false // We already set the title
+        });
+      } catch (error) {
+        // Error is handled by loadMarkdownInto
+      }
+    }
+
+    /**
+     * Initialize documentation
+     */
+    function init() {
+      // Initialize marked.js
+      initMarked();
+
+      // Set up navigation click handlers
+      const navLinks = document.querySelectorAll('#docs-nav a');
+      navLinks.forEach(link => {
+        link.addEventListener('click', (e) => {
+          e.preventDefault();
+          const page = link.dataset.page;
+          loadPage(page);
+        });
+      });
+
+      // Handle browser back/forward
+      window.addEventListener('popstate', (e) => {
+        const page = e.state?.page || getCurrentPage();
+        loadPage(page);
+      });
+
+      // Load initial page
+      loadPage(getCurrentPage());
+    }
+
+    // Initialize when DOM is ready
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  </script>
+  <script type="module" src="../js/main.js"></script>
+</body>
+</html>
