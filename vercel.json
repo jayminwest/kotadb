@@ -1,6 +1,12 @@
 {
-  "cleanUrls": true,
-  "trailingSlash": false,
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "outputDirectory": "web",
+  "buildCommand": "",
+  "framework": null,
+  "rewrites": [
+    { "source": "/docs", "destination": "/docs/index.html" },
+    { "source": "/blog", "destination": "/blog/index.html" }
+  ],
   "headers": [
     {
       "source": "/(.*)",
@@ -16,9 +22,5 @@
         { "key": "Cache-Control", "value": "public, max-age=31536000, immutable" }
       ]
     }
-  ],
-  "rewrites": [
-    { "source": "/docs", "destination": "/docs/index.html" },
-    { "source": "/blog", "destination": "/blog/index.html" }
   ]
 }
