@@ -38,12 +38,13 @@ jobs:
       - name: Cache dependencies
         uses: actions/cache@v4
         with:
-          path: node_modules
+          path: app/node_modules
           key: bun-${{ hashFiles('**/bun.lock') }}
           restore-keys: |
             bun-
 
       - name: Install dependencies
+        working-directory: app
         run: bun install --frozen-lockfile
 
       - name: Type check application
