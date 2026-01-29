@@ -5,22 +5,23 @@
 overview:
   description: |
     KotaDB API expertise covering Express HTTP server patterns, MCP SDK integration with
-    StreamableHTTPServerTransport, OpenAPI specification generation, CLI entry point, 
-    and query layer patterns. This expertise enables correct API endpoint, MCP tool, 
-    and CLI command implementation within KotaDB's local-only, SQLite-based architecture.
+    StreamableHTTPServerTransport and StdioServerTransport, OpenAPI specification generation, 
+    CLI entry point, and query layer patterns. This expertise enables correct API endpoint, 
+    MCP tool, and CLI command implementation within KotaDB's local-only, SQLite-based architecture.
   scope: |
     Covers Express app structure (app/src/api/), route patterns, MCP server and transport
-    configuration, MCP tool definitions and executors, OpenAPI spec generation with Zod schemas,
-    CLI entry point (app/src/cli.ts), query layer functions for SQLite, and middleware patterns.
+    configuration (stdio and HTTP), MCP tool definitions and executors, OpenAPI spec generation 
+    with Zod schemas, CLI entry point (app/src/cli.ts), query layer functions for SQLite, and 
+    middleware patterns.
 
     KOTADB ADAPTATIONS:
     - Local-only mode (no Supabase, no cloud auth)
     - SQLite database via getGlobalDatabase()
     - Authentication bypassed in local mode
     - Synchronous operations (no queue)
-    - MCP uses StreamableHTTPServerTransport with JSON mode
+    - MCP supports StdioServerTransport (recommended) and StreamableHTTPServerTransport
     - Path aliases (@api/*, @mcp/*, @db/*, @logging/*, etc.)
-    - Logging via process.stdout.write (never console.*)
+    - Logging via process.stdout.write (never console.*), forceStderr for stdio mode
     - CLI entry point via bin field in package.json
   rationale: |
     Consistent API implementation enables reliable MCP tool usage and proper endpoint design.
@@ -30,9 +31,9 @@ overview:
 core_implementation:
   key_files:
     - path: app/src/cli.ts
-      purpose: CLI entry point - argument parsing, server startup, graceful shutdown
+      purpose: CLI entry point - argument parsing, server startup, graceful shutdown, stdio transport
       exports: (none - direct execution)
-      patterns: shebang, arg parsing, signal handlers, version resolution
+      patterns: shebang, arg parsing, signal handlers, version resolution, stdio mode routing
     - path: app/src/api/routes.ts
       purpose: Express app factory - createExpressApp()
       exports: createExpressApp
@@ -48,6 +49,9 @@ core_implementation:
     - path: app/src/api/openapi/builder.ts
       purpose: OpenAPI 3.1 spec generator
       exports: buildOpenAPISpec, clearSpecCache
+    - path: app/src/logging/logger.ts
+      purpose: Structured logging with stderr routing support
+      exports: createLogger, Logger, LogContext
 
 key_operations:
   create_cli_entry_point:
@@ -56,9 +60,9 @@ key_operations:
       1. Create app/src/cli.ts with #!/usr/bin/env bun shebang (first line, no BOM)
       2. Import createExpressApp, getEnvironmentConfig, createLogger
       3. Implement getVersion(): Reads package.json at runtime
-      4. Implement parseArgs() to handle --help, -h, --version, -v, --port <number>
-      5. In main(): parse args -> handle --version/--help -> start server
-      6. Set up graceful shutdown handlers for SIGTERM and SIGINT:
+      4. Implement parseArgs() to handle --help, -h, --version, -v, --port <number>, --stdio
+      5. In main(): parse args -> handle --version/--help -> route stdio/HTTP mode
+      6. Set up graceful shutdown handlers for SIGTERM and SIGINT (HTTP mode only):
          - Close server and exit(0) on success
          - Force exit(1) after 10-second timeout
       7. Add global error handlers for unhandledRejection and uncaughtException
@@ -71,7 +75,7 @@ key_operations:
     key_patterns:
       - getVersion() reads package.json at runtime (supports bundled packages)
       - process.argv.slice(2) skips executable and script path
-      - Timeout-based forced shutdown (10s) prevents hanging processes
+      - Timeout-based forced shutdown (10s) prevents hanging processes (HTTP mode)
       - process.stdout.write for output, process.stderr.write for errors
     pitfalls:
       - what: "Using console.log instead of process.stdout.write"
@@ -83,6 +87,55 @@ key_operations:
       - what: "Missing timeout in shutdown handler"
         instead: "Always include 10-second timeout for forced shutdown"
         reason: "Prevents process hanging if close() doesn't complete"
+
+  implement_mcp_stdio_transport:
+    when: Adding stdio transport for MCP server (Claude Code integration)
+    approach: |
+      1. Import StdioServerTransport from @modelcontextprotocol/sdk/server/stdio.js
+      2. Add --stdio flag to CLI option parsing (CliOptions interface)
+      3. Create runStdioMode() function:
+         - Create logger with forceStderr: true (CRITICAL for JSON-RPC protocol)
+         - Create MCP server with createMcpServer(context)
+         - Instantiate new StdioServerTransport()
+         - Connect server to transport via server.connect(transport)
+         - Let transport manage process lifecycle (no explicit shutdown handler)
+      4. Update main() to route --stdio flag to runStdioMode()
+      5. Add forceStderr support to logger:
+         - Add forceStderr?: boolean to LogContext interface
+         - Update createLogger() to extract and pass forceStderr flag
+         - Update writeLog() to accept forceStderr parameter
+         - Route all logs to stderr when forceStderr is true
+      6. Update help text to document --stdio flag and stdio configuration
+    timestamp: 2026-01-29
+    evidence: Issue #49, app/src/cli.ts, app/src/logging/logger.ts
+    rationale: |
+      Stdio transport eliminates port conflicts (EADDRINUSE on 3000) by using stdin/stdout
+      instead of TCP. This is the MCP-recommended pattern for local CLI tools. CRITICAL:
+      stdout MUST be reserved for JSON-RPC protocol messages - all logs go to stderr.
+    key_patterns:
+      - StdioServerTransport from @modelcontextprotocol/sdk/server/stdio.js (v1.25+)
+      - forceStderr: true in logger ensures stdout is protocol-only
+      - Transport manages process lifecycle (stdin close triggers shutdown)
+      - No graceful shutdown handler needed (unlike HTTP mode)
+      - Mode selection via CLI flag (--stdio), not environment variable
+    pitfalls:
+      - what: "Logging to stdout in stdio mode"
+        instead: "Use forceStderr: true in createLogger() options"
+        reason: "stdout is reserved for JSON-RPC messages, logs corrupt protocol"
+      - what: "Adding SIGTERM/SIGINT handlers in stdio mode"
+        instead: "Let transport manage lifecycle via stdin close"
+        reason: "Transport handles shutdown when Claude Code closes stdin"
+      - what: "Using PORT environment variable in stdio mode"
+        instead: "Ignore port configuration when --stdio is set"
+        reason: "Stdio doesn't use TCP ports, PORT is meaningless"
+      - what: "Starting HTTP server when --stdio is set"
+        instead: "Route to runStdioMode() and return early"
+        reason: "Modes are mutually exclusive - stdio XOR HTTP"
+    affected_files: |
+      - app/src/cli.ts (CliOptions, parseArgs, runStdioMode, main routing)
+      - app/src/logging/logger.ts (LogContext.forceStderr, createLogger, writeLog)
+      - README.md (stdio-first documentation)
+      - app/tests/cli.test.ts (--stdio flag validation)
 
   add_express_route:
     when: Adding new HTTP endpoint to the API
@@ -195,7 +248,6 @@ key_operations:
         instead: "Use KOTADB_PATH env var for file-based test database"
         reason: "Global singleton needs file path for proper isolation"
 
-
   configure_npm_package_distribution:
     when: Publishing TypeScript package with path aliases for direct execution (Bun/ts-node)
     approach: |
@@ -250,10 +302,11 @@ patterns:
       }
       
       function parseArgs(args: string[]): CliOptions {
-        const options: CliOptions = { port: 3000, help: false, version: false };
+        const options: CliOptions = { port: 3000, help: false, version: false, stdio: false };
         for (let i = 0; i < args.length; i++) {
           if (args[i] === "--help" || args[i] === "-h") options.help = true;
           else if (args[i] === "--version" || args[i] === "-v") options.version = true;
+          else if (args[i] === "--stdio") options.stdio = true;
           else if (args[i] === "--port") options.port = Number(args[++i]);
         }
         return options;
@@ -265,6 +318,14 @@ patterns:
           process.stdout.write(`kotadb v${getVersion()}\n`);
           process.exit(0);
         }
+        
+        // Route to stdio mode
+        if (options.stdio) {
+          await runStdioMode();
+          return;
+        }
+        
+        // HTTP mode
         const server = createExpressApp().listen(options.port);
         const shutdown = () => {
           server.close(() => process.exit(0));
@@ -278,9 +339,104 @@ patterns:
       - process.argv.slice(2) skips executable and script path
       - getVersion() reads package.json at runtime
       - Use process.stdout.write / process.stderr.write (not console.*)
-      - 10-second timeout in shutdown handler
-    timestamp: 2026-01-28
+      - 10-second timeout in shutdown handler (HTTP mode only)
+      - Stdio mode requires no shutdown handler (transport manages lifecycle)
+    timestamp: 2026-01-29
     evidence: app/src/cli.ts
+
+  mcp_stdio_mode_pattern:
+    structure: |
+      // app/src/cli.ts (stdio transport mode)
+      import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+      import { createMcpServer, type McpServerContext } from "@mcp/server";
+      
+      async function runStdioMode(): Promise<void> {
+        // CRITICAL: All logs must go to stderr in stdio mode
+        const logger = createLogger({
+          module: "mcp-stdio",
+          forceStderr: true,  // stdout reserved for JSON-RPC
+        });
+      
+        logger.info("KotaDB MCP server starting in stdio mode", {
+          version: getVersion(),
+        });
+      
+        // Create MCP server (same as HTTP mode)
+        const context: McpServerContext = {
+          userId: "local",  // Local-only mode
+        };
+        const server = createMcpServer(context);
+      
+        // Create and connect stdio transport
+        const transport = new StdioServerTransport();
+        await server.connect(transport);
+      
+        logger.info("KotaDB MCP server connected via stdio");
+      
+        // Process stays alive until stdin closes (Claude Code manages lifecycle)
+      }
+      
+      async function main(): Promise<void> {
+        const options = parseArgs(process.argv.slice(2));
+        
+        // Route to stdio mode
+        if (options.stdio) {
+          await runStdioMode();
+          return;  // runStdioMode() keeps process alive
+        }
+        
+        // Otherwise start HTTP server (existing code)
+        // ...
+      }
+    notes:
+      - StdioServerTransport requires @modelcontextprotocol/sdk v1.25+
+      - forceStderr: true is CRITICAL - stdout is reserved for JSON-RPC protocol
+      - No graceful shutdown handler needed - transport manages lifecycle
+      - Process terminates when Claude Code closes stdin
+      - Same MCP server works with both stdio and HTTP transports
+    timestamp: 2026-01-29
+    evidence: app/src/cli.ts (runStdioMode implementation)
+
+  logger_stderr_routing_pattern:
+    structure: |
+      // app/src/logging/logger.ts (stderr routing for stdio mode)
+      export interface LogContext {
+        request_id?: string;
+        user_id?: string;
+        forceStderr?: boolean;  // NEW: route all logs to stderr
+        [key: string]: unknown;
+      }
+      
+      export function createLogger(baseContext?: LogContext): Logger {
+        const context = baseContext ? maskSensitiveData(baseContext) : {};
+        const forceStderr = context.forceStderr === true;
+        
+        return {
+          info(message: string, additionalContext?: LogContext): void {
+            const entry: LogEntry = { /* ... */ };
+            writeLog(entry, forceStderr);  // Pass forceStderr flag
+          },
+          // ... other log methods
+        };
+      }
+      
+      function writeLog(entry: LogEntry, forceStderr = false): void {
+        const json = JSON.stringify(entry);
+        const output = `${json}\n`;
+        
+        if (forceStderr || entry.level === "error") {
+          process.stderr.write(output);
+        } else {
+          process.stdout.write(output);
+        }
+      }
+    notes:
+      - forceStderr flag routes ALL log levels to stderr (including info/debug)
+      - Default behavior: info/debug/warn to stdout, error to stderr
+      - Stdio mode behavior: ALL logs to stderr (stdout is protocol channel)
+      - Flag is set once at logger creation, not per log call
+    timestamp: 2026-01-29
+    evidence: app/src/logging/logger.ts (forceStderr implementation)
 
   express_route_pattern:
     structure: |
@@ -406,14 +562,13 @@ patterns:
     timestamp: 2026-01-29
     evidence: Issue #39 fix for v2.0.1
 
-
 best_practices:
   cli: |
     - Include #!/usr/bin/env bun shebang on first line (no BOM)
     - Use process.stdout.write for output, process.stderr.write for errors
     - Read version from package.json at runtime, not hardcoded
-    - Register BOTH SIGTERM and SIGINT handlers
-    - Include 10-second forced shutdown timeout
+    - Register BOTH SIGTERM and SIGINT handlers (HTTP mode only)
+    - Include 10-second forced shutdown timeout (HTTP mode only)
   
   routes: |
     - Always addRateLimitHeaders before response
@@ -426,6 +581,15 @@ best_practices:
     - Validate ALL parameters including types
     - Return structured objects that serialize to JSON
     - Log tool calls with tool_name and user_id
+  
+  mcp_transports: |
+    - Use stdio transport for Claude Code integration (recommended)
+    - Use HTTP transport for multi-client scenarios or remote access
+    - CRITICAL: In stdio mode, ALL logs must go to stderr (forceStderr: true)
+    - Stdio: Transport manages lifecycle, no shutdown handlers needed
+    - HTTP: Requires graceful shutdown handlers for SIGTERM/SIGINT
+    - Mode selection via CLI flag (--stdio), not environment variable
+    - Document both transports in README with stdio-first recommendation
   
   queries: |
     - Internal functions take db param (testable)
@@ -446,7 +610,6 @@ best_practices:
     - Test with npm pack + bunx <tarball> before publishing
     - Update CI workflows when restructuring monorepo packages
 
-
 known_issues:
   - issue: OpenAPI spec cached at startup
     impact: Changes not reflected until restart
@@ -463,23 +626,34 @@ known_issues:
     status: resolved (2026-01-29, Issue #39)
     resolution: Include tsconfig.json and shared/**/*.ts in files array, relocate shared/ into app/
 
+  - issue: MCP server port conflicts (EADDRINUSE on 3000)
+    impact: Cannot start multiple instances or when port occupied
+    status: resolved (2026-01-29, Issue #49)
+    resolution: Stdio transport eliminates port conflicts (uses stdin/stdout, not TCP)
+
 stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 2
-    patterns_updated_this_cycle: 0
+    new_patterns_added_this_cycle: 3
+    patterns_updated_this_cycle: 1
     last_reviewed: 2026-01-29
     utility_ratio: 1.0
     notes: |
-      Sixth review cycle - npm package distribution patterns:
+      Seventh review cycle - MCP stdio transport implementation:
       
-      New operation: configure_npm_package_distribution
-      - Complete guidance on TypeScript package publishing with Bun
-      - tsconfig.json inclusion, path alias management, monorepo restructuring
+      New operation: implement_mcp_stdio_transport
+      - Complete guidance on StdioServerTransport integration
+      - forceStderr logging pattern for JSON-RPC protocol compliance
+      - CLI mode routing (stdio vs HTTP)
+      - Transport lifecycle management
       
-      New pattern: npm_package_files_pattern
-      - Template for package.json files array and tsconfig.json configuration
+      New patterns:
+      - mcp_stdio_mode_pattern (runStdioMode implementation)
+      - logger_stderr_routing_pattern (forceStderr support)
+      
+      Updated pattern:
+      - cli_entry_point_pattern (added --stdio flag, mode routing)
       
       Previously stable patterns:
       - CLI entry point (Issue #19)
@@ -488,13 +662,14 @@ stability:
       - FTS5 search term escaping
       - Local file path validation
       - Local auth bypass
+      - npm package distribution
       
       Architecture stability: Very High
-      - Zero contradictions across 6 cycles
+      - Zero contradictions across 7 cycles
       - All core operations documented
       - All 8 MCP tools with comprehensive tests
       - CLI deployment pattern established
-      - npm distribution patterns now comprehensive
+      - Stdio transport eliminates port conflict issues
+      - Both MCP transports (stdio + HTTP) fully documented
       
-      Next review: After 10-15 API commits or next npm distribution issue
-
+      Next review: After 10-15 API commits or next MCP transport issue

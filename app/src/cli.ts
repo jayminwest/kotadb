@@ -7,6 +7,7 @@
  *
  * Usage:
  *   kotadb              Start the MCP server (default port 3000)
+ *   kotadb --stdio      Start in stdio mode (for Claude Code integration)
  *   kotadb --port 4000  Start on custom port
  *   kotadb --version    Show version
  *   kotadb --help       Show help
@@ -15,6 +16,8 @@
 import { createExpressApp } from "@api/routes";
 import { getEnvironmentConfig } from "@config/environment";
 import { createLogger } from "@logging/logger";
+import { createMcpServer, type McpServerContext } from "@mcp/server";
+import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -25,6 +28,7 @@ interface CliOptions {
   port: number;
   help: boolean;
   version: boolean;
+  stdio: boolean;
 }
 
 function getVersion(): string {
@@ -46,22 +50,37 @@ USAGE:
   kotadb [OPTIONS]
 
 OPTIONS:
+  --stdio           Use stdio transport (for Claude Code integration)
   --port <number>   Port to listen on (default: 3000, env: PORT)
   --version, -v     Show version number
   --help, -h        Show this help message
 
 ENVIRONMENT VARIABLES:
-  PORT              Server port (default: 3000)
+  PORT              Server port (default: 3000, HTTP mode only)
   KOTA_DB_PATH      SQLite database path (default: ~/.kotadb/kotadb.sqlite)
   KOTA_ALLOWED_ORIGINS  Comma-separated allowed CORS origins
+  LOG_LEVEL         Logging level: debug, info, warn, error (default: info)
 
 EXAMPLES:
-  kotadb                    Start server on port 3000
-  kotadb --port 4000        Start server on port 4000
-  PORT=8080 kotadb          Start server on port 8080
+  kotadb --stdio            Start in stdio mode (for Claude Code)
+  kotadb                    Start HTTP server on port 3000
+  kotadb --port 4000        Start HTTP server on port 4000
+  PORT=8080 kotadb          Start HTTP server on port 8080
 
-MCP CONFIGURATION:
-  Add to your .mcp.json or Claude settings:
+MCP CONFIGURATION (stdio mode - RECOMMENDED):
+  Add to your .mcp.json or Claude Code settings:
+
+  {
+    "mcpServers": {
+      "kotadb": {
+        "command": "bunx",
+        "args": ["kotadb@next", "--stdio"]
+      }
+    }
+  }
+
+MCP CONFIGURATION (HTTP mode - legacy):
+  Add to your .mcp.json or Claude Code settings:
 
   {
     "mcpServers": {
@@ -72,17 +91,6 @@ MCP CONFIGURATION:
           "Accept": "application/json, text/event-stream",
           "MCP-Protocol-Version": "2025-06-18"
         }
-      }
-    }
-  }
-
-  Or use bunx directly in Claude Code settings:
-
-  {
-    "mcpServers": {
-      "kotadb": {
-        "command": "bunx",
-        "args": ["kotadb"]
       }
     }
   }
@@ -103,6 +111,7 @@ function parseArgs(args: string[]): CliOptions {
     port: Number(process.env.PORT ?? 3000),
     help: false,
     version: false,
+    stdio: false,
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -113,6 +122,8 @@ function parseArgs(args: string[]): CliOptions {
       options.help = true;
     } else if (arg === "--version" || arg === "-v") {
       options.version = true;
+    } else if (arg === "--stdio") {
+      options.stdio = true;
     } else if (arg === "--port") {
       const portStr = args[++i];
       if (!portStr || Number.isNaN(Number(portStr))) {
@@ -137,6 +148,36 @@ function parseArgs(args: string[]): CliOptions {
   return options;
 }
 
+async function runStdioMode(): Promise<void> {
+  // Redirect logger to stderr in stdio mode
+  // This is CRITICAL - stdout is reserved for JSON-RPC protocol
+  const logger = createLogger({
+    module: "mcp-stdio",
+    forceStderr: true,
+  });
+
+  logger.info("KotaDB MCP server starting in stdio mode", {
+    version: getVersion(),
+  });
+
+  // Create MCP server with local-only context
+  const context: McpServerContext = {
+    userId: "local", // Local-only mode uses fixed user ID
+  };
+  const server = createMcpServer(context);
+
+  // Create stdio transport
+  const transport = new StdioServerTransport();
+
+  // Connect server to transport
+  await server.connect(transport);
+
+  logger.info("KotaDB MCP server connected via stdio");
+
+  // Server lifecycle is managed by the transport
+  // Process will stay alive until stdin closes (when Claude Code terminates it)
+}
+
 async function main(): Promise<void> {
   // Parse command line arguments (skip first two: bun/node and script path)
   const args = process.argv.slice(2);
@@ -154,7 +195,13 @@ async function main(): Promise<void> {
     process.exit(0);
   }
 
-  // Start server
+  // Handle stdio mode
+  if (options.stdio) {
+    await runStdioMode();
+    return; // runStdioMode() keeps process alive
+  }
+
+  // Start server in HTTP mode
   const logger = createLogger();
   const envConfig = getEnvironmentConfig();
 

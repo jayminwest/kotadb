@@ -9,6 +9,7 @@ export interface LogContext {
 	user_id?: string;
 	key_id?: string;
 	job_id?: string;
+	forceStderr?: boolean;
 	[key: string]: unknown;
 }
 
@@ -101,11 +102,11 @@ function maskSensitiveData(context: LogContext): LogContext {
 /**
  * Format and write log entry to stdout (info/debug/warn) or stderr (error)
  */
-function writeLog(entry: LogEntry): void {
+function writeLog(entry: LogEntry, forceStderr = false): void {
 	const json = JSON.stringify(entry);
 	const output = `${json}\n`;
 
-	if (entry.level === "error") {
+	if (forceStderr || entry.level === "error") {
 		process.stderr.write(output);
 	} else {
 		process.stdout.write(output);
@@ -117,6 +118,7 @@ function writeLog(entry: LogEntry): void {
  */
 export function createLogger(baseContext?: LogContext): Logger {
 	const context = baseContext ? maskSensitiveData(baseContext) : {};
+	const forceStderr = context.forceStderr === true;
 
 	return {
 		debug(message: string, additionalContext?: LogContext): void {
@@ -128,7 +130,7 @@ export function createLogger(baseContext?: LogContext): Logger {
 				message,
 				context: additionalContext ? { ...context, ...maskSensitiveData(additionalContext) } : Object.keys(context).length > 0 ? context : undefined,
 			};
-			writeLog(entry);
+			writeLog(entry, forceStderr);
 		},
 
 		info(message: string, additionalContext?: LogContext): void {
@@ -140,7 +142,7 @@ export function createLogger(baseContext?: LogContext): Logger {
 				message,
 				context: additionalContext ? { ...context, ...maskSensitiveData(additionalContext) } : Object.keys(context).length > 0 ? context : undefined,
 			};
-			writeLog(entry);
+			writeLog(entry, forceStderr);
 		},
 
 		warn(message: string, additionalContext?: LogContext): void {
@@ -152,7 +154,7 @@ export function createLogger(baseContext?: LogContext): Logger {
 				message,
 				context: additionalContext ? { ...context, ...maskSensitiveData(additionalContext) } : Object.keys(context).length > 0 ? context : undefined,
 			};
-			writeLog(entry);
+			writeLog(entry, forceStderr);
 		},
 
 		error(message: string, errorOrContext?: Error | LogContext, additionalContext?: LogContext): void {
@@ -183,7 +185,7 @@ export function createLogger(baseContext?: LogContext): Logger {
 				entry.context = context;
 			}
 
-			writeLog(entry);
+			writeLog(entry, forceStderr);
 		},
 
 		child(childContext: LogContext): Logger {
