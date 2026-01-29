@@ -582,12 +582,13 @@ export function queryDependents(
 	}
 	
 	const sql = `
-		WITH RECURSIVE dependents AS (
+		WITH RECURSIVE 
+		dependents AS (
 			SELECT
 				f.id AS file_id,
 				f.path AS file_path,
 				1 AS depth,
-				'/' || f.id || '/' AS path_tracker
+				'|' || f.path || '|' AS path_tracker
 			FROM indexed_references r
 			JOIN indexed_files f ON r.file_id = f.id
 			WHERE r.reference_type = 'import'
@@ -600,7 +601,7 @@ export function queryDependents(
 				f2.id AS file_id,
 				f2.path AS file_path,
 				d.depth + 1 AS depth,
-				d.path_tracker || f2.id || '/' AS path_tracker
+				d.path_tracker || f2.path || '|' AS path_tracker
 			FROM indexed_references r2
 			JOIN indexed_files f2 ON r2.file_id = f2.id
 			JOIN indexed_files target2 ON r2.target_file_path = target2.path
@@ -608,31 +609,44 @@ export function queryDependents(
 			WHERE r2.reference_type = 'import'
 				AND r2.repository_id = ?
 				AND d.depth < ?
-				AND INSTR(d.path_tracker, '/' || f2.id || '/') = 0
+				AND INSTR(d.path_tracker, '|' || f2.path || '|') = 0
+		),
+		cycles AS (
+			SELECT DISTINCT
+				d.path_tracker || f2.path || '|' AS cycle_path
+			FROM indexed_references r2
+			JOIN indexed_files f2 ON r2.file_id = f2.id
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependents d ON target2.id = d.file_id
+			WHERE r2.reference_type = 'import'
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '|' || f2.path || '|') > 0
 		)
-		SELECT DISTINCT
+		SELECT 
 			file_path,
-			depth
+			depth,
+			NULL AS cycle_path
 		FROM dependents
+		UNION ALL
+		SELECT
+			NULL AS file_path,
+			NULL AS depth,
+			cycle_path
+		FROM cycles
 		ORDER BY depth ASC, file_path ASC
 	`;
 	
 	const results = db.query<{
-		file_path: string;
-		depth: number;
-	}>(sql, [fileRecord.repository_id, fileRecord.path, fileRecord.repository_id, depth]);
+		file_path: string | null;
+		depth: number | null;
+		cycle_path: string | null;
+	}>(sql, [fileRecord.repository_id, fileRecord.path, fileRecord.repository_id, depth, fileRecord.repository_id, depth]);
 	
 	return processDepthResults(results, includeTests);
 }
 
 
-/**
- * Query files that the given file depends on (forward lookup).
- *
- * @param fileId - Source file UUID
- * @param depth - Recursion depth (1-5)
- * @returns Dependency result with direct/indirect relationships and cycles
- */
 /**
  * Query files that the given file depends on (forward lookup).
  *
@@ -660,12 +674,13 @@ export function queryDependencies(
 	}
 	
 	const sql = `
-		WITH RECURSIVE dependencies AS (
+		WITH RECURSIVE 
+		dependencies AS (
 			SELECT
 				target.id AS file_id,
 				target.path AS file_path,
 				1 AS depth,
-				'/' || target.id || '/' AS path_tracker
+				'|' || target.path || '|' AS path_tracker
 			FROM indexed_references r
 			JOIN indexed_files target ON r.target_file_path = target.path
 			WHERE r.reference_type = 'import'
@@ -678,26 +693,45 @@ export function queryDependencies(
 				target2.id AS file_id,
 				target2.path AS file_path,
 				d.depth + 1 AS depth,
-				d.path_tracker || target2.id || '/' AS path_tracker
+				d.path_tracker || target2.path || '|' AS path_tracker
 			FROM indexed_references r2
 			JOIN indexed_files target2 ON r2.target_file_path = target2.path
 			JOIN dependencies d ON r2.file_id = d.file_id
 			WHERE r2.reference_type = 'import'
 				AND r2.repository_id = ?
 				AND d.depth < ?
-				AND INSTR(d.path_tracker, '/' || target2.id || '/') = 0
+				AND INSTR(d.path_tracker, '|' || target2.path || '|') = 0
+		),
+		cycles AS (
+			SELECT DISTINCT
+				d.path_tracker || target2.path || '|' AS cycle_path
+			FROM indexed_references r2
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependencies d ON r2.file_id = d.file_id
+			WHERE r2.reference_type = 'import'
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '|' || target2.path || '|') > 0
 		)
-		SELECT DISTINCT
+		SELECT 
 			file_path,
-			depth
+			depth,
+			NULL AS cycle_path
 		FROM dependencies
+		UNION ALL
+		SELECT
+			NULL AS file_path,
+			NULL AS depth,
+			cycle_path
+		FROM cycles
 		ORDER BY depth ASC, file_path ASC
 	`;
 	
 	const results = db.query<{
-		file_path: string;
-		depth: number;
-	}>(sql, [fileRecord.repository_id, fileId, fileRecord.repository_id, depth]);
+		file_path: string | null;
+		depth: number | null;
+		cycle_path: string | null;
+	}>(sql, [fileRecord.repository_id, fileId, fileRecord.repository_id, depth, fileRecord.repository_id, depth]);
 	
 	return processDepthResults(results, true); // Always include tests for dependencies
 }
@@ -705,20 +739,45 @@ export function queryDependencies(
 
 function processDepthResults(
 	results: Array<{
-		file_path: string;
-		depth: number;
+		file_path: string | null;
+		depth: number | null;
+		cycle_path: string | null;
 	}>,
 	includeTests: boolean
 ): DependencyResult {
 	const direct: string[] = [];
 	const indirect: Record<string, string[]> = {};
 	const cycles: string[][] = [];
+	const seenCycles = new Set<string>();
 	
 	for (const result of results) {
-				if (!includeTests && (result.file_path.includes("test") || result.file_path.includes("spec"))) {
+		// Handle cycle detection
+		if (result.cycle_path) {
+			const cycleKey = result.cycle_path;
+			if (!seenCycles.has(cycleKey)) {
+				seenCycles.add(cycleKey);
+				const cyclePaths = result.cycle_path
+					.split('|')
+					.filter(path => path.length > 0);
+				
+				if (cyclePaths.length > 1) {
+					cycles.push(cyclePaths);
+				}
+			}
+			continue;  // Don't add cycles to direct/indirect
+		}
+		
+		// Skip if file_path is null (cycle-only rows)
+		if (!result.file_path || result.depth === null) {
 			continue;
 		}
 		
+		// Filter test files if requested
+		if (!includeTests && (result.file_path.includes("test") || result.file_path.includes("spec"))) {
+			continue;
+		}
+		
+		// Categorize by depth
 		if (result.depth === 1) {
 			if (!direct.includes(result.file_path)) {
 				direct.push(result.file_path);
@@ -737,163 +796,12 @@ function processDepthResults(
 	return { direct, indirect, cycles };
 }
 
+
 /**
  * Query dependents (reverse lookup): files/symbols that depend on the target
  * 
  * @internal - Use queryDependents() for the wrapped version
  */
-export function queryDependentsRaw(
-	db: KotaDatabase,
-	repositoryId: string,
-	fileId: string | null,
-	symbolId: string | null = null,
-	depth: number = 5
-): Array<{
-	file_id: string | null;
-	file_path: string | null;
-	symbol_id: string | null;
-	symbol_name: string | null;
-	dependency_type: string;
-	depth: number;
-}> {
-	const targetCondition = symbolId
-		? 'AND dg.to_symbol_id = ?'
-		: 'AND dg.to_file_id = ?';
-	
-	const recursiveJoinCondition = symbolId
-		? 'dg.to_symbol_id = d.from_symbol_id'
-		: 'dg.to_file_id = d.from_file_id';
-
-	const sql = `
-		WITH RECURSIVE dependents AS (
-			SELECT
-				dg.id,
-				dg.from_file_id,
-				dg.from_symbol_id,
-				dg.dependency_type,
-				1 AS depth,
-				'/' || dg.id || '/' AS path
-			FROM dependency_graph dg
-			WHERE dg.repository_id = ?
-				${targetCondition}
-			
-			UNION ALL
-			
-			SELECT
-				dg.id,
-				dg.from_file_id,
-				dg.from_symbol_id,
-				dg.dependency_type,
-				d.depth + 1,
-				d.path || dg.id || '/'
-			FROM dependency_graph dg
-			JOIN dependents d ON ${recursiveJoinCondition}
-			WHERE dg.repository_id = ?
-				AND d.depth < ?
-				AND INSTR(d.path, '/' || dg.id || '/') = 0
-		)
-		SELECT DISTINCT
-			d.from_file_id AS file_id,
-			f.path AS file_path,
-			d.from_symbol_id AS symbol_id,
-			s.name AS symbol_name,
-			d.dependency_type,
-			d.depth
-		FROM dependents d
-		LEFT JOIN indexed_files f ON d.from_file_id = f.id
-		LEFT JOIN indexed_symbols s ON d.from_symbol_id = s.id
-		ORDER BY d.depth ASC
-	`;
-
-	const targetParam = symbolId || fileId;
-	return db.query<{
-		file_id: string | null;
-		file_path: string | null;
-		symbol_id: string | null;
-		symbol_name: string | null;
-		dependency_type: string;
-		depth: number;
-	}>(sql, [repositoryId, targetParam, repositoryId, depth]);
-}
-
-/**
- * Query dependencies (forward lookup): files/symbols that the source depends on
- * 
- * @internal - Use queryDependencies() for the wrapped version
- */
-export function queryDependenciesRaw(
-	db: KotaDatabase,
-	repositoryId: string,
-	fileId: string | null,
-	symbolId: string | null = null,
-	depth: number = 5
-): Array<{
-	file_id: string | null;
-	file_path: string | null;
-	symbol_id: string | null;
-	symbol_name: string | null;
-	dependency_type: string;
-	depth: number;
-}> {
-	const sourceCondition = symbolId
-		? 'AND dg.from_symbol_id = ?'
-		: 'AND dg.from_file_id = ?';
-	
-	const recursiveJoinCondition = symbolId
-		? 'dg.from_symbol_id = d.to_symbol_id'
-		: 'dg.from_file_id = d.to_file_id';
-
-	const sql = `
-		WITH RECURSIVE dependencies AS (
-			SELECT
-				dg.id,
-				dg.to_file_id,
-				dg.to_symbol_id,
-				dg.dependency_type,
-				1 AS depth,
-				'/' || dg.id || '/' AS path
-			FROM dependency_graph dg
-			WHERE dg.repository_id = ?
-				${sourceCondition}
-			
-			UNION ALL
-			
-			SELECT
-				dg.id,
-				dg.to_file_id,
-				dg.to_symbol_id,
-				dg.dependency_type,
-				d.depth + 1,
-				d.path || dg.id || '/'
-			FROM dependency_graph dg
-			JOIN dependencies d ON ${recursiveJoinCondition}
-			WHERE dg.repository_id = ?
-				AND d.depth < ?
-				AND INSTR(d.path, '/' || dg.id || '/') = 0
-		)
-		SELECT DISTINCT
-			d.to_file_id AS file_id,
-			f.path AS file_path,
-			d.to_symbol_id AS symbol_id,
-			s.name AS symbol_name,
-			d.dependency_type,
-			d.depth
-		FROM dependencies d
-		LEFT JOIN indexed_files f ON d.to_file_id = f.id
-		LEFT JOIN indexed_symbols s ON d.to_symbol_id = s.id
-		ORDER BY d.depth ASC
-	`;
-
-	const sourceParam = symbolId || fileId;
-	return db.query<{
-		file_id: string | null;
-		file_path: string | null;
-		symbol_id: string | null;
-		symbol_name: string | null;
-		dependency_type: string;
-		depth: number;
-	}>(sql, [repositoryId, sourceParam, repositoryId, depth]);
-}
 
 /**
  * Ensure repository exists in SQLite, create if not.
