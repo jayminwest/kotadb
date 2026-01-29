@@ -107,7 +107,6 @@ const greeting = greet("World");
 		expect(result.symbolsExtracted).toBeGreaterThan(0);
 		// References may or may not be extracted depending on AST support
 		expect(typeof result.referencesExtracted).toBe("number");
-		expect(typeof result.dependenciesExtracted).toBe("number");
 	});
 
 	test("throws error for nonexistent path", async () => {

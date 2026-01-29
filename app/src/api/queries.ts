@@ -233,54 +233,6 @@ function storeReferencesInternal(
 	return count;
 }
 
-function storeDependenciesInternal(
-	db: KotaDatabase,
-	dependencies: Array<{
-		repositoryId: string;
-		fromFileId: string | null;
-		toFileId: string | null;
-		fromSymbolId: string | null;
-		toSymbolId: string | null;
-		dependencyType: "file_import" | "symbol_usage";
-		metadata: Record<string, unknown>;
-	}>,
-): number {
-	if (dependencies.length === 0) {
-		return 0;
-	}
-
-	let count = 0;
-
-	db.transaction(() => {
-		const stmt = db.prepare(`
-			INSERT INTO dependency_graph (
-				id, repository_id, from_file_id, to_file_id,
-				from_symbol_id, to_symbol_id, dependency_type, metadata
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`);
-
-		for (const dep of dependencies) {
-			const id = randomUUID();
-			const metadata = JSON.stringify(dep.metadata);
-
-			stmt.run([
-				id,
-				dep.repositoryId,
-				dep.fromFileId,
-				dep.toFileId,
-				dep.fromSymbolId,
-				dep.toSymbolId,
-				dep.dependencyType,
-				metadata
-			]);
-			count++;
-		}
-	});
-
-	logger.info("Stored dependencies to SQLite", { count });
-	return count;
-}
-
 /**
  * Escape a search term for use in SQLite FTS5 MATCH clause.
  * Wraps the entire term in double quotes for exact phrase matching.
@@ -543,26 +495,6 @@ export function storeReferences(
 		references,
 		allFiles
 	);
-}
-
-/**
- * Store dependency graph edges into SQLite database.
- *
- * @param dependencies - Array of dependency edges
- * @returns Number of dependencies stored
- */
-export function storeDependencies(
-	dependencies: Array<{
-		repositoryId: string;
-		fromFileId: string | null;
-		toFileId: string | null;
-		fromSymbolId: string | null;
-		toSymbolId: string | null;
-		dependencyType: "file_import" | "symbol_usage";
-		metadata: Record<string, unknown>;
-	}>,
-): number {
-	return storeDependenciesInternal(getGlobalDatabase(), dependencies);
 }
 
 /**
@@ -1003,7 +935,6 @@ export async function runIndexingWorkflow(
 	filesIndexed: number;
 	symbolsExtracted: number;
 	referencesExtracted: number;
-	dependenciesExtracted: number;
 }> {
 	const { existsSync } = await import("node:fs");
 	const { resolve } = await import("node:path");
@@ -1012,8 +943,6 @@ export async function runIndexingWorkflow(
 	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
 	const { extractSymbols } = await import("@indexer/symbol-extractor");
 	const { extractReferences } = await import("@indexer/reference-extractor");
-	const { extractDependencies } = await import("@indexer/dependency-extractor");
-	const { detectCircularDependencies } = await import("@indexer/circular-detector");
 
 	const db = getGlobalDatabase();
 
@@ -1141,37 +1070,6 @@ export async function runIndexingWorkflow(
 		}
 	}
 
-	logger.info("Extracting dependency graph", {
-		fileCount: filesWithId.length,
-		repositoryId,
-	});
-
-	const dependencies = extractDependencies(
-		filesWithId,
-		allSymbolsWithFileId,
-		allReferencesWithFileId,
-		repositoryId,
-	);
-
-	db.run("DELETE FROM dependency_graph WHERE repository_id = ?", [repositoryId]);
-	const dependencyCount = storeDependencies(dependencies);
-
-	const filePathById = new Map(filesWithId.map((f) => [f.id!, f.path]));
-	const symbolNameById = new Map(allSymbolsWithFileId.map((s) => [s.id, s.name]));
-
-	const circularChains = detectCircularDependencies(dependencies, filePathById, symbolNameById);
-
-	if (circularChains.length > 0) {
-		logger.warn("Circular dependency chains detected", {
-			chainCount: circularChains.length,
-			repositoryId,
-			chains: circularChains.map((c) => ({
-				type: c.type,
-				description: c.description,
-			})),
-		});
-	}
-
 	updateRepositoryLastIndexed(repositoryId);
 
 	logger.info("Local indexing workflow completed", {
@@ -1179,8 +1077,6 @@ export async function runIndexingWorkflow(
 		filesIndexed,
 		symbolsExtracted: totalSymbols,
 		referencesExtracted: totalReferences,
-		dependenciesExtracted: dependencyCount,
-		circularDependencies: circularChains.length,
 	});
 
 	return {
@@ -1188,7 +1084,6 @@ export async function runIndexingWorkflow(
 		filesIndexed,
 		symbolsExtracted: totalSymbols,
 		referencesExtracted: totalReferences,
-		dependenciesExtracted: dependencyCount,
 	};
 }
 
@@ -1274,34 +1169,6 @@ export function resolveFilePathLocal(
 ): string | null {
 	return resolveFilePathInternal(db, filePath, repositoryId);
 }
-
-/**
- * @deprecated Use storeDependencies() directly
- */
-export function storeDependenciesLocal(
-	db: KotaDatabase,
-	dependencies: Array<{
-		repositoryId: string;
-		fromFileId: string | null;
-		toFileId: string | null;
-		fromSymbolId: string | null;
-		toSymbolId: string | null;
-		dependencyType: "file_import" | "symbol_usage";
-		metadata: Record<string, unknown>;
-	}>
-): number {
-	return storeDependenciesInternal(db, dependencies);
-}
-
-/**
- * @deprecated Use queryDependentsRaw() directly
- */
-export const queryDependentsLocal = queryDependentsRaw;
-
-/**
- * @deprecated Use queryDependenciesRaw() directly
- */
-export const queryDependenciesLocal = queryDependenciesRaw;
 
 /**
  * @deprecated Use ensureRepository() directly

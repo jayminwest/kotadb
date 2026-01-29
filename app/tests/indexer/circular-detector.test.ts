@@ -11,7 +11,7 @@ import {
 	findCycles,
 	detectCircularDependencies,
 } from "@indexer/circular-detector";
-import type { DependencyEdge } from "@indexer/dependency-extractor";
+import type { DependencyEdge } from "@indexer/circular-detector";
 
 describe("circular-detector", () => {
 	describe("buildAdjacencyList", () => {
