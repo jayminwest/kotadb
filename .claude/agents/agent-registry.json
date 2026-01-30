@@ -647,6 +647,90 @@
         "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
+    },
+    "automation-plan-agent": {
+      "name": "automation-plan-agent",
+      "description": "Plans automation layer changes for kotadb. Expects USER_PROMPT (SDK or workflow requirement)",
+      "file": "experts/automation/automation-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "automation-planning",
+        "sdk-analysis",
+        "workflow-design"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": false
+    },
+    "automation-build-agent": {
+      "name": "automation-build-agent",
+      "description": "Implements automation layer features from specs. Expects SPEC (path to spec file)",
+      "file": "experts/automation/automation-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "automation-implementation",
+        "sdk-integration"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
+      ],
+      "readOnly": false
+    },
+    "automation-improve-agent": {
+      "name": "automation-improve-agent",
+      "description": "Automation expertise evolution specialist",
+      "file": "experts/automation/automation-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "automation-learning",
+        "expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Task",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
+      ],
+      "readOnly": false
+    },
+    "automation-question-agent": {
+      "name": "automation-question-agent",
+      "description": "Automation Q&A specialist. Answers questions about SDK patterns and workflow execution",
+      "file": "experts/automation/automation-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "automation-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": true
     }
   },
   "capabilityIndex": {
@@ -803,6 +887,30 @@
     ],
     "github-qa": [
       "github-question-agent"
+    ],
+    "automation-planning": [
+      "automation-plan-agent"
+    ],
+    "sdk-analysis": [
+      "automation-plan-agent"
+    ],
+    "workflow-design": [
+      "automation-plan-agent"
+    ],
+    "automation-implementation": [
+      "automation-build-agent"
+    ],
+    "sdk-integration": [
+      "automation-build-agent"
+    ],
+    "automation-learning": [
+      "automation-improve-agent"
+    ],
+    "automation-qa": [
+      "automation-question-agent"
+    ],
+    "expertise-evolution": [
+      "automation-improve-agent"
     ]
   },
   "modelIndex": {
@@ -815,7 +923,8 @@
       "indexer-question-agent",
       "database-question-agent",
       "testing-question-agent",
-      "github-question-agent"
+      "github-question-agent",
+      "automation-question-agent"
     ],
     "sonnet": [
       "build-agent",
@@ -840,7 +949,10 @@
       "testing-improve-agent",
       "github-plan-agent",
       "github-build-agent",
-      "github-improve-agent"
+      "github-improve-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ]
   },
   "toolMatrix": {
@@ -875,7 +987,11 @@
       "testing-build-agent",
       "testing-improve-agent",
       "testing-plan-agent",
-      "testing-question-agent"
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "Grep": [
       "agent-authoring-build-agent",
@@ -908,7 +1024,11 @@
       "testing-build-agent",
       "testing-improve-agent",
       "testing-plan-agent",
-      "testing-question-agent"
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "Read": [
       "agent-authoring-build-agent",
@@ -941,7 +1061,11 @@
       "testing-build-agent",
       "testing-improve-agent",
       "testing-plan-agent",
-      "testing-question-agent"
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "Edit": [
       "agent-authoring-build-agent",
@@ -959,7 +1083,9 @@
       "indexer-build-agent",
       "indexer-improve-agent",
       "testing-build-agent",
-      "testing-improve-agent"
+      "testing-improve-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ],
     "Write": [
       "agent-authoring-build-agent",
@@ -984,7 +1110,10 @@
       "indexer-plan-agent",
       "testing-build-agent",
       "testing-improve-agent",
-      "testing-plan-agent"
+      "testing-plan-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ],
     "Bash": [
       "agent-authoring-improve-agent",
@@ -996,7 +1125,10 @@
       "github-improve-agent",
       "github-plan-agent",
       "indexer-improve-agent",
-      "testing-improve-agent"
+      "testing-improve-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ],
     "NotebookEdit": [
       "build-agent"
@@ -1005,7 +1137,8 @@
       "build-agent",
       "github-improve-agent",
       "review-agent",
-      "scout-agent"
+      "scout-agent",
+      "automation-improve-agent"
     ],
     "TodoWrite": [
       "build-agent"
@@ -1048,7 +1181,11 @@
       "testing-build-agent",
       "testing-improve-agent",
       "testing-plan-agent",
-      "testing-question-agent"
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "mcp__kotadb-bunx__search_dependencies": [
       "agent-authoring-build-agent",
@@ -1081,7 +1218,11 @@
       "testing-build-agent",
       "testing-improve-agent",
       "testing-plan-agent",
-      "testing-question-agent"
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "mcp__kotadb-bunx__list_recent_files": [
       "agent-authoring-plan-agent",
@@ -1098,7 +1239,9 @@
       "indexer-question-agent",
       "scout-agent",
       "testing-plan-agent",
-      "testing-question-agent"
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-question-agent"
     ],
     "mcp__kotadb-bunx__analyze_change_impact": [
       "agent-authoring-build-agent",
@@ -1109,7 +1252,8 @@
       "github-build-agent",
       "indexer-build-agent",
       "review-agent",
-      "testing-build-agent"
+      "testing-build-agent",
+      "automation-build-agent"
     ]
   }
 }
