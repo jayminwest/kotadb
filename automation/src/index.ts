@@ -6,8 +6,8 @@
 import { join, dirname } from "node:path";
 import { readFileSync, existsSync } from "node:fs";
 
-// Load .env from project root (two levels up from src/)
-const projectRoot = dirname(dirname(dirname(import.meta.dir)));
+// Load .env from project root (one level up from automation/)
+const projectRoot = dirname(dirname(import.meta.dir));
 const envPath = join(projectRoot, ".env");
 
 if (existsSync(envPath)) {
@@ -187,6 +187,10 @@ async function main(): Promise<number> {
 
     if (result.prUrl) {
       process.stdout.write(`PR: ${result.prUrl}\n`);
+    }
+
+    if (result.logDir) {
+      process.stdout.write(`Logs: ${result.logDir}\n`);
     }
 
     if (result.errorMessage) {

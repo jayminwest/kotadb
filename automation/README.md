@@ -54,12 +54,15 @@ bun run src/index.ts --metrics
 ```
 automation/
 ├── src/
-│   ├── index.ts      # CLI entry point
-│   ├── workflow.ts   # SDK query() orchestration
-│   ├── metrics.ts    # SQLite metrics storage
-│   └── github.ts     # GitHub issue commenting
-├── tests/            # Test files
-├── .data/            # SQLite database storage
+│   ├── index.ts         # CLI entry point
+│   ├── workflow.ts      # SDK query() integration and result handling
+│   ├── orchestrator.ts  # Multi-phase workflow orchestration
+│   ├── logger.ts        # Centralized logging system
+│   ├── parser.ts        # Output parsing utilities
+│   ├── metrics.ts       # SQLite metrics storage
+│   └── github.ts        # GitHub issue commenting
+├── tests/               # Test files
+├── .data/               # SQLite database and logs storage
 ├── package.json
 ├── tsconfig.json
 └── README.md

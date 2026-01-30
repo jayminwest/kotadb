@@ -2,6 +2,9 @@
 title: Architecture
 description: Understanding KotaDB internals
 order: 4
+last_updated: 2026-01-30
+version: 2.0.0
+reviewed_by: documentation-build-agent
 ---
 
 # Architecture
@@ -67,10 +70,11 @@ Parses source files to extract meaningful information:
 - **Dependency tracking** - Import statements, require calls
 - **Incremental updates** - Only re-index changed files
 
-The indexer uses tree-sitter for parsing, providing:
-- Fast, parallel parsing
-- Error recovery (partial parses for invalid code)
-- Consistent AST structure across languages
+The indexer uses @typescript-eslint/parser for AST parsing, providing:
+- Full TypeScript and JavaScript syntax support
+- Precise source location information (line, column, range)
+- Comment and token preservation for JSDoc extraction
+- Graceful error handling with structured logging
 
 ### MCP Server
 
@@ -88,13 +92,33 @@ RESTful API for programmatic access:
 - **JSON responses** - Easy to integrate with any client
 - **CORS support** - Works with browser-based tools
 
+### Error Tracking
+
+Sentry integration provides comprehensive error monitoring:
+
+- **Exception capture** - Automatic error collection with context
+- **Structured logging** - Correlation with request IDs
+- **Privacy compliance** - Sensitive headers automatically scrubbed
+- **Environment-aware** - Different sampling rates for dev/prod
+- **Request correlation** - Links errors to specific API requests
+
+### Authentication Middleware
+
+JWT-based authentication protects all endpoints (except health checks):
+
+- **Token validation** - Verifies JWT signature and expiration
+- **Rate limiting** - Per-user request limits with headers
+- **Context injection** - Attaches user context to requests
+- **Header sanitization** - Removes sensitive data from logs
+- **CORS support** - Configurable origin policies
+
 ## Data Flow
 
 ### Indexing Flow
 
 1. **File discovery** - Walk repository, respecting ignore patterns
 2. **Change detection** - Compare file hashes to detect modifications
-3. **Parsing** - Parse changed files with tree-sitter
+3. **Parsing** - Parse changed files with @typescript-eslint/parser
 4. **Symbol extraction** - Extract functions, classes, imports
 5. **Storage** - Write to SQLite with proper transactions
 6. **FTS update** - Update full-text search index
@@ -128,7 +152,7 @@ Everything runs on your machine:
 
 Keep the dependency tree small:
 - SQLite for storage (bundled with Bun)
-- tree-sitter for parsing
+- @typescript-eslint/parser for AST parsing
 - Express for HTTP (optional)
 
 ### Incremental by Default
@@ -149,8 +173,9 @@ kotadb/
 │       ├── indexer/    # File parsing and indexing
 │       ├── mcp/        # MCP server implementation
 │       └── cli.ts      # Command-line interface
-└── ~/.kotadb/
-    └── kotadb.db       # SQLite database
+└── .kotadb/           # Project-local directory
+    ├── kota.db        # SQLite database
+    └── export/        # JSONL export files for git sync
 ```
 
 ## Next Steps

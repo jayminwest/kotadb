@@ -2,6 +2,9 @@
 title: API Reference
 description: KotaDB MCP tools and HTTP endpoints
 order: 3
+last_updated: 2026-01-30
+version: 2.0.0
+reviewed_by: documentation-build-agent
 ---
 
 # API Reference
@@ -38,14 +41,16 @@ Search indexed code files for a specific term.
 Index a repository for code search and analysis.
 
 **Parameters:**
-- `path` (required): Absolute path to the repository
-- `incremental` (optional): Only index changed files (default: true)
+- `repository` (required): Repository identifier (owner/repo)
+- `ref` (optional): Git reference (branch, tag, commit SHA) (default: "main")
+- `localPath` (optional): Local path to the repository
 
 **Example:**
 ```json
 {
-  "path": "/Users/dev/my-project",
-  "incremental": true
+  "repository": "owner/repo",
+  "ref": "main",
+  "localPath": "/Users/dev/my-project"
 }
 ```
 
@@ -58,15 +63,14 @@ Index a repository for code search and analysis.
 List recently modified files across indexed repositories.
 
 **Parameters:**
-- `repository` (optional): Filter to a specific repository
 - `limit` (optional): Number of files to return (default: 20)
-- `since` (optional): ISO timestamp to filter files modified after
+- `repository` (optional): Repository ID to filter results
 
 **Example:**
 ```json
 {
   "limit": 10,
-  "since": "2024-01-01T00:00:00Z"
+  "repository": "repo-id"
 }
 ```
 
@@ -123,52 +127,129 @@ Analyze the impact of proposed code changes.
 
 ---
 
+### validate_implementation_spec
+
+Validate an implementation specification against KotaDB conventions and repository state.
+
+**Parameters:**
+- `feature_name` (required): Name of the feature or change
+- `files_to_create` (optional): Array of files to create with path, purpose, estimated_lines
+- `files_to_modify` (optional): Array of files to modify with path, purpose, estimated_lines
+- `migrations` (optional): Array of database migrations with filename, description, tables_affected
+- `dependencies_to_add` (optional): Array of npm dependencies with name, version, dev
+- `breaking_changes` (optional): Whether this includes breaking changes (default: false)
+- `repository` (optional): Repository ID to validate against
+
+**Example:**
+```json
+{
+  "feature_name": "user-authentication",
+  "files_to_create": [
+    {
+      "path": "src/auth/middleware.ts",
+      "purpose": "JWT authentication middleware",
+      "estimated_lines": 50
+    }
+  ],
+  "breaking_changes": false
+}
+```
+
+**Returns:** Validation errors, warnings, and approval conditions checklist.
+
+---
+
+### kota_sync_export
+
+Export local SQLite database to JSONL files for git sync.
+
+**Parameters:**
+- `force` (optional): Force export even if tables unchanged (default: false)
+- `export_dir` (optional): Custom export directory path
+
+**Example:**
+```json
+{
+  "force": false,
+  "export_dir": ".kotadb/custom-export"
+}
+```
+
+**Returns:** Export summary with tables exported, skipped, total rows, and duration.
+
+---
+
+### kota_sync_import
+
+Import JSONL files into local SQLite database.
+
+**Parameters:**
+- `import_dir` (optional): Custom import directory path (default: .kotadb/export)
+
+**Example:**
+```json
+{
+  "import_dir": ".kotadb/custom-export"
+}
+```
+
+**Returns:** Import summary with tables imported, rows imported, errors, and duration.
+
+---
+
 ## HTTP Endpoints
 
 When running `kotadb serve`, these HTTP endpoints are available:
 
 ### Health Check
-
 ```
 GET /health
 ```
+Returns server status, version, mode (local/cloud), and queue status.
 
-Returns server status and version information.
-
-### Search
-
+### Search Code
 ```
-POST /api/search
+GET /search?term=query&limit=20&repository=repo-id
+```
+Search indexed code files with optional repository and limit filters.
+
+### List Recent Files
+```
+GET /files/recent?limit=10
+```
+List recently indexed files with optional limit parameter.
+
+### Validate Output
+```
+POST /validate-output
 Content-Type: application/json
 
 {
-  "term": "search query",
-  "limit": 20
+  "schema": "schema-definition",
+  "output": "output-to-validate"
 }
 ```
+Validate command output against a schema definition.
 
-Search indexed code files.
-
-### Index
-
+### MCP Endpoint
 ```
-POST /api/index
+POST /mcp
 Content-Type: application/json
-
-{
-  "path": "/path/to/repository"
-}
+Accept: application/json, text/event-stream
 ```
+MCP (Model Context Protocol) endpoint for AI assistant integration.
 
-Trigger indexing for a repository.
-
-### Status
-
+### MCP Health Check
 ```
-GET /api/status
+GET /mcp
 ```
+Simple health check for MCP endpoint availability.
 
-Returns indexing status and statistics.
+### OpenAPI Specification
+```
+GET /openapi.json
+```
+Returns OpenAPI 3.1 specification for all endpoints.
 
 ## Error Handling
 
