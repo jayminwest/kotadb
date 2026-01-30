@@ -92,3 +92,5 @@ supabase/
 .kotadb/
 
 .eraser/
+
+.automation/.data/
