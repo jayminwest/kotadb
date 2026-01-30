@@ -35,6 +35,7 @@ function setupFixtures() {
 			compilerOptions: {
 				baseUrl: ".",
 				paths: {
+					"@api": ["src/api/index.ts"],
 					"@api/*": ["src/api/*"],
 					"@db/*": ["src/db/*"],
 					"@shared/*": ["./shared/*"],
@@ -44,7 +45,15 @@ function setupFixtures() {
 	);
 
 	writeFileSync(join(simpleDir, "src", "api", "routes.ts"), "export const routes = []");
+	writeFileSync(join(simpleDir, "src", "api", "index.ts"), "export const api = {}");
 	writeFileSync(join(simpleDir, "src", "db", "schema.ts"), "export const schema = {}");
+
+	// Create utils directory with index file for index resolution test
+	mkdirSync(join(simpleDir, "src", "api", "utils"), { recursive: true });
+	writeFileSync(
+		join(simpleDir, "src", "api", "utils", "index.ts"),
+		"export const utils = {}"
+	);
 
 	// Create extends fixture (child extends parent)
 	const extendsDir = join(FIXTURES_DIR, "extends");
@@ -156,6 +165,25 @@ function setupFixtures() {
 			extends: "./a.json",
 		}),
 	);
+
+	// Create baseUrl fixture (baseUrl other than ".")
+	const baseUrlDir = join(FIXTURES_DIR, "baseurl");
+	mkdirSync(baseUrlDir, { recursive: true });
+	mkdirSync(join(baseUrlDir, "src", "api"), { recursive: true });
+
+	writeFileSync(
+		join(baseUrlDir, "tsconfig.json"),
+		JSON.stringify({
+			compilerOptions: {
+				baseUrl: "src",
+				paths: {
+					"@api/*": ["api/*"],
+				},
+			},
+		}),
+	);
+
+	writeFileSync(join(baseUrlDir, "src", "api", "routes.ts"), "export const routes = []");
 }
 
 describe("path-resolver", () => {
@@ -170,6 +198,7 @@ describe("path-resolver", () => {
 
 			expect(mappings).not.toBeNull();
 			expect(mappings?.baseUrl).toBe(".");
+			expect(mappings?.paths["@api"]).toEqual(["src/api/index.ts"]);
 			expect(mappings?.paths["@api/*"]).toEqual(["src/api/*"]);
 			expect(mappings?.paths["@db/*"]).toEqual(["src/db/*"]);
 			expect(mappings?.paths["@shared/*"]).toEqual(["./shared/*"]);
@@ -296,6 +325,51 @@ describe("path-resolver", () => {
 
 			const result = resolvePathAlias("@api/missing", simpleDir, files, mappings);
 			expect(result).toBeNull();
+		});
+
+		it("resolves exact match pattern (no wildcard)", () => {
+			const simpleDir = join(FIXTURES_DIR, "simple");
+			const files = new Set([
+				join(simpleDir, "src", "api", "index.ts")
+			]);
+			const mappings = {
+				baseUrl: ".",
+				paths: { "@api": ["src/api/index.ts"] },
+			};
+			
+			const result = resolvePathAlias("@api", simpleDir, files, mappings);
+			expect(result).toBe(join(simpleDir, "src", "api", "index.ts"));
+		});
+
+		it("resolves path alias to index file in directory", () => {
+			const simpleDir = join(FIXTURES_DIR, "simple");
+			// Create directory with only index file (not utils.ts itself)
+			const files = new Set([
+				join(simpleDir, "src", "api", "utils", "index.ts")
+			]);
+			const mappings = {
+				baseUrl: ".",
+				paths: { "@api/*": ["src/api/*"] },
+			};
+			
+			const result = resolvePathAlias("@api/utils", simpleDir, files, mappings);
+			expect(result).toBe(join(simpleDir, "src", "api", "utils", "index.ts"));
+		});
+
+		it("handles baseUrl other than '.'", () => {
+			const baseUrlDir = join(FIXTURES_DIR, "baseurl");
+			// File is at baseUrlDir/src/api/routes.ts
+			// baseUrl is "src", so path "@api/*" maps to "api/*" relative to baseUrl
+			const files = new Set([
+				join(baseUrlDir, "src", "api", "routes.ts")
+			]);
+			const mappings = {
+				baseUrl: "src",
+				paths: { "@api/*": ["api/*"] },
+			};
+			
+			const result = resolvePathAlias("@api/routes", baseUrlDir, files, mappings);
+			expect(result).toBe(join(baseUrlDir, "src", "api", "routes.ts"));
 		});
 	});
 });

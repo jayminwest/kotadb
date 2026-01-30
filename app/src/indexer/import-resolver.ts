@@ -23,23 +23,9 @@ import { existsSync } from "node:fs";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
 import { resolvePathAlias, type PathMappings } from "./path-resolver.js";
+import { SUPPORTED_EXTENSIONS, INDEX_FILES } from "./constants.js";
 
 const logger = createLogger({ module: "indexer-import-resolver" });
-
-/**
- * Supported file extensions in priority order.
- *
- * TypeScript extensions are checked first, followed by JavaScript variants.
- * This matches the TypeScript compiler's resolution behavior.
- */
-const SUPPORTED_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
-
-/**
- * Index file basenames in priority order.
- *
- * TypeScript index files take precedence over JavaScript.
- */
-const INDEX_FILES = ["index.ts", "index.tsx", "index.js", "index.jsx"];
 
 /**
  * Resolve an import path to an absolute file path.

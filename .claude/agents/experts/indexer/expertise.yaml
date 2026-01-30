@@ -798,6 +798,64 @@ patterns:
     timestamp: 2026-01-29
     evidence: app/src/api/queries.ts runIndexingWorkflow()
 
+
+  constant_extraction_pattern:
+    structure: |
+      Place shared constants in dedicated constants.ts module.
+      Use readonly arrays with 'as const' for type safety.
+      Export: SUPPORTED_EXTENSIONS, INDEX_FILES (priority-ordered).
+    key_features:
+      - Dedicated constants.ts module (not scattered across files)
+      - Use 'as const' for exhaustiveness checking in consuming modules
+      - Order by priority (TypeScript variants first)
+      - Document priority order and consuming modules in JSDoc
+      - Note IMPORTANT synchronization requirements with other modules
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/constants.ts (imported by import-resolver.ts, path-resolver.ts)
+
+  cross_module_synchronization_jsdoc:
+    when: Constants or patterns need to stay synchronized across multiple modules
+    approach: |
+      Add IMPORTANT JSDoc comment linking all modules that share the constant.
+      Note any format differences (e.g., array vs Set) explicitly.
+      Consider adding sync validation tests to catch drift.
+    anti_patterns:
+      - what: Duplicating constants across multiple files
+        instead: Extract to constants.ts and import
+        reason: One copy updated, others drift out of sync
+      - what: Silently allowing format differences
+        instead: Document differences explicitly in JSDoc
+        reason: Developers may incorrectly assume they're identical
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/constants.ts JSDoc ("Keep synchronized" pattern)
+
+  test_fixture_edge_case_pattern:
+    when: Testing complex resolution logic (tsconfig parsing, extends support, path aliases)
+    approach: |
+      1. Organize fixtures in named subdirectories per test scenario (simple, extends, jsconfig, multipath, empty, circular, baseurl)
+      2. Create setupFixtures() function that builds realistic directory structures in /tmp
+      3. Write real config files (JSON) to fixtures, not mocks
+      4. Clean up with rmSync() in beforeAll()
+      5. Run tests against real parsed configs
+    edge_cases_to_cover:
+      - Missing config (graceful null return)
+      - Circular extends (depth limit prevents infinite loop)
+      - jsconfig.json fallback when tsconfig missing
+      - Multi-path aliases (first match wins)
+      - baseUrl other than "." (e.g., "src")
+      - Extension resolution without explicit extension
+      - Index file resolution (resolving directories)
+    anti_patterns:
+      - what: Using mocks or hardcoded JSON strings in test bodies
+        instead: Create real fixtures in /tmp with setupFixtures()
+        reason: Antimocking philosophy ensures tests catch real parsing issues
+      - what: Fixture cleanup in individual tests
+        instead: Single setupFixtures() in beforeAll()
+        reason: Faster tests, cleaner organization
+    timestamp: 2026-01-29
+    evidence: app/tests/indexer/path-resolver.test.ts (150+ lines setupFixtures() with 7 edge case fixtures)
+
+
 best_practices:
   ast_parsing:
     - Use @typescript-eslint/parser for modern TypeScript support
@@ -863,70 +921,24 @@ known_issues:
     prevention: |
       Never use path.resolve() in import resolution.
       Always use: path.normalize(path.join(fromDir, importSource))
-      This preserves relative paths matching database storage format.
     status: resolved
     timestamp: 2026-01-28
-    evidence: commit 5713a52, app/src/indexer/import-resolver.ts
+    evidence: commit 5713a52
 
   - issue: tsconfig.json path mapping not supported
     impact: Absolute imports with path aliases not resolved
     resolution: Implemented in path-resolver.ts with full extends support
-    prevention: N/A - feature complete with recursive extends and fallback
     status: resolved
     timestamp: 2026-01-29
-    evidence: app/src/indexer/path-resolver.ts, commit pending
-
-  - issue: Dynamic imports not tracked
-    impact: import() expressions not in dependency graph
-    resolution: Could add CallExpression with import callee handling
-    prevention: Document limitation
-    status: known limitation
-
-  - issue: Type-only imports not distinguished
-    impact: import type { Foo } treated same as import { Foo }
-    resolution: Could check importKind in TSESTree
-    prevention: Minor impact on dependency analysis
-    status: low priority
-
-  - issue: Overloaded functions create multiple symbols
-    impact: Same name appears multiple times in symbol table
-    resolution: Could merge by name and deduplicate
-    prevention: Acceptable for now, may confuse "find usages"
-    status: known limitation
+    evidence: app/src/indexer/path-resolver.ts
 
   - issue: Schema CHECK constraint must match all reference types
     impact: Insertion failures when reference extractor produces new types
     resolution: property_access was missing from CHECK constraint list
-    prevention: |
-      When adding new reference types:
-      1. Update reference extractor enum/type
-      2. Update SQLite schema CHECK constraint
-      3. Add integration test for new type
+    prevention: When adding reference types: update extractor, schema, tests
     status: resolved
     timestamp: 2026-01-28
     evidence: commit 91415ad
-
-potential_enhancements:
-  - enhancement: Dynamic import tracking
-    rationale: Complete dependency graph for code splitting
-    effort: low
-    approach: Handle CallExpression with import callee
-
-  - enhancement: Call graph visualization
-    rationale: Visual dependency analysis
-    effort: medium
-    approach: Generate DOT format from dependency graph
-
-  - enhancement: Incremental indexing
-    rationale: Faster re-indexing for changed files only
-    effort: high
-    approach: Track file hashes, re-index only changed files
-
-  - enhancement: Cross-repository symbol resolution
-    rationale: Find usages across multiple repositories
-    effort: high
-    approach: Global symbol index with repository context
-
 
 stability:
   convergence_indicators:
@@ -937,13 +949,11 @@ stability:
     last_reviewed: 2026-01-29
     utility_ratio: 1.0
     notes: |
-      Cycle 3 update - path alias resolution implementation (issue #56):
-      - Previous: Batch processing, build artifact filtering, FTS5 escaping
-      - New: Path alias resolution (tsconfig.json/jsconfig.json parsing)
-      - New: Recursive extends support with circular detection
-      - New: Integration pattern for passing pathMappings through pipeline
-      - Updated: resolve_imports operation with path alias support
-      - Updated: import_resolution_strategy decision tree
-      - Updated: best_practices for import resolution
-      - Resolved: tsconfig.json path mapping limitation (was known issue)
-      - Comprehensive test coverage with real filesystem fixtures
+      Cycle 4 update - constant extraction and test fixtures (focus_area: constants extraction pattern):
+      - Added: Constant extraction pattern (dedicated constants.ts module with 'as const')
+      - Added: Cross-module synchronization JSDoc pattern (IMPORTANT comments, drift prevention)
+      - Added: Test fixture edge case pattern (real fixtures in /tmp, antimocking philosophy)
+      - Pruned: Removed low-priority known issues, potential_enhancements section
+      - Consolidated: Removed verbose code examples, maintained pattern essence
+      - File size managed: 949 -> 1098 -> 1058 -> ~950 lines (target achieved)
+
