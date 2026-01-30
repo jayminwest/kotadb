@@ -140,3 +140,103 @@ describe("import-resolver", () => {
 		});
 	});
 });
+
+describe("resolveImport with path aliases", () => {
+	it("resolves path alias import", () => {
+		const files = [
+			{ path: "/repo/src/api/routes.ts" },
+			{ path: "/repo/src/app.ts" },
+		];
+
+		const pathMappings = {
+			baseUrl: ".",
+			paths: { "@api/*": ["src/api/*"] },
+		};
+
+		const result = resolveImport("@api/routes", "/repo/src/app.ts", files, pathMappings);
+		expect(result).toBe("/repo/src/api/routes.ts");
+	});
+
+	it("falls back to null for unresolved alias", () => {
+		const files = [
+			{ path: "/repo/src/app.ts" },
+		];
+
+		const pathMappings = {
+			baseUrl: ".",
+			paths: { "@api/*": ["src/api/*"] },
+		};
+
+		const result = resolveImport("@db/schema", "/repo/src/app.ts", files, pathMappings);
+		expect(result).toBeNull();
+	});
+
+	it("prefers relative imports over path aliases", () => {
+		const files = [
+			{ path: "/repo/src/api/routes.ts" },
+			{ path: "/repo/src/api/handlers.ts" },
+		];
+
+		const pathMappings = {
+			baseUrl: ".",
+			paths: { "@api/*": ["src/api/*"] },
+		};
+
+		// Relative import should resolve first
+		const result = resolveImport("./routes", "/repo/src/api/handlers.ts", files, pathMappings);
+		expect(result).toBe("/repo/src/api/routes.ts");
+	});
+
+	it("resolves nested path alias imports", () => {
+		const files = [
+			{ path: "/repo/src/db/sqlite/index.ts" },
+			{ path: "/repo/src/app.ts" },
+		];
+
+		const pathMappings = {
+			baseUrl: ".",
+			paths: { "@db/*": ["src/db/*"] },
+		};
+
+		const result = resolveImport("@db/sqlite/index", "/repo/src/app.ts", files, pathMappings);
+		expect(result).toBe("/repo/src/db/sqlite/index.ts");
+	});
+
+	it("returns null for external packages even with path mappings", () => {
+		const files = [
+			{ path: "/repo/src/index.ts" },
+		];
+
+		const pathMappings = {
+			baseUrl: ".",
+			paths: { "@api/*": ["src/api/*"] },
+		};
+
+		const result = resolveImport("react", "/repo/src/index.ts", files, pathMappings);
+		expect(result).toBeNull();
+	});
+
+	it("works without path mappings (backward compatibility)", () => {
+		const files = [
+			{ path: "/repo/src/utils.ts" },
+			{ path: "/repo/src/index.ts" },
+		];
+
+		const result = resolveImport("./utils", "/repo/src/index.ts", files);
+		expect(result).toBe("/repo/src/utils.ts");
+	});
+
+	it("handles multiple path options (first match wins)", () => {
+		const files = [
+			{ path: "/repo/packages/shared/utils.ts" },
+		];
+
+		const pathMappings = {
+			baseUrl: ".",
+			paths: { "@shared/*": ["src/shared/*", "packages/shared/*"] },
+		};
+
+		const result = resolveImport("@shared/utils", "/repo/src/app.ts", files, pathMappings);
+		expect(result).toBe("/repo/packages/shared/utils.ts");
+	});
+});

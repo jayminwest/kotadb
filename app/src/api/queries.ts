@@ -14,6 +14,7 @@ import type { IndexRequest, IndexedFile } from "@shared/types";
 import { detectLanguage } from "@shared/language-utils";
 import { getGlobalDatabase, type KotaDatabase } from "@db/sqlite/index.js";
 import { resolveImport } from "@indexer/import-resolver.js";
+import { parseTsConfig, type PathMappings } from "@indexer/path-resolver.js";
 
 const logger = createLogger({ module: "api-queries" });
 
@@ -172,6 +173,7 @@ function storeReferencesInternal(
 	filePath: string,
 	references: Reference[],
 	allFiles: Array<{ path: string }>,
+	pathMappings?: PathMappings | null,
 ): number {
 	if (references.length === 0) {
 		return 0;
@@ -204,7 +206,8 @@ function storeReferencesInternal(
 				const resolved = resolveImport(
 					ref.metadata.importSource,
 					filePath,
-					allFiles
+					allFiles,
+					pathMappings
 				);
 				
 				// Normalize path if resolved
@@ -473,7 +476,8 @@ export function storeReferences(
 	fileId: string,
 	filePath: string,
 	references: Reference[],
-	allFiles: Array<{ path: string }>
+	allFiles: Array<{ path: string }>,
+	pathMappings?: PathMappings | null
 ): number {
 	const db = getGlobalDatabase();
 
@@ -493,7 +497,8 @@ export function storeReferences(
 		result.repository_id, 
 		filePath,
 		references,
-		allFiles
+		allFiles,
+		pathMappings
 	);
 }
 
@@ -851,6 +856,7 @@ export async function runIndexingWorkflow(
 	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
 	const { extractSymbols } = await import("@indexer/symbol-extractor");
 	const { extractReferences } = await import("@indexer/reference-extractor");
+	const { parseTsConfig } = await import("@indexer/path-resolver");
 
 	const db = getGlobalDatabase();
 
@@ -884,6 +890,15 @@ export async function runIndexingWorkflow(
 		fullName,
 		localPath,
 	});
+
+	// Parse tsconfig.json for path alias resolution
+	const pathMappings = parseTsConfig(localPath);
+	if (pathMappings) {
+		logger.info("Loaded path mappings from tsconfig.json", {
+			aliasCount: Object.keys(pathMappings.paths).length,
+			baseUrl: pathMappings.baseUrl,
+		});
+	}
 
 	const sources = await discoverSources(localPath);
 	const records = (
@@ -936,7 +951,7 @@ export async function runIndexingWorkflow(
 		filesWithId.push({ ...file, id: fileRecord.id, repository_id: repositoryId });
 
 		const symbolCount = storeSymbols(symbols, fileRecord.id);
-		const referenceCount = storeReferences(fileRecord.id, file.path, references, filesWithId);
+		const referenceCount = storeReferences(fileRecord.id, file.path, references, filesWithId, pathMappings);
 
 		totalSymbols += symbolCount;
 		totalReferences += referenceCount;
@@ -1030,7 +1045,8 @@ export function storeReferencesLocal(
 	fileId: string,
 	filePath: string,
 	references: Reference[],
-	allFiles: Array<{ path: string }>
+	allFiles: Array<{ path: string }>,
+	pathMappings?: PathMappings | null
 ): number {
 	const repositoryId = db.queryOne<{ repository_id: string }>(
 		"SELECT repository_id FROM indexed_files WHERE id = ?",
@@ -1041,7 +1057,7 @@ export function storeReferencesLocal(
 		throw new Error(`File not found: ${fileId}`);
 	}
 	
-	return storeReferencesInternal(db, fileId, repositoryId, filePath, references, allFiles);
+	return storeReferencesInternal(db, fileId, repositoryId, filePath, references, allFiles, pathMappings);
 }
 
 /**
