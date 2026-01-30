@@ -1,8 +1,9 @@
 /**
  * Claude Agent SDK integration for workflow execution
  */
-import { query, type SDKMessage, type SDKResultMessage, type SDKSystemMessage, type SDKAssistantMessage } from "@anthropic-ai/claude-code";
 import { dirname } from "node:path";
+import { WorkflowLogger } from "./logger.ts";
+import { orchestrateWorkflow } from "./orchestrator.ts";
 
 export interface WorkflowResult {
   success: boolean;
@@ -12,13 +13,7 @@ export interface WorkflowResult {
   totalCostUsd: number;
   prUrl: string | null;
   errorMessage: string | null;
-}
-
-function extractPrUrl(text: string): string | null {
-  // Match GitHub PR URLs
-  const prUrlPattern = /https:\/\/github\.com\/[^/]+\/[^/]+\/pull\/\d+/;
-  const match = text.match(prUrlPattern);
-  return match ? match[0] : null;
+  logDir: string | null;
 }
 
 function getProjectRoot(): string {
@@ -26,22 +21,13 @@ function getProjectRoot(): string {
   return dirname(dirname(import.meta.dir));
 }
 
-function isSystemMessage(msg: SDKMessage): msg is SDKSystemMessage {
-  return msg.type === "system" && "subtype" in msg && msg.subtype === "init";
-}
-
-function isResultMessage(msg: SDKMessage): msg is SDKResultMessage {
-  return msg.type === "result";
-}
-
-function isAssistantMessage(msg: SDKMessage): msg is SDKAssistantMessage {
-  return msg.type === "assistant";
-}
-
 export async function runWorkflow(
   issueNumber: number,
   dryRun = false
 ): Promise<WorkflowResult> {
+  const projectRoot = getProjectRoot();
+  const logger = new WorkflowLogger({ issueNumber, dryRun, projectRoot });
+  
   const result: WorkflowResult = {
     success: false,
     sessionId: null,
@@ -50,85 +36,48 @@ export async function runWorkflow(
     totalCostUsd: 0,
     prUrl: null,
     errorMessage: null,
+    logDir: null,
   };
 
-  const prompt = dryRun
-    ? `/do #${issueNumber} --dry-run`
-    : `/do #${issueNumber}`;
-
-  const projectRoot = getProjectRoot();
-
   try {
-    const messages: SDKMessage[] = [];
+    logger.initialize();
+    logger.logEvent("WORKFLOW_START", { issue_number: issueNumber, dry_run: dryRun });
+    
+    const startTime = performance.now();
 
-    for await (const message of query({
-      prompt,
-      options: {
-        maxTurns: 100,
-        cwd: projectRoot,
-        permissionMode: "bypassPermissions",
-        mcpServers: {
-          kotadb: {
-            type: "stdio",
-            command: "bunx",
-            args: ["--bun", "kotadb"],
-            env: {
-              KOTADB_CWD: projectRoot,
-            },
-          },
-        },
-      },
-    })) {
-      messages.push(message);
+    // NEW: Use orchestrator instead of single /do invocation
+    const orchResult = await orchestrateWorkflow({
+      issueNumber,
+      projectRoot,
+      logger,
+      dryRun
+    });
 
-      // Extract session ID from init message
-      if (isSystemMessage(message)) {
-        result.sessionId = message.session_id;
-      }
+    const endTime = performance.now();
+    const durationMs = Math.round(endTime - startTime);
 
-      // Log progress to stderr
-      if (isAssistantMessage(message)) {
-        const content = message.message.content;
-        if (Array.isArray(content)) {
-          for (const block of content) {
-            if (block.type === "text") {
-              process.stderr.write(".");
-            }
-          }
-        }
-      }
-
-      // Track token usage from result messages
-      if (isResultMessage(message)) {
-        result.inputTokens = message.usage.input_tokens;
-        result.outputTokens = message.usage.output_tokens;
-        result.totalCostUsd = message.total_cost_usd;
-        result.success = !message.is_error;
-      }
-    }
-
-    process.stderr.write("\n");
-
-    // Check for PR URL in final messages
-    const lastAssistant = messages.filter(isAssistantMessage).pop();
-
-    if (lastAssistant) {
-      const content = lastAssistant.message.content;
-      if (Array.isArray(content)) {
-        for (const block of content) {
-          if (block.type === "text") {
-            const prUrl = extractPrUrl(block.text);
-            if (prUrl) {
-              result.prUrl = prUrl;
-            }
-          }
-        }
-      }
-    }
+    // Extract metrics from logger
+    const { inputTokens, outputTokens, totalCostUsd, sessionId } = logger.getMetrics();
+    
+    result.success = true;
+    result.sessionId = sessionId;
+    result.inputTokens = inputTokens;
+    result.outputTokens = outputTokens;
+    result.totalCostUsd = totalCostUsd;
+    result.logDir = logger.getLogDir();
+    
+    logger.logEvent("WORKFLOW_COMPLETE", {
+      success: true,
+      duration_ms: durationMs,
+      domain: orchResult.domain,
+      files_modified: orchResult.filesModified.length
+    });
+    
   } catch (error) {
     result.success = false;
-    result.errorMessage =
-      error instanceof Error ? error.message : String(error);
+    result.errorMessage = error instanceof Error ? error.message : String(error);
+    logger.logError("workflow_execution", error instanceof Error ? error : new Error(String(error)));
+    result.logDir = logger.getLogDir();
   }
 
   return result;

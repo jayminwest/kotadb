@@ -1,0 +1,344 @@
+# Documentation Expert Domain Expertise
+# Last reviewed: 2026-01-30
+# Domain: technical documentation improvement and maintenance
+
+overview:
+  description: |
+    Documentation expert domain provides specialized knowledge for kotadb's technical documentation,
+    covering API reference accuracy, architectural documentation, installation guides, and versioning
+    metadata. This domain ensures documentation stays synchronized with implementation, follows
+    consistent patterns, and provides accurate guidance for developers using KotaDB's MCP tools,
+    HTTP endpoints, and local-first architecture.
+
+  scope:
+    primary_codebase:
+      - web/docs/content/ (markdown documentation files)
+      - docs/specs/ (technical specifications)
+      - automation/README.md (automation layer docs)
+      - .claude/agents/experts/ (agent documentation)
+
+    broader_scope:
+      - MCP tool documentation validation against implementation
+      - HTTP endpoint documentation accuracy
+      - Architecture documentation sync with codebase
+      - Installation guide testing and verification
+      - Versioning metadata and freshness tracking
+
+    not_covered:
+      - Code implementation (see respective expert domains)
+      - Agent orchestration (see automation expert)
+      - API implementation details (see api expert)
+
+  rationale: |
+    Accurate documentation is critical for developer adoption and reduces support burden.
+    Documentation drift from implementation causes integration failures and developer
+    frustration. This expertise enables systematic validation and improvement of technical
+    documentation while maintaining consistency with KotaDB's local-first principles.
+
+core_implementation:
+  documentation_structure:
+    web_docs_content:
+      path: web/docs/content/
+      purpose: User-facing documentation website
+      files:
+        - api-reference.md (MCP tools and HTTP endpoints)
+        - architecture.md (system design and components)
+        - installation.md (setup and getting started)
+        - configuration.md (settings and customization)
+
+    specs_documentation:
+      path: docs/specs/
+      purpose: Technical specifications for features
+      subdirs:
+        - automation/ (automation layer specs)
+        - documentation/ (documentation improvement specs)
+        - indexer/ (code indexing specs)
+
+  versioning_metadata:
+    required_frontmatter:
+      - title (document title)
+      - description (brief summary)
+      - order (navigation order)
+      - last_updated (YYYY-MM-DD format)
+      - version (semantic version)
+      - reviewed_by (agent or person identifier)
+
+key_operations:
+  validate_mcp_tool_documentation:
+    when: Ensuring MCP tool docs match implementation
+    approach: |
+      1. Cross-reference documented tools with app/src/mcp/tools.ts
+      2. Validate parameter names and types against implementation schemas
+      3. Check examples use correct JSON structure and required fields
+      4. Verify all 8 MCP tools are documented (common gap: missing tools)
+      5. Test parameter combinations in examples for correctness
+    patterns:
+      - Tool documentation structure: description, parameters table, example, returns
+      - Required/optional parameter indication with defaults
+      - JSON examples with proper escaping and formatting
+      - Cross-references between related tools
+    code_example: |
+      ### search_code
+
+      Search indexed code files for a specific term.
+
+      **Parameters:**
+      - `term` (required): The search term to find in code files
+      - `repository` (optional): Filter results to a specific repository ID
+      - `limit` (optional): Maximum number of results (default: 20, max: 100)
+
+      **Example:**
+      ```json
+      {
+        "term": "async function",
+        "limit": 10
+      }
+      ```
+    pitfalls:
+      - Missing recently added tools (validate complete tool list)
+      - Incorrect parameter names (index_repository used "path" instead of "repository")
+      - Non-existent parameters (list_recent_files documented invalid "since" parameter)
+      - Wrong default values or data types in documentation
+
+  validate_http_endpoint_documentation:
+    when: Ensuring HTTP API docs match route implementation
+    approach: |
+      1. Cross-reference documented endpoints with app/src/api/routes.ts
+      2. Verify HTTP methods (GET/POST), paths, and parameter formats
+      3. Check response format documentation against actual responses
+      4. Validate query parameter names and types
+      5. Test endpoint examples for correctness
+    patterns:
+      - Endpoint format: METHOD /path with description
+      - Query parameter documentation with types and defaults
+      - Request/response body examples in proper JSON
+      - Error response format consistency
+    code_example: |
+      ### Search Code
+      ```
+      GET /search?term=query&limit=20&repository=repo-id
+      ```
+      Search indexed code files with optional repository and limit filters.
+    pitfalls:
+      - Wrong endpoint paths (docs showed "/api/search" but implementation is "/search")
+      - Incorrect HTTP methods (POST vs GET confusion)
+      - Missing or incorrect query parameters
+      - Outdated response format examples
+
+  sync_architecture_documentation:
+    when: Ensuring architecture docs reflect current implementation
+    approach: |
+      1. Validate component descriptions against actual codebase structure
+      2. Check parser/technology claims (TypeScript ESLint vs tree-sitter)
+      3. Verify database location and file structure accuracy
+      4. Update integration details (Sentry, authentication middleware)
+      5. Cross-reference file paths and directory structure
+    patterns:
+      - Technology stack accuracy (parser, database, authentication)
+      - File structure diagrams with correct paths
+      - Component interaction descriptions
+      - Integration service documentation (Sentry, JWT middleware)
+    pitfalls:
+      - Outdated technology claims (tree-sitter when using TypeScript ESLint)
+      - Wrong database location (~/.kotadb/ vs .kotadb/)
+      - Missing integration services (Sentry error tracking)
+      - Incorrect file structure diagrams
+
+  update_installation_documentation:
+    when: Ensuring installation guide works end-to-end
+    approach: |
+      1. Test CLI commands for accuracy (kotadb index parameters)
+      2. Verify default ports and configuration options
+      3. Update system requirements and dependencies
+      4. Test troubleshooting sections with common issues
+      5. Validate example commands produce expected output
+    patterns:
+      - Step-by-step installation with verification commands
+      - Correct CLI parameter formats and examples
+      - Accurate default values (ports, paths, options)
+      - Troubleshooting for common installation issues
+    code_example: |
+      ```bash
+      kotadb index --repository owner/repo --ref main
+      # Or for local path:
+      kotadb index --local-path /path/to/your/repo
+      ```
+    pitfalls:
+      - Incorrect CLI parameter format (old: kotadb index /path vs new: --local-path)
+      - Wrong default ports (3000 vs 8080)
+      - Missing environment variable configuration
+      - Untested troubleshooting advice
+
+  add_versioning_metadata:
+    when: Adding freshness tracking to documentation files
+    approach: |
+      1. Add complete frontmatter to all documentation files
+      2. Use consistent date format (YYYY-MM-DD) for last_updated
+      3. Correlate version with package.json or release version
+      4. Include reviewer information for accountability
+      5. Maintain order field for navigation structure
+    patterns:
+      - Standard frontmatter template across all docs
+      - Semantic versioning correlation with releases
+      - Review attribution (agent or human reviewer)
+      - Navigation order consistency
+    code_example: |
+      ---
+      title: API Reference
+      description: KotaDB MCP tools and HTTP endpoints
+      order: 3
+      last_updated: 2026-01-30
+      version: 2.0.0
+      reviewed_by: documentation-build-agent
+      ---
+    pitfalls:
+      - Inconsistent date formats
+      - Missing version correlation
+      - No reviewer attribution
+      - Incorrect navigation order
+
+decision_trees:
+  documentation_validation_strategy:
+    question: How should I validate this documentation section?
+    branches:
+      - condition: MCP tool documentation
+        action: Cross-reference with app/src/mcp/tools.ts implementation
+        rationale: Tool parameters and behavior must match exactly
+
+      - condition: HTTP endpoint documentation
+        action: Cross-reference with app/src/api/routes.ts implementation
+        rationale: Paths, methods, and parameters must match routes
+
+      - condition: Architecture documentation
+        action: Validate against current codebase structure and technology stack
+        rationale: Architecture descriptions must reflect actual implementation
+
+      - condition: Installation documentation
+        action: Test CLI commands and verify system requirements
+        rationale: Installation steps must work end-to-end
+
+  documentation_update_priority:
+    question: What order should I update documentation sections?
+    branches:
+      - condition: API reference errors
+        action: Fix parameter mismatches and missing tools first
+        rationale: API errors block integration and development
+
+      - condition: Installation issues
+        action: Fix CLI commands and system requirements second
+        rationale: Installation problems prevent initial adoption
+
+      - condition: Architecture inaccuracies
+        action: Update technology and component descriptions third
+        rationale: Architecture understanding affects design decisions
+
+      - condition: Versioning metadata missing
+        action: Add metadata and freshness tracking last
+        rationale: Metadata improves maintenance but doesn't block usage
+
+  documentation_accuracy_approach:
+    question: How should I ensure this documentation stays accurate?
+    branches:
+      - condition: Implementation-dependent content
+        action: Reference source code files directly in validation
+        rationale: Single source of truth prevents drift
+
+      - condition: Example code or commands
+        action: Test examples in actual environment
+        rationale: Working examples build developer confidence
+
+      - condition: Version-sensitive information
+        action: Add versioning metadata and review dates
+        rationale: Enables staleness detection and maintenance scheduling
+
+      - condition: Cross-referenced content
+        action: Validate links and dependencies between sections
+        rationale: Broken references fragment user experience
+
+patterns:
+  comprehensive_specification_pattern:
+    structure: Detailed technical specification with implementation guidance
+    usage: Issue-specific documentation improvements with validation requirements
+    trade_offs: Thorough validation vs time investment
+    example_evidence: docs/specs/documentation/issue-52-comprehensive-documentation-update-spec.md
+
+  frontmatter_versioning_pattern:
+    structure: Consistent metadata across all documentation files
+    usage: Freshness tracking and review attribution
+    trade_offs: Maintenance overhead vs staleness prevention
+
+  implementation_cross_reference_pattern:
+    structure: Documentation validation against source code files
+    usage: Parameter validation, endpoint verification, architecture accuracy
+    trade_offs: Implementation coupling vs accuracy guarantee
+
+  example_driven_documentation:
+    structure: Working code examples with JSON/CLI snippets
+    usage: API tool documentation, installation guides, configuration
+    trade_offs: Example maintenance vs developer usability
+
+best_practices:
+  api_documentation:
+    - Cross-reference all MCP tools with app/src/mcp/tools.ts
+    - Validate parameter names, types, and default values
+    - Test JSON examples for syntax and semantic correctness
+    - Include all implemented tools (common gap: missing 3 of 8 tools)
+    - Document parameter optionality and default behavior
+
+  endpoint_documentation:
+    - Match HTTP methods and paths exactly with app/src/api/routes.ts
+    - Use correct query parameter formats and names
+    - Provide working curl examples that can be copy-pasted
+    - Document response formats with actual response structure
+
+  architecture_documentation:
+    - Verify technology stack claims against actual dependencies
+    - Update parser information when implementation changes
+    - Correct file paths and directory structure diagrams
+    - Include integration services (Sentry, authentication)
+
+  installation_documentation:
+    - Test CLI commands end-to-end in clean environment
+    - Verify default ports, paths, and configuration options
+    - Update system requirements with actual dependencies
+    - Provide working troubleshooting solutions
+
+  versioning_metadata:
+    - Use YYYY-MM-DD format for last_updated consistently
+    - Correlate version with package.json or release tags
+    - Include reviewer attribution for accountability
+    - Maintain navigation order for user experience
+
+known_issues:
+  - issue: MCP tool documentation incomplete (5 of 8 tools documented)
+    impact: Missing tools prevent full API utilization
+    resolution: Added validate_implementation_spec, kota_sync_export, kota_sync_import tools
+    status: Resolved (2026-01-30)
+
+  - issue: HTTP endpoint paths incorrect (/api/* vs actual paths)
+    impact: API integration failures due to wrong endpoints
+    resolution: Updated to match app/src/api/routes.ts implementation
+    status: Resolved (2026-01-30)
+
+  - issue: Architecture claims outdated (tree-sitter vs TypeScript ESLint)
+    impact: Developer confusion about parsing technology
+    resolution: Updated parser information to reflect @typescript-eslint/parser usage
+    status: Resolved (2026-01-30)
+
+potential_enhancements:
+  - Automated documentation validation against implementation
+  - CLI command testing in CI/CD pipeline
+  - Documentation freshness monitoring and alerts
+  - Cross-reference validation between documentation sections
+  - Example testing framework for code snippets
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: new (initial domain creation)
+    contradiction_count: 0
+    last_reviewed: 2026-01-30
+    notes: |
+      Initial domain creation based on comprehensive documentation update (Issue #52).
+      Patterns extracted from successful synchronization of API reference, architecture,
+      and installation documentation with current implementation. Focus on validation
+      against source code and prevention of documentation drift.

@@ -2,6 +2,9 @@
 title: Installation
 description: Get KotaDB running locally
 order: 1
+last_updated: 2026-01-30
+version: 2.0.0
+reviewed_by: documentation-build-agent
 ---
 
 # Installation
@@ -43,7 +46,9 @@ You should see the version number printed to your terminal.
 1. **Index a repository** - Point KotaDB at your codebase:
 
 ```bash
-kotadb index /path/to/your/repo
+kotadb index --repository owner/repo --ref main
+# Or for local path:
+kotadb index --local-path /path/to/your/repo
 ```
 
 2. **Start the server** - Launch the API server:
@@ -55,7 +60,8 @@ kotadb serve
 3. **Test the connection** - Verify the server is running:
 
 ```bash
-curl http://localhost:3000/health
+curl http://localhost:8080/health
+# Default port is 8080, configurable via PORT environment variable
 ```
 
 ## Troubleshooting
