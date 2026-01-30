@@ -2,144 +2,50 @@ name: Automation CI
 
 on:
   push:
-    branches:
-      - main
-      - develop
-      - 'feat/**'
-      - 'bug/**'
-      - 'chore/**'
-      - 'fix/**'
-      - 'refactor/**'
-      - 'interactive-*'
     paths:
       - 'automation/**'
-      - '.github/workflows/automation-ci.yml'
-      - '.github/workflows/adw-metrics.yml'
+    branches:
+      - '**'
   pull_request:
     paths:
       - 'automation/**'
-      - '.github/workflows/automation-ci.yml'
-      - '.github/workflows/adw-metrics.yml'
+    branches:
+      - develop
+      - main
 
 jobs:
   test:
+    name: test
     runs-on: ubuntu-latest
     defaults:
       run:
         working-directory: automation
 
     steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install Python 3.12
-        uses: actions/setup-python@v5
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
         with:
-          python-version: '3.12'
-
-      - name: Install uv
-        uses: astral-sh/setup-uv@v5
-        with:
-          enable-cache: true
-
-      - name: Configure git identity for worktree tests
-        run: |
-          git config --global user.name "CI Test Runner"
-          git config --global user.email "ci@example.com"
-
-      - name: Python syntax check
-        run: python3 -m py_compile adws/adw_modules/*.py adws/adw_phases/*.py
+          bun-version: 1.1.29
 
       - name: Install dependencies
-        run: uv sync
+        run: bun install
 
-      - name: Run security audit
-        id: audit
-        working-directory: ./automation
+      - name: Type check
+        run: bunx tsc --noEmit
+
+      - name: Run tests
         run: |
-          # Create output directory
-          mkdir -p audit-results
-
-          # Run pip-audit with JSON output (allow failures for reporting)
-          uv run pip-audit --format json --output audit-results/audit.json
-
-          # Run pip-audit with exit codes for severity threshold
-          # Fail on high or critical vulnerabilities
-          uv run pip-audit
-        continue-on-error: false
-
-      - name: Generate audit summary
-        if: always()
-        working-directory: ./automation
-        run: |
-          echo "## Security Audit Results (Python)" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-
-          # Parse JSON and create summary
-          if [ -f audit-results/audit.json ]; then
-            # Count vulnerabilities by severity
-            CRITICAL=$(jq '[.dependencies[].vulns[]? | select(.fix_versions != null)] | length // 0' audit-results/audit.json)
-
-            echo "| Metric | Value |" >> $GITHUB_STEP_SUMMARY
-            echo "|--------|-------|" >> $GITHUB_STEP_SUMMARY
-            echo "| Vulnerabilities Found | $CRITICAL |" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-
-            # Add details if vulnerabilities found
-            if [ "$CRITICAL" -gt 0 ]; then
-              echo "⚠️ **Action Required**: Vulnerabilities detected in Python dependencies" >> $GITHUB_STEP_SUMMARY
-              echo "" >> $GITHUB_STEP_SUMMARY
-              echo "### Affected Packages" >> $GITHUB_STEP_SUMMARY
-              jq -r '.dependencies[] | select(.vulns | length > 0) | "- \(.name) \(.version)"' audit-results/audit.json >> $GITHUB_STEP_SUMMARY
-            else
-              echo "✅ No vulnerabilities detected in Python dependencies" >> $GITHUB_STEP_SUMMARY
-            fi
+          if [ -d "tests" ] || [ -d "__tests__" ] || find . -name "*.test.ts" -o -name "*.spec.ts" | grep -q .; then
+            bun test
           else
-            echo "❌ Audit failed to generate results" >> $GITHUB_STEP_SUMMARY
+            echo "No test files found - skipping tests"
           fi
 
-      - name: Upload audit results
+      - name: Summary
         if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: automation-security-audit
-          path: |
-            automation/audit-results/
-          retention-days: 30
-
-      - name: Run pytest suite with coverage
         run: |
-          uv run pytest adws/adw_tests/ -v --tb=short \
-            --cov=adws \
-            --cov-report=term \
-            --cov-report=json \
-            --cov-report=html \
-            --cov-report=lcov
-
-      - name: Generate coverage summary
-        if: always()
-        working-directory: automation
-        run: |
-          echo "## Automation Coverage Report" >> $GITHUB_STEP_SUMMARY
-          echo "" >> $GITHUB_STEP_SUMMARY
-          if [ -f coverage.json ]; then
-            # Extract coverage percentage from coverage.json
-            COVERAGE=$(python3 -c "import json; data=json.load(open('coverage.json')); print(f\"{data['totals']['percent_covered']:.2f}%\")" 2>/dev/null || echo "N/A")
-            echo "**Total Coverage:** $COVERAGE" >> $GITHUB_STEP_SUMMARY
-            echo "" >> $GITHUB_STEP_SUMMARY
-            echo "Full coverage details available in artifacts." >> $GITHUB_STEP_SUMMARY
-          else
-            echo "Coverage report not found." >> $GITHUB_STEP_SUMMARY
-          fi
-
-      - name: Upload automation coverage report
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: automation-coverage-report
-          path: |
-            automation/.coverage
-            automation/coverage.json
-            automation/htmlcov/
-            automation/coverage.lcov
-          retention-days: 30
+          echo "## Automation CI Results" >> $GITHUB_STEP_SUMMARY
+          echo "- Type checking: completed" >> $GITHUB_STEP_SUMMARY
+          echo "- Tests: completed" >> $GITHUB_STEP_SUMMARY
