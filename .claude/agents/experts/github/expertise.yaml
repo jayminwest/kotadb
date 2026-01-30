@@ -396,7 +396,7 @@ decision_trees:
   pr_type_determination:
     question: What files are being changed?
     options:
-      - if: Only docs/specs/*.md files
+      - if: Only .claude/.cache/specs/*.md files
         then: Planning PR (title uses "add specification/plan for")
       - if: app/src/, automation/, or >50 lines outside docs/
         then: Implementation PR (title uses imperative verb)
@@ -442,7 +442,7 @@ patterns:
       - [or] Temporary exception: [description] - follow-up: #<issue>
 
       ## References
-      - [Plan](./docs/specs/<spec-file>.md) (if applicable)
+      - [Plan](./.claude/.cache/specs/<spec-file>.md) (if applicable)
       - Closes #<issue_number>
       - ADW ID: <id> (if applicable)
 

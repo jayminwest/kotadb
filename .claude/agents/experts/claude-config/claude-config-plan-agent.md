@@ -200,7 +200,7 @@ Use Bash for git operations, file statistics, or verification commands.
    - Examples and usage scenarios
 
 7. **Save Specification**
-   - Save spec to `docs/specs/claude-config-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/claude-config-<descriptive-name>-spec.md`
    - Include example configurations
    - Document validation criteria
    - Return the spec path when complete
@@ -236,5 +236,5 @@ Use Bash for git operations, file statistics, or verification commands.
 - Tool matrix: <tools to register>
 
 **Specification Location:**
-- Path: `docs/specs/claude-config-<name>-spec.md`
+- Path: `.claude/.cache/specs/claude-config-<name>-spec.md`
 ```

@@ -159,7 +159,7 @@ Use Bash for git operations, file statistics, or verification commands.
    - Examples and usage scenarios
 
 7. **Save Specification**
-   - Save spec to `docs/specs/github-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/github-<descriptive-name>-spec.md`
    - Include example workflows
    - Document validation criteria
    - Return the spec path when complete
@@ -193,5 +193,5 @@ Use Bash for git operations, file statistics, or verification commands.
 - Commands: <validation commands>
 
 **Specification Location:**
-- Path: `docs/specs/github-<name>-spec.md`
+- Path: `.claude/.cache/specs/github-<name>-spec.md`
 ```

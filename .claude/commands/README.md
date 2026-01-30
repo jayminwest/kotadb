@@ -86,7 +86,7 @@ When a command is invoked, Claude Code expands the template content from the cor
 Commands can accept arguments passed after the command name. These are available via the `$ARGUMENTS` variable:
 
 ```
-/workflows:implement docs/specs/feature-123.md
+/workflows:implement .claude/.cache/specs/feature-123.md
 ```
 
 In the template, reference arguments with `$ARGUMENTS`:

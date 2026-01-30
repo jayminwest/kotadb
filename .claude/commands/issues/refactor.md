@@ -8,13 +8,13 @@ Author a refactoring plan for the code improvement described in `$ARGUMENTS` (is
 - You are executing in an isolated git worktree directory
 - Your CWD is the worktree root (e.g., `/project/trees/refactor-123-abc12345`)
 - ALL file paths in Write, Edit, Read tools MUST be relative to CWD
-- ✅ Correct: `docs/specs/refactor-123-plan.md`
-- ❌ Wrong: `/project/trees/refactor-123-abc12345/docs/specs/refactor-123-plan.md`
+- ✅ Correct: `.claude/.cache/specs/refactor-123-plan.md`
+- ❌ Wrong: `/project/trees/refactor-123-abc12345/.claude/.cache/specs/refactor-123-plan.md`
 - Using absolute paths will cause git staging failures and commit errors
 
 ## Instructions
 - **Verify issue labels first**: Run `gh issue view <issue-number> --json labels` to ensure the issue has labels from all four categories (component, priority, effort, status). If labels are missing, apply them before proceeding.
-- Create a new markdown plan under `docs/specs/` named `refactor-<issue-number>-<slug>.md` (e.g., `docs/specs/refactor-2350-extract-auth-logic.md`).
+- Create a new markdown plan under `.claude/.cache/specs/` named `refactor-<issue-number>-<slug>.md` (e.g., `.claude/.cache/specs/refactor-2350-extract-auth-logic.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Follow the format exactly so orchestrators can parse sections reliably.
 - **MANDATORY: Use KotaDB MCP tools for impact analysis**: Use `mcp__kotadb-staging__search_dependencies` (minimum depth=2) and `mcp__kotadb-staging__analyze_change_impact` before refactoring (see `.claude/commands/docs/kotadb-agent-usage.md` for patterns)
@@ -31,7 +31,7 @@ Author a refactoring plan for the code improvement described in `$ARGUMENTS` (is
 - If executing via ADW orchestration, query workflow state via MCP instead of searching:
   ```typescript
   const state = await mcp.call("adw_get_state", { adw_id: "<adw_id>" });
-  const planFile = state.plan_file;  // e.g., "docs/specs/refactor-145-plan.md"
+  const planFile = state.plan_file;  // e.g., ".claude/.cache/specs/refactor-145-plan.md"
   const worktreePath = state.worktree_path;  // e.g., "trees/refactor-145-abc12345"
   ```
 
@@ -120,17 +120,17 @@ Return ONLY the plan file path as plain text on a single line.
 
 **Correct output:**
 ```
-docs/specs/refactor-1450-extract-logic.md
+.claude/.cache/specs/refactor-1450-extract-logic.md
 ```
 
 **INCORRECT outputs (do NOT do this):**
 ```
-Created refactor plan at docs/specs/refactor-1450-extract-logic.md
+Created refactor plan at .claude/.cache/specs/refactor-1450-extract-logic.md
 ```
 ```
-Plan file: docs/specs/refactor-1450-extract-logic.md
+Plan file: .claude/.cache/specs/refactor-1450-extract-logic.md
 ```
 ```
-**docs/specs/refactor-1450-extract-logic.md**
+**.claude/.cache/specs/refactor-1450-extract-logic.md**
 ```
 

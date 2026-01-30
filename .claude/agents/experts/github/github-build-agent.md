@@ -135,7 +135,7 @@ bun run build
 - No new mocks introduced
 
 ## References
-- [Plan](./docs/specs/<spec>.md)
+- [Plan](./.claude/.cache/specs/<spec>.md)
 - Closes #<issue>
 ```
 

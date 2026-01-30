@@ -126,7 +126,7 @@ Use Bash for git operations, file statistics, or verification commands.
    - Determine model tier for modelIndex
 
 8. **Save Specification**
-   - Save spec to `docs/specs/agent-authoring/{slug}-spec.md`
+   - Save spec to `.claude/.cache/specs/agent-authoring/{slug}-spec.md`
    - Return the spec path when complete
 
 ## Report
@@ -201,5 +201,5 @@ expertDomain: <domain if applicable>
 - Example agents: <paths to reference agents>
 
 **Specification Location:**
-- Path: `docs/specs/agent-authoring/{slug}-spec.md`
+- Path: `.claude/.cache/specs/agent-authoring/{slug}-spec.md`
 ```

@@ -167,7 +167,7 @@ afterEach(() => {
    - Cleanup requirements
 
 7. **Save Specification**
-   - Save spec to `docs/specs/test-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/test-<descriptive-name>-spec.md`
    - Include example test code
    - Document assertion strategies
    - Return the spec path when complete
@@ -203,5 +203,5 @@ afterEach(() => {
 - <edge case 2>
 
 **Specification Location:**
-- Path: `docs/specs/test-<name>-spec.md`
+- Path: `.claude/.cache/specs/test-<name>-spec.md`
 ```
