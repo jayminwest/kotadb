@@ -1,0 +1,356 @@
+# Automation Expert Domain Expertise
+# Last reviewed: 2026-01-30
+# Domain: automation layer development with Claude Agent SDK
+
+overview:
+  description: |
+    Automation expert domain provides specialized knowledge for kotadb's automation layer,
+    which uses the Claude Agent SDK (@anthropic-ai/claude-code) to execute automated workflows.
+    This domain covers SDK integration patterns, workflow orchestration, metrics tracking with
+    SQLite, GitHub commenting via gh CLI, and cost tracking for AI operations.
+    
+  scope:
+    primary_codebase:
+      - automation/src/index.ts (CLI entry, env loading, metrics display)
+      - automation/src/workflow.ts (SDK query() integration, message streaming)
+      - automation/src/metrics.ts (SQLite metrics storage)
+      - automation/src/github.ts (gh CLI commenting)
+      - automation/package.json (SDK dependency)
+      - automation/tsconfig.json (TypeScript config)
+      - automation/README.md (documentation)
+    
+    broader_scope:
+      - Claude Agent SDK patterns (query(), message streaming)
+      - MCP server configuration for kotadb access
+      - Bun.spawn patterns for gh CLI integration
+      - SQLite metrics storage (automation/.data/metrics.db)
+      
+    not_covered:
+      - General Claude configuration (see claude-config expert)
+      - GitHub issue/PR workflows (see github expert)
+      - KotaDB API implementation (see api expert)
+      
+  rationale: |
+    The automation layer represents a critical architectural component that orchestrates
+    Claude Code workflows programmatically. This expertise enables reliable SDK integration,
+    proper metrics tracking, and effective workflow automation while maintaining clear
+    boundaries with related domains (github for GitHub operations, database for code
+    intelligence storage).
+
+core_implementation:
+  database_location: automation/.data/metrics.db
+  
+  key_files:
+    index_ts:
+      path: automation/src/index.ts
+      purpose: CLI entry point with env loading and metrics display
+      responsibilities:
+        - Parse CLI arguments (issue number, flags)
+        - Load .env from project root
+        - Validate ANTHROPIC_API_KEY
+        - Execute workflow via workflow.ts
+        - Display metrics table or run workflow
+        - Handle exit codes
+        
+    workflow_ts:
+      path: automation/src/workflow.ts
+      purpose: SDK query() integration and message streaming
+      responsibilities:
+        - Import query() from @anthropic-ai/claude-code
+        - Configure SDK options (maxTurns, cwd, permissionMode, mcpServers)
+        - Stream messages from async iterator
+        - Extract session_id, usage, cost, errors
+        - Record metrics via metrics.ts
+        - Post GitHub comment via github.ts
+        
+    metrics_ts:
+      path: automation/src/metrics.ts
+      purpose: SQLite metrics storage and retrieval
+      responsibilities:
+        - Auto-initialize workflow_metrics table
+        - Record workflow start/completion
+        - Store tokens, cost, duration, PR URL
+        - Retrieve recent metrics for display
+        - Handle DB errors gracefully
+        
+    github_ts:
+      path: automation/src/github.ts
+      purpose: GitHub commenting via gh CLI
+      responsibilities:
+        - Parse git remote for repo path
+        - Format markdown table for metrics
+        - Execute gh CLI via Bun.spawn
+        - Handle auth failures gracefully
+        - Support --no-comment flag
+
+key_operations:
+  integrate_sdk_query:
+    when: Setting up Claude Agent SDK workflow execution
+    approach: |
+      Import query() from @anthropic-ai/claude-code and configure with appropriate
+      options for automation context. Use async for...of loop to stream messages.
+    patterns:
+      - maxTurns 100 (allow complex multi-turn workflows)
+      - permissionMode bypassPermissions (automation context, no interactive prompts)
+      - cwd projectRoot (ensure correct working directory)
+      - mcpServers Configure kotadb server with stdio transport
+    code_example: |
+      import { query, type SDKMessage } from "@anthropic-ai/claude-code";
+      
+      const messages: SDKMessage[] = [];
+      for await (const message of query({
+        prompt: `/do #${issueNumber}`,
+        options: {
+          maxTurns: 100,
+          cwd: projectRoot,
+          permissionMode: "bypassPermissions",
+          mcpServers: {
+            kotadb: {
+              type: "stdio",
+              command: "bunx",
+              args: ["--bun", "kotadb@next"],
+              env: { KOTADB_CWD: projectRoot }
+            }
+          }
+        }
+      })) {
+        messages.push(message);
+        // Handle message types...
+      }
+    pitfalls:
+      - Missing ANTHROPIC_API_KEY causes SDK error
+      - Incorrect projectRoot path breaks kotadb MCP access
+      - Not using bypassPermissions requires manual intervention
+      - Low maxTurns value terminates complex workflows prematurely
+      
+  stream_sdk_messages:
+    when: Processing query() async iterator
+    approach: |
+      Use type guards to handle different SDKMessage types (system, assistant, result).
+      Extract session_id from system init message, progress from assistant messages,
+      and final usage/cost from result message.
+    patterns:
+      - Type guards for message discrimination
+      - Progress logging via process.stderr.write
+      - Session ID extraction from system init message
+      - Final result extraction from result message
+      - Error message extraction from error messages
+    code_example: |
+      function isSystemMessage(msg: SDKMessage): msg is SDKSystemMessage {
+        return msg.type === "system" && "subtype" in msg && msg.subtype === "init";
+      }
+      
+      function isResultMessage(msg: SDKMessage): msg is SDKResultMessage {
+        return msg.type === "result";
+      }
+      
+      for await (const message of query(...)) {
+        if (isSystemMessage(message)) {
+          sessionId = message.session_id;
+        } else if (isResultMessage(message)) {
+          usage = message.usage;
+          success = message.success;
+        }
+      }
+    pitfalls:
+      - Not handling all message types leads to missing data
+      - Using console.* breaks logging conventions
+      - Not extracting session_id makes debugging difficult
+      - Missing error state handling prevents failure tracking
+      
+  configure_mcp_server:
+    when: Enabling kotadb MCP tools in SDK workflow
+    approach: |
+      Configure mcpServers object with stdio transport to enable kotadb code intelligence
+      tools during SDK workflow execution. Pass KOTADB_CWD env var for correct indexing.
+    patterns:
+      - Server name kotadb matches SDK expectations
+      - Type stdio for local server process
+      - Command bunx with --bun flag for Bun runtime
+      - Args for package execution
+      - Env KOTADB_CWD for indexing context
+    code_example: |
+      mcpServers: {
+        kotadb: {
+          type: "stdio",
+          command: "bunx",
+          args: ["--bun", "kotadb@next"],
+          env: { KOTADB_CWD: projectRoot }
+        }
+      }
+    pitfalls:
+      - Wrong transport type fails to connect
+      - Missing KOTADB_CWD causes indexing in wrong directory
+      - Incorrect package name breaks MCP server startup
+      - Not using bunx --bun flag may use Node.js
+      
+  record_workflow_metrics:
+    when: Tracking workflow execution for analysis and cost monitoring
+    approach: |
+      Use SQLite database with auto-initialized schema to store workflow metrics.
+      Record start time immediately, update on completion with tokens/cost/duration.
+    patterns:
+      - Auto-initialize schema on first DB access
+      - Prepared statements for inserts
+      - Index on issue_number and started_at for queries
+      - Store session_id for debugging
+      - Store PR URL extracted from SDK output
+      - Record error messages for failed workflows
+    pitfalls:
+      - Not handling DB initialization errors prevents metrics storage
+      - Missing indexes slow down queries
+      - Not closing DB connection can corrupt metrics
+      - Storing tokens as REAL loses precision
+      
+  post_github_comment:
+    when: Reporting workflow results to GitHub issue
+    approach: |
+      Use gh CLI via Bun.spawn to post formatted comment with workflow results.
+      Parse git remote for repo path, format duration/cost/tokens in markdown table.
+    patterns:
+      - gh CLI via Bun.spawn
+      - Markdown table format for metrics
+      - Success/failure emoji
+      - Format duration as Xm Ys or Xs
+      - Format cost with 4 decimal places
+      - Parse git remote for repo
+      - Non-fatal failure
+    pitfalls:
+      - gh auth not configured causes failure
+      - Network failures are transient
+      - Wrong repo format breaks comment posting
+      - Not handling empty PR URL shows undefined
+
+decision_trees:
+  sdk_option_selection:
+    question: Which SDK options should I use for automation workflows?
+    branches:
+      - condition: Always in automation context
+        action: Use permissionMode bypassPermissions
+        rationale: No human in loop for permission prompts
+        
+      - condition: Complex multi-step workflows
+        action: Set maxTurns to 100 or higher
+        rationale: Prevents premature termination
+        
+      - condition: Need kotadb code intelligence
+        action: Configure mcpServers with kotadb stdio transport
+        rationale: Enables code search and dependency analysis
+        
+      - condition: Multiple repositories or paths
+        action: Set cwd to projectRoot
+        rationale: Ensures correct working directory
+        
+  message_type_handling:
+    question: How should I handle this SDK message type?
+    branches:
+      - condition: Message type is system with subtype init
+        action: Extract session_id for debugging
+        
+      - condition: Message type is assistant
+        action: Log progress to stderr, accumulate for final PR extraction
+        
+      - condition: Message type is result
+        action: Extract usage, cost, success status
+        
+      - condition: Message type is error
+        action: Record error message, mark workflow failed
+        
+  metrics_vs_logging:
+    question: Should I store this data in metrics DB or just log it?
+    branches:
+      - condition: Workflow outcome data
+        action: Store in metrics.db
+        rationale: Persistent tracking for analysis
+        
+      - condition: Progress updates
+        action: Log to stderr via process.stderr.write
+        rationale: Real-time feedback, no persistence needed
+        
+      - condition: Final summary
+        action: Log to stdout via process.stdout.write
+        rationale: User-facing output
+        
+      - condition: Errors
+        action: Log to stderr AND store in metrics if workflow-level
+        rationale: Both immediate feedback and historical tracking
+
+patterns:
+  sdk_query_pattern:
+    structure: Async for...of loop over query() iterator
+    usage: Stream messages, accumulate results, handle errors
+    trade_offs: Streaming progress vs batched results
+      
+  type_guard_pattern:
+    structure: Type predicates for SDKMessage union types
+    usage: isSystemMessage, isAssistantMessage, isResultMessage
+    trade_offs: Type safety vs runtime overhead
+      
+  metrics_schema_pattern:
+    structure: SQLite auto-initialization, prepared statements
+    usage: workflow_metrics table with indexes
+    trade_offs: Storage overhead vs queryability
+      
+  github_comment_pattern:
+    structure: gh CLI via Bun.spawn, markdown table
+    usage: Post workflow results with emoji, metrics table
+    trade_offs: gh CLI dependency vs API complexity
+      
+  cli_argument_pattern:
+    structure: Simple flag detection, positional args
+    usage: --dry-run, --metrics, --no-comment, issue number
+    trade_offs: Simple parsing vs rich CLI library
+
+best_practices:
+  sdk_integration:
+    - Always validate ANTHROPIC_API_KEY before query()
+    - Use type guards for message handling
+    - Configure mcpServers for kotadb access
+    - Set permissionMode bypassPermissions for automation
+    
+  metrics_storage:
+    - Auto-initialize schema on first use
+    - Use prepared statements for inserts
+    - Index on issue_number and started_at
+    - Store session_id for debugging
+    
+  error_handling:
+    - Non-fatal GitHub comment failures
+    - Graceful env loading failures
+    - Record failed workflow metrics
+    - Always close metrics DB on exit
+    
+  logging:
+    - Use process.stdout.write for output
+    - Use process.stderr.write for progress/errors
+    - Format duration properly
+    - Format cost with 4 decimals
+
+known_issues:
+  - issue: SDK query() timeout on long workflows
+    impact: Workflow fails mid-execution
+    resolution: Increase maxTurns, optimize workflow
+    status: Operational guidance
+    
+  - issue: GitHub comment auth failures
+    impact: Metrics recorded but no issue comment
+    resolution: Non-fatal, log warning and continue
+    status: Handled gracefully
+
+potential_enhancements:
+  - Workflow pause/resume capability
+  - Cost budget enforcement
+  - Retry logic for transient failures
+  - Workflow visualization UI
+  - Metrics aggregation and reporting
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: new
+    contradiction_count: 0
+    last_reviewed: 2026-01-30
+    notes: |
+      Initial domain creation based on automation/ rewrite (commit 5d257ea, Issue #60).
+      SDK patterns from @anthropic-ai/claude-code v1.0.32. Metrics schema follows
+      SQLite conventions from database expert. Distinct from github domain (SDK
+      orchestration vs GitHub operations).
