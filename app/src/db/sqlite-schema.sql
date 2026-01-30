@@ -187,6 +187,19 @@ CREATE INDEX IF NOT EXISTS idx_indexed_references_symbol_name ON indexed_referen
 CREATE INDEX IF NOT EXISTS idx_indexed_references_target_symbol ON indexed_references(target_symbol_id);
 CREATE INDEX IF NOT EXISTS idx_indexed_references_type ON indexed_references(reference_type);
 
+-- Phase 1 (Issue #37): Additional indexes for dependency queries
+-- Partial index for target file path lookups (only where target_file_path IS NOT NULL)
+CREATE INDEX IF NOT EXISTS idx_indexed_references_target_file_path 
+ON indexed_references(target_file_path) 
+WHERE target_file_path IS NOT NULL;
+
+-- Composite index for import reference queries (CRITICAL for performance)
+-- Optimizes the common query pattern: filter by type + join on path
+CREATE INDEX IF NOT EXISTS idx_refs_import_target 
+ON indexed_references(reference_type, target_file_path)
+WHERE reference_type = 'import';
+
+
 -- ============================================================================
 -- 7. Projects Table
 -- ============================================================================
@@ -232,52 +245,7 @@ CREATE INDEX IF NOT EXISTS idx_project_repositories_repository_id ON project_rep
 
 
 -- ============================================================================
--- 9. Dependency Graph Table
--- ============================================================================
-
-CREATE TABLE IF NOT EXISTS dependency_graph (
-    id TEXT PRIMARY KEY,                         -- uuid → TEXT
-    repository_id TEXT NOT NULL,                 -- Foreign key to repositories
-    from_file_id TEXT,                           -- Source file (nullable)
-    to_file_id TEXT,                             -- Target file (nullable)
-    from_symbol_id TEXT,                         -- Source symbol (nullable)
-    to_symbol_id TEXT,                           -- Target symbol (nullable)
-    dependency_type TEXT NOT NULL,               -- 'file_import' or 'symbol_usage'
-    metadata TEXT DEFAULT '{}',                  -- jsonb → TEXT (JSON string)
-    created_at TEXT NOT NULL DEFAULT (datetime('now')),
-    
-    FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
-    FOREIGN KEY (from_file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
-    FOREIGN KEY (to_file_id) REFERENCES indexed_files(id) ON DELETE CASCADE,
-    FOREIGN KEY (from_symbol_id) REFERENCES indexed_symbols(id) ON DELETE CASCADE,
-    FOREIGN KEY (to_symbol_id) REFERENCES indexed_symbols(id) ON DELETE CASCADE,
-    
-    -- At least one dependency relationship must be defined
-    CHECK (
-        (from_file_id IS NOT NULL AND to_file_id IS NOT NULL) OR
-        (from_symbol_id IS NOT NULL AND to_symbol_id IS NOT NULL)
-    ),
-    
-    -- dependency_type must be valid
-    CHECK (dependency_type IN ('file_import', 'symbol_usage'))
-);
-
--- Indexes for efficient dependency queries
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_repository_id ON dependency_graph(repository_id);
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_from_file_id ON dependency_graph(from_file_id);
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_to_file_id ON dependency_graph(to_file_id);
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_from_symbol_id ON dependency_graph(from_symbol_id);
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_to_symbol_id ON dependency_graph(to_symbol_id);
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_dependency_type ON dependency_graph(dependency_type);
-
--- Composite index for "what depends on file X" queries
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_from_file_to_file ON dependency_graph(to_file_id, dependency_type);
-
--- Composite index for "what does file X depend on" queries
-CREATE INDEX IF NOT EXISTS idx_dependency_graph_composite ON dependency_graph(from_file_id, dependency_type);
-
--- ============================================================================
--- 10. Schema Migrations Tracking Table
+-- 9. Schema Migrations Tracking Table
 -- ============================================================================
 -- 9. Schema Migrations Tracking Table
 -- ============================================================================

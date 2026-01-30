@@ -18,7 +18,7 @@
  */
 
 import path from "node:path";
-import type { IndexedFile } from "@shared/types/entities";
+
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
 
@@ -58,8 +58,8 @@ const INDEX_FILES = ["index.ts", "index.tsx", "index.js", "index.jsx"];
  * @example
  * ```typescript
  * const files = [
- *   { path: '/repo/src/utils.ts', ... },
- *   { path: '/repo/src/api/routes.ts', ... }
+ *   { path: '/repo/src/utils.ts' },
+ *   { path: '/repo/src/api/routes.ts' }
  * ];
  * resolveImport('./utils', '/repo/src/api/routes.ts', files);
  * // => '/repo/src/utils.ts'
@@ -68,7 +68,7 @@ const INDEX_FILES = ["index.ts", "index.tsx", "index.js", "index.jsx"];
 export function resolveImport(
 	importSource: string,
 	fromFilePath: string,
-	files: IndexedFile[],
+	files: Array<{ path: string }>,
 ): string | null {
 	// Skip non-relative imports (node_modules, absolute paths, etc.)
 	if (!importSource.startsWith(".")) {

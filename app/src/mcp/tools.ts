@@ -465,8 +465,7 @@ export async function executeIndexRepository(
 				files_indexed: result.filesIndexed,
 				symbols_extracted: result.symbolsExtracted,
 				references_extracted: result.referencesExtracted,
-				dependencies_extracted: result.dependenciesExtracted,
-			},
+				},
 		};
 	} catch (error) {
 		Sentry.captureException(error, {

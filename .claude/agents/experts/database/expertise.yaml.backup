@@ -451,260 +451,37 @@ key_operations:
   implement_recursive_cte:
     when: Traversing dependency graphs or hierarchical data
     approach: |
-      Use recursive CTEs with cycle detection and depth limiting for dependency traversal.
-      
-      Pattern: queryDependents() (find files that import target file)
-      ```sql
-      WITH RECURSIVE dependents AS (
-          -- Base case: direct imports of target file
-          SELECT
-              f.id AS file_id,
-              f.path AS file_path,
-              1 AS depth,
-              '/' || f.id || '/' AS path_tracker
-          FROM indexed_references r
-          JOIN indexed_files f ON r.file_id = f.id
-          WHERE r.reference_type = 'import'
-              AND r.repository_id = ?
-              AND r.target_file_path = ?
-          
-          UNION ALL
-          
-          -- Recursive case: indirect imports via dependency chain
-          SELECT
-              f2.id AS file_id,
-              f2.path AS file_path,
-              d.depth + 1 AS depth,
-              d.path_tracker || f2.id || '/' AS path_tracker
-          FROM indexed_references r2
-          JOIN indexed_files f2 ON r2.file_id = f2.id
-          JOIN indexed_files target2 ON r2.target_file_path = target2.path
-          JOIN dependents d ON target2.id = d.file_id
-          WHERE r2.reference_type = 'import'
-              AND r2.repository_id = ?
-              AND d.depth < ?
-              AND INSTR(d.path_tracker, '/' || f2.id || '/') = 0  -- Cycle detection
-      )
-      SELECT DISTINCT file_path, depth
-      FROM dependents
-      ORDER BY depth ASC, file_path ASC
-      ```
-      
-      Pattern: queryDependencies() (find files that source file imports)
-      ```sql
-      WITH RECURSIVE dependencies AS (
-          -- Base case: direct imports by source file
-          SELECT
-              target.id AS file_id,
-              target.path AS file_path,
-              1 AS depth,
-              '/' || target.id || '/' AS path_tracker
-          FROM indexed_references r
-          JOIN indexed_files target ON r.target_file_path = target.path
-          WHERE r.reference_type = 'import'
-              AND r.repository_id = ?
-              AND r.file_id = ?
-          
-          UNION ALL
-          
-          -- Recursive case: transitive dependencies
-          SELECT
-              target2.id AS file_id,
-              target2.path AS file_path,
-              d.depth + 1 AS depth,
-              d.path_tracker || target2.id || '/' AS path_tracker
-          FROM indexed_references r2
-          JOIN indexed_files target2 ON r2.target_file_path = target2.path
-          JOIN dependencies d ON r2.file_id = d.file_id
-          WHERE r2.reference_type = 'import'
-              AND r2.repository_id = ?
-              AND d.depth < ?
-              AND INSTR(d.path_tracker, '/' || target2.id || '/') = 0  -- Cycle detection
-      )
-      SELECT DISTINCT file_path, depth
-      FROM dependencies
-      ORDER BY depth ASC, file_path ASC
-      ```
-      
-      Key techniques:
-      - path_tracker: String accumulator ('/' || id || '/') for visited nodes
-      - Cycle detection: INSTR(path_tracker, '/' || id || '/') = 0 prevents revisiting
-      - Depth limiting: d.depth < :max_depth prevents infinite recursion
-      - Repository scoping: Filter by repository_id for multi-repo support
-      - Join on file paths: Use target_file_path column for file-level dependencies
-    timestamp: 2026-01-29
-    evidence: Commits 35e8b4c, 6055382, ba1e03a (Issue #37)
-    related_files:
-      - app/src/api/queries.ts (lines 567-703)
-      - app/tests/mcp/search-dependencies.integration.test.ts
-  
-  normalize_file_paths:
-    when: Storing or comparing file paths in database
-    approach: |
-      Apply consistent path normalization to avoid mismatch issues in queries.
-      
-      ```typescript
-      /**
-       * Normalize file path to consistent format for database storage.
-       * 
-       * Rules:
-       * - No leading slashes
-       * - Forward slashes only (replace backslashes)
-       * - No ./ prefix
-       * - Consistent relative-to-repo-root format
-       */
-      function normalizePath(filePath: string): string {
-          let normalized = filePath;
-          
-          // Replace backslashes with forward slashes
-          normalized = normalized.replace(/\/g, '/');
-          
-          // Remove leading slash if present
-          if (normalized.startsWith('/')) {
-              normalized = normalized.slice(1);
-          }
-          
-          // Remove ./ prefix
-          if (normalized.startsWith('./')) {
-              normalized = normalized.slice(2);
-          }
-          
-          return normalized;
-      }
-      ```
-      
-      Usage:
-      - Apply when populating target_file_path column
-      - Ensures consistent format across import references
-      - Prevents query mismatches due to path variations (./foo vs foo vs /foo)
-      - Critical for recursive CTE joins on target_file_path
-    timestamp: 2026-01-29
-    evidence: Commit 35e8b4c, app/src/api/queries.ts lines 23-50
-  
-  use_partial_indexes_for_optional_columns:
-    when: Creating index on nullable column where most queries filter by non-NULL
-    approach: |
-      Use partial indexes with WHERE clause to index only relevant rows.
-      
-      Example: target_file_path column is NULL for many reference types (only imports have values)
-      
-      ```sql
-      -- Partial index: Only index rows with non-NULL target_file_path
-      CREATE INDEX IF NOT EXISTS idx_indexed_references_target_file_path 
-      ON indexed_references(target_file_path) 
-      WHERE target_file_path IS NOT NULL;
-      ```
-      
-      Benefits:
-      - Smaller index size (skips NULL rows)
-      - Faster index maintenance (fewer rows to update)
-      - Better query performance (only indexes relevant data)
-      - Reduced disk I/O and memory usage
-      
-      Best practices:
-      - Use for columns where query always filters NULL out
-      - Document the WHERE clause to match query predicates
-      - Combine with reference_type filtering for maximum selectivity
-      - Monitor index usage with EXPLAIN QUERY PLAN
-    timestamp: 2026-01-29
-    evidence: Commit 3d7d5b3, app/src/db/sqlite-schema.sql lines 192-194
-  
-  create_composite_indexes_for_common_patterns:
-    when: Queries frequently filter by multiple columns together
-    approach: |
-      Create composite indexes matching common query predicates for optimal performance.
-      
-      Example: Import dependency queries filter by reference_type + target_file_path
-      
-      ```sql
-      -- Composite index for import reference queries (CRITICAL for performance)
-      -- Optimizes the common query pattern: filter by type + join on path
-      CREATE INDEX IF NOT EXISTS idx_refs_import_target 
-      ON indexed_references(reference_type, target_file_path)
-      WHERE reference_type = 'import';
-      ```
-      
-      This index supports queries like:
-      ```sql
-      SELECT f.id, f.path
-      FROM indexed_references r
-      JOIN indexed_files f ON r.file_id = f.id
-      WHERE r.reference_type = 'import'
-          AND r.target_file_path = 'src/base.ts';
-      ```
-      
-      Design principles:
-      - Leading column: Most selective filter (reference_type = 'import')
-      - Trailing column: Join target (target_file_path)
-      - Add WHERE clause to partial index for additional selectivity
-      - Column order matters: put equality filters before range/join columns
-      - Use EXPLAIN QUERY PLAN to verify index usage
-      
-      Trade-offs:
-      - Index only covers import references (95% of queries)
-      - Other reference_type values fall back to table scan
-      - Acceptable trade-off: faster critical path, smaller index size
-    timestamp: 2026-01-29
-    evidence: Commit 3d7d5b3, app/src/db/sqlite-schema.sql lines 197-200
-  
-  avoid_duplicate_storage_tables:
-    when: Designing schema with potential for data duplication
-    approach: |
-      Use single source of truth instead of maintaining duplicate tables.
-      
-      Anti-pattern: dependency_graph table that duplicates indexed_references
-      ```sql
-      -- BAD: Separate table requiring manual synchronization
-      CREATE TABLE dependency_graph (
-          id TEXT PRIMARY KEY,
-          from_file_id TEXT,
-          to_file_id TEXT,
-          dependency_type TEXT,
-          ...
-      );
-      ```
-      
-      Better pattern: Single table with proper indexes
-      ```sql
-      -- GOOD: Single source of truth (indexed_references)
-      CREATE TABLE indexed_references (
-          id TEXT PRIMARY KEY,
-          file_id TEXT NOT NULL,              -- Source file
-          target_file_path TEXT,              -- Target file path
-          reference_type TEXT NOT NULL,       -- 'import', 'call', etc.
-          ...
-      );
-      
-      -- Add indexes to support dependency queries
-      CREATE INDEX idx_refs_import_target 
-      ON indexed_references(reference_type, target_file_path)
-      WHERE reference_type = 'import';
-      ```
-      
-      Benefits:
-      - No synchronization logic needed
-      - No risk of data inconsistency
-      - Simpler codebase (one insert path)
-      - Reduced storage requirements
-      - Single point of truth for debugging
-      
-      When to consolidate:
-      - If "derived" table is never populated (dead code)
-      - If derived table exactly mirrors another table
-      - If synchronization logic is complex or error-prone
-      - If queries can be rewritten with recursive CTEs + indexes
-      
-      Migration strategy:
-      1. Add indexes to primary table for performance
-      2. Rewrite queries to use primary table with recursive CTEs
-      3. Verify test coverage shows correctness
-      4. Remove unused table and associated code
-    timestamp: 2026-01-29
-    evidence: Commit ba1e03a (removed dependency_graph table, ~650 lines deleted)
-    related_issue: "#37 - dependency storage consolidation"
+      1. Define base case (initial selection):
+         ```sql
+         WITH RECURSIVE deps AS (
+             SELECT id, target_id, 1 AS depth, '/' || id || '/' AS path
+             FROM dependency_graph
+             WHERE source_id = ?
+         ```
+      2. Define recursive case (join to CTE):
+         ```sql
+             UNION ALL
+             SELECT d.id, d.target_id, deps.depth + 1, deps.path || d.id || '/'
+             FROM dependency_graph d
+             JOIN deps ON d.source_id = deps.target_id
+             WHERE deps.depth < ? AND INSTR(deps.path, '/' || d.id || '/') = 0
+         )
+         ```
+      3. Add cycle detection via path column (INSTR check)
+      4. Limit depth to prevent infinite recursion
+      5. Select from CTE with appropriate joins:
+         ```sql
+         SELECT DISTINCT d.*, f.path AS file_path
+         FROM deps d
+         LEFT JOIN indexed_files f ON d.target_id = f.id
+         ORDER BY d.depth
+         ```
+    patterns:
+      - queryDependents(): Find files that depend ON target
+      - queryDependencies(): Find files that target DEPENDS on
+      - Cycle detection: Track visited IDs in path string
 
   configure_wal_mode:
-
     when: Setting up database for concurrent access
     approach: |
       1. Enable WAL mode (writer connection only):
@@ -943,39 +720,24 @@ stability:
   convergence_indicators:
     insight_rate_trend: increasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 9
-    patterns_updated_this_cycle: 1
-    last_reviewed: 2026-01-29
+    new_patterns_added_this_cycle: 5
+    patterns_updated_this_cycle: 2
+    last_reviewed: 2026-01-28
     utility_ratio: 1.0
     notes: |
-      Cycle 2026-01-29: Added 5 new patterns from Issue #37 (dependency consolidation), 
-      updated 1 existing pattern (implement_recursive_cte).
+      Cycle 2026-01-28: Added 5 new patterns, updated 2 existing (database_location, key_files).
       
       New patterns added:
-      1. implement_recursive_cte - UPDATED with production recursive CTE patterns from Issue #37
-      2. normalize_file_paths - Path normalization for consistent storage/queries
-      3. use_partial_indexes_for_optional_columns - Partial indexes for nullable columns
-      4. create_composite_indexes_for_common_patterns - Composite indexes for multi-column queries
-      5. avoid_duplicate_storage_tables - Single source of truth vs duplicate tables
+      1. escape_fts5_search_terms - Critical FTS5 escaping function (commit 5af086f)
+      2. auto_initialize_schema - Automatic schema initialization (commit 2032801)
+      3. resolve_project_local_path - Three-tier path resolution for project-local storage (commit d669841, issue #592)
+      4. detect_project_root - Walk up to .git marker for project root detection (commit d669841, issue #592)
+      5. ensure_kotadb_in_gitignore - Auto-management of .kotadb/ in gitignore (commit d669841, issue #592)
       
-      Previous cycle (2026-01-28): Added 5 new patterns, updated 2 existing
-      - escape_fts5_search_terms (commit 5af086f)
-      - auto_initialize_schema (commit 2032801)
-      - resolve_project_local_path (commit d669841, issue #592)
-      - detect_project_root (commit d669841, issue #592)
-      - ensure_kotadb_in_gitignore (commit d669841, issue #592)
+      Updated patterns:
+      1. database_location - Updated to reflect project-local v2 default
+      2. key_files - Added project-root.ts and gitignore.ts entries
       
-      Evidence: Real production implementations from Issue #37 dependency consolidation refactor
-      - Removed dependency_graph table (~650 lines of code deleted)
-      - Implemented recursive CTEs on indexed_references table
-      - Added partial and composite indexes for query performance
-      - Path normalization for consistent dependency resolution
-      
-      Test coverage: 
-      - 8 integration tests in search-dependencies.integration.test.ts
-      - Comprehensive cycle detection, depth limiting, test filtering tests
-      - Real SQLite database fixtures (no mocks)
-      
-      Domain stability: Increasing - dependency query patterns converging around 
-      recursive CTEs, partial indexes, and single-source-of-truth principles.
-      File size: 967 lines (target 600, warning at 800, hard limit 1000).
+      Evidence: Real production implementations in local-only v2 refactor (commit d669841)
+      Test coverage: Integration tested in project initialization workflow
+      Domain stability: Increasing - project-local storage patterns converging with local-first architecture
