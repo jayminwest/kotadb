@@ -1,19 +1,8 @@
 {
   "mcpServers": {
-    "kotadb": {
-      "type": "http",
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "Accept": "application/json, text/event-stream",
-        "MCP-Protocol-Version": "2025-06-18"
-      }
-    },
-    "kotadb-bunx": {
+   "kotadb-bunx": {
       "command": "bunx",
-      "args": ["kotadb"],
-      "env": {
-        "PORT": "3000"
-      }
+      "args": ["kotadb@next", "--stdio"]
     }
   }
 }

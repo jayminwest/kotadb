@@ -90,3 +90,5 @@ supabase/
 .vscode/
 # KotaDB local storage
 .kotadb/
+
+.eraser/
