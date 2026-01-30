@@ -39,11 +39,11 @@ export async function runWorkflow(
     logDir: null,
   };
 
+  const startTime = performance.now();
+
   try {
     logger.initialize();
     logger.logEvent("WORKFLOW_START", { issue_number: issueNumber, dry_run: dryRun });
-    
-    const startTime = performance.now();
 
     // NEW: Use orchestrator instead of single /do invocation
     const orchResult = await orchestrateWorkflow({
@@ -73,11 +73,31 @@ export async function runWorkflow(
       files_modified: orchResult.filesModified.length
     });
     
+    // NEW: Finalize agent output with summary
+    logger.finalizeAgentOutput({
+      totalInputTokens: inputTokens,
+      totalOutputTokens: outputTokens,
+      totalCostUsd: totalCostUsd,
+      durationMs
+    });
+    
   } catch (error) {
+    const endTime = performance.now();
+    const durationMs = Math.round(endTime - startTime);
+    const { inputTokens, outputTokens, totalCostUsd } = logger.getMetrics();
+    
     result.success = false;
     result.errorMessage = error instanceof Error ? error.message : String(error);
     logger.logError("workflow_execution", error instanceof Error ? error : new Error(String(error)));
     result.logDir = logger.getLogDir();
+    
+    // NEW: Finalize agent output even on error
+    logger.finalizeAgentOutput({
+      totalInputTokens: inputTokens,
+      totalOutputTokens: outputTokens,
+      totalCostUsd: totalCostUsd,
+      durationMs
+    });
   }
 
   return result;

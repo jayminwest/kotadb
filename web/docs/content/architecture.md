@@ -118,7 +118,7 @@ JWT-based authentication protects all endpoints (except health checks):
 
 1. **File discovery** - Walk repository, respecting ignore patterns
 2. **Change detection** - Compare file hashes to detect modifications
-3. **Parsing** - Parse changed files with tree-sitter
+3. **Parsing** - Parse changed files with @typescript-eslint/parser
 4. **Symbol extraction** - Extract functions, classes, imports
 5. **Storage** - Write to SQLite with proper transactions
 6. **FTS update** - Update full-text search index
@@ -152,7 +152,7 @@ Everything runs on your machine:
 
 Keep the dependency tree small:
 - SQLite for storage (bundled with Bun)
-- tree-sitter for parsing
+- @typescript-eslint/parser for AST parsing
 - Express for HTTP (optional)
 
 ### Incremental by Default

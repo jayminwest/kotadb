@@ -60,8 +60,8 @@ kotadb serve
 3. **Test the connection** - Verify the server is running:
 
 ```bash
-curl http://localhost:8080/health
-# Default port is 8080, configurable via PORT environment variable
+curl http://localhost:3000/health
+# Default port is 3000, configurable via PORT environment variable
 ```
 
 ## Troubleshooting

@@ -26,6 +26,25 @@ export interface OrchestrationOptions {
 }
 
 /**
+ * SDK options for automated workflow queries
+ * Configured for headless execution with kotadb MCP access
+ */
+interface AutomationSDKOptions {
+  maxTurns: number;
+  cwd: string;
+  permissionMode: "bypassPermissions";
+  settingSources: [];
+  mcpServers: {
+    kotadb: {
+      type: "stdio";
+      command: string;
+      args: string[];
+      env: { KOTADB_CWD: string };
+    };
+  };
+}
+
+/**
  * Multi-phase workflow orchestration
  * Bypasses /do command and approval gates for headless execution
  */
@@ -35,14 +54,14 @@ export async function orchestrateWorkflow(
   const { issueNumber, projectRoot, logger, dryRun } = opts;
 
   // SDK options with settingSources: [] to bypass .claude/settings.json
-  const sdkOptions = {
+  const sdkOptions: AutomationSDKOptions = {
     maxTurns: 100,
     cwd: projectRoot,
-    permissionMode: "bypassPermissions" as const,
+    permissionMode: "bypassPermissions",
     settingSources: [],  // Critical: prevents loading project settings
     mcpServers: {
       kotadb: {
-        type: "stdio" as const,
+        type: "stdio",
         command: "bunx",
         args: ["--bun", "kotadb"],
         env: { KOTADB_CWD: projectRoot }
@@ -91,7 +110,7 @@ export async function orchestrateWorkflow(
 
 async function analyzeIssue(
   issueNumber: number,
-  options: any,
+  options: AutomationSDKOptions,
   logger: WorkflowLogger
 ): Promise<string> {
   const prompt = `
@@ -130,7 +149,7 @@ async function executePlan(
   domain: string,
   requirements: string,
   issueNumber: number,
-  options: any,
+  options: AutomationSDKOptions,
   logger: WorkflowLogger,
   dryRun: boolean
 ): Promise<string> {
@@ -164,7 +183,7 @@ Return the absolute spec path when complete.
 async function executeBuild(
   domain: string,
   specPath: string,
-  options: any,
+  options: AutomationSDKOptions,
   logger: WorkflowLogger,
   dryRun: boolean
 ): Promise<string[]> {
@@ -192,7 +211,7 @@ Report absolute file paths for all files modified.
 
 async function executeImprove(
   domain: string,
-  options: any,
+  options: AutomationSDKOptions,
   logger: WorkflowLogger
 ): Promise<void> {
   const prompt = `
