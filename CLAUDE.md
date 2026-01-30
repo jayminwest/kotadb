@@ -32,7 +32,7 @@ For specific operations, these commands remain available:
 | **Git** | `/git:commit`, `/git:pull_request` |
 | **Issues** | `/issues:feature`, `/issues:bug`, `/issues:chore`, `/issues:refactor`, `/issues:classify_issue`, `/issues:audit`, `/issues:prioritize` |
 | **Tools** | `/tools:install`, `/tools:bun_install`, `/tools:pr-review`, `/tools:question`, `/tools:tools` |
-| **Docs** | `/docs:load-ai-docs`, `/docs:mcp-integration`, `/docs:mcp-usage-guidance`, `/docs:kotadb-agent-usage` |
+| **Docs** | `/docs:load-ai-docs` |
 | **Release** | `/release:release` |
 | **Validation** | `/validation:resolve_failed_validation` |
 
@@ -87,4 +87,4 @@ cd app && bun run lint
 
 ## MCP Server
 
-KotaDB provides MCP tools for code search, indexing, and dependency analysis. See `/docs:mcp-usage-guidance` for the decision matrix on when to use MCP vs direct operations.
+KotaDB provides MCP tools for code search, indexing, and dependency analysis. 
