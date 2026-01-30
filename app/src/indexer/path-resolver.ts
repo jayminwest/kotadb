@@ -19,6 +19,7 @@ import { dirname, join, normalize, isAbsolute } from "node:path";
 
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+import { SUPPORTED_EXTENSIONS, INDEX_FILES } from "./constants.js";
 
 const logger = createLogger({ module: "indexer-path-resolver" });
 
@@ -63,16 +64,6 @@ interface TsConfig {
  * Maximum depth for extends resolution to prevent infinite loops.
  */
 const MAX_EXTENDS_DEPTH = 10;
-
-/**
- * Supported file extensions in priority order.
- */
-const SUPPORTED_EXTENSIONS = [".ts", ".tsx", ".js", ".jsx", ".mjs", ".cjs"];
-
-/**
- * Index file basenames in priority order.
- */
-const INDEX_FILES = ["index.ts", "index.tsx", "index.js", "index.jsx"];
 
 /**
  * Parse tsconfig.json from a directory.
@@ -308,7 +299,32 @@ export function resolvePathAlias(
  *
  * Returns the matched suffix if pattern matches, null otherwise.
  *
+ * Supported patterns:
+ * - Exact match: "@api" matches only "@api" (returns "")
+ * - Prefix wildcard: "@api/star" matches "@api/routes" (returns "routes")
+ * - Prefix + suffix: "@api/star.config" matches "@api/foo.config" (returns "foo")
+ *
+ * Unsupported patterns (returns null):
+ * - Wildcard-only: "star" (no prefix)
+ * - Wildcard prefix: "star/foo" (no prefix before wildcard)
+ *
+ * Note: "star" represents the asterisk wildcard character in path mappings.
+ * These unsupported patterns are not used by TypeScript's path mapping
+ * and are rejected gracefully.
+ *
  * @internal - Used by resolvePathAlias()
+ *
+ * @param importSource - Import string to match (e.g., "@api/routes")
+ * @param pattern - Path alias pattern (e.g., "@api/star")
+ * @returns Matched suffix or null if no match
+ *
+ * @example
+ * ```typescript
+ * matchesPattern("@api/routes", "@api/star") // => "routes"
+ * matchesPattern("@api", "@api") // => ""
+ * matchesPattern("@api/routes", "@db/star") // => null
+ * matchesPattern("foo", "star") // => null (unsupported pattern)
+ * ```
  */
 function matchesPattern(importSource: string, pattern: string): string | null {
 	// Exact match (no wildcard)
@@ -321,6 +337,8 @@ function matchesPattern(importSource: string, pattern: string): string | null {
 	const prefix = parts[0];
 	const suffix = parts[1];
 	
+	// Reject wildcard-only patterns (e.g., "*" or "star/foo")
+	// TypeScript path mappings don't use these patterns
 	if (!prefix) {
 		return null;
 	}
