@@ -29,20 +29,6 @@
 - https://zod.dev/?id=unions -> validation/zod/unions.md
 - https://zod.dev/?id=error-handling -> validation/zod/error-handling.md
 
-### Database (Supabase)
-- https://supabase.com/docs/reference/javascript/introduction -> database/supabase/javascript-client.md
-- https://supabase.com/docs/guides/auth -> database/supabase/auth.md
-- https://supabase.com/docs/guides/database -> database/supabase/database.md
-- https://supabase.com/docs/guides/realtime -> database/supabase/realtime.md
-- https://supabase.com/docs/guides/functions -> database/supabase/edge-functions.md
-
-### Payments (Stripe)
-- https://stripe.com/docs/api -> payments/stripe/api-overview.md
-- https://stripe.com/docs/api/subscriptions -> payments/stripe/subscriptions.md
-- https://stripe.com/docs/webhooks -> payments/stripe/webhooks.md
-- https://stripe.com/docs/payments/checkout -> payments/stripe/checkout.md
-- https://stripe.com/docs/customer-management/customer-portal -> payments/stripe/customer-portal.md
-- 
 ### Frameworks (Next.js)
 - https://nextjs.org/docs/app -> frameworks/nextjs/app-router.md
 - https://nextjs.org/docs/app/building-your-application/routing/route-handlers -> frameworks/nextjs/api-routes.md

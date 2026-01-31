@@ -13,7 +13,7 @@ overview:
   scope:
     primary_codebase:
       - web/docs/content/ (markdown documentation files)
-      - docs/specs/ (technical specifications)
+      - .claude/.cache/specs/ (technical specifications)
       - automation/README.md (automation layer docs)
       - .claude/agents/experts/ (agent documentation)
 
@@ -47,7 +47,7 @@ core_implementation:
         - configuration.md (settings and customization)
 
     specs_documentation:
-      path: docs/specs/
+      path: .claude/.cache/specs/
       purpose: Technical specifications for features
       subdirs:
         - automation/ (automation layer specs)
@@ -260,7 +260,7 @@ patterns:
     structure: Detailed technical specification with implementation guidance
     usage: Issue-specific documentation improvements with validation requirements
     trade_offs: Thorough validation vs time investment
-    example_evidence: docs/specs/documentation/issue-52-comprehensive-documentation-update-spec.md
+    example_evidence: .claude/.cache/specs/documentation/issue-52-comprehensive-documentation-update-spec.md
 
   frontmatter_versioning_pattern:
     structure: Consistent metadata across all documentation files

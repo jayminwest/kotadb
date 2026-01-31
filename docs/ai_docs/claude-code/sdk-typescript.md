@@ -1,281 +1,488 @@
+---
+title: Agent SDK Reference - TypeScript
+source: https://code.claude.com/docs/en/agent-sdk/typescript
+date: 2026-01-30
+tags:
+  - claude-code
+  - sdk
+  - typescript
+  - agent
+---
+
 # Agent SDK Reference - TypeScript
 
-**Date:** 2025-12-05
-**Source:** https://platform.claude.com/docs/en/agent-sdk/typescript.md
-
-This comprehensive documentation covers the TypeScript Agent SDK for Claude Code, detailing all available functions, types, interfaces, and configuration options.
+The Claude Code TypeScript SDK provides programmatic access to Claude Code's agent capabilities, enabling you to build custom agents and integrate Claude Code into your applications.
 
 ## Installation
 
-Install via npm:
-
 ```bash
-npm install @anthropic-ai/claude-agent-sdk
+npm install @anthropic-ai/claude-code-sdk
+# or
+yarn add @anthropic-ai/claude-code-sdk
+# or
+pnpm add @anthropic-ai/claude-code-sdk
 ```
 
 ## Core Functions
 
-The SDK provides three primary functions for Claude Code integration:
-
 ### query()
 
-The primary function for interacting with Claude Code. It accepts a prompt (string or async iterable) and optional configuration, returning an `AsyncGenerator` that streams messages. This enables real-time interaction with Claude's responses.
+The primary function for interacting with Claude Code. Sends a prompt and returns an async generator of messages.
 
-**Signature:**
 ```typescript
-query(prompt: string | AsyncIterable<string>, options?: Options): AsyncGenerator<SDKMessage>
+import { query } from '@anthropic-ai/claude-code-sdk';
+
+async function main() {
+  const messages = query({
+    prompt: 'Explain the code in this file',
+    options: {
+      cwd: process.cwd(),
+    },
+  });
+
+  for await (const message of messages) {
+    if (message.type === 'assistant') {
+      console.log(message.content);
+    }
+  }
+}
 ```
+
+**Parameters:**
+- `prompt: string` - The user's request or question
+- `options?: Options` - Configuration options for the query
+
+**Returns:** `AsyncGenerator<SDKMessage>`
 
 ### tool()
 
-Creates type-safe MCP tool definitions using Zod schemas. Developers define tool name, description, input schema, and async handler function for custom tool integration.
+Creates a custom tool that can be used by the agent.
 
-**Purpose:** Enables the model to execute custom functionality with validated inputs.
+```typescript
+import { tool } from '@anthropic-ai/claude-code-sdk';
+
+const myTool = tool({
+  name: 'get_weather',
+  description: 'Get the current weather for a location',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      location: {
+        type: 'string',
+        description: 'The city and state, e.g. San Francisco, CA',
+      },
+    },
+    required: ['location'],
+  },
+  handler: async (input) => {
+    // Implement tool logic
+    return { temperature: 72, conditions: 'sunny' };
+  },
+});
+```
+
+**Parameters:**
+- `name: string` - Unique identifier for the tool
+- `description: string` - Human-readable description of what the tool does
+- `inputSchema: object` - JSON Schema defining the tool's input parameters
+- `handler: (input: T) => Promise<R>` - Function that executes the tool logic
 
 ### createSdkMcpServer()
 
-Establishes an in-process MCP server with specified tools, enabling local tool serving without external processes.
+Creates an MCP (Model Context Protocol) server from SDK tools.
 
-**Purpose:** Instantiates an in-process MCP server with specified tools and metadata.
+```typescript
+import { createSdkMcpServer, tool } from '@anthropic-ai/claude-code-sdk';
 
-## Configuration Options
+const server = createSdkMcpServer({
+  name: 'my-mcp-server',
+  version: '1.0.0',
+  tools: [myTool],
+});
 
-The `Options` type provides extensive customization for Claude Code execution:
+server.listen({ port: 3000 });
+```
 
-### Execution Control
-- **Model selection** - Specify which Claude model to use
-- **Fallback models** - Configure alternative models if primary is unavailable
-- **Maximum turns** - Limit conversation depth
-- **Budget limits** - Control execution costs
-- **Thinking token allocation** - Configure extended thinking capabilities
+## Options Type
 
-### Runtime
-- Runtime selection (Node, Deno, Bun)
-- Executable selection
-- Environment variables
-- Working directory configuration
+The `Options` type configures the behavior of a query.
 
-### Permission Management
-- **Permission modes:**
-  - `default` - Standard permission prompting
-  - `acceptEdits` - Automatically accept edit operations
-  - `bypassPermissions` - Skip permission checks entirely
-  - `plan` - Planning mode with restricted permissions
-- **Custom permission functions** - Implement `canUseTool` handlers for granular control
-- **Tool allowlists** - Specify which tools are permitted
-- **Tool denylists** - Explicitly block certain tools
-- **Permission updates** - Dynamic permission modification during execution
+```typescript
+interface Options {
+  // Working directory for the agent
+  cwd?: string;
 
-### Tool Configuration
-- **Built-in tool preset** - Use standard Claude Code tools
-- **Custom tool arrays** - Provide your own tool implementations
-- **Tool allowlisting/denylisting** - Fine-grained tool access control
+  // System prompt to prepend to the conversation
+  systemPrompt?: string;
 
-### Session Management
-- Continue existing sessions
-- Resume previous sessions
-- Fork sessions for parallel exploration
+  // Maximum number of turns (agent loops)
+  maxTurns?: number;
 
-### Advanced Features
-- **Hooks for lifecycle events** - Monitor and respond to execution events
-- **Sandbox settings** - Isolate command execution
-- **MCP servers** - Connect to external MCP servers
-- **Plugins** - Extend functionality with plugins
-- **Structured outputs** - Define JSON schemas for deterministic results via `outputFormat`
+  // Maximum tokens for the response
+  maxTokens?: number;
 
-### Settings Sources
+  // Model to use (defaults to claude-sonnet-4-20250514)
+  model?: string;
 
-The `settingSources` parameter controls which configuration files load:
-- User settings
-- Project settings
-- Local settings
+  // API key (defaults to ANTHROPIC_API_KEY env var)
+  apiKey?: string;
 
-**Important:** The SDK does **not** load any filesystem settings by default, providing isolation. Developers can explicitly enable loading from configuration files via the `settingSources` parameter.
+  // Custom tools to make available
+  tools?: Tool[];
 
-## Message Architecture
+  // MCP servers to connect to
+  mcpServers?: McpServerConfig[];
 
-The SDK uses a unified message type system for streaming communication:
+  // Permission configuration
+  permissions?: Permissions;
+
+  // Sandbox configuration
+  sandbox?: SandboxConfig;
+
+  // Hook configuration
+  hooks?: Hooks;
+
+  // Environment variables to pass to tools
+  env?: Record<string, string>;
+
+  // Continue from a previous conversation
+  conversationId?: string;
+
+  // Resume a previous session
+  resume?: boolean;
+
+  // Allowed tools (whitelist)
+  allowedTools?: string[];
+
+  // Disallowed tools (blacklist)
+  disallowedTools?: string[];
+
+  // Enable verbose logging
+  verbose?: boolean;
+
+  // Custom headers for API requests
+  headers?: Record<string, string>;
+
+  // Timeout in milliseconds
+  timeout?: number;
+}
+```
+
+## Query Interface
+
+```typescript
+interface Query {
+  prompt: string;
+  options?: Options;
+}
+```
+
+## Message Types
+
+### SDKMessage
+
+The base union type for all messages emitted by the SDK.
+
+```typescript
+type SDKMessage =
+  | SDKUserMessage
+  | SDKAssistantMessage
+  | SDKToolUseMessage
+  | SDKToolResultMessage
+  | SDKResultMessage
+  | SDKErrorMessage
+  | SDKSystemMessage;
+```
 
 ### SDKAssistantMessage
-Claude's responses with UUIDs and session tracking. Represents model-generated content during the conversation.
 
-### SDKUserMessage
-User inputs supporting streaming mode. Can be provided as strings or async iterables for progressive input.
+Represents a response from the assistant.
+
+```typescript
+interface SDKAssistantMessage {
+  type: 'assistant';
+  content: string;
+  id: string;
+  timestamp: number;
+}
+```
 
 ### SDKResultMessage
-Final results with comprehensive execution metadata:
-- Token usage statistics
-- Cost information
-- Structured outputs (if configured)
-- Session completion data
+
+The final message indicating the query has completed.
+
+```typescript
+interface SDKResultMessage {
+  type: 'result';
+  success: boolean;
+  conversationId: string;
+  totalTokens: number;
+  inputTokens: number;
+  outputTokens: number;
+  duration: number;
+}
+```
+
+### SDKUserMessage
+
+Represents a user input message.
+
+```typescript
+interface SDKUserMessage {
+  type: 'user';
+  content: string;
+  id: string;
+  timestamp: number;
+}
+```
+
+### SDKToolUseMessage
+
+Indicates the agent is invoking a tool.
+
+```typescript
+interface SDKToolUseMessage {
+  type: 'tool_use';
+  toolName: string;
+  toolInput: unknown;
+  toolUseId: string;
+  timestamp: number;
+}
+```
+
+### SDKToolResultMessage
+
+Contains the result of a tool invocation.
+
+```typescript
+interface SDKToolResultMessage {
+  type: 'tool_result';
+  toolUseId: string;
+  result: unknown;
+  isError: boolean;
+  timestamp: number;
+}
+```
+
+### SDKErrorMessage
+
+Indicates an error occurred during processing.
+
+```typescript
+interface SDKErrorMessage {
+  type: 'error';
+  error: string;
+  code?: string;
+  timestamp: number;
+}
+```
 
 ### SDKSystemMessage
-Initialization data covering:
-- Available tools
-- Model configuration
-- Permission settings
-- Runtime information
 
-### SDKPartialAssistantMessage
-Streaming events emitted during response generation (when streaming is enabled). Allows real-time processing of incremental responses.
+System-level messages for status updates.
 
-### SDKCompactBoundaryMessage
-Conversation compaction markers indicating when conversation history has been compressed or summarized.
+```typescript
+interface SDKSystemMessage {
+  type: 'system';
+  content: string;
+  timestamp: number;
+}
+```
 
-## Built-in Tools
+## Hook Types
 
-The SDK includes comprehensive tools for various operations:
+Hooks allow you to intercept and modify agent behavior at various points.
 
-### File Operations
-- **Read** - Read file contents
-- **Write** - Write or create files
-- **Edit** - Modify existing files with precise edits
+```typescript
+interface Hooks {
+  // Called before each tool execution
+  beforeToolUse?: (toolUse: ToolUseContext) => Promise<ToolUseResult | void>;
 
-### Execution
-- **Bash** - Execute shell commands with configurable isolation
+  // Called after each tool execution
+  afterToolUse?: (result: ToolResultContext) => Promise<void>;
 
-### Search & Discovery
-- **Glob** - Pattern-based file discovery
-- **Grep** - Search file contents with regex
-- **WebSearch** - Search the internet for information
+  // Called before sending a message to the model
+  beforeModelCall?: (context: ModelCallContext) => Promise<void>;
 
-### Web Capabilities
-- **WebFetch** - Retrieve and process web content
+  // Called after receiving a response from the model
+  afterModelCall?: (context: ModelResponseContext) => Promise<void>;
 
-### Code Analysis
-- Code understanding and navigation tools
+  // Called when the agent completes
+  onComplete?: (result: CompletionContext) => Promise<void>;
 
-### Specialized Features
-- **Notebook editing** - Jupyter notebook manipulation
-- **MCP resource access** - Access resources from MCP servers
+  // Called when an error occurs
+  onError?: (error: ErrorContext) => Promise<void>;
+}
 
-**Total:** 16 built-in tools spanning file operations, execution, search, web interactions, and specialized features.
+interface ToolUseContext {
+  toolName: string;
+  toolInput: unknown;
+  conversationId: string;
+}
 
-## Hook System
+interface ToolUseResult {
+  // Return to skip tool execution and use this result instead
+  result?: unknown;
+  // Return true to allow the tool to execute
+  allow?: boolean;
+  // Return a message to show to the user
+  message?: string;
+}
+```
 
-Developers can register callbacks for lifecycle events to monitor and modify execution behavior:
+## Permission Types
 
-### Available Hooks
-- **PreToolUse** - Called before a tool is executed
-- **PostToolUse** - Called after a tool completes
-- **PermissionRequest** - Triggered when permission is needed
-- **SessionStart** - Called when a session begins
-- **SessionEnd** - Called when a session completes
-- **Subagents** - Monitor subagent creation and execution
-- **Compaction** - Track conversation history compression
+Configure what actions the agent is allowed to perform.
 
-### Hook Context
-Hooks receive detailed context about the operation:
-- Tool information
-- Input parameters
-- Execution state
-- Session metadata
+```typescript
+interface Permissions {
+  // File system permissions
+  fileSystem?: {
+    read?: boolean | string[];  // true, false, or glob patterns
+    write?: boolean | string[];
+    delete?: boolean | string[];
+  };
 
-### Hook Capabilities
-- Modify behavior dynamically
-- Collect telemetry and metrics
-- Implement custom authorization
-- Log execution details
-- Inject additional context
+  // Network permissions
+  network?: {
+    allow?: boolean;
+    allowedHosts?: string[];
+    blockedHosts?: string[];
+  };
+
+  // Shell/Bash permissions
+  shell?: {
+    allow?: boolean;
+    allowedCommands?: string[];
+    blockedCommands?: string[];
+  };
+
+  // MCP tool permissions
+  mcpTools?: {
+    allow?: boolean;
+    allowedTools?: string[];
+    blockedTools?: string[];
+  };
+
+  // Auto-approve certain actions
+  autoApprove?: {
+    read?: boolean;
+    write?: boolean;
+    bash?: boolean;
+    mcp?: boolean;
+  };
+}
+```
 
 ## Sandbox Configuration
 
-Optional sandbox settings enable command execution isolation:
+Configure isolated execution environments for the agent.
 
-### Features
-- **Command execution isolation** - Run commands in restricted environment
-- **Network restrictions** - Control network access for sandboxed commands
-- **Configurable exclusions** - Whitelist specific commands or patterns
-- **Unix socket access** - Control Unix domain socket availability
-- **Permission fallback mechanisms** - Handle permission requests for unsandboxed operations requested by the model
-
-### Use Cases
-- Secure execution of untrusted code
-- Prevent unintended system modifications
-- Comply with security policies
-- Test code in isolated environments
-
-## Subagents
-
-Delegate complex tasks to specialized agents with custom configuration:
-
-### Features
-- Custom prompts for specialized contexts
-- Tool restrictions for focused execution
-- Independent permission scopes
-- Parallel execution support
-
-### Use Cases
-- Break down complex tasks into specialized subtasks
-- Implement expert systems with domain-specific agents
-- Isolate risky operations
-- Improve performance through parallelization
-
-## Structured Outputs
-
-Define JSON schemas for deterministic agent results:
-
-### Configuration
-Use `outputFormat` option to specify expected output structure:
 ```typescript
-const options = {
-  outputFormat: {
-    type: "json_schema",
-    schema: yourZodSchema
-  }
+interface SandboxConfig {
+  // Enable sandboxed execution
+  enabled: boolean;
+
+  // Sandbox type
+  type: 'docker' | 'firecracker' | 'none';
+
+  // Docker-specific configuration
+  docker?: {
+    image?: string;
+    volumes?: Array<{
+      host: string;
+      container: string;
+      readonly?: boolean;
+    }>;
+    env?: Record<string, string>;
+    network?: 'none' | 'bridge' | 'host';
+    memory?: string;
+    cpus?: number;
+  };
+
+  // Firecracker-specific configuration
+  firecracker?: {
+    kernelImage?: string;
+    rootfs?: string;
+    vcpuCount?: number;
+    memSizeMib?: number;
+  };
+
+  // Timeout for sandbox operations
+  timeout?: number;
+
+  // Working directory inside the sandbox
+  workDir?: string;
 }
 ```
 
-### Benefits
-- Type-safe results
-- Predictable output format
-- Easy integration with downstream systems
-- Validation at runtime
+## Complete Example
 
-## Permission System
-
-Implement granular access control through multiple mechanisms:
-
-### Permission Modes
-1. **default** - Interactive prompting for all operations
-2. **acceptEdits** - Auto-approve file edits, prompt for others
-3. **bypassPermissions** - Skip all permission checks (use with caution)
-4. **plan** - Planning mode with restricted default permissions
-
-### Custom Handlers
-Implement `canUseTool` for fine-grained control:
 ```typescript
-const options = {
-  canUseTool: async (toolName, inputs, context) => {
-    // Custom authorization logic
-    return true; // or false to deny
+import { query, tool } from '@anthropic-ai/claude-code-sdk';
+
+// Define a custom tool
+const searchDocs = tool({
+  name: 'search_docs',
+  description: 'Search project documentation',
+  inputSchema: {
+    type: 'object',
+    properties: {
+      query: { type: 'string', description: 'Search query' },
+    },
+    required: ['query'],
+  },
+  handler: async ({ query }) => {
+    // Implementation
+    return { results: ['doc1.md', 'doc2.md'] };
+  },
+});
+
+async function main() {
+  const messages = query({
+    prompt: 'Search the docs for authentication patterns',
+    options: {
+      cwd: '/path/to/project',
+      tools: [searchDocs],
+      maxTurns: 10,
+      permissions: {
+        fileSystem: {
+          read: true,
+          write: ['src/**/*.ts'],
+        },
+        shell: {
+          allow: true,
+          allowedCommands: ['npm', 'bun', 'git'],
+        },
+      },
+      hooks: {
+        beforeToolUse: async (ctx) => {
+          console.log(`Using tool: ${ctx.toolName}`);
+        },
+        onComplete: async (ctx) => {
+          console.log('Agent completed');
+        },
+      },
+    },
+  });
+
+  for await (const message of messages) {
+    switch (message.type) {
+      case 'assistant':
+        console.log('Assistant:', message.content);
+        break;
+      case 'tool_use':
+        console.log(`Tool: ${message.toolName}`);
+        break;
+      case 'result':
+        console.log(`Done! Tokens: ${message.totalTokens}`);
+        break;
+      case 'error':
+        console.error('Error:', message.error);
+        break;
+    }
   }
 }
+
+main();
 ```
-
-### Dynamic Updates
-Update permissions during execution based on:
-- User feedback
-- Tool outcomes
-- Session state
-- External authorization systems
-
-## Best Practices
-
-1. **Use type-safe tools** - Leverage Zod schemas for tool definitions
-2. **Configure appropriate permissions** - Don't use `bypassPermissions` in production
-3. **Monitor via hooks** - Implement telemetry and logging through lifecycle hooks
-4. **Sandbox untrusted code** - Enable sandbox for executing unknown commands
-5. **Set budget limits** - Prevent runaway costs with budget controls
-6. **Handle streaming** - Process partial messages for responsive UX
-7. **Isolate settings** - Keep SDK isolated from filesystem settings unless explicitly needed
-8. **Use structured outputs** - Define schemas for predictable results
-9. **Leverage subagents** - Decompose complex tasks for better results
-
-## Related Resources
-
-- Agent SDK Overview
-- Python SDK Reference
-- MCP Server Documentation
-- Claude Code Documentation
-- Example Applications

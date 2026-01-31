@@ -7,7 +7,7 @@ Open a GitHub pull request as soon as implementation work is complete and valida
 ## Variables
 - branch_name: $1
 - issue_json: $2
-- plan_file: $3 (relative path within `docs/specs/`)
+- plan_file: $3 (relative path within `.claude/.cache/specs/`)
 - adw_id: $4
 
 ## CRITICAL: Output Format Requirements
@@ -64,7 +64,7 @@ https://github.com/user/kota-db-ts/pull/123
 - **Determine PR type** (planning vs implementation):
   1. Run `git diff origin/develop...HEAD --name-only` to get list of changed files
   2. Count lines changed outside `docs/` with `git diff origin/develop...HEAD --stat | grep -v 'docs/' | tail -1`
-  3. If PR contains ONLY changes to `docs/specs/*.md` files → **planning PR**
+  3. If PR contains ONLY changes to `.claude/.cache/specs/*.md` files → **planning PR**
   4. If PR contains changes to `app/src/`, `automation/`, or >50 lines outside `docs/` → **implementation PR**
 - **PR title format**:
   - **Planning PRs**: `<issue_type>: add [specification|plan] for <feature name> (#<issue_number>)`

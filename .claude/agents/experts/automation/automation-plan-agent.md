@@ -162,7 +162,7 @@ mcpServers: {
    - Examples and usage scenarios
 
 7. **Save Specification**
-   - Save spec to `docs/specs/automation/<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/automation/<descriptive-name>-spec.md`
    - Include code examples
    - Document validation criteria
    - Return the spec path when complete
@@ -203,5 +203,5 @@ mcpServers: {
 - Manual: <verification steps>
 
 **Specification Location:**
-- Path: `docs/specs/automation/<name>-spec.md`
+- Path: `.claude/.cache/specs/automation/<name>-spec.md`
 ```
