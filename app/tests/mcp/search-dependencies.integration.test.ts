@@ -326,6 +326,56 @@ describe("search_dependencies integration tests", () => {
     expect(result.file_path).toBe("src/base.ts");
   });
 
+  test("resolves path alias imports in dependency graph", async () => {
+    // Create file with path alias import
+    const aliasFileId = randomUUID();
+    const targetFileId = randomUUID();
+    
+    // Target file using path alias pattern (@api/*)
+    db.run(
+      `INSERT INTO indexed_files (id, repository_id, path, content, language, indexed_at, content_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [targetFileId, repoId, "src/api/routes.ts", "export const routes = [];", "typescript", new Date().toISOString(), randomUUID()]
+    );
+    
+    // Importer file with path alias import
+    db.run(
+      `INSERT INTO indexed_files (id, repository_id, path, content, language, indexed_at, content_hash)
+       VALUES (?, ?, ?, ?, ?, ?, ?)`,
+      [aliasFileId, repoId, "src/index.ts", "import { routes } from '@api/routes';", "typescript", new Date().toISOString(), randomUUID()]
+    );
+    
+    // Add path alias import reference with resolved target_file_path
+    db.run(
+      `INSERT INTO indexed_references (id, file_id, repository_id, symbol_name, target_file_path, line_number, reference_type, metadata)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        randomUUID(),
+        aliasFileId,
+        repoId,
+        "routes",
+        "src/api/routes.ts",  // Resolved target_file_path (should work after fix)
+        1,
+        "import",
+        JSON.stringify({ importSource: "@api/routes" }),
+      ]
+    );
+    
+    // Search for dependents of target file
+    const result = await executeSearchDependencies(
+      {
+        file_path: "src/api/routes.ts",
+        direction: "dependents",
+        depth: 1,
+      },
+      requestId,
+      userId
+    ) as { dependents: { direct: string[] } };
+    
+    // Should find the path alias dependent
+    expect(result.dependents.direct).toContain("src/index.ts");
+  });
+
   test("should detect direct cycle (A -> B -> A)", async () => {
     // Create files with circular dependency
     const fileA = randomUUID();

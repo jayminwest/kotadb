@@ -245,31 +245,31 @@ describe("path-resolver", () => {
 	describe("resolvePathAlias", () => {
 		it("resolves simple path alias", () => {
 			const simpleDir = join(FIXTURES_DIR, "simple");
-			const files = new Set([join(simpleDir, "src", "api", "routes.ts")]);
+			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 
 			const result = resolvePathAlias("@api/routes", simpleDir, files, mappings);
-			expect(result).toBe(join(simpleDir, "src", "api", "routes.ts"));
+			expect(result).toBe("src/api/routes.ts");
 		});
 
 		it("tries multiple paths and returns first match", () => {
 			const multiPathDir = join(FIXTURES_DIR, "multipath");
-			const files = new Set([join(multiPathDir, "packages", "shared", "utils.ts")]);
+			const files = new Set(["packages/shared/utils.ts"]);
 			const mappings = {
 				baseUrl: ".",
 				paths: { "@shared/*": ["src/shared/*", "packages/shared/*"] },
 			};
 
 			const result = resolvePathAlias("@shared/utils", multiPathDir, files, mappings);
-			expect(result).toBe(join(multiPathDir, "packages", "shared", "utils.ts"));
+			expect(result).toBe("packages/shared/utils.ts");
 		});
 
 		it("returns null when no paths match", () => {
 			const simpleDir = join(FIXTURES_DIR, "simple");
-			const files = new Set([join(simpleDir, "src", "api", "routes.ts")]);
+			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
 				paths: { "@api/*": ["src/api/*"] },
@@ -281,31 +281,31 @@ describe("path-resolver", () => {
 
 		it("handles nested path aliases", () => {
 			const simpleDir = join(FIXTURES_DIR, "simple");
-			const files = new Set([join(simpleDir, "src", "db", "schema.ts")]);
+			const files = new Set(["src/db/schema.ts"]);
 			const mappings = {
 				baseUrl: ".",
 				paths: { "@db/*": ["src/db/*"] },
 			};
 
 			const result = resolvePathAlias("@db/schema", simpleDir, files, mappings);
-			expect(result).toBe(join(simpleDir, "src", "db", "schema.ts"));
+			expect(result).toBe("src/db/schema.ts");
 		});
 
 		it("resolves imports without extension", () => {
 			const simpleDir = join(FIXTURES_DIR, "simple");
-			const files = new Set([join(simpleDir, "src", "api", "routes.ts")]);
+			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 
 			const result = resolvePathAlias("@api/routes", simpleDir, files, mappings);
-			expect(result).toBe(join(simpleDir, "src", "api", "routes.ts"));
+			expect(result).toBe("src/api/routes.ts");
 		});
 
 		it("returns null for import source that doesn't match any pattern", () => {
 			const simpleDir = join(FIXTURES_DIR, "simple");
-			const files = new Set([join(simpleDir, "src", "api", "routes.ts")]);
+			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
 				paths: { "@api/*": ["src/api/*"] },
@@ -330,7 +330,7 @@ describe("path-resolver", () => {
 		it("resolves exact match pattern (no wildcard)", () => {
 			const simpleDir = join(FIXTURES_DIR, "simple");
 			const files = new Set([
-				join(simpleDir, "src", "api", "index.ts")
+				"src/api/index.ts"
 			]);
 			const mappings = {
 				baseUrl: ".",
@@ -338,14 +338,14 @@ describe("path-resolver", () => {
 			};
 			
 			const result = resolvePathAlias("@api", simpleDir, files, mappings);
-			expect(result).toBe(join(simpleDir, "src", "api", "index.ts"));
+			expect(result).toBe("src/api/index.ts");
 		});
 
 		it("resolves path alias to index file in directory", () => {
 			const simpleDir = join(FIXTURES_DIR, "simple");
 			// Create directory with only index file (not utils.ts itself)
 			const files = new Set([
-				join(simpleDir, "src", "api", "utils", "index.ts")
+				"src/api/utils/index.ts"
 			]);
 			const mappings = {
 				baseUrl: ".",
@@ -353,7 +353,7 @@ describe("path-resolver", () => {
 			};
 			
 			const result = resolvePathAlias("@api/utils", simpleDir, files, mappings);
-			expect(result).toBe(join(simpleDir, "src", "api", "utils", "index.ts"));
+			expect(result).toBe("src/api/utils/index.ts");
 		});
 
 		it("handles baseUrl other than '.'", () => {
@@ -361,7 +361,7 @@ describe("path-resolver", () => {
 			// File is at baseUrlDir/src/api/routes.ts
 			// baseUrl is "src", so path "@api/*" maps to "api/*" relative to baseUrl
 			const files = new Set([
-				join(baseUrlDir, "src", "api", "routes.ts")
+				"src/api/routes.ts"
 			]);
 			const mappings = {
 				baseUrl: "src",
@@ -369,7 +369,33 @@ describe("path-resolver", () => {
 			};
 			
 			const result = resolvePathAlias("@api/routes", baseUrlDir, files, mappings);
-			expect(result).toBe(join(baseUrlDir, "src", "api", "routes.ts"));
+			expect(result).toBe("src/api/routes.ts");
 		});
 	});
 });
+
+		it("resolves path alias when files Set contains relative paths", () => {
+			const simpleDir = join(FIXTURES_DIR, "simple");
+			const projectRoot = simpleDir;
+			
+			// files Set with RELATIVE paths (real-world format)
+			const files = new Set([
+				"src/api/routes.ts",     // Relative, no leading slash
+				"src/db/schema.ts",
+			]);
+			
+			const mappings = {
+				baseUrl: ".",
+				paths: { 
+					"@api/*": ["src/api/*"],
+					"@db/*": ["src/db/*"],
+				},
+			};
+
+			// Should resolve using relative path lookup
+			const result1 = resolvePathAlias("@api/routes", projectRoot, files, mappings);
+			expect(result1).toBe("src/api/routes.ts");
+			
+			const result2 = resolvePathAlias("@db/schema", projectRoot, files, mappings);
+			expect(result2).toBe("src/db/schema.ts");
+		});

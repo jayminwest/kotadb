@@ -262,8 +262,13 @@ export function resolvePathAlias(
 			const basePath = join(projectRoot, mappings.baseUrl, substituted);
 			const resolved = normalize(basePath);
 
+			// Convert absolute path to relative path for files Set lookup
+			const relativePath = resolved.startsWith(projectRoot) 
+				? resolved.slice(projectRoot.length + 1) 
+				: resolved;
+
 			// Try with extension variants
-			const withExtension = tryExtensions(resolved, files);
+			const withExtension = tryExtensions(relativePath, files);
 			if (withExtension) {
 				logger.debug("Resolved path alias", {
 					importSource,
@@ -274,7 +279,7 @@ export function resolvePathAlias(
 			}
 
 			// Try index files
-			const withIndex = tryIndexFiles(resolved, files);
+			const withIndex = tryIndexFiles(relativePath, files);
 			if (withIndex) {
 				logger.debug("Resolved path alias to index", {
 					importSource,

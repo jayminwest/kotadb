@@ -144,8 +144,8 @@ describe("import-resolver", () => {
 describe("resolveImport with path aliases", () => {
 	it("resolves path alias import", () => {
 		const files = [
-			{ path: "/repo/src/api/routes.ts" },
-			{ path: "/repo/src/app.ts" },
+			{ path: "src/api/routes.ts" },
+			{ path: "src/app.ts" },
 		];
 
 		const pathMappings = {
@@ -154,12 +154,12 @@ describe("resolveImport with path aliases", () => {
 		};
 
 		const result = resolveImport("@api/routes", "/repo/src/app.ts", files, pathMappings);
-		expect(result).toBe("/repo/src/api/routes.ts");
+		expect(result).toBe("src/api/routes.ts");
 	});
 
 	it("falls back to null for unresolved alias", () => {
 		const files = [
-			{ path: "/repo/src/app.ts" },
+			{ path: "src/app.ts" },
 		];
 
 		const pathMappings = {
@@ -189,8 +189,8 @@ describe("resolveImport with path aliases", () => {
 
 	it("resolves nested path alias imports", () => {
 		const files = [
-			{ path: "/repo/src/db/sqlite/index.ts" },
-			{ path: "/repo/src/app.ts" },
+			{ path: "src/db/sqlite/index.ts" },
+			{ path: "src/app.ts" },
 		];
 
 		const pathMappings = {
@@ -199,12 +199,12 @@ describe("resolveImport with path aliases", () => {
 		};
 
 		const result = resolveImport("@db/sqlite/index", "/repo/src/app.ts", files, pathMappings);
-		expect(result).toBe("/repo/src/db/sqlite/index.ts");
+		expect(result).toBe("src/db/sqlite/index.ts");
 	});
 
 	it("returns null for external packages even with path mappings", () => {
 		const files = [
-			{ path: "/repo/src/index.ts" },
+			{ path: "src/index.ts" },
 		];
 
 		const pathMappings = {
@@ -228,7 +228,7 @@ describe("resolveImport with path aliases", () => {
 
 	it("handles multiple path options (first match wins)", () => {
 		const files = [
-			{ path: "/repo/packages/shared/utils.ts" },
+			{ path: "packages/shared/utils.ts" },
 		];
 
 		const pathMappings = {
@@ -237,6 +237,6 @@ describe("resolveImport with path aliases", () => {
 		};
 
 		const result = resolveImport("@shared/utils", "/repo/src/app.ts", files, pathMappings);
-		expect(result).toBe("/repo/packages/shared/utils.ts");
+		expect(result).toBe("packages/shared/utils.ts");
 	});
 });
