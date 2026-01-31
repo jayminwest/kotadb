@@ -1,47 +1,65 @@
-# Zod - TypeScript-first Schema Validation
+---
+title: Zod - Getting Started
+source: https://zod.dev
+date: 2026-01-30
+tags:
+  - zod
+  - validation
+  - typescript
+  - schema
+---
 
-**Date Scraped:** 2025-12-05
-**Source:** https://zod.dev/?id=introduction
-**Version:** Latest (as of scrape date)
+# Zod - Getting Started
 
-## Overview
+Zod is a TypeScript-first schema declaration and validation library. It provides a simple, chainable API to define schemas and validate data at runtime while providing excellent TypeScript type inference.
 
-Zod is a **TypeScript-first schema validation library with static type inference** created by Colin McDonnell (@colinhacks). It enables developers to define schemas for validating data structures with complete type safety.
+## Introduction
 
-The fundamental principle: Define a schema, parse some data with it, and receive a strongly typed, validated result.
+Zod is designed with these goals:
+- **TypeScript-first**: Full type inference from schemas
+- **Zero dependencies**: Lightweight and standalone
+- **Immutable**: Methods return new instances
+- **Concise**: Chainable, functional API
+- **Works everywhere**: Browser, Node.js, Deno, Bun
 
-## Key Features
+### Key Features
 
-- **Zero external dependencies** - No external packages required
-- **Universal compatibility** - Works in Node.js and all modern browsers
-- **Lightweight** - Core bundle is only 2kb (gzipped)
-- **Immutable API** - Methods return new instances rather than mutating
-- **Concise, developer-friendly interface** - Easy to read and write
-- **Plain JavaScript compatible** - TypeScript not required (but recommended)
-- **Built-in JSON Schema conversion** - Easy integration with JSON Schema tools
-- **Extensive ecosystem** - Rich third-party integrations and tools
-- **Static type inference** - Automatic TypeScript type generation from schemas
+- Define schemas for any data type
+- Parse and validate data with detailed error messages
+- Transform data during parsing
+- Infer TypeScript types from schemas
+- Compose complex schemas from simple ones
 
 ## Installation
 
-Install via npm:
+### npm
 
 ```bash
 npm install zod
 ```
 
-Zod is also available as `@zod/zod` on jsr.io.
+### yarn
 
-### MCP Server
+```bash
+yarn add zod
+```
 
-Zod provides an MCP (Model Context Protocol) server for AI agents to search Zod's documentation programmatically.
+### pnpm
 
-## Requirements
+```bash
+pnpm add zod
+```
 
-- **TypeScript v5.5 or later** (if using TypeScript)
-- **Strict mode enabled** - Must have `"strict": true` in `tsconfig.json`
+### bun
 
-Example `tsconfig.json`:
+```bash
+bun add zod
+```
+
+### TypeScript Configuration
+
+Zod requires TypeScript 4.5+ and the following `tsconfig.json` settings:
+
 ```json
 {
   "compilerOptions": {
@@ -50,394 +68,270 @@ Example `tsconfig.json`:
 }
 ```
 
-## Basic Usage
+Or at minimum:
 
-### Importing
-
-```typescript
-import * as z from "zod";
-// or
-import { z } from "zod";
+```json
+{
+  "compilerOptions": {
+    "strictNullChecks": true
+  }
+}
 ```
 
-### Defining a Schema
+## Basic Usage
 
-Create schemas using Zod's schema builders:
+### Importing Zod
 
 ```typescript
-import * as z from "zod";
+import { z } from 'zod';
+```
 
-const User = z.object({
-  username: z.string(),
+### Creating a Simple Schema
+
+```typescript
+// Define a schema
+const UserSchema = z.object({
+  name: z.string(),
   age: z.number(),
   email: z.string().email(),
 });
+
+// Infer the TypeScript type
+type User = z.infer<typeof UserSchema>;
+// { name: string; age: number; email: string }
 ```
 
 ### Parsing Data
 
-#### `.parse()` Method
-
-Validates input data and returns a deep clone if valid. Throws a `ZodError` if validation fails:
-
 ```typescript
-const userData = {
-  username: "johndoe",
+// Valid data
+const validUser = UserSchema.parse({
+  name: 'Alice',
   age: 30,
-  email: "john@example.com"
-};
+  email: 'alice@example.com',
+});
+// Returns: { name: 'Alice', age: 30, email: 'alice@example.com' }
 
-const validatedUser = User.parse(userData);
-// validatedUser is now type-safe and validated
-```
-
-If validation fails:
-```typescript
+// Invalid data throws an error
 try {
-  User.parse({ username: "john", age: "thirty" }); // throws ZodError
+  UserSchema.parse({
+    name: 'Bob',
+    age: 'thirty', // Wrong type
+    email: 'invalid-email',
+  });
 } catch (error) {
-  console.error(error);
+  console.error(error.errors);
 }
 ```
 
-#### `.safeParse()` Method
+## Schema Definition
 
-Returns a discriminated union result object instead of throwing:
+### Primitive Types
 
 ```typescript
-const result = User.safeParse({ username: 42, age: "100" });
+// String
+const nameSchema = z.string();
 
-if (!result.success) {
-  // result.error contains ZodError details
-  console.error(result.error);
-} else {
-  // result.data contains validated data
-  console.log(result.data);
-}
+// Number
+const ageSchema = z.number();
+
+// Boolean
+const activeSchema = z.boolean();
+
+// Date
+const createdAtSchema = z.date();
 ```
 
-#### Async Variants
-
-For asynchronous refinements and transforms:
+### Object Schemas
 
 ```typescript
-const result = await User.parseAsync(data);
-// or
-const result = await User.safeParseAsync(data);
-```
-
-### Type Inference
-
-Extract TypeScript types from your schemas using `z.infer`:
-
-```typescript
-type User = z.infer<typeof User>;
-// Equivalent to:
-// type User = {
-//   username: string;
-//   age: number;
-//   email: string;
-// }
-```
-
-For schemas with different input/output types (when using `.transform()`):
-
-```typescript
-type MySchemaInput = z.input<typeof mySchema>;
-type MySchemaOutput = z.output<typeof mySchema>;
-```
-
-## Core Schema Types
-
-### Primitives
-
-```typescript
-z.string()    // string
-z.number()    // number
-z.boolean()   // boolean
-z.bigint()    // bigint
-z.date()      // Date
-z.symbol()    // symbol
-z.undefined() // undefined
-z.null()      // null
-z.void()      // void
-z.any()       // any
-z.unknown()   // unknown
-z.never()     // never
-```
-
-### Objects
-
-```typescript
-const Player = z.object({
-  username: z.string(),
-  xp: z.number(),
+const PersonSchema = z.object({
+  firstName: z.string(),
+  lastName: z.string(),
+  age: z.number().optional(),
+  address: z.object({
+    street: z.string(),
+    city: z.string(),
+    zipCode: z.string(),
+  }).optional(),
 });
 
-type Player = z.infer<typeof Player>;
+type Person = z.infer<typeof PersonSchema>;
 ```
 
-### Arrays
+### Array Schemas
 
 ```typescript
-const stringArray = z.array(z.string());
-const numberArray = z.number().array(); // alternative syntax
+const TagsSchema = z.array(z.string());
+
+const NumberListSchema = z.array(z.number()).min(1).max(10);
 ```
 
-### Tuples
+### Union Types
 
 ```typescript
-const coordinates = z.tuple([z.number(), z.number()]);
+const StringOrNumber = z.union([z.string(), z.number()]);
+
+// Shorthand
+const Status = z.enum(['pending', 'active', 'archived']);
 ```
-
-### Unions
-
-```typescript
-const stringOrNumber = z.union([z.string(), z.number()]);
-// or using the shorthand:
-const stringOrNumber = z.string().or(z.number());
-```
-
-### Records
-
-```typescript
-const stringRecord = z.record(z.string());
-// Record<string, string>
-```
-
-### Maps
-
-```typescript
-const myMap = z.map(z.string(), z.number());
-```
-
-### Sets
-
-```typescript
-const mySet = z.set(z.string());
-```
-
-### Promises
-
-```typescript
-const promiseSchema = z.promise(z.string());
-```
-
-### Functions
-
-```typescript
-const myFunction = z.function()
-  .args(z.string(), z.number())
-  .returns(z.boolean());
-```
-
-## Schema Methods
 
 ### Optional and Nullable
 
 ```typescript
-const optionalString = z.string().optional(); // string | undefined
-const nullableString = z.string().nullable(); // string | null
-const nullishString = z.string().nullish();   // string | null | undefined
+const OptionalString = z.string().optional(); // string | undefined
+const NullableString = z.string().nullable(); // string | null
+const NullishString = z.string().nullish();   // string | null | undefined
 ```
 
-### Default Values
+## Parsing and Validation
+
+### .parse()
+
+Parses data and throws a `ZodError` if validation fails.
 
 ```typescript
-const stringWithDefault = z.string().default("default value");
+const schema = z.string();
+
+// Success - returns the value
+const result = schema.parse('hello'); // 'hello'
+
+// Failure - throws ZodError
+schema.parse(123); // Throws!
 ```
 
-### Catch (Error Recovery)
+### .safeParse()
+
+Returns a result object instead of throwing.
 
 ```typescript
-const numberWithCatch = z.number().catch(0);
-// Returns 0 if parsing fails
-```
+const schema = z.string();
 
-## Refinements and Transformations
+const successResult = schema.safeParse('hello');
+// { success: true, data: 'hello' }
 
-### `.refine()`
+const errorResult = schema.safeParse(123);
+// { success: false, error: ZodError }
 
-Add custom validation logic:
-
-```typescript
-const positiveNumber = z.number().refine(val => val > 0, {
-  message: "Number must be positive"
-});
-```
-
-### `.superRefine()`
-
-More advanced refinement with full control over error handling:
-
-```typescript
-const schema = z.object({
-  password: z.string(),
-  confirmPassword: z.string()
-}).superRefine((data, ctx) => {
-  if (data.password !== data.confirmPassword) {
-    ctx.addIssue({
-      code: z.ZodIssueCode.custom,
-      message: "Passwords must match",
-      path: ["confirmPassword"]
-    });
-  }
-});
-```
-
-### `.transform()`
-
-Transform validated data:
-
-```typescript
-const stringToNumber = z.string().transform(val => parseInt(val, 10));
-```
-
-### `.preprocess()`
-
-Preprocess input before validation:
-
-```typescript
-const schema = z.preprocess(
-  (input) => (typeof input === "string" ? input.toLowerCase() : input),
-  z.string()
-);
-```
-
-## Error Handling
-
-### ZodError Structure
-
-When validation fails, Zod throws (or returns in `safeParse`) a `ZodError` containing:
-
-- **issues**: Array of validation issues
-- **path**: Path to the field that failed
-- **code**: Error code (e.g., "invalid_type", "too_small", "too_big")
-- **message**: Human-readable error message
-
-### Error Formatting
-
-```typescript
-const result = schema.safeParse(data);
-if (!result.success) {
-  // Formatted errors
-  const formatted = result.error.format();
-
-  // Flattened errors
-  const flattened = result.error.flatten();
+// Usage pattern
+if (successResult.success) {
+  console.log(successResult.data);
+} else {
+  console.error(successResult.error.errors);
 }
 ```
 
-## String Validations
+### .parseAsync() and .safeParseAsync()
 
-Zod provides extensive string validations:
-
-```typescript
-z.string().email()           // Email validation
-z.string().url()             // URL validation
-z.string().uuid()            // UUID validation
-z.string().cuid()            // CUID validation
-z.string().regex(/pattern/)  // Custom regex
-z.string().min(5)            // Minimum length
-z.string().max(100)          // Maximum length
-z.string().length(10)        // Exact length
-z.string().trim()            // Trim whitespace
-z.string().toLowerCase()     // Convert to lowercase
-z.string().toUpperCase()     // Convert to uppercase
-```
-
-## Number Validations
+For schemas with async refinements or transforms.
 
 ```typescript
-z.number().min(0)            // Minimum value
-z.number().max(100)          // Maximum value
-z.number().int()             // Must be integer
-z.number().positive()        // Must be > 0
-z.number().negative()        // Must be < 0
-z.number().nonnegative()     // Must be >= 0
-z.number().nonpositive()     // Must be <= 0
-z.number().multipleOf(5)     // Must be multiple of 5
-z.number().finite()          // Must be finite
-z.number().safe()            // Must be safe integer
+const schema = z.string().refine(async (val) => {
+  const exists = await checkDatabase(val);
+  return exists;
+});
+
+const result = await schema.parseAsync('test');
+const safeResult = await schema.safeParseAsync('test');
 ```
 
-## Coercion
+## Type Inference
 
-Coerce input values to the target type:
+### Inferring Types
 
 ```typescript
-z.coerce.string()  // Coerce to string
-z.coerce.number()  // Coerce to number
-z.coerce.boolean() // Coerce to boolean
-z.coerce.date()    // Coerce to Date
-z.coerce.bigint()  // Coerce to bigint
+const UserSchema = z.object({
+  id: z.number(),
+  name: z.string(),
+  email: z.string().email(),
+  role: z.enum(['admin', 'user', 'guest']),
+  metadata: z.record(z.string()),
+});
+
+// Infer the type
+type User = z.infer<typeof UserSchema>;
+
+// Equivalent to:
+type User = {
+  id: number;
+  name: string;
+  email: string;
+  role: 'admin' | 'user' | 'guest';
+  metadata: Record<string, string>;
+};
 ```
 
-Example:
+### Input vs Output Types
+
+For schemas with transforms, input and output types may differ.
+
 ```typescript
-const schema = z.coerce.number();
-schema.parse("123"); // returns 123 (number)
+const TransformSchema = z.string().transform((val) => val.length);
+
+type Input = z.input<typeof TransformSchema>;  // string
+type Output = z.output<typeof TransformSchema>; // number
+type Inferred = z.infer<typeof TransformSchema>; // number (same as output)
 ```
 
-## JSON Schema Conversion
-
-Convert Zod schemas to JSON Schema:
+## Complete Example
 
 ```typescript
-import { zodToJsonSchema } from "zod-to-json-schema";
+import { z } from 'zod';
 
-const jsonSchema = zodToJsonSchema(myZodSchema);
+// Define schemas
+const AddressSchema = z.object({
+  street: z.string().min(1),
+  city: z.string().min(1),
+  state: z.string().length(2),
+  zipCode: z.string().regex(/^\d{5}(-\d{4})?$/),
+});
+
+const UserSchema = z.object({
+  id: z.string().uuid(),
+  username: z.string().min(3).max(20),
+  email: z.string().email(),
+  age: z.number().int().min(0).max(150).optional(),
+  roles: z.array(z.enum(['admin', 'editor', 'viewer'])).default(['viewer']),
+  address: AddressSchema.optional(),
+  createdAt: z.date().default(() => new Date()),
+});
+
+// Infer types
+type Address = z.infer<typeof AddressSchema>;
+type User = z.infer<typeof UserSchema>;
+
+// Validation function
+function validateUser(data: unknown): User | null {
+  const result = UserSchema.safeParse(data);
+  
+  if (result.success) {
+    return result.data;
+  }
+  
+  console.error('Validation errors:');
+  result.error.errors.forEach((err) => {
+    console.error(`  ${err.path.join('.')}: ${err.message}`);
+  });
+  
+  return null;
+}
+
+// Usage
+const userData = {
+  id: '550e8400-e29b-41d4-a716-446655440000',
+  username: 'johndoe',
+  email: 'john@example.com',
+  age: 28,
+  address: {
+    street: '123 Main St',
+    city: 'Springfield',
+    state: 'IL',
+    zipCode: '62701',
+  },
+};
+
+const user = validateUser(userData);
+if (user) {
+  console.log('Valid user:', user);
+}
 ```
-
-## Ecosystem
-
-Zod has a thriving ecosystem including:
-
-### API Libraries
-- **tRPC** - End-to-end typesafe APIs
-
-### Form Integrations
-- **React Hook Form** - Form validation with Zod resolver
-- **Formik** - Formik integration
-- **React Final Form** - React Final Form adapter
-
-### Mocking Libraries
-- Tools for generating mock data from Zod schemas
-
-### ORM Integrations
-- Prisma Zod Generator
-- Drizzle ORM integration
-
-### Documentation Tools
-- Auto-generate API documentation from Zod schemas
-
-### And many more...
-
-Visit the [Zod ecosystem page](https://zod.dev/ecosystem) for the complete list.
-
-## Sponsorship
-
-Zod is open-source and supported by sponsors at various tiers:
-
-- **Platinum**: CodeRabbit
-- **Gold**: Courier, Neon
-- **Silver**: Retool, Stainless
-- **Bronze**: Speakeasy, and others
-
-Sponsorship at any level is appreciated and helps maintain the project.
-
-## Community
-
-- **Documentation**: [zod.dev](https://zod.dev)
-- **API Reference**: [zod.dev/api](https://zod.dev/api)
-- **Discord**: Community Discord server available
-- **Social Media**: Follow on X (formerly Twitter) and Bluesky
-- **GitHub**: [github.com/colinhacks/zod](https://github.com/colinhacks/zod)
-
-## License
-
-MIT
-
----
-
-**Note:** This documentation represents the introduction and getting started content from the Zod documentation. For comprehensive API documentation covering advanced topics like discriminated unions, recursive types, custom error maps, and more, visit the official documentation at [zod.dev](https://zod.dev).
