@@ -907,24 +907,29 @@ export async function runIndexingWorkflow(
 
 	const filesIndexed = saveIndexedFiles(records, repositoryId);
 
-	const allSymbolsWithFileId: Array<{
-		id: string;
-		file_id: string;
-		name: string;
-		kind: SymbolKind;
-		lineStart: number;
-		lineEnd: number;
-		columnStart: number;
-		columnEnd: number;
-		signature: string | null;
-		documentation: string | null;
-		isExported: boolean;
-	}> = [];
-	const allReferencesWithFileId: Array<Reference & { file_id: string }> = [];
-	const filesWithId: IndexedFile[] = [];
+	// Query ALL indexed files for complete resolution (fixes order dependency bug)
+	const allIndexedFiles = db
+		.query<{ id: string; path: string }>(
+			`SELECT id, path FROM indexed_files WHERE repository_id = ?`,
+			[repositoryId]
+		)
+		.map(row => ({ id: row.id, path: row.path, repository_id: repositoryId }));
+
+	logger.debug("Queried all indexed files for path alias resolution", {
+		count: allIndexedFiles.length,
+		repositoryId,
+	});
 
 	let totalSymbols = 0;
 	let totalReferences = 0;
+
+	// First pass: Store symbols and collect references (but don't resolve imports yet)
+	interface FileWithReferences {
+		fileId: string;
+		filePath: string;
+		references: Reference[];
+	}
+	const filesWithReferences: FileWithReferences[] = [];
 
 	for (const file of records) {
 		if (!isSupportedForAST(file.path)) continue;
@@ -948,14 +953,47 @@ export async function runIndexingWorkflow(
 			continue;
 		}
 
-		filesWithId.push({ ...file, id: fileRecord.id, repository_id: repositoryId });
-
+		// Store symbols immediately
 		const symbolCount = storeSymbols(symbols, fileRecord.id);
-		const referenceCount = storeReferences(fileRecord.id, file.path, references, filesWithId, pathMappings);
-
 		totalSymbols += symbolCount;
-		totalReferences += referenceCount;
 
+		// Collect references for later processing
+		filesWithReferences.push({
+			fileId: fileRecord.id,
+			filePath: file.path,
+			references,
+		});
+	}
+
+	// Second pass: Store references with complete file list for proper path alias resolution
+	for (const fileWithRefs of filesWithReferences) {
+		const referenceCount = storeReferences(
+			fileWithRefs.fileId,
+			fileWithRefs.filePath,
+			fileWithRefs.references,
+			allIndexedFiles, // Use complete file list instead of incremental array
+			pathMappings
+		);
+		totalReferences += referenceCount;
+	}
+
+	// Build symbol metadata for backward compatibility
+	const allSymbolsWithFileId: Array<{
+		id: string;
+		file_id: string;
+		name: string;
+		kind: SymbolKind;
+		lineStart: number;
+		lineEnd: number;
+		columnStart: number;
+		columnEnd: number;
+		signature: string | null;
+		documentation: string | null;
+		isExported: boolean;
+	}> = [];
+	const allReferencesWithFileId: Array<Reference & { file_id: string }> = [];
+
+	for (const fileWithRefs of filesWithReferences) {
 		const storedSymbols = db.query<{
 			id: string;
 			file_id: string;
@@ -968,7 +1006,7 @@ export async function runIndexingWorkflow(
 			metadata: string;
 		}>(
 			"SELECT id, file_id, name, kind, line_start, line_end, signature, documentation, metadata FROM indexed_symbols WHERE file_id = ?",
-			[fileRecord.id]
+			[fileWithRefs.fileId]
 		);
 
 		for (const s of storedSymbols) {
@@ -988,8 +1026,8 @@ export async function runIndexingWorkflow(
 			});
 		}
 
-		for (const ref of references) {
-			allReferencesWithFileId.push({ ...ref, file_id: fileRecord.id });
+		for (const ref of fileWithRefs.references) {
+			allReferencesWithFileId.push({ ...ref, file_id: fileWithRefs.fileId });
 		}
 	}
 

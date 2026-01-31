@@ -80,20 +80,26 @@ export { routes, schema };`
 export { schema };`
     );
     
-    // Initialize database and create repository
+    // Initialize database
     db = getGlobalDatabase();
-    repoId = randomUUID();
-    db.run(
-      `INSERT INTO repositories (id, name, full_name, default_branch)
-       VALUES (?, ?, ?, ?)`,
-      [repoId, "test-repo", "test-org/test-repo", "main"]
-    );
     
     // Run full indexing workflow (parses tsconfig, resolves imports)
+    // This will create the repository automatically
+    const repoName = "test-repo-" + randomUUID().slice(0, 8);
     await runIndexingWorkflow({
-      repository: repoId,
+      repository: repoName,
       localPath: fixtureDir,
     });
+    
+    // Get the created repository ID
+    const repo = db.queryOne<{ id: string }>(
+      `SELECT id FROM repositories WHERE full_name LIKE ?`,
+      [`local/${repoName}`]
+    );
+    if (!repo) {
+      throw new Error("Repository not created");
+    }
+    repoId = repo.id;
   });
   
   afterAll(() => {
