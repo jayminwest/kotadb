@@ -61,11 +61,13 @@ Options:
   --dry-run        Preview workflow without executing changes
   --metrics        Display recent workflow metrics
   --no-comment     Skip posting GitHub comment
+  --verbose, -v    Enable detailed action-level logging
   --help           Show this help message
 
 Examples:
   bun run src/index.ts #123
   bun run src/index.ts 123 --dry-run
+  bun run src/index.ts 123 --verbose
   bun run src/index.ts --metrics
 `);
 }
@@ -112,7 +114,7 @@ async function main(): Promise<number> {
   // Find issue number in args
   let issueNumber: number | null = null;
   for (const arg of args) {
-    if (!arg.startsWith("--")) {
+    if (!arg.startsWith("--") && !arg.startsWith("-")) {
       issueNumber = parseIssueNumber(arg);
       if (issueNumber !== null) break;
     }
@@ -126,16 +128,17 @@ async function main(): Promise<number> {
 
   const dryRun = args.includes("--dry-run");
   const skipComment = args.includes("--no-comment");
+  const verbose = args.includes("--verbose") || args.includes("-v");
 
   process.stdout.write(
-    `Starting workflow for issue #${issueNumber}${dryRun ? " (dry run)" : ""}\n`
+    `Starting workflow for issue #${issueNumber}${dryRun ? " (dry run)" : ""}${verbose ? " (verbose)" : ""}\n`
   );
 
   const startedAt = new Date().toISOString();
   const startTime = performance.now();
 
   try {
-    const result = await runWorkflow(issueNumber, dryRun);
+    const result = await runWorkflow(issueNumber, dryRun, verbose);
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
 

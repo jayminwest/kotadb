@@ -3,6 +3,7 @@
  */
 import { dirname } from "node:path";
 import { WorkflowLogger } from "./logger.ts";
+import { ConsoleReporter } from "./reporter.ts";
 import { orchestrateWorkflow } from "./orchestrator.ts";
 
 export interface WorkflowResult {
@@ -23,10 +24,12 @@ function getProjectRoot(): string {
 
 export async function runWorkflow(
   issueNumber: number,
-  dryRun = false
+  dryRun = false,
+  verbose = false
 ): Promise<WorkflowResult> {
   const projectRoot = getProjectRoot();
   const logger = new WorkflowLogger({ issueNumber, dryRun, projectRoot });
+  const reporter = new ConsoleReporter({ verbose, issueNumber });
   
   const result: WorkflowResult = {
     success: false,
@@ -43,14 +46,17 @@ export async function runWorkflow(
 
   try {
     logger.initialize();
-    logger.logEvent("WORKFLOW_START", { issue_number: issueNumber, dry_run: dryRun });
+    reporter.startWorkflow(dryRun);
+    logger.logEvent("WORKFLOW_START", { issue_number: issueNumber, dry_run: dryRun, verbose });
 
-    // NEW: Use orchestrator instead of single /do invocation
+    // Use orchestrator with reporter integration
     const orchResult = await orchestrateWorkflow({
       issueNumber,
       projectRoot,
       logger,
-      dryRun
+      reporter,
+      dryRun,
+      verbose
     });
 
     const endTime = performance.now();
@@ -73,12 +79,23 @@ export async function runWorkflow(
       files_modified: orchResult.filesModified.length
     });
     
-    // NEW: Finalize agent output with summary
+    // Finalize agent output with summary
     logger.finalizeAgentOutput({
       totalInputTokens: inputTokens,
       totalOutputTokens: outputTokens,
       totalCostUsd: totalCostUsd,
       durationMs
+    });
+    
+    // Report workflow completion
+    reporter.completeWorkflow({
+      success: true,
+      durationMs,
+      inputTokens,
+      outputTokens,
+      totalCostUsd,
+      filesModified: orchResult.filesModified,
+      specPath: orchResult.specPath
     });
     
   } catch (error) {
@@ -91,12 +108,25 @@ export async function runWorkflow(
     logger.logError("workflow_execution", error instanceof Error ? error : new Error(String(error)));
     result.logDir = logger.getLogDir();
     
-    // NEW: Finalize agent output even on error
+    // Finalize agent output even on error
     logger.finalizeAgentOutput({
       totalInputTokens: inputTokens,
       totalOutputTokens: outputTokens,
       totalCostUsd: totalCostUsd,
       durationMs
+    });
+    
+    // Report error to console
+    reporter.logError("Workflow failed", error instanceof Error ? error : undefined);
+    reporter.completeWorkflow({
+      success: false,
+      durationMs,
+      inputTokens,
+      outputTokens,
+      totalCostUsd,
+      filesModified: [],
+      specPath: null,
+      errorMessage: result.errorMessage
     });
   }
 
