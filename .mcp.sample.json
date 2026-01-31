@@ -1,8 +1,15 @@
 {
   "mcpServers": {
-   "kotadb-bunx": {
+    "kotadb-bunx": {
       "command": "bunx",
       "args": ["kotadb@next", "--stdio"]
+    },
+    "kotadb-local-dev": {
+      "command": "bun",
+      "args": ["run", "/path/to/kotadb/app/src/cli.ts", "--stdio"],
+      "env": {
+        "LOG_LEVEL": "debug"
+      }
     }
   }
 }

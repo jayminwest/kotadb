@@ -76,6 +76,8 @@ kotadb --port 4000
 
 ## Development
 
+For detailed local development setup, including how to test MCP changes with Claude Code, see [DEVELOPMENT.md](./DEVELOPMENT.md).
+
 ### Install dependencies (for development)
 
 ```bash
