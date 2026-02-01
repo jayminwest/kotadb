@@ -17,6 +17,7 @@ overview:
       - automation/src/reporter.ts (ConsoleReporter for ANSI output, verbosity control)
       - automation/src/metrics.ts (SQLite metrics storage)
       - automation/src/github.ts (gh CLI commenting)
+      - automation/src/worktree.ts (git worktree management for isolated execution)
       - automation/src/logger.ts (structured logging with JSON events)
       - automation/package.json (SDK dependency)
       - automation/tsconfig.json (TypeScript config)
@@ -28,6 +29,7 @@ overview:
       - Bun.spawn patterns for gh CLI integration
       - SQLite metrics storage (automation/.data/metrics.db)
       - ANSI escape code formatting for console output
+      - Git worktree isolation for parallel workflow execution
       - SDK hook integration (PreToolUse, PostToolUse, Notification)
       
     not_covered:
@@ -112,6 +114,17 @@ core_implementation:
         - Handle auth failures gracefully
         - Support --no-comment flag
 
+
+    worktree_ts:
+      path: automation/src/worktree.ts
+      purpose: Git worktree management for isolated workflow execution
+      responsibilities:
+        - Create isolated git worktrees for parallel execution
+        - Format filesystem-safe timestamps for worktree naming
+        - Manage worktree lifecycle with graceful fallback to projectRoot
+        - Preserve worktrees on failure for debugging
+        - Query worktree info via git worktree list --porcelain
+
 key_operations:
   suppress_sdk_stderr:
     when: Providing custom console output without SDK default dots
@@ -119,7 +132,7 @@ key_operations:
       Configure SDK options with stderr callback that captures or ignores stderr.
       This suppresses default progress dots while allowing custom reporting via hooks.
     patterns:
-      - SDK options include stderr: (data: string) => { ... }
+      - SDK options include stderr callback function
       - Callback receives SDK progress updates
       - Return void to suppress, or implement custom handling
       - Use with hooks for structured output instead
@@ -691,7 +704,7 @@ stability:
   convergence_indicators:
     insight_rate_trend: converging
     contradiction_count: 0
-    last_reviewed: 2026-01-31
+    last_reviewed: 2026-02-01
     notes: |
       Issue #65 implementation (console output transparency) adds comprehensive
       SDK hook integration, ANSI formatting patterns, and verbosity control.
@@ -699,3 +712,8 @@ stability:
       logging. SDK stderr callback pattern established for suppressing default
       output. All key automation operations now documented with code examples.
       Domain approaching stability with most patterns established and tested.
+
+      Issue #64 implementation (git worktree isolation) adds worktree.ts module
+      with graceful fallback patterns, filesystem-safe timestamps, and preservation
+      strategies for debugging. Enables parallel workflow execution without conflicts.
+      See worktree-learnings.md for detailed patterns and best practices.

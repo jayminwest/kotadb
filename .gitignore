@@ -94,3 +94,5 @@ supabase/
 .eraser/
 
 automation/.data/
+# Automation worktrees (isolated git working directories)
+automation/.worktrees/
