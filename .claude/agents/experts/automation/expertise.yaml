@@ -1,5 +1,5 @@
 # Automation Expert Domain Expertise
-# Last reviewed: 2026-01-30
+# Last reviewed: 2026-01-31
 # Domain: automation layer development with Claude Agent SDK
 
 overview:
@@ -7,23 +7,28 @@ overview:
     Automation expert domain provides specialized knowledge for kotadb's automation layer,
     which uses the Claude Agent SDK (@anthropic-ai/claude-code) to execute automated workflows.
     This domain covers SDK integration patterns, workflow orchestration, metrics tracking with
-    SQLite, GitHub commenting via gh CLI, and cost tracking for AI operations.
+    SQLite, GitHub commenting via gh CLI, console output transparency, and cost tracking for AI operations.
     
   scope:
     primary_codebase:
       - automation/src/index.ts (CLI entry, env loading, metrics display)
       - automation/src/workflow.ts (SDK query() integration, message streaming)
+      - automation/src/orchestrator.ts (multi-phase orchestration, SDK hooks)
+      - automation/src/reporter.ts (ConsoleReporter for ANSI output, verbosity control)
       - automation/src/metrics.ts (SQLite metrics storage)
       - automation/src/github.ts (gh CLI commenting)
+      - automation/src/logger.ts (structured logging with JSON events)
       - automation/package.json (SDK dependency)
       - automation/tsconfig.json (TypeScript config)
       - automation/README.md (documentation)
     
     broader_scope:
-      - Claude Agent SDK patterns (query(), message streaming)
+      - Claude Agent SDK patterns (query(), message streaming, hooks, stderr callback)
       - MCP server configuration for kotadb access
       - Bun.spawn patterns for gh CLI integration
       - SQLite metrics storage (automation/.data/metrics.db)
+      - ANSI escape code formatting for console output
+      - SDK hook integration (PreToolUse, PostToolUse, Notification)
       
     not_covered:
       - General Claude configuration (see claude-config expert)
@@ -33,9 +38,9 @@ overview:
   rationale: |
     The automation layer represents a critical architectural component that orchestrates
     Claude Code workflows programmatically. This expertise enables reliable SDK integration,
-    proper metrics tracking, and effective workflow automation while maintaining clear
-    boundaries with related domains (github for GitHub operations, database for code
-    intelligence storage).
+    proper metrics tracking, effective workflow automation, and transparent console output
+    while maintaining clear boundaries with related domains (github for GitHub operations,
+    database for code intelligence storage).
 
 core_implementation:
   database_location: automation/.data/metrics.db
@@ -45,23 +50,47 @@ core_implementation:
       path: automation/src/index.ts
       purpose: CLI entry point with env loading and metrics display
       responsibilities:
-        - Parse CLI arguments (issue number, flags)
-        - Load .env from project root
-        - Validate ANTHROPIC_API_KEY
+        - Parse CLI arguments (issue number, flags: --dry-run, --verbose, --metrics, --no-comment)
+        - Load .env from project root for ANTHROPIC_API_KEY
+        - Validate ANTHROPIC_API_KEY before workflow
         - Execute workflow via workflow.ts
         - Display metrics table or run workflow
         - Handle exit codes
+        - Record metrics and post GitHub comments
+        
+    orchestrator_ts:
+      path: automation/src/orchestrator.ts
+      purpose: Multi-phase workflow orchestration with SDK hook integration
+      responsibilities:
+        - Orchestrate 4-phase workflow (analysis, plan, build, improve)
+        - Configure SDK options with hooks for action-level logging
+        - Manage PreToolUse, PostToolUse, Notification hooks
+        - Suppress SDK default stderr output via stderr callback
+        - Handle dry-run mode with status tracking
+        - Parse domain and requirements from analysis
+        - Extract spec paths and file modifications
+        
+    reporter_ts:
+      path: automation/src/reporter.ts
+      purpose: Console output with ANSI formatting and verbosity control
+      responsibilities:
+        - Format workflow lifecycle events with ANSI colors
+        - Provide verbosity-aware logging (verbose vs summary modes)
+        - Summarize tool inputs and outputs for readable logging
+        - Separate key actions (file write/edit) from verbose details
+        - Track phase timing and metrics accumulation
+        - Handle workflow completion with tokens and cost
         
     workflow_ts:
       path: automation/src/workflow.ts
       purpose: SDK query() integration and message streaming
       responsibilities:
         - Import query() from @anthropic-ai/claude-code
-        - Configure SDK options (maxTurns, cwd, permissionMode, mcpServers)
+        - Configure SDK options (maxTurns, cwd, permissionMode, mcpServers, hooks)
         - Stream messages from async iterator
         - Extract session_id, usage, cost, errors
         - Record metrics via metrics.ts
-        - Post GitHub comment via github.ts
+        - Integrate ConsoleReporter for real-time progress
         
     metrics_ts:
       path: automation/src/metrics.ts
@@ -84,6 +113,205 @@ core_implementation:
         - Support --no-comment flag
 
 key_operations:
+  suppress_sdk_stderr:
+    when: Providing custom console output without SDK default dots
+    approach: |
+      Configure SDK options with stderr callback that captures or ignores stderr.
+      This suppresses default progress dots while allowing custom reporting via hooks.
+    patterns:
+      - SDK options include stderr: (data: string) => { ... }
+      - Callback receives SDK progress updates
+      - Return void to suppress, or implement custom handling
+      - Use with hooks for structured output instead
+    code_example: |
+      const sdkOptions: AutomationSDKOptions = {
+        maxTurns: 100,
+        cwd: projectRoot,
+        permissionMode: "bypassPermissions",
+        // Suppress default stderr dots
+        stderr: (data: string) => {
+          if (verbose) {
+            logger.logEvent("SDK_STDERR", { data });
+          }
+          // Suppress console output (SDK dots)
+        },
+        hooks: { /* ... */ }
+      };
+    pitfalls:
+      - Not providing stderr callback shows default SDK progress
+      - Verbose logging of SDK_STDERR fills logs unnecessarily
+      - Mixing stderr callback with Notification hook creates duplicate output
+      
+  integrate_sdk_hooks:
+    when: Adding action-level logging for tool execution
+    approach: |
+      Use SDK hooks (PreToolUse, PostToolUse, Notification) to intercept tool calls
+      and SDK notifications. Implement HookCallback for each hook type. Configure
+      via hooks option in SDK options.
+    patterns:
+      - PreToolUse: Log tool invocation with input summary
+      - PostToolUse: Log tool completion with output summary
+      - Notification: Log SDK notifications (errors, warnings, progress)
+      - Wrap hooks in HookCallbackMatcher array with hooks property
+      - Non-fatal hook failures allow workflow continuation
+    code_example: |
+      function createPreToolUseHook(reporter: ConsoleReporter): HookCallback {
+        return async (input: HookInput) => {
+          try {
+            if (input.hook_event_name === "PreToolUse") {
+              const summary = summarizeToolInput(input.tool_name, input.tool_input);
+              reporter.logToolUse(input.tool_name, summary);
+            }
+          } catch {
+            // Non-fatal: continue workflow on hook error
+          }
+          return {};
+        };
+      }
+      
+      const hooks: Partial<Record<string, HookCallbackMatcher[]>> = {
+        PreToolUse: [{ hooks: [createPreToolUseHook(reporter)] }],
+        PostToolUse: [{ hooks: [createPostToolUseHook(reporter)] }],
+        Notification: [{ hooks: [createNotificationHook(reporter)] }]
+      };
+      
+      const sdkOptions = {
+        maxTurns: 100,
+        hooks
+      };
+    pitfalls:
+      - Hook exceptions should not terminate workflows (wrap in try-catch)
+      - HookInput event_name must match hook type exactly
+      - Tool input/output summarization must handle all tool types
+      - Not returning {} from hook callback may break SDK
+      
+  implement_console_reporter:
+    when: Creating user-facing real-time workflow progress output
+    approach: |
+      Build ConsoleReporter class with ANSI formatting constants, verbosity-aware
+      logging methods, and phase timing. Use process.stdout.write for output.
+      Separate console reporting from structured logging (logger.ts).
+    patterns:
+      - ANSI color constants (PHASE, ACTION, SUCCESS, ERROR, WARNING, VERBOSE)
+      - Verbosity flag controls what gets logged (isVerbose method)
+      - Key actions always logged (file writes/edits via isKeyAction)
+      - Tool summaries only in verbose mode
+      - Phase start/complete with timing
+      - Workflow start/complete with full metrics summary
+      - Process stream writes with fallback to stderr
+    code_example: |
+      export const ANSI = {
+        RESET: "\x1b[0m",
+        BOLD: "\x1b[1m",
+        PHASE: "\x1b[1m\x1b[36m",    // cyan+bold
+        ACTION: "\x1b[34m",           // blue
+        SUCCESS: "\x1b[32m",          // green
+        ERROR: "\x1b[1m\x1b[31m",    // red+bold
+        WARNING: "\x1b[33m",          // yellow
+        VERBOSE: "\x1b[2m"            // dim
+      };
+      
+      class ConsoleReporter {
+        logKeyAction(message: string): void {
+          // Always shown
+          this.write(`  ${ANSI.ACTION}->${ANSI.RESET} ${message}\n`);
+        }
+        
+        logVerbose(message: string): void {
+          // Only if verbose
+          if (this.verbose) {
+            this.write(`  ${ANSI.VERBOSE}${message}${ANSI.RESET}\n`);
+          }
+        }
+        
+        private write(text: string): void {
+          try {
+            process.stdout.write(text);
+          } catch {
+            // Fallback to stderr
+            try {
+              process.stderr.write(text);
+            } catch {
+              // Silent failure
+            }
+          }
+        }
+      }
+    pitfalls:
+      - Not providing fallback to stderr causes lost output
+      - ANSI codes must be complete (bold+color combinations need both codes)
+      - Forgetting RESET codes causes all subsequent output to be colored
+      - Mixing console.* with process.std* breaks logging conventions
+      
+  summarize_tool_actions:
+    when: Extracting readable summaries from tool input/output
+    approach: |
+      Create helper functions to extract meaningful summaries from tool input
+      and output objects. Handle each tool type differently (Read vs Write vs Bash).
+      Truncate long commands to avoid verbose output.
+    patterns:
+      - Separate summarizeToolInput and summarizeToolOutput functions
+      - Tool-specific case branches (Read, Write, Edit, Bash, Grep, Glob, MCP tools)
+      - Truncate long commands to ~60 chars
+      - Extract file paths for Write/Edit
+      - Extract patterns for Grep/Glob
+      - Recognize Bash commands (test, tsc, lint) for standardized output
+      - Return empty string if no meaningful summary
+    code_example: |
+      export function summarizeToolInput(toolName: string, toolInput: unknown): string {
+        if (!toolInput || typeof toolInput !== "object") return "";
+        const input = toolInput as Record<string, unknown>;
+        
+        switch (toolName) {
+          case "Read":
+            return `file: ${input.file_path}`;
+          case "Bash": {
+            const cmd = String(input.command || "");
+            return `cmd: ${cmd.length > 60 ? cmd.substring(0, 60) + "..." : cmd}`;
+          }
+          case "Grep":
+            return `pattern: "${input.pattern}"`;
+          default:
+            return "";
+        }
+      }
+      
+      export function isKeyAction(toolName: string): boolean {
+        return ["Write", "Edit"].includes(toolName);
+      }
+    pitfalls:
+      - Not handling all tool types returns empty summaries
+      - Long command output makes logs unreadable
+      - Not checking for undefined/null input causes crashes
+      
+  configure_verbose_flag:
+    when: Adding --verbose/-v support for detailed output
+    approach: |
+      Parse --verbose or -v flag from CLI args. Pass to ConsoleReporter and
+      orchestrator for depth control. Check verbose state in reporter methods
+      to gate detailed output.
+    patterns:
+      - CLI flag parsing: args.includes("--verbose") || args.includes("-v")
+      - Pass verbose boolean to ConsoleReporter constructor
+      - Reporter.isVerbose() method for external hook access
+      - Gate tool summaries and stack traces on verbose
+      - Always show key actions and errors regardless of verbosity
+    code_example: |
+      // In index.ts
+      const verbose = args.includes("--verbose") || args.includes("-v");
+      
+      // In orchestrator.ts
+      const reporter = new ConsoleReporter({ verbose, issueNumber });
+      
+      // In hook callbacks
+      if (reporter.isVerbose()) {
+        reporter.logToolComplete(toolName, summary);
+      }
+    pitfalls:
+      - Not exposing isVerbose() method breaks external access
+      - Forgetting to gate some verbose output inconsistently
+      - Verbose flag not passed through all orchestration layers
+
   integrate_sdk_query:
     when: Setting up Claude Agent SDK workflow execution
     approach: |
@@ -94,6 +322,8 @@ key_operations:
       - permissionMode bypassPermissions (automation context, no interactive prompts)
       - cwd projectRoot (ensure correct working directory)
       - mcpServers Configure kotadb server with stdio transport
+      - hooks for action-level logging
+      - stderr callback to suppress default output
     code_example: |
       import { query, type SDKMessage } from "@anthropic-ai/claude-code";
       
@@ -108,10 +338,12 @@ key_operations:
             kotadb: {
               type: "stdio",
               command: "bunx",
-              args: ["--bun", "kotadb@next"],
+              args: ["--bun", "kotadb"],
               env: { KOTADB_CWD: projectRoot }
             }
-          }
+          },
+          stderr: (data: string) => { /* suppress */ },
+          hooks: { /* ... */ }
         }
       })) {
         messages.push(message);
@@ -122,6 +354,7 @@ key_operations:
       - Incorrect projectRoot path breaks kotadb MCP access
       - Not using bypassPermissions requires manual intervention
       - Low maxTurns value terminates complex workflows prematurely
+      - Missing hooks means no action-level visibility
       
   stream_sdk_messages:
     when: Processing query() async iterator
@@ -131,7 +364,7 @@ key_operations:
       and final usage/cost from result message.
     patterns:
       - Type guards for message discrimination
-      - Progress logging via process.stderr.write
+      - Progress logging via process.stderr.write or reporter
       - Session ID extraction from system init message
       - Final result extraction from result message
       - Error message extraction from error messages
@@ -174,7 +407,7 @@ key_operations:
         kotadb: {
           type: "stdio",
           command: "bunx",
-          args: ["--bun", "kotadb@next"],
+          args: ["--bun", "kotadb"],
           env: { KOTADB_CWD: projectRoot }
         }
       }
@@ -222,6 +455,44 @@ key_operations:
       - Not handling empty PR URL shows undefined
 
 decision_trees:
+  console_output_strategy:
+    question: How should I output console feedback for this event?
+    branches:
+      - condition: File creation/modification
+        action: Call reporter.logKeyAction() - always shown
+        rationale: Critical user feedback regardless of verbosity
+        
+      - condition: Tool execution details (input/output)
+        action: Call reporter.logToolUse()/logToolComplete() - verbose only
+        rationale: Too much detail for normal output
+        
+      - condition: Phase start/completion
+        action: Call reporter.startPhase()/completePhase() - always shown
+        rationale: Key workflow milestones
+        
+      - condition: Debugging information (timing, stack traces)
+        action: Call reporter.logVerbose() - verbose only
+        rationale: Only useful for troubleshooting
+        
+      - condition: Errors and warnings
+        action: Call reporter.logError()/logWarning() - always shown
+        rationale: Critical for workflow success
+        
+  sdk_output_suppression:
+    question: How do I control SDK default output (dots, progress)?
+    branches:
+      - condition: Want no SDK output at all
+        action: Provide stderr callback that ignores data
+        rationale: Custom reporting via hooks replaces SDK output
+        
+      - condition: Want SDK output for debugging
+        action: Log stderr via logger.logEvent("SDK_STDERR", ...)
+        rationale: Preserved in logs but not on console
+        
+      - condition: Want progress in verbose mode only
+        action: Check verbose flag in stderr callback
+        rationale: Selective output based on user preference
+
   sdk_option_selection:
     question: Which SDK options should I use for automation workflows?
     branches:
@@ -240,6 +511,10 @@ decision_trees:
       - condition: Multiple repositories or paths
         action: Set cwd to projectRoot
         rationale: Ensures correct working directory
+        
+      - condition: Need action-level visibility
+        action: Configure PreToolUse, PostToolUse, Notification hooks
+        rationale: Transparent action logging without SDK verbosity
         
   message_type_handling:
     question: How should I handle this SDK message type?
@@ -264,18 +539,38 @@ decision_trees:
         rationale: Persistent tracking for analysis
         
       - condition: Progress updates
-        action: Log to stderr via process.stderr.write
-        rationale: Real-time feedback, no persistence needed
+        action: Log to console via reporter
+        rationale: Real-time feedback
         
-      - condition: Final summary
-        action: Log to stdout via process.stdout.write
-        rationale: User-facing output
+      - condition: Structured events
+        action: Log to logger (JSON events)
+        rationale: Queryable event history
         
       - condition: Errors
-        action: Log to stderr AND store in metrics if workflow-level
+        action: Log to console AND store in metrics if workflow-level
         rationale: Both immediate feedback and historical tracking
 
 patterns:
+  console_reporter_pattern:
+    structure: Class with ANSI constants, verbosity-aware methods, phase tracking
+    usage: Real-time user feedback with transparent action logging
+    trade_offs: Verbosity control vs completeness of output
+      
+  sdk_hook_pattern:
+    structure: HookCallback functions with event_name discrimination
+    usage: Intercept tool execution and SDK notifications
+    trade_offs: Hook overhead vs detailed visibility
+      
+  tool_summary_pattern:
+    structure: Tool-specific summarization functions (input/output)
+    usage: Readable action logging without overwhelming output
+    trade_offs: Simplification vs full details (use verbose for details)
+      
+  stderr_callback_pattern:
+    structure: SDK options.stderr callback that accepts string
+    usage: Suppress or redirect default SDK progress output
+    trade_offs: Custom output vs SDK default formatting
+      
   sdk_query_pattern:
     structure: Async for...of loop over query() iterator
     usage: Stream messages, accumulate results, handle errors
@@ -298,15 +593,53 @@ patterns:
       
   cli_argument_pattern:
     structure: Simple flag detection, positional args
-    usage: --dry-run, --metrics, --no-comment, issue number
+    usage: --dry-run, --metrics, --no-comment, --verbose/-v
     trade_offs: Simple parsing vs rich CLI library
 
 best_practices:
+  console_output:
+    - Use ConsoleReporter for all user-facing output
+    - Separate ANSI formatting constants for maintainability
+    - Always provide fallback to stderr if stdout fails
+    - Gate verbose output in external code (use isVerbose method)
+    - Never use console.* (use process.std* only)
+    - Format numbers consistently (cost with 4 decimals, duration in seconds)
+    
+  sdk_hook_integration:
+    - Wrap hooks in try-catch to prevent workflow interruption
+    - Ensure HookCallback returns empty object {}
+    - Use HookInput event_name to discriminate hook types
+    - Implement separate functions for each hook type for clarity
+    - Consider non-fatal hook failures as expected
+    - Don't duplicate output between hooks (stderr vs hooks)
+    
+  console_output_suppression:
+    - Always provide stderr callback to control SDK output
+    - Use callback to filter (suppress) or redirect output
+    - Consider verbosity flag when logging SDK_STDERR events
+    - Avoid logging SDK output to console (use logger instead)
+    
+  tool_summarization:
+    - Create separate functions for input and output summaries
+    - Handle each tool type in switch statement
+    - Truncate long commands to avoid verbose output
+    - Return empty string if no meaningful summary exists
+    - Keep summaries under 80 chars for readability
+    
+  verbose_flag_usage:
+    - Parse from CLI args (--verbose or -v)
+    - Pass to ConsoleReporter constructor
+    - Access via reporter.isVerbose() in external code
+    - Gate stack traces and detailed logs on verbosity
+    - Always show errors and key actions regardless
+    
   sdk_integration:
     - Always validate ANTHROPIC_API_KEY before query()
     - Use type guards for message handling
     - Configure mcpServers for kotadb access
     - Set permissionMode bypassPermissions for automation
+    - Configure hooks for action-level logging
+    - Provide stderr callback to suppress default output
     
   metrics_storage:
     - Auto-initialize schema on first use
@@ -319,12 +652,14 @@ best_practices:
     - Graceful env loading failures
     - Record failed workflow metrics
     - Always close metrics DB on exit
+    - Catch hook exceptions to prevent workflow termination
     
   logging:
     - Use process.stdout.write for output
     - Use process.stderr.write for progress/errors
     - Format duration properly
     - Format cost with 4 decimals
+    - Separate ConsoleReporter from structured logger
 
 known_issues:
   - issue: SDK query() timeout on long workflows
@@ -336,21 +671,31 @@ known_issues:
     impact: Metrics recorded but no issue comment
     resolution: Non-fatal, log warning and continue
     status: Handled gracefully
+    
+  - issue: ANSI escape codes in non-TTY environments
+    impact: Colored output appears as escape codes in logs
+    resolution: Consider environment detection or flag
+    status: Known limitation
 
 potential_enhancements:
+  - TTY detection for conditional ANSI code usage
   - Workflow pause/resume capability
   - Cost budget enforcement
   - Retry logic for transient failures
   - Workflow visualization UI
   - Metrics aggregation and reporting
+  - Real-time progress bar using ANSI codes
+  - Tool execution timeline visualization
 
 stability:
   convergence_indicators:
-    insight_rate_trend: new
+    insight_rate_trend: converging
     contradiction_count: 0
-    last_reviewed: 2026-01-30
+    last_reviewed: 2026-01-31
     notes: |
-      Initial domain creation based on automation/ rewrite (commit 5d257ea, Issue #60).
-      SDK patterns from @anthropic-ai/claude-code v1.0.32. Metrics schema follows
-      SQLite conventions from database expert. Distinct from github domain (SDK
-      orchestration vs GitHub operations).
+      Issue #65 implementation (console output transparency) adds comprehensive
+      SDK hook integration, ANSI formatting patterns, and verbosity control.
+      ConsoleReporter successfully separates user-facing output from structured
+      logging. SDK stderr callback pattern established for suppressing default
+      output. All key automation operations now documented with code examples.
+      Domain approaching stability with most patterns established and tested.
