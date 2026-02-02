@@ -25,10 +25,15 @@ function getProjectRoot(): string {
 export async function runWorkflow(
   issueNumber: number,
   dryRun = false,
-  verbose = false
+  verbose = false,
+  workingDirectory?: string  // Optional worktree path
 ): Promise<WorkflowResult> {
-  const projectRoot = getProjectRoot();
-  const logger = new WorkflowLogger({ issueNumber, dryRun, projectRoot });
+  const projectRoot = workingDirectory ?? getProjectRoot();  // Use worktree if provided
+  const logger = new WorkflowLogger({ 
+    issueNumber, 
+    dryRun, 
+    projectRoot  // Logger will write to worktree location
+  });
   const reporter = new ConsoleReporter({ verbose, issueNumber });
   
   const result: WorkflowResult = {

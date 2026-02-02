@@ -40,6 +40,11 @@ import {
   type WorkflowMetrics,
 } from "./metrics.ts";
 import { postIssueComment } from "./github.ts";
+import { 
+  createWorktree, 
+  formatWorktreeTimestamp,
+  type WorktreeInfo 
+} from "./worktree.ts";
 
 function parseIssueNumber(arg: string): number | null {
   // Support #123 or 123 format
@@ -130,15 +135,46 @@ async function main(): Promise<number> {
   const skipComment = args.includes("--no-comment");
   const verbose = args.includes("--verbose") || args.includes("-v");
 
+  // Create worktree info (but don't create actual worktree in dry-run)
+  const timestamp = formatWorktreeTimestamp(new Date());
+  let worktreeInfo: WorktreeInfo | null = null;
+  
+  if (!dryRun) {
+    try {
+      worktreeInfo = await createWorktree({
+        issueNumber,
+        projectRoot,
+        baseBranch: "develop",
+        timestamp
+      });
+    } catch (error) {
+      process.stderr.write(`Failed to create worktree: ${error}\n`);
+      process.stderr.write(`Falling back to current directory\n`);
+      // Continue with projectRoot (current behavior)
+      worktreeInfo = null;
+    }
+  }
+
   process.stdout.write(
     `Starting workflow for issue #${issueNumber}${dryRun ? " (dry run)" : ""}${verbose ? " (verbose)" : ""}\n`
   );
+
+  if (worktreeInfo) {
+    process.stdout.write(`Worktree: ${worktreeInfo.path}\n`);
+    process.stdout.write(`Branch: ${worktreeInfo.branch}\n`);
+  }
 
   const startedAt = new Date().toISOString();
   const startTime = performance.now();
 
   try {
-    const result = await runWorkflow(issueNumber, dryRun, verbose);
+    // Pass worktree path to workflow
+    const result = await runWorkflow(
+      issueNumber, 
+      dryRun, 
+      verbose,
+      worktreeInfo?.path ?? projectRoot  // Use worktree or fallback to projectRoot
+    );
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
 
@@ -200,6 +236,23 @@ async function main(): Promise<number> {
       process.stderr.write(`Error: ${result.errorMessage}\n`);
     }
 
+    // Keep worktree on success (will be cleaned after PR merge)
+    if (worktreeInfo && result.success) {
+      process.stdout.write(
+        `Worktree preserved at ${worktreeInfo.path} (will be removed after PR merge)\n`
+      );
+    }
+    
+    // Keep worktree on failure for debugging
+    if (worktreeInfo && !result.success) {
+      process.stderr.write(
+        `Worktree preserved at ${worktreeInfo.path} for debugging\n`
+      );
+      process.stderr.write(
+        `To clean up: git worktree remove ${worktreeInfo.path}\n`
+      );
+    }
+
     closeMetricsDb();
     return result.success ? 0 : 1;
   } catch (error) {
@@ -225,6 +278,14 @@ async function main(): Promise<number> {
     recordMetrics(metrics);
 
     process.stderr.write(`Workflow failed: ${errorMessage}\n`);
+    
+    // Preserve worktree on exception for debugging
+    if (worktreeInfo) {
+      process.stderr.write(
+        `Worktree preserved at ${worktreeInfo.path} for debugging\n`
+      );
+    }
+
     closeMetricsDb();
     return 1;
   }
