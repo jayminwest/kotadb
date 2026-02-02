@@ -93,6 +93,8 @@ supabase/
 
 .eraser/
 
-automation/.data/
+# Automation data directory (keep .gitkeep for directory structure)
+automation/.data/*
+!automation/.data/.gitkeep
 # Automation worktrees (isolated git working directories)
 automation/.worktrees/
