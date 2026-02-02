@@ -573,6 +573,7 @@ export function queryDependents(
 	fileId: string,
 	depth: number,
 	includeTests: boolean,
+	referenceTypes: string[] = ["import", "re_export", "export_all"],
 ): DependencyResult {
 	const db = getGlobalDatabase();
 	
@@ -586,6 +587,9 @@ export function queryDependents(
 		throw new Error(`File not found: ${fileId}`);
 	}
 	
+	// Build IN clause placeholders for reference types
+	const refTypePlaceholders = referenceTypes.map(() => "?").join(", ");
+	
 	const sql = `
 		WITH RECURSIVE 
 		dependents AS (
@@ -596,7 +600,7 @@ export function queryDependents(
 				'|' || f.path || '|' AS path_tracker
 			FROM indexed_references r
 			JOIN indexed_files f ON r.file_id = f.id
-			WHERE r.reference_type = 'import'
+			WHERE r.reference_type IN (${refTypePlaceholders})
 				AND r.repository_id = ?
 				AND r.target_file_path = ?
 			
@@ -611,7 +615,7 @@ export function queryDependents(
 			JOIN indexed_files f2 ON r2.file_id = f2.id
 			JOIN indexed_files target2 ON r2.target_file_path = target2.path
 			JOIN dependents d ON target2.id = d.file_id
-			WHERE r2.reference_type = 'import'
+			WHERE r2.reference_type IN (${refTypePlaceholders})
 				AND r2.repository_id = ?
 				AND d.depth < ?
 				AND INSTR(d.path_tracker, '|' || f2.path || '|') = 0
@@ -623,7 +627,7 @@ export function queryDependents(
 			JOIN indexed_files f2 ON r2.file_id = f2.id
 			JOIN indexed_files target2 ON r2.target_file_path = target2.path
 			JOIN dependents d ON target2.id = d.file_id
-			WHERE r2.reference_type = 'import'
+			WHERE r2.reference_type IN (${refTypePlaceholders})
 				AND r2.repository_id = ?
 				AND d.depth < ?
 				AND INSTR(d.path_tracker, '|' || f2.path || '|') > 0
@@ -642,11 +646,16 @@ export function queryDependents(
 		ORDER BY depth ASC, file_path ASC
 	`;
 	
+	// Build params array: [refTypes..., repoId, path, refTypes..., repoId, depth, refTypes..., repoId, depth]
 	const results = db.query<{
 		file_path: string | null;
 		depth: number | null;
 		cycle_path: string | null;
-	}>(sql, [fileRecord.repository_id, fileRecord.path, fileRecord.repository_id, depth, fileRecord.repository_id, depth]);
+	}>(sql, [
+		...referenceTypes, fileRecord.repository_id, fileRecord.path,
+		...referenceTypes, fileRecord.repository_id, depth,
+		...referenceTypes, fileRecord.repository_id, depth
+	]);
 	
 	return processDepthResults(results, includeTests);
 }
@@ -665,6 +674,7 @@ export function queryDependents(
 export function queryDependencies(
 	fileId: string,
 	depth: number,
+	referenceTypes: string[] = ["import", "re_export", "export_all"],
 ): DependencyResult {
 	const db = getGlobalDatabase();
 	
@@ -678,6 +688,9 @@ export function queryDependencies(
 		throw new Error(`File not found: ${fileId}`);
 	}
 	
+	// Build IN clause placeholders for reference types
+	const refTypePlaceholders = referenceTypes.map(() => "?").join(", ");
+	
 	const sql = `
 		WITH RECURSIVE 
 		dependencies AS (
@@ -688,7 +701,7 @@ export function queryDependencies(
 				'|' || target.path || '|' AS path_tracker
 			FROM indexed_references r
 			JOIN indexed_files target ON r.target_file_path = target.path
-			WHERE r.reference_type = 'import'
+			WHERE r.reference_type IN (${refTypePlaceholders})
 				AND r.repository_id = ?
 				AND r.file_id = ?
 			
@@ -702,7 +715,7 @@ export function queryDependencies(
 			FROM indexed_references r2
 			JOIN indexed_files target2 ON r2.target_file_path = target2.path
 			JOIN dependencies d ON r2.file_id = d.file_id
-			WHERE r2.reference_type = 'import'
+			WHERE r2.reference_type IN (${refTypePlaceholders})
 				AND r2.repository_id = ?
 				AND d.depth < ?
 				AND INSTR(d.path_tracker, '|' || target2.path || '|') = 0
@@ -713,7 +726,7 @@ export function queryDependencies(
 			FROM indexed_references r2
 			JOIN indexed_files target2 ON r2.target_file_path = target2.path
 			JOIN dependencies d ON r2.file_id = d.file_id
-			WHERE r2.reference_type = 'import'
+			WHERE r2.reference_type IN (${refTypePlaceholders})
 				AND r2.repository_id = ?
 				AND d.depth < ?
 				AND INSTR(d.path_tracker, '|' || target2.path || '|') > 0
@@ -732,11 +745,16 @@ export function queryDependencies(
 		ORDER BY depth ASC, file_path ASC
 	`;
 	
+	// Build params array: [refTypes..., repoId, fileId, refTypes..., repoId, depth, refTypes..., repoId, depth]
 	const results = db.query<{
 		file_path: string | null;
 		depth: number | null;
 		cycle_path: string | null;
-	}>(sql, [fileRecord.repository_id, fileId, fileRecord.repository_id, depth, fileRecord.repository_id, depth]);
+	}>(sql, [
+		...referenceTypes, fileRecord.repository_id, fileId,
+		...referenceTypes, fileRecord.repository_id, depth,
+		...referenceTypes, fileRecord.repository_id, depth
+	]);
 	
 	return processDepthResults(results, true); // Always include tests for dependencies
 }

@@ -168,14 +168,15 @@ async function main(): Promise<number> {
   const startTime = performance.now();
 
   try {
-    // Pass worktree path to workflow
-    const result = await runWorkflow(
-      issueNumber, 
-      dryRun, 
+    // Pass worktree path to workflow, but use main repo for logs
+    const result = await runWorkflow({
+      issueNumber,
+      dryRun,
       verbose,
-      worktreeInfo?.path ?? projectRoot,
-      worktreeInfo?.branch
-    );
+      workingDirectory: worktreeInfo?.path ?? projectRoot,
+      mainProjectRoot: projectRoot,  // Always use main repo for logs
+      branchName: worktreeInfo?.branch
+    });
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
 

@@ -144,6 +144,15 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
 				description:
 					"Include test files in results (default: true). Set to false to filter out files with 'test' or 'spec' in path.",
 			},
+			reference_types: {
+				type: "array",
+				items: {
+					type: "string",
+					enum: ["import", "re_export", "export_all", "dynamic_import"],
+				},
+				description:
+					"Filter by reference types (default: ['import', 're_export', 'export_all']). Add 'dynamic_import' to include lazy-loaded dependencies.",
+			},
 			repository: {
 				type: "string",
 				description: "Repository ID to search within. Required for multi-repository workspaces.",
@@ -557,11 +566,25 @@ export async function executeSearchDependencies(
 		throw new Error("Parameter 'repository' must be a string");
 	}
 
+	// Validate reference_types parameter
+	if (p.reference_types !== undefined) {
+		if (!Array.isArray(p.reference_types)) {
+			throw new Error("Parameter 'reference_types' must be an array");
+		}
+		const validTypes = ["import", "re_export", "export_all", "dynamic_import"];
+		for (const t of p.reference_types) {
+			if (typeof t !== "string" || !validTypes.includes(t)) {
+				throw new Error(`Invalid reference type: ${t}. Must be one of: ${validTypes.join(", ")}`);
+			}
+		}
+	}
+
 	const validatedParams = {
 		file_path: p.file_path as string,
 		direction: (p.direction as string | undefined) ?? "both",
 		depth: (p.depth as number | undefined) ?? 1,
 		include_tests: (p.include_tests as boolean | undefined) ?? true,
+		reference_types: (p.reference_types as string[] | undefined) ?? ["import", "re_export", "export_all"],
 		repository: p.repository as string | undefined,
 	};
 
@@ -616,11 +639,11 @@ export async function executeSearchDependencies(
 	} | null = null;
 
 	if (validatedParams.direction === "dependents" || validatedParams.direction === "both") {
-		dependents = queryDependents(fileId, validatedParams.depth, validatedParams.include_tests);
+		dependents = queryDependents(fileId, validatedParams.depth, validatedParams.include_tests, validatedParams.reference_types);
 	}
 
 	if (validatedParams.direction === "dependencies" || validatedParams.direction === "both") {
-		dependencies = queryDependencies(fileId, validatedParams.depth);
+		dependencies = queryDependencies(fileId, validatedParams.depth, validatedParams.reference_types);
 	}
 
 	// Build response
@@ -651,6 +674,16 @@ export async function executeSearchDependencies(
 				Object.values(dependencies.indirect).reduce((sum, arr) => sum + arr.length, 0),
 		};
 	}
+
+	// Query unresolved imports for this file
+	const db = getGlobalDatabase();
+	const unresolvedRows = db.query<{ source: string }>(
+		`SELECT DISTINCT json_extract(metadata, '$.importSource') as source
+		 FROM indexed_references
+		 WHERE file_id = ? AND target_file_path IS NULL AND json_extract(metadata, '$.importSource') IS NOT NULL`,
+		[fileId],
+	);
+	result.unresolved_imports = unresolvedRows.map((r) => r.source);
 
 	return result;
 }

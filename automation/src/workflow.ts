@@ -17,23 +17,42 @@ export interface WorkflowResult {
   logDir: string | null;
 }
 
+export interface WorkflowOptions {
+  issueNumber: number;
+  dryRun?: boolean;
+  verbose?: boolean;
+  /** Working directory for SDK execution (worktree path or main repo) */
+  workingDirectory?: string;
+  /** Main project root for centralized logging (always the main repo root) */
+  mainProjectRoot?: string;
+  branchName?: string;
+}
+
 function getProjectRoot(): string {
   // automation/src/workflow.ts -> automation -> project root
   return dirname(dirname(import.meta.dir));
 }
 
-export async function runWorkflow(
-  issueNumber: number,
-  dryRun = false,
-  verbose = false,
-  workingDirectory?: string,
-  branchName?: string
-): Promise<WorkflowResult> {
-  const projectRoot = workingDirectory ?? getProjectRoot();
+export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult> {
+  const {
+    issueNumber,
+    dryRun = false,
+    verbose = false,
+    workingDirectory,
+    mainProjectRoot,
+    branchName
+  } = opts;
+
+  const defaultProjectRoot = getProjectRoot();
+  // Use workingDirectory for SDK execution (may be worktree)
+  const executionRoot = workingDirectory ?? defaultProjectRoot;
+  // Use mainProjectRoot for logging (always main repo, not worktree)
+  const logRoot = mainProjectRoot ?? defaultProjectRoot;
+
   const logger = new WorkflowLogger({ 
     issueNumber, 
     dryRun, 
-    projectRoot
+    projectRoot: logRoot  // Logs always go to main repo
   });
   const reporter = new ConsoleReporter({ verbose, issueNumber });
   
@@ -58,7 +77,7 @@ export async function runWorkflow(
     // Use orchestrator with reporter integration
     const orchResult = await orchestrateWorkflow({
       issueNumber,
-      projectRoot,
+      projectRoot: executionRoot,  // Use executionRoot for SDK work
       branchName: branchName ?? null,
       logger,
       reporter,

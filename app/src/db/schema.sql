@@ -164,7 +164,7 @@ CREATE TABLE references (
     target_symbol_id uuid REFERENCES symbols(id) ON DELETE SET NULL,
     target_file_path text,  -- Fallback if symbol not extracted
     line_number integer NOT NULL,
-    reference_type text NOT NULL CHECK (reference_type IN ('import', 'call', 'extends', 'implements')),
+    reference_type text NOT NULL CHECK (reference_type IN ('import', 'call', 'extends', 'implements', 'property_access', 'type_reference', 'variable_reference', 're_export', 'export_all', 'dynamic_import')),
     metadata jsonb DEFAULT '{}'::jsonb,
     created_at timestamptz NOT NULL DEFAULT now()
 );
