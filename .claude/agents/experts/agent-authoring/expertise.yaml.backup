@@ -5,7 +5,7 @@ overview:
   description: |
     Agent authoring and configuration for kotadb—frontmatter schema with tools[], constraints[],
     readOnly, expertDomain, and color fields; flat agent structure with general-purpose and expert agents;
-    agent-registry.json integration; MCP tool selection (mcp__kotadb__*); and system prompt
+    agent-registry.json integration; MCP tool selection (mcp__kotadb-bunx__*); and system prompt
     structure. This expertise enables correct agent configuration for discoverability, capability,
     and appropriate model selection within kotadb's local-only architecture.
   scope: |
@@ -117,15 +117,15 @@ key_operations:
       - Question: Read, Glob, Grep (read-only, haiku model)
 
       KotaDB MCP tools (for codebase analysis):
-      - mcp__kotadb__search_code (term)
-      - mcp__kotadb__search_dependencies (file_path, direction, depth)
-      - mcp__kotadb__analyze_change_impact (files)
-      - mcp__kotadb__list_recent_files ()
+      - mcp__kotadb-bunx__search_code (term)
+      - mcp__kotadb-bunx__search_dependencies (file_path, direction, depth)
+      - mcp__kotadb-bunx__analyze_change_impact (files)
+      - mcp__kotadb-bunx__list_recent_files ()
     examples:
       - role: scout-agent
         tools: Read, Glob, Grep
       - role: build-agent
-        tools: Read, Write, Edit, Bash, Glob, Grep, mcp__kotadb__search_code
+        tools: Read, Write, Edit, Bash, Glob, Grep, mcp__kotadb-bunx__search_code
       - role: expert-plan
         tools: Read, Glob, Grep, Write
 
@@ -419,10 +419,10 @@ patterns:
     context: kotadb uses MCP tools for codebase search and analysis
     implementation: |
       KotaDB MCP tools (search and analysis):
-      - mcp__kotadb__search_code(term)
-      - mcp__kotadb__search_dependencies(file_path, direction, depth)
-      - mcp__kotadb__analyze_change_impact(files)
-      - mcp__kotadb__list_recent_files()
+      - mcp__kotadb-bunx__search_code(term)
+      - mcp__kotadb-bunx__search_dependencies(file_path, direction, depth)
+      - mcp__kotadb-bunx__analyze_change_impact(files)
+      - mcp__kotadb-bunx__list_recent_files()
 
       Tool selection by agent type:
       - scout-agent: Optional kotadb search tools
@@ -574,4 +574,4 @@ stability:
       - Registry v2.0.0 with comprehensive indexes
       - Removed branch/leaf references completely
       - Removed Supabase references (now SQLite only)
-      - MCP tools limited to mcp__kotadb__* for local search
+      - MCP tools limited to mcp__kotadb-bunx__* for local search

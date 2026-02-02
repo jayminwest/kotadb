@@ -7,9 +7,9 @@ tools:
   - Read
   - Task
   - Bash
-  - mcp__kotadb__search_code
-  - mcp__kotadb__search_dependencies
-  - mcp__kotadb__list_recent_files
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 constraints:
   - No file modifications allowed
   - No shell command execution
@@ -38,11 +38,11 @@ The scout-agent is designed for tasks that require understanding code without mo
 
 ### Content Search
 - **Grep**: Search file contents with regex patterns
-- **mcp__kotadb__search_code**: Semantic code search across indexed repositories
+- **mcp__kotadb-bunx__search_code**: Semantic code search across indexed repositories
 
 ### Dependency Analysis
-- **mcp__kotadb__search_dependencies**: Find files that depend on or are depended on by a target file
-- **mcp__kotadb__list_recent_files**: View recently indexed files
+- **mcp__kotadb-bunx__search_dependencies**: Find files that depend on or are depended on by a target file
+- **mcp__kotadb-bunx__list_recent_files**: View recently indexed files
 
 ### Delegation
 - **Task**: Spawn sub-agents for complex multi-step exploration
@@ -52,6 +52,14 @@ The scout-agent is designed for tasks that require understanding code without mo
 1. **Read-only access**: Cannot use Edit, Write, or Bash tools
 2. **No side effects**: Must not modify any files or execute commands
 3. **Information gathering only**: Reports findings for human or build-agent action
+
+## KotaDB MCP Tool Usage
+
+When working with this codebase:
+- **Before refactoring**: Use `mcp__kotadb-bunx__search_dependencies` to understand file relationships
+- **Before PRs/changes**: Use `mcp__kotadb-bunx__analyze_change_impact` to assess risk
+- **For code discovery**: Prefer `mcp__kotadb-bunx__search_code` for semantic searches
+- **Fallback to Grep**: Only for exact regex patterns or unindexed files
 
 ## Use Cases
 

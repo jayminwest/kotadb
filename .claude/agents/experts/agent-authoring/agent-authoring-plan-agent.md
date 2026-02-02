@@ -169,7 +169,7 @@ expertDomain: <domain if applicable>
 **Tool Selection Rationale:**
 - Role category: <scout|build|review|expert-*>
 - Selected tools: <list with reasoning>
-- MCP tools: <mcp__kotadb__* as needed>
+- MCP tools: <mcp__kotadb-bunx__* as needed>
 
 **Model Selection Rationale:**
 - Complexity level: <simple|moderate|complex>

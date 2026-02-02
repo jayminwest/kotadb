@@ -47,7 +47,7 @@ You are an Agent Authoring Expert specializing in answering questions about kota
 
 *[2026-01-26]*: Frontmatter format questions - kotadb uses YAML list for tools (not comma-separated). NEVER use colons in description. Include constraints[], readOnly, expertDomain as applicable.
 
-*[2026-01-26]*: MCP tool questions - mcp__kotadb__* for codebase search and analysis. See `patterns.mcp_tool_patterns` in expertise.yaml.
+*[2026-01-26]*: MCP tool questions - mcp__kotadb-bunx__* for codebase search and analysis. See `patterns.mcp_tool_patterns` in expertise.yaml.
 
 *[2026-01-26]*: Registry integration - agent-registry.json has agents, capabilityIndex, modelIndex, toolMatrix. All new agents must be registered. See `key_operations.update_agent_registry`.
 

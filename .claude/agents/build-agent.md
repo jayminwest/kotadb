@@ -11,9 +11,9 @@ tools:
   - NotebookEdit
   - Task
   - TodoWrite
-  - mcp__kotadb__search_code
-  - mcp__kotadb__search_dependencies
-  - mcp__kotadb__analyze_change_impact
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__analyze_change_impact
 constraints:
   - Follow existing code patterns
   - Validate changes with lint and typecheck
@@ -52,9 +52,9 @@ The build-agent handles all implementation tasks that require modifying the code
 - **TodoWrite**: Track implementation progress
 
 ### Analysis
-- **mcp__kotadb__search_code**: Find relevant code patterns
-- **mcp__kotadb__search_dependencies**: Understand impact areas
-- **mcp__kotadb__analyze_change_impact**: Assess risk of changes
+- **mcp__kotadb-bunx__search_code**: Find relevant code patterns
+- **mcp__kotadb-bunx__search_dependencies**: Understand impact areas
+- **mcp__kotadb-bunx__analyze_change_impact**: Assess risk of changes
 
 ## Constraints
 
@@ -63,6 +63,14 @@ The build-agent handles all implementation tasks that require modifying the code
 3. **Incremental commits**: Create logical commit units, not monolithic changes
 4. **Security awareness**: Avoid introducing OWASP top 10 vulnerabilities
 5. **Minimal changes**: Only modify what is necessary for the task
+
+## KotaDB MCP Tool Usage
+
+When working with this codebase:
+- **Before refactoring**: Use `mcp__kotadb-bunx__search_dependencies` to understand file relationships
+- **Before PRs/changes**: Use `mcp__kotadb-bunx__analyze_change_impact` to assess risk
+- **For code discovery**: Prefer `mcp__kotadb-bunx__search_code` for semantic searches
+- **Fallback to Grep**: Only for exact regex patterns or unindexed files
 
 ## Workflow
 

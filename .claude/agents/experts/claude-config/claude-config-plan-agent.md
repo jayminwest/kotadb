@@ -99,7 +99,7 @@ Use Bash for git operations, file statistics, or verification commands.
 - Tools as YAML array (NOT comma-separated)
 - Valid models: `haiku`, `sonnet`, `opus`
 - Valid colors: red, blue, green, yellow, purple, orange, pink, cyan
-- MCP tools: `mcp__kotadb__search_code`, `mcp__kotadb__search_dependencies`, `mcp__kotadb__analyze_change_impact`
+- MCP tools: `mcp__kotadb-bunx__search_code`, `mcp__kotadb-bunx__search_dependencies`, `mcp__kotadb-bunx__analyze_change_impact`
 - CRITICAL: Description must NOT contain colons
 
 **Agent Registry:**
