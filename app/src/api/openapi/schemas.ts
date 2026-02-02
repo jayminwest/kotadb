@@ -13,41 +13,6 @@ extendZodWithOpenApi(z);
 
 // ===== Request Schemas =====
 
-export const IndexRequestSchema = z.object({
-	repository: z.string()
-		.min(1)
-		.openapi({
-			description: 'Repository identifier (e.g., "owner/repo" or local path)',
-			example: 'octocat/Hello-World',
-		}),
-	ref: z.string()
-		.optional()
-		.openapi({
-			description: 'Git ref to index (branch, tag, or commit SHA). Defaults to repository\'s default branch.',
-			example: 'main',
-		}),
-	localPath: z.string()
-		.optional()
-		.openapi({
-			description: 'Local filesystem path (for local repositories instead of remote clones)',
-			example: '/Users/dev/my-project',
-		}),
-}).openapi('IndexRequest');
-
-export const IndexResponseSchema = z.object({
-	jobId: z.string()
-		.uuid()
-		.openapi({
-			description: 'Index job UUID for tracking status',
-			example: '550e8400-e29b-41d4-a716-446655440000',
-		}),
-	status: z.string()
-		.openapi({
-			description: 'Initial job status (always "pending" when job is created)',
-			example: 'pending',
-		}),
-}).openapi('IndexResponse');
-
 export const SearchRequestSchema = z.object({
 	term: z.string()
 		.min(1)
@@ -606,3 +571,60 @@ export const McpHealthResponseSchema = z.object({
 			example: 'http',
 		}),
 }).openapi('McpHealthResponse');
+
+// ===== Validation Schemas =====
+
+/**
+ * Validation error for a specific field or path
+ */
+export const ValidationErrorSchema = z.object({
+	path: z.string()
+		.openapi({
+			description: 'JSON path to the field with error (e.g., "user.email", "[0].name")',
+			example: 'user.email',
+		}),
+	message: z.string()
+		.openapi({
+			description: 'Human-readable error message',
+			example: 'Invalid email format',
+		}),
+}).openapi('ValidationError');
+
+/**
+ * Request payload for POST /validate-output endpoint
+ */
+export const ValidationRequestSchema = z.object({
+	schema: z.record(z.string(), z.unknown())
+		.openapi({
+			description: 'Zod-compatible JSON schema (object with type, properties, etc.)',
+			example: {
+				type: 'object',
+				properties: {
+					name: { type: 'string' },
+					age: { type: 'number' },
+				},
+				required: ['name'],
+			},
+		}),
+	output: z.string()
+		.openapi({
+			description: 'The output string to validate',
+			example: '{"name": "John", "age": 30}',
+		}),
+}).openapi('ValidationRequest');
+
+/**
+ * Response from POST /validate-output endpoint
+ */
+export const ValidationResponseSchema = z.object({
+	valid: z.boolean()
+		.openapi({
+			description: 'Whether the output passes validation',
+			example: true,
+		}),
+	errors: z.array(ValidationErrorSchema)
+		.optional()
+		.openapi({
+			description: 'Array of validation errors (only present if valid is false)',
+		}),
+}).openapi('ValidationResponse');

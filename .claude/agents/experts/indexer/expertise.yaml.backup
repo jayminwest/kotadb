@@ -39,6 +39,7 @@ core_implementation:
       symbol-extractor.ts: Visitor pattern for symbol extraction
       reference-extractor.ts: Visitor pattern for reference extraction
       import-resolver.ts: Import path resolution utilities
+      path-resolver.ts: TypeScript path alias resolution (tsconfig.json parsing)
       dependency-extractor.ts: Dependency graph construction
       circular-detector.ts: Circular dependency detection algorithms
       storage.ts: SQLite storage layer with transactional writes
@@ -60,6 +61,9 @@ core_implementation:
     - path: app/src/indexer/import-resolver.ts
       purpose: Import path resolution
       exports: resolveImport, resolveExtensions, handleIndexFiles
+    - path: app/src/indexer/path-resolver.ts
+      purpose: TypeScript path alias resolution
+      exports: parseTsConfig, resolvePathAlias, PathMappings
     - path: app/src/indexer/dependency-extractor.ts
       purpose: Dependency graph construction
       exports: extractDependencies, DependencyEdge
@@ -185,39 +189,99 @@ key_operations:
         reason: Cannot resolve obj[key] statically
 
   resolve_imports:
-    when: Resolving import paths to absolute file paths
+    when: Resolving import paths to absolute file paths (relative and path aliases)
     approach: |
-      1. Call resolveImport(importSource, fromFilePath, files)
-      2. Skip non-relative imports (node_modules, absolute paths)
-         - Only handle imports starting with ./ or ../
-      3. Resolve relative to importing file's directory
-      4. Try extension resolution
-         - Check .ts, .tsx, .js, .jsx, .mjs, .cjs in order
-      5. Try index file resolution
-         - Check index.ts, index.tsx, index.js, index.jsx
-      6. Return null if not found (graceful failure)
+      1. Call resolveImport(importSource, fromFilePath, files, pathMappings)
+      2. If starts with ./ or ../ -> relative import resolution
+         - Resolve relative to importing file's directory
+         - Try extension resolution (.ts, .tsx, .js, .jsx, .mjs, .cjs)
+         - Try index file resolution (index.ts, index.tsx, etc.)
+         - Return result or null
+      3. If pathMappings provided -> path alias resolution
+         - Match import against alias patterns (e.g., "@api/*")
+         - Try each resolution path for matched alias
+         - Check files Set for existence (not filesystem)
+         - Return first match or null
+      4. Otherwise -> external import (node_modules, etc.)
+         - Return null (out of scope)
 
       Resolution priority:
-      1. Exact path (if has extension)
-      2. Path + .ts, .tsx, .js, .jsx, .mjs, .cjs
-      3. Directory + index.ts, index.tsx, index.js, index.jsx
+      1. Relative imports (./ or ../)
+      2. Path aliases (tsconfig.json paths)
+      3. External imports (null)
+
+      Path alias features (NEW):
+      - Parses tsconfig.json/jsconfig.json at project root
+      - Supports extends inheritance (recursive, depth-limited)
+      - First-match-wins for multi-path mappings
+      - Graceful fallback if no config found
 
       Non-goals (out of scope):
-      - tsconfig.json path mapping (paths, baseUrl)
       - node_modules resolution
-      - Absolute imports (/foo, @scope/pkg)
       - Dynamic imports
     examples:
-      - "./utils" -> "/repo/src/utils.ts"
-      - "./api" -> "/repo/src/api/index.ts"
+      - "./utils" -> "/repo/src/utils.ts" (relative)
+      - "./api" -> "/repo/src/api/index.ts" (relative with index)
+      - "@api/routes" -> "/repo/src/api/routes.ts" (path alias)
       - "lodash" -> null (node_modules, skip)
     pitfalls:
       - what: Resolving node_modules imports
-        instead: Return null for non-relative imports
+        instead: Return null for non-relative, non-alias imports
         reason: External dependencies handled separately
       - what: Using path.resolve (creates absolute paths)
         instead: Use path.join + path.normalize
         reason: Preserves relative path structure
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/import-resolver.ts
+
+  resolve_path_aliases:
+    when: Resolving path alias imports (@api/*, @db/*, etc.) to absolute file paths
+    approach: |
+      1. Parse tsconfig.json (or jsconfig.json) at project root
+         - Extract compilerOptions.paths and compilerOptions.baseUrl
+         - Support extends inheritance (recursive with MAX_EXTENDS_DEPTH = 10)
+         - Merge child paths with parent (child takes precedence)
+      2. Match import against each alias pattern
+         - Exact match (no wildcard): "@api" === "@api"
+         - Wildcard match: "@api/*" matches "@api/routes" -> suffix "routes"
+      3. Try each resolution path for matched alias (first-match-wins)
+         - Substitute wildcard with matched suffix: "src/api/*" -> "src/api/routes"
+         - Resolve relative to baseUrl: join(projectRoot, baseUrl, substituted)
+         - Normalize path for consistent format
+      4. Try extension variants (.ts, .tsx, .js, .jsx, .mjs, .cjs)
+      5. Try index file resolution (index.ts, index.tsx, index.js, index.jsx)
+      6. Return first match or null if not found
+      
+      Project root determination:
+      - Walk up directory tree looking for package.json, tsconfig.json, or .git
+      - Limit to 10 levels (maxDepth)
+      - Fallback to first two path segments if markers not found
+      
+      Key features:
+      - Recursive extends support (child tsconfig extends parent)
+      - Circular extends detection with depth limit
+      - Fallback from tsconfig.json to jsconfig.json (JavaScript projects)
+      - First-match-wins for multi-path mappings (e.g., monorepo fallbacks)
+      - Graceful error handling (return null on parse errors)
+    examples:
+      - "@api/routes" with { "@api/*": ["src/api/*"] } -> "/repo/src/api/routes.ts"
+      - "@shared/utils" with { "@shared/*": ["src/shared/*", "packages/shared/*"] } -> first match wins
+      - Child tsconfig extends parent -> merges path mappings
+    pitfalls:
+      - what: Not supporting tsconfig extends
+        instead: Parse parent recursively and merge configs
+        reason: Monorepos often use base tsconfig with child overrides
+      - what: Using existsSync to check resolved paths
+        instead: Check against files Set (indexed files only)
+        reason: Avoids filesystem access, matches indexed data
+      - what: Failing on circular extends
+        instead: Implement depth limit and return null gracefully
+        reason: Some projects have malformed tsconfig chains
+      - what: Testing with mocks
+        instead: Use real filesystem fixtures in /tmp
+        reason: Antimocking philosophy - test real tsconfig parsing
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/path-resolver.ts, app/tests/indexer/path-resolver.test.ts
 
   build_dependencies:
     when: Constructing file-to-file and symbol-to-symbol dependency graph
@@ -486,10 +550,10 @@ decision_trees:
     options:
       - if: Starts with ./ or ../
         then: Relative import, resolve with extensions/index files
-      - if: Starts with / or @ scope
-        then: Absolute import, return null (out of scope)
-      - if: No prefix (bare module)
-        then: Node modules import, return null (out of scope)
+      - if: Matches path alias pattern (pathMappings provided)
+        then: Resolve using tsconfig.json path mappings
+      - if: Starts with / or bare module (no alias match)
+        then: Absolute/external import, return null (out of scope)
       - if: Has extension already
         then: Check exact path in files Set
       - if: No extension
@@ -651,6 +715,147 @@ patterns:
     timestamp: 2026-01-28
     evidence: commit d47a650
 
+  tsconfig_extends_pattern:
+    structure: |
+      function parseTsConfigWithExtends(
+        configPath: string,
+        depth: number,
+        maxDepth: number
+      ): TsConfig | null {
+        // Prevent infinite recursion
+        if (depth >= maxDepth) {
+          logger.warn("Circular extends detected");
+          return null;
+        }
+        
+        const config = JSON.parse(readFileSync(configPath, "utf-8"));
+        
+        // No extends - return as-is
+        if (!config.extends) return config;
+        
+        // Parse parent config
+        const extendsPath = isAbsolute(config.extends)
+          ? config.extends
+          : join(dirname(configPath), config.extends);
+        
+        // Add .json extension if missing
+        const resolved = extendsPath.endsWith(".json")
+          ? extendsPath
+          : `${extendsPath}.json`;
+        
+        const parent = parseTsConfigWithExtends(resolved, depth + 1, maxDepth);
+        
+        // Merge parent and child configs
+        return mergeTsConfigs(config, parent);
+      }
+      
+      function mergeTsConfigs(child: TsConfig, parent: TsConfig): TsConfig {
+        return {
+          ...parent,
+          ...child,
+          compilerOptions: {
+            ...parent.compilerOptions,
+            ...child.compilerOptions,
+            paths: {
+              ...parent.compilerOptions?.paths,
+              ...child.compilerOptions?.paths,  // Child overrides parent
+            }
+          }
+        };
+      }
+    trade_offs:
+      pros: [Supports monorepo base configs, Matches tsc behavior, Prevents infinite loops]
+      cons: [Recursive parsing overhead, Depth limit may miss deep chains]
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/path-resolver.ts
+
+  path_alias_integration_pattern:
+    structure: |
+      // 1. Parse tsconfig at workflow start
+      const pathMappings = parseTsConfig(projectRoot);
+      if (pathMappings) {
+        logger.info("Loaded path mappings", {
+          aliasCount: Object.keys(pathMappings.paths).length,
+          baseUrl: pathMappings.baseUrl
+        });
+      }
+      
+      // 2. Pass through resolution pipeline
+      const resolved = resolveImport(
+        importSource,
+        fromFilePath,
+        files,
+        pathMappings  // Optional parameter
+      );
+      
+      // 3. Store resolved path in database
+      if (resolved) {
+        targetFilePath = normalizePath(resolved);
+      }
+    trade_offs:
+      pros: [Single parse per indexing run, Optional enhancement (graceful if null), Clean parameter threading]
+      cons: [Additional parameter in call chain, Null handling complexity]
+    timestamp: 2026-01-29
+    evidence: app/src/api/queries.ts runIndexingWorkflow()
+
+
+  constant_extraction_pattern:
+    structure: |
+      Place shared constants in dedicated constants.ts module.
+      Use readonly arrays with 'as const' for type safety.
+      Export: SUPPORTED_EXTENSIONS, INDEX_FILES (priority-ordered).
+    key_features:
+      - Dedicated constants.ts module (not scattered across files)
+      - Use 'as const' for exhaustiveness checking in consuming modules
+      - Order by priority (TypeScript variants first)
+      - Document priority order and consuming modules in JSDoc
+      - Note IMPORTANT synchronization requirements with other modules
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/constants.ts (imported by import-resolver.ts, path-resolver.ts)
+
+  cross_module_synchronization_jsdoc:
+    when: Constants or patterns need to stay synchronized across multiple modules
+    approach: |
+      Add IMPORTANT JSDoc comment linking all modules that share the constant.
+      Note any format differences (e.g., array vs Set) explicitly.
+      Consider adding sync validation tests to catch drift.
+    anti_patterns:
+      - what: Duplicating constants across multiple files
+        instead: Extract to constants.ts and import
+        reason: One copy updated, others drift out of sync
+      - what: Silently allowing format differences
+        instead: Document differences explicitly in JSDoc
+        reason: Developers may incorrectly assume they're identical
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/constants.ts JSDoc ("Keep synchronized" pattern)
+
+  test_fixture_edge_case_pattern:
+    when: Testing complex resolution logic (tsconfig parsing, extends support, path aliases)
+    approach: |
+      1. Organize fixtures in named subdirectories per test scenario (simple, extends, jsconfig, multipath, empty, circular, baseurl)
+      2. Create setupFixtures() function that builds realistic directory structures in /tmp
+      3. Write real config files (JSON) to fixtures, not mocks
+      4. Clean up with rmSync() in beforeAll()
+      5. Run tests against real parsed configs
+    edge_cases_to_cover:
+      - Missing config (graceful null return)
+      - Circular extends (depth limit prevents infinite loop)
+      - jsconfig.json fallback when tsconfig missing
+      - Multi-path aliases (first match wins)
+      - baseUrl other than "." (e.g., "src")
+      - Extension resolution without explicit extension
+      - Index file resolution (resolving directories)
+    anti_patterns:
+      - what: Using mocks or hardcoded JSON strings in test bodies
+        instead: Create real fixtures in /tmp with setupFixtures()
+        reason: Antimocking philosophy ensures tests catch real parsing issues
+      - what: Fixture cleanup in individual tests
+        instead: Single setupFixtures() in beforeAll()
+        reason: Faster tests, cleaner organization
+    timestamp: 2026-01-29
+    evidence: app/tests/indexer/path-resolver.test.ts (150+ lines setupFixtures() with 7 edge case fixtures)
+
+
 best_practices:
   ast_parsing:
     - Use @typescript-eslint/parser for modern TypeScript support
@@ -673,13 +878,20 @@ best_practices:
     - Track optional chaining (?.) in metadata
 
   import_resolution:
-    - Only resolve relative imports (./ and ../)
+    - Resolve relative imports (./ and ../) AND path aliases (@alias/*)
+    - Parse tsconfig.json once at indexing start (not per file)
+    - Pass pathMappings through entire resolution pipeline
+    - Try relative resolution first, then path alias resolution
+    - Return null for unresolvable imports (node_modules, missing configs)
+    - Use path.join + path.normalize (NOT path.resolve)
+    - Check files Set instead of filesystem (indexed files only)
+    - Support jsconfig.json fallback for JavaScript projects
+    - Handle extends recursively with circular detection
     - Try extensions in priority order (.ts first)
     - Handle index file resolution
-    - Return null for unresolvable imports (graceful)
-    - Use path.join + path.normalize (NOT path.resolve)
     - Preserve relative path structure for database matching
-    timestamp: 2026-01-28
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/import-resolver.ts, app/src/indexer/path-resolver.ts
   storage:
     - Use single transaction for atomicity
     - Build lookup maps for efficient foreign key resolution
@@ -709,86 +921,39 @@ known_issues:
     prevention: |
       Never use path.resolve() in import resolution.
       Always use: path.normalize(path.join(fromDir, importSource))
-      This preserves relative paths matching database storage format.
     status: resolved
     timestamp: 2026-01-28
-    evidence: commit 5713a52, app/src/indexer/import-resolver.ts
+    evidence: commit 5713a52
 
   - issue: tsconfig.json path mapping not supported
     impact: Absolute imports with path aliases not resolved
-    resolution: Only relative imports currently supported
-    prevention: Document limitation, plan future enhancement
-    status: known limitation
-
-  - issue: Dynamic imports not tracked
-    impact: import() expressions not in dependency graph
-    resolution: Could add CallExpression with import callee handling
-    prevention: Document limitation
-    status: known limitation
-
-  - issue: Type-only imports not distinguished
-    impact: import type { Foo } treated same as import { Foo }
-    resolution: Could check importKind in TSESTree
-    prevention: Minor impact on dependency analysis
-    status: low priority
-
-  - issue: Overloaded functions create multiple symbols
-    impact: Same name appears multiple times in symbol table
-    resolution: Could merge by name and deduplicate
-    prevention: Acceptable for now, may confuse "find usages"
-    status: known limitation
+    resolution: Implemented in path-resolver.ts with full extends support
+    status: resolved
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/path-resolver.ts
 
   - issue: Schema CHECK constraint must match all reference types
     impact: Insertion failures when reference extractor produces new types
     resolution: property_access was missing from CHECK constraint list
-    prevention: |
-      When adding new reference types:
-      1. Update reference extractor enum/type
-      2. Update SQLite schema CHECK constraint
-      3. Add integration test for new type
+    prevention: When adding reference types: update extractor, schema, tests
     status: resolved
     timestamp: 2026-01-28
     evidence: commit 91415ad
-
-potential_enhancements:
-  - enhancement: tsconfig.json path mapping support
-    rationale: Enable resolution of @alias/* imports
-    effort: medium
-    approach: Parse tsconfig.json, apply paths mapping in resolveImport
-
-  - enhancement: Dynamic import tracking
-    rationale: Complete dependency graph for code splitting
-    effort: low
-    approach: Handle CallExpression with import callee
-
-  - enhancement: Call graph visualization
-    rationale: Visual dependency analysis
-    effort: medium
-    approach: Generate DOT format from dependency graph
-
-  - enhancement: Incremental indexing
-    rationale: Faster re-indexing for changed files only
-    effort: high
-    approach: Track file hashes, re-index only changed files
-
-  - enhancement: Cross-repository symbol resolution
-    rationale: Find usages across multiple repositories
-    effort: high
-    approach: Global symbol index with repository context
-
 
 stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 5
-    patterns_updated_this_cycle: 1
-    last_reviewed: 2026-01-28
+    new_patterns_added_this_cycle: 3
+    patterns_updated_this_cycle: 3
+    last_reviewed: 2026-01-29
     utility_ratio: 1.0
     notes: |
-      Cycle 2 update - added batch processing and build artifact filtering:
-      - Previous: FTS5 term escaping, storage abstraction, schema validation
-      - New: Batch processing for large repos, build artifact filtering (27 dirs)
-      - New: Path resolution fix (path.join + normalize vs resolve)
-      - Schema constraint validation alignment
-      - Updated local-only v2 architecture patterns
+      Cycle 4 update - constant extraction and test fixtures (focus_area: constants extraction pattern):
+      - Added: Constant extraction pattern (dedicated constants.ts module with 'as const')
+      - Added: Cross-module synchronization JSDoc pattern (IMPORTANT comments, drift prevention)
+      - Added: Test fixture edge case pattern (real fixtures in /tmp, antimocking philosophy)
+      - Pruned: Removed low-priority known issues, potential_enhancements section
+      - Consolidated: Removed verbose code examples, maintained pattern essence
+      - File size managed: 949 -> 1098 -> 1058 -> ~950 lines (target achieved)
+
