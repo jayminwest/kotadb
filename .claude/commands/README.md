@@ -54,17 +54,11 @@ Use direct statements instead of meta-commentary.
 
 The commands are organized into the following subdirectories:
 
-- **workflows/** - SDLC phase commands (plan, build, test, review, document)
-- **git/** - Version control operations (commit, branch management)
-- **issues/** - GitHub issue template commands (chore, bug, feature)
-- **homeserver/** - Trigger automation and webhook handlers
-- **worktree/** - Git worktree management commands
-- **automation/** - ADW workflow orchestration commands
-- **app/** - Application layer commands (start server, database operations)
-- **docs/** - Documentation helpers (anti-mock guidelines, conditional docs, prompt-code alignment)
-- **ci/** - CI/CD workflow commands
-- **tools/** - Utility commands (install, PR review)
-- **experts/** - Domain expert system (architecture, testing, security, integration)
+- **git/** - Version control operations (commit, pull request)
+- **issues/** - GitHub issue template commands (feature, bug, chore, refactor, classify, audit, prioritize)
+- **docs/** - Documentation helpers (load AI docs)
+- **tools/** - Utility commands (install, tools)
+- **release/** - Release management commands
 
 ## Command Discovery
 
