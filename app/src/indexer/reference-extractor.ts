@@ -62,7 +62,10 @@ export type ReferenceType =
 	| "import" // Import statement (named, default, namespace)
 	| "call" // Function/method call expression
 	| "property_access" // Member expression (property access)
-	| "type_reference"; // TypeScript type reference
+	| "type_reference" // TypeScript type reference
+	| "re_export" // Named re-export (export { x } from './module')
+	| "export_all" // Star re-export (export * from './module')
+	| "dynamic_import"; // Dynamic import (import('./module'))
 
 /**
  * Additional metadata for references.
@@ -88,6 +91,14 @@ export interface ReferenceMetadata {
 	calleeName?: string;
 	/** Whether this is a method call (vs function call) */
 	isMethodCall?: boolean;
+	/** Exported name for re-exports (for aliased re-exports) */
+	exportedName?: string;
+	/** Local name for re-exports (source symbol name) */
+	localName?: string;
+	/** Whether this is a dynamic import */
+	isDynamic?: boolean;
+	/** Whether this uses template literals (for dynamic imports) */
+	isTemplatePattern?: boolean;
 }
 
 /**
@@ -161,8 +172,25 @@ function visitNode(
 		case "ImportDeclaration":
 			extractImportDeclaration(node, references);
 			break;
+		case "ExportNamedDeclaration":
+			extractExportNamedDeclaration(node, references);
+			// Also visit children for nested references
+			visitChildren(node, references, childContext);
+			break;
+		case "ExportAllDeclaration":
+			extractExportAllDeclaration(node, references);
+			// Also visit children for nested references
+			visitChildren(node, references, childContext);
+			break;
 		case "CallExpression":
+			// Note: ImportExpression is handled separately, CallExpression with Import callee
+			// is not a standard pattern in modern TypeScript/JavaScript parsers
 			extractCallExpression(node, references, childContext);
+			break;
+		case "ImportExpression":
+			extractDynamicImport(node, references);
+			// Also visit children for nested references
+			visitChildren(node, references, childContext);
 			break;
 		case "MemberExpression":
 			// Extract member expressions (property access)
@@ -484,5 +512,135 @@ function extractTypeReference(
 		lineNumber: node.loc.start.line,
 		columnNumber: node.loc.start.column,
 		metadata: {},
+	});
+}
+
+/**
+ * Extract named re-export declarations.
+ *
+ * Handles:
+ * - Named re-exports: export { foo, bar } from './module'
+ * - Aliased re-exports: export { foo as bar } from './module'
+ * - Mixed re-exports: export { foo, bar as baz } from './module'
+ *
+ * @param node - ExportNamedDeclaration AST node
+ * @param references - Reference accumulator
+ */
+function extractExportNamedDeclaration(
+	node: TSESTree.ExportNamedDeclaration,
+	references: Reference[],
+): void {
+	if (!node.loc || !node.source) return;
+
+	const importSource = node.source.value as string;
+
+	// Process each export specifier
+	for (const specifier of node.specifiers) {
+		if (!specifier.loc || specifier.type !== "ExportSpecifier") continue;
+
+		const localName =
+			specifier.local.type === "Identifier"
+				? specifier.local.name
+				: specifier.local.value;
+		const exportedName =
+			specifier.exported.type === "Identifier"
+				? specifier.exported.name
+				: specifier.exported.value;
+
+		references.push({
+			targetName: localName,
+			referenceType: "re_export",
+			lineNumber: specifier.loc.start.line,
+			columnNumber: specifier.loc.start.column,
+			metadata: {
+				importSource,
+				localName,
+				exportedName: localName !== exportedName ? exportedName : undefined,
+			},
+		});
+	}
+}
+
+/**
+ * Extract star re-export declarations.
+ *
+ * Handles:
+ * - Star re-exports: export * from './module'
+ * - Namespaced star re-exports: export * as utils from './module'
+ *
+ * @param node - ExportAllDeclaration AST node
+ * @param references - Reference accumulator
+ */
+function extractExportAllDeclaration(
+	node: TSESTree.ExportAllDeclaration,
+	references: Reference[],
+): void {
+	if (!node.loc || !node.source) return;
+
+	const importSource = node.source.value as string;
+	const exportedName = node.exported?.type === "Identifier" ? node.exported.name : undefined;
+
+	references.push({
+		targetName: exportedName || "*",
+		referenceType: "export_all",
+		lineNumber: node.loc.start.line,
+		columnNumber: node.loc.start.column,
+		metadata: {
+			importSource,
+			exportedName,
+		},
+	});
+}
+
+/**
+ * Extract dynamic import expressions.
+ *
+ * Handles:
+ * - Dynamic imports: import('./module')
+ * - Template literal imports: import(`./pages/${name}`)
+ * - Conditional imports: import(condition ? './a' : './b')
+ *
+ * @param node - ImportExpression AST node
+ * @param references - Reference accumulator
+ */
+function extractDynamicImport(
+	node: TSESTree.ImportExpression,
+	references: Reference[],
+): void {
+	if (!node.loc) return;
+
+	let importSource: string | undefined;
+	let isTemplatePattern = false;
+
+	if (node.source.type === "Literal" && typeof node.source.value === "string") {
+		// Static string: import('./module')
+		importSource = node.source.value;
+	} else if (node.source.type === "TemplateLiteral") {
+		// Template literal: import(`./pages/${name}`)
+		isTemplatePattern = true;
+		// Reconstruct template pattern for storage
+		const parts: string[] = [];
+		for (let i = 0; i < node.source.quasis.length; i++) {
+			parts.push(node.source.quasis[i]!.value.raw);
+			if (i < node.source.expressions.length) {
+				parts.push("${}");
+			}
+		}
+		importSource = parts.join("");
+	} else {
+		// Complex expression, use placeholder
+		importSource = "<dynamic>";
+	}
+
+	references.push({
+		targetName: importSource || "<dynamic>",
+		referenceType: "dynamic_import",
+		lineNumber: node.loc.start.line,
+		columnNumber: node.loc.start.column,
+		metadata: {
+			importSource,
+			isDynamic: true,
+			isTemplatePattern,
+		},
 	});
 }

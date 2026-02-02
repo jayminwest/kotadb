@@ -391,6 +391,213 @@ describe("Reference Extraction - Type References", () => {
 	});
 });
 
+describe("Reference Extraction - Re-exports", () => {
+	test("extracts named re-exports", () => {
+		const content = `export { foo, bar } from './utils';`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const reExports = references.filter((r) => r.referenceType === "re_export");
+		expect(reExports.length).toBe(2);
+
+		const fooExport = reExports.find((r) => r.targetName === "foo");
+		expect(fooExport).toBeDefined();
+		expect(fooExport!.metadata.importSource).toBe("./utils");
+		expect(fooExport!.metadata.localName).toBe("foo");
+		expect(fooExport!.metadata.exportedName).toBeUndefined();
+
+		const barExport = reExports.find((r) => r.targetName === "bar");
+		expect(barExport).toBeDefined();
+		expect(barExport!.metadata.importSource).toBe("./utils");
+		expect(barExport!.metadata.localName).toBe("bar");
+	});
+
+	test("extracts aliased re-exports", () => {
+		const content = `export { foo as bar, baz as qux } from './module';`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const reExports = references.filter((r) => r.referenceType === "re_export");
+		expect(reExports.length).toBe(2);
+
+		const fooExport = reExports.find((r) => r.targetName === "foo");
+		expect(fooExport).toBeDefined();
+		expect(fooExport!.metadata.localName).toBe("foo");
+		expect(fooExport!.metadata.exportedName).toBe("bar");
+		expect(fooExport!.metadata.importSource).toBe("./module");
+
+		const bazExport = reExports.find((r) => r.targetName === "baz");
+		expect(bazExport).toBeDefined();
+		expect(bazExport!.metadata.localName).toBe("baz");
+		expect(bazExport!.metadata.exportedName).toBe("qux");
+	});
+
+	test("extracts mixed re-exports (some aliased, some not)", () => {
+		const content = `export { foo, bar as baz, qux } from './utils';`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const reExports = references.filter((r) => r.referenceType === "re_export");
+		expect(reExports.length).toBe(3);
+
+		// Check non-aliased exports
+		const fooExport = reExports.find((r) => r.targetName === "foo");
+		expect(fooExport!.metadata.exportedName).toBeUndefined();
+
+		const quxExport = reExports.find((r) => r.targetName === "qux");
+		expect(quxExport!.metadata.exportedName).toBeUndefined();
+
+		// Check aliased export
+		const barExport = reExports.find((r) => r.targetName === "bar");
+		expect(barExport!.metadata.exportedName).toBe("baz");
+	});
+
+	test("extracts star re-exports", () => {
+		const content = `export * from './validators';`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const exportAllRefs = references.filter((r) => r.referenceType === "export_all");
+		expect(exportAllRefs.length).toBe(1);
+
+		const exportAll = exportAllRefs[0]!;
+		expect(exportAll.targetName).toBe("*");
+		expect(exportAll.metadata.importSource).toBe("./validators");
+		expect(exportAll.metadata.exportedName).toBeUndefined();
+	});
+
+	test("extracts namespaced star re-exports", () => {
+		const content = `export * as utils from './utils';`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const exportAllRefs = references.filter((r) => r.referenceType === "export_all");
+		expect(exportAllRefs.length).toBe(1);
+
+		const exportAll = exportAllRefs[0]!;
+		expect(exportAll.targetName).toBe("utils");
+		expect(exportAll.metadata.importSource).toBe("./utils");
+		expect(exportAll.metadata.exportedName).toBe("utils");
+	});
+
+	test("skips re-exports without source (local exports)", () => {
+		const content = `
+			const foo = 42;
+			export { foo };
+		`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		// Should not extract local exports (no source)
+		const reExports = references.filter((r) => r.referenceType === "re_export");
+		expect(reExports.length).toBe(0);
+	});
+});
+
+describe("Reference Extraction - Dynamic Imports", () => {
+	test("extracts static dynamic imports", () => {
+		const content = `const module = import('./component');`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const dynamicImports = references.filter((r) => r.referenceType === "dynamic_import");
+		expect(dynamicImports.length).toBe(1);
+
+		const dynamicImport = dynamicImports[0]!;
+		expect(dynamicImport.targetName).toBe("./component");
+		expect(dynamicImport.metadata.importSource).toBe("./component");
+		expect(dynamicImport.metadata.isDynamic).toBe(true);
+		expect(dynamicImport.metadata.isTemplatePattern).toBe(false);
+	});
+
+	test("extracts template literal dynamic imports", () => {
+		const content = "const module = import(`./pages/${name}`);";
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const dynamicImports = references.filter((r) => r.referenceType === "dynamic_import");
+		expect(dynamicImports.length).toBe(1);
+
+		const dynamicImport = dynamicImports[0]!;
+		expect(dynamicImport.targetName).toBe("./pages/${}");
+		expect(dynamicImport.metadata.importSource).toBe("./pages/${}");
+		expect(dynamicImport.metadata.isDynamic).toBe(true);
+		expect(dynamicImport.metadata.isTemplatePattern).toBe(true);
+	});
+
+	test("extracts React.lazy dynamic imports", () => {
+		const content = `const LazyComponent = React.lazy(() => import('./Component'));`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const dynamicImports = references.filter((r) => r.referenceType === "dynamic_import");
+		expect(dynamicImports.length).toBe(1);
+
+		const dynamicImport = dynamicImports[0]!;
+		expect(dynamicImport.targetName).toBe("./Component");
+		expect(dynamicImport.metadata.importSource).toBe("./Component");
+		expect(dynamicImport.metadata.isDynamic).toBe(true);
+	});
+
+	test("extracts conditional dynamic imports", () => {
+		const content = `
+			const module = condition ?
+				import('./moduleA') :
+				import('./moduleB');
+		`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const dynamicImports = references.filter((r) => r.referenceType === "dynamic_import");
+		expect(dynamicImports.length).toBe(2);
+
+		const moduleASources = dynamicImports.filter(
+			(r) => r.metadata.importSource === "./moduleA"
+		);
+		const moduleBSources = dynamicImports.filter(
+			(r) => r.metadata.importSource === "./moduleB"
+		);
+		expect(moduleASources.length).toBe(1);
+		expect(moduleBSources.length).toBe(1);
+	});
+
+	test("handles complex dynamic import expressions", () => {
+		const content = `const module = import(getModulePath());`;
+		const ast = parseFile("test.ts", content);
+		expect(ast).not.toBeNull();
+
+		const references = extractReferences(ast!, "test.ts");
+
+		const dynamicImports = references.filter((r) => r.referenceType === "dynamic_import");
+		expect(dynamicImports.length).toBe(1);
+
+		const dynamicImport = dynamicImports[0]!;
+		expect(dynamicImport.targetName).toBe("<dynamic>");
+		expect(dynamicImport.metadata.importSource).toBe("<dynamic>");
+		expect(dynamicImport.metadata.isDynamic).toBe(true);
+	});
+});
+
 describe("Reference Extraction - Edge Cases", () => {
 	test("handles empty files", () => {
 		const content = "";
