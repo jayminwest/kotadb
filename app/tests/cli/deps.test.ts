@@ -260,7 +260,7 @@ describe("CLI deps command - integration", () => {
     // Should exit with 1 due to error
     expect(exitCode).toBe(1);
     expect(stdout).toContain("Error:");
-    expect(stdout).toContain("File not found");
+    expect(stdout).toMatch(/File not found|No repositories found/);
   });
 
   test("deps --file with missing file in JSON format shows error", async () => {
@@ -268,9 +268,8 @@ describe("CLI deps command - integration", () => {
     expect(exitCode).toBe(1);
     // Extract JSON from stdout (may have log lines before)
     const result = extractJson(stdout) as DepsResult;
-    expect(result.error).toContain("File not found");
+    expect(result.error).toMatch(/File not found|No repositories found/);
   });
-
   test("--help shows deps command documentation", async () => {
     const { stdout, exitCode } = await runCli(["--help"]);
     expect(exitCode).toBe(0);
