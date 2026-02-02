@@ -203,3 +203,15 @@ expertDomain: <domain if applicable>
 **Specification Location:**
 - Path: `.claude/.cache/specs/agent-authoring/{slug}-spec.md`
 ```
+
+### MCP Tool Usage Guidance
+
+*[2026-02-02]*: Add "KotaDB MCP Tool Usage" sections to agent prompts with PREFER/FALLBACK decision trees. Helps agents choose between MCP tools and traditional tools at runtime. See commit 2705560.
+
+*[2026-02-02]*: Tool selection guidance pattern - PREFER MCP for semantic search and dependencies, FALLBACK to Grep for exact regex. Include numbered decision tree.
+
+### Documentation Patterns
+
+*[2026-02-01]*: Supplemental learnings files (experts/<domain>/<feature>-learnings.md) solve expertise.yaml size constraints. Structure: Overview, Operations, Patterns, Practices, Pitfalls, Integration. Example: automation/worktree-learnings.md.
+
+*[2026-02-01]*: Learnings files keep expertise.yaml focused on high-level patterns while preserving implementation details for reference.

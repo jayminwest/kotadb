@@ -399,6 +399,67 @@ patterns:
       - expert improve agents: search_code, search_dependencies (sub-agent analysis)
       - expert question agents: search_code, search_dependencies, list_recent_files
 
+
+  learnings_documentation_pattern:
+    name: Supplemental Learnings Documentation Pattern
+    context: Large feature implementations generate detailed learnings that exceed expertise.yaml capacity
+    implementation: |
+      Create domain-specific learnings files for comprehensive feature documentation:
+      - Location: experts/<domain>/<feature>-learnings.md
+      - Keep expertise.yaml focused on high-level patterns and decision trees
+      - Reference learnings files from expertise.yaml for deep dives
+      - Example: automation/worktree-learnings.md (101 lines) documents worktree isolation
+
+      Structure for Learnings Files:
+      1. Overview (2-3 sentences)
+      2. Key Operations Added (with code patterns)
+      3. Patterns (with structure/usage/trade-offs)
+      4. Best Practices (bulleted list)
+      5. Pitfalls (what to avoid)
+      6. File Changes (affected files)
+      7. Integration Points (how it connects)
+    trade_offs:
+      - advantage: Keeps expertise.yaml under size limits while preserving detail
+        cost: Additional files to maintain
+      - advantage: Learnings can evolve independently of core expertise
+        cost: Need cross-references between expertise.yaml and learnings files
+    real_examples:
+      - location: .claude/agents/experts/automation/worktree-learnings.md
+        note: Worktree isolation patterns with graceful fallback
+
+  mcp_tool_usage_guidance_pattern:
+    name: MCP Tool Usage Guidance in Agent Prompts
+    context: Agents need clear decision trees for when to use MCP tools vs traditional tools
+    implementation: |
+      Add "KotaDB MCP Tool Usage" section to agent prompts (after Instructions):
+
+      Template:
+      ## KotaDB MCP Tool Usage
+
+      **PREFER KotaDB MCP tools for:**
+      - `mcp__<server>__<tool>` - Use case description
+
+      **FALLBACK to <Traditional Tool> for:**
+      - Specific scenario
+      - Another scenario
+
+      **Decision Tree:**
+      1. Condition? → Use MCP tool X
+      2. Other condition? → Use traditional tool Y
+
+      When to Apply:
+      - Core agents (build, scout, review) that use MCP tools
+      - Expert domain agents with codebase analysis responsibilities
+      - NOT needed for simple read-only agents without MCP tools
+    trade_offs:
+      - advantage: Provides runtime guidance for tool selection
+        cost: Additional prompt section maintenance
+      - advantage: Consistent decision-making across agents
+        cost: Must update when MCP tools change
+    real_examples:
+      - location: .claude/agents/build-agent.md
+        note: PREFER search_dependencies for refactoring, FALLBACK to Grep for regex
+
 best_practices:
   - category: Frontmatter
     practices:
@@ -470,11 +531,11 @@ best_practices:
         timestamp: 2026-01-30
 
 known_issues:
-  - issue: Agent-authoring expertise.yaml at hard limit (697 lines)
-    impact: Cannot add new patterns without consolidation
-    resolution: Consolidate pre-2026-01-28 entries, preserve 2026-01-29+ learnings
-    status: needs_consolidation
-    timestamp: 2026-01-30
+  - issue: Agent-authoring expertise.yaml at capacity (701 lines, limit 700)
+    impact: Must use supplemental learnings files for new detailed patterns
+    resolution: Use learnings files (automation/worktree-learnings.md pattern) for feature details
+    status: stable_with_learnings_pattern
+    timestamp: 2026-02-02
 
 potential_enhancements:
   - enhancement: Expertise.yaml size monitoring in improve agents
@@ -533,6 +594,61 @@ recent_changes:
       This pattern can guide future infrastructure/SDK-focused expert domains.
     timestamp: 2026-01-30
 
+  - change: MCP tool naming correction and usage guidance (2026-02-02)
+    impact: Standardized MCP tool naming and added decision-tree guidance across all agents
+    learnings: |
+      CRITICAL FIX: MCP tool naming convention must derive from .mcp.json server name
+      - Corrected mcp__kotadb__ → mcp__kotadb-bunx__ across 13 files
+      - Added "KotaDB MCP Tool Usage" sections to core agents (build, scout, review)
+      - Updated CLAUDE.md with Tool Selection Guide and decision tree
+      
+      GUIDANCE PATTERN BENEFITS:
+      - PREFER/FALLBACK structure clarifies tool selection
+      - Numbered decision trees easier to follow than prose
+      - Agent prompts now include runtime tool selection guidance
+      - Project documentation provides consistent mental model
+      
+      FILES AFFECTED:
+      - .claude/agents/*.md (3 core agents updated)
+      - .claude/agents/experts/*/expertise.yaml (2 domains)
+      - .claude/agents/experts/*/*.md (7 agent files)
+      - CLAUDE.md (new Tool Selection Guide section)
+      
+      KEY LEARNINGS:
+      1. MCP tool prefix MUST match .mcp.json server name exactly
+      2. Decision trees more effective than prose for tool selection
+      3. In-prompt guidance helps agents choose appropriate tools at runtime
+      4. Project-level docs (CLAUDE.md) ensure consistency across all agents
+    timestamp: 2026-02-02
+
+  - change: Worktree isolation and learnings documentation pattern (2026-02-01)
+    impact: Enabled parallel workflow execution and established supplemental documentation pattern
+    learnings: |
+      INFRASTRUCTURE PATTERN: Git worktree isolation for agent workflows
+      - Created automation/src/worktree.ts (221 lines) with graceful fallback
+      - Implemented filesystem-safe timestamp format (ISO 8601 with : → -)
+      - Worktrees preserved on both success (PR review) and failure (debugging)
+      - Dry-run mode skips worktree creation for backward compatibility
+      
+      DOCUMENTATION PATTERN: Supplemental learnings files
+      - Created automation/worktree-learnings.md (101 lines)
+      - Structure: Overview → Operations → Patterns → Practices → Pitfalls → Integration
+      - Keeps expertise.yaml under size limits while preserving implementation details
+      - Learnings files enable deep dives without bloating core expertise
+      
+      GRACEFUL FALLBACK PATTERN:
+      - Try worktree creation, catch failure, warn to stderr, continue with projectRoot
+      - Maintains backward compatibility when worktrees unavailable
+      - Non-fatal cleanup operations prevent workflow abort
+      
+      KEY LEARNINGS:
+      1. Supplemental learnings files solve expertise.yaml size constraints
+      2. Graceful fallback maintains reliability while adding new features
+      3. Filesystem-safe timestamps essential for cross-platform compatibility
+      4. Documentation structure: Overview → Operations → Patterns → Practices → Pitfalls
+      5. Preserve worktrees on failure for debugging, on success for PR review
+    timestamp: 2026-02-01
+
 stability:
   convergence_indicators:
     insight_rate_trend: "stabilizing"
@@ -547,8 +663,36 @@ stability:
       - Color scheme universal (yellow/green/purple/cyan)
       - expertDomain field standard across all expert agents
       - Registry v2.0.0 with 31+ agents and 45+ capabilities
-      - MCP tool naming convention established (mcp__kotadb-bunx__ from .mcp.json)
-      - Expertise.yaml sizing patterns emerging (350-600 line target)
-      - agent-authoring expertise.yaml at hard limit (697 lines) - consolidation needed
-      - Automation domain demonstrates SDK-focused expertise patterns
-      - Future domains should target 350-600 line expertise.yaml range
+      
+      MCP TOOL PATTERNS STABILIZING [2026-02-02]:
+      - Tool naming convention: mcp__{SERVER_NAME}__toolName from .mcp.json
+      - In-prompt usage guidance with PREFER/FALLBACK decision trees
+      - Project-level Tool Selection Guide in CLAUDE.md
+      - Consistent tool assignment by agent type (scout/build/expert roles)
+      
+      DOCUMENTATION PATTERNS EMERGING [2026-02-01]:
+      - Supplemental learnings files for feature implementations
+      - Structure: Overview → Operations → Patterns → Practices → Pitfalls
+      - Keeps expertise.yaml focused (current: 689 lines, target 500-600)
+      - Example: automation/worktree-learnings.md (101 lines)
+      
+      CONVERGENCE INDICATORS:
+      - MCP tool integration patterns stable (naming, usage guidance, assignment)
+      - Documentation meta-patterns emerging (when to create learnings files)
+      - Expertise.yaml sizing patterns validated (350-600 line target)
+      - 8 expert domains show consistent 4-agent structure
+      - Tool selection guidance standardized across core and expert agents
+      
+      Domain showing maturation with meta-patterns for documentation and knowledge capture.
+  - category: Documentation Patterns (NEW LEARNING [2026-02-01])
+    practices:
+      - practice: Create supplemental learnings files for large feature implementations
+        evidence: automation/worktree-learnings.md (101 lines) documents worktree isolation separately from expertise.yaml
+        timestamp: 2026-02-01
+      - practice: Structure learnings files with Overview, Operations, Patterns, Practices, Pitfalls, Integration
+        evidence: worktree-learnings.md demonstrates comprehensive yet focused structure
+        timestamp: 2026-02-01
+      - practice: Reference learnings files from expertise.yaml for deep dives
+        evidence: Keeps expertise.yaml focused on high-level patterns while preserving implementation details
+        timestamp: 2026-02-01
+

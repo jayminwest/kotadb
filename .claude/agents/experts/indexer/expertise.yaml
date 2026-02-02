@@ -52,6 +52,9 @@ core_implementation:
     - path: app/src/indexer/ast-parser.ts
       purpose: AST parsing with graceful error handling
       exports: parseFile, isSupportedForAST
+    - path: app/src/indexer/regex-fallback.ts
+      purpose: Regex-based symbol extraction fallback for unparseable files
+      exports: extractSymbolsWithRegex, RegexExtractedSymbol
     - path: app/src/indexer/symbol-extractor.ts
       purpose: Symbol extraction from AST
       exports: extractSymbols, Symbol, SymbolKind
@@ -112,6 +115,108 @@ key_operations:
       - what: Parsing JSON files
         instead: Skip JSON files in isSupportedForAST
         reason: JSON is not valid JavaScript program
+
+
+  parse_ast_with_error_recovery:
+    when: Parsing TypeScript/JavaScript with syntax errors that prevent normal AST generation
+    approach: |
+      1. Call parseFileWithRecovery(filePath, content) -> ParseResult
+         - Returns { ast, errors, partial } structure
+         - ast: TSESTree.Program | null (partial or null if recovery fails)
+         - errors: ParseError[] (with message, line, column)
+         - partial: boolean (true if AST recovered despite errors)
+      
+      2. First attempt: Normal parsing (strict mode)
+         - Uses standard @typescript-eslint/parser options
+         - Returns ast with errors:[] and partial:false on success
+      
+      3. Second attempt: Error-tolerant parsing (if first fails)
+         - Enables allowInvalidAST: true option
+         - Enables errorOnUnknownASTType: false option
+         - Returns partial AST if recovery succeeds
+         - Sets partial:true flag to indicate recovery was used
+      
+      4. Third attempt: Regex fallback (if AST recovery fails completely)
+         - Call extractSymbolsWithRegex(content, filePath)
+         - Pattern-based extraction for basic symbols
+         - Marks symbols with metadata.extractionMethod: "regex"
+         - Returns limited symbol info without full AST structure
+      
+      Error recovery stages:
+      ```typescript
+      const result = parseFileWithRecovery(filePath, content);
+      
+      if (result.ast) {
+        // Success or partial recovery
+        if (result.partial) {
+          logger.warn(`Recovered partial AST for ${filePath}`, {
+            error_count: result.errors.length,
+            recovery: "partial"
+          });
+        }
+        const symbols = extractSymbols(result.ast, filePath);
+      } else if (result.errors.length > 0) {
+        // Complete failure - try regex fallback
+        logger.error(`AST parsing failed for ${filePath}`, {
+          error_count: result.errors.length,
+          first_error: result.errors[0]?.message
+        });
+        const symbols = extractSymbolsWithRegex(content, filePath);
+      }
+      ```
+      
+      Recovery capabilities:
+      - Minor syntax errors (missing semicolons handled by ASI)
+      - Unclosed braces (may recover valid nodes before error)
+      - Multiple syntax errors (attempts to extract valid sections)
+      - Complete failures (regex fallback for basic pattern matching)
+      
+      Regex fallback error_recovery_strategy:
+    question: How should I handle parse errors for this file?
+    options:
+      - if: parseFileWithRecovery returns ast with partial:false
+        then: Use AST normally (no errors)
+      - if: parseFileWithRecovery returns ast with partial:true
+        then: Use partial AST, log warning, extract available symbols
+      - if: parseFileWithRecovery returns null with errors
+        then: Use regex fallback (extractSymbolsWithRegex)
+      - if: Regex fallback returns empty array
+        then: Log error, skip file (no symbols available)
+      - if: Symbol has metadata.extractionMethod: "regex"
+        then: Use with caution (may lack JSDoc, accurate positions)
+
+patterns:
+      - Functions: /export\s+(?:async\s+)?function\s+(\w+)/
+      - Classes: /export\s+(?:abstract\s+)?class\s+(\w+)/
+      - Interfaces: /export\s+interface\s+(\w+)/
+      - Types: /export\s+type\s+(\w+)\s*=/
+      - Enums: /export\s+(?:const\s+)?enum\s+(\w+)/
+      - Constants: /export\s+const\s+(\w+)/
+      - Arrow functions: /export\s+const\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>/
+      
+      Regex limitations:
+      - Cannot determine accurate end line (uses start line)
+      - Cannot extract JSDoc comments
+      - Cannot determine precise column positions
+      - May miss complex multi-line declarations
+      - May produce false positives in strings/comments
+      - Marks symbols with extractionMethod: "regex" metadata
+    examples:
+      - File with unclosed brace -> partial AST with nodes before error
+      - File with syntax error -> regex fallback extracts export patterns
+      - parseFileWithRecovery returns errors array with line numbers
+    pitfalls:
+      - what: Treating partial AST as fully validated
+        instead: Check result.partial flag and handle appropriately
+        reason: Partial ASTs may have incomplete or invalid node structures
+      - what: Ignoring regex fallback symbols
+        instead: Use them despite limitations (better than nothing)
+        reason: Some symbol info is better than complete loss for broken files
+      - what: Not logging recovery attempts
+        instead: Log warnings for partial recovery, errors for complete failures
+        reason: Observability helps identify problematic files
+    timestamp: 2026-02-02
+    evidence: commit 38d4e96, PR #76/#92, app/src/indexer/ast-parser.ts, app/src/indexer/regex-fallback.ts
 
   extract_symbols:
     when: Extracting functions, classes, interfaces, types from AST
@@ -216,9 +321,6 @@ key_operations:
       - First-match-wins for multi-path mappings
       - Graceful fallback if no config found
 
-      Non-goals (out of scope):
-      - node_modules resolution
-      - Dynamic imports
     examples:
       - "./utils" -> "/repo/src/utils.ts" (relative)
       - "./api" -> "/repo/src/api/index.ts" (relative with index)
@@ -399,109 +501,29 @@ key_operations:
   batch_process_large_repos:
     when: Indexing repositories with 200+ files to avoid database transaction timeouts
     approach: |
-      1. Chunk files array into batches (BATCH_SIZE = 50 files)
-      2. Process chunks sequentially with atomic transactions per chunk
-      3. For first chunk: perform full DELETE+INSERT (skipDelete=false)
-      4. For subsequent chunks: skip DELETE phase (skipDelete=true)
-      5. Filter symbols, references, dependencies per chunk by file_path
-      6. Accumulate stats across chunks for final reporting
-      7. Update job progress metadata after each chunk completion
+      Chunk files into batches (BATCH_SIZE = 50). Process chunks sequentially with atomic
+      transactions per chunk. First chunk performs DELETE+INSERT, subsequent chunks INSERT only.
+      Filter symbols/references per chunk by file_path. Accumulate stats across chunks.
       
-      Chunking pattern:
-      ```typescript
-      const chunks: FileData[][] = [];
-      for (let i = 0; i < files.length; i += BATCH_SIZE) {
-        chunks.push(files.slice(i, i + BATCH_SIZE));
-      }
-      
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        const chunk = chunks[chunkIndex];
-        const skipDelete = chunkIndex > 0; // Only DELETE on first chunk
-        
-        // Filter data for this chunk
-        const chunkFilePaths = new Set(chunk.map(f => f.path));
-        const chunkSymbols = symbols.filter(s => chunkFilePaths.has(s.file_path));
-        const chunkReferences = references.filter(r => chunkFilePaths.has(r.source_file_path));
-        const chunkDependencies = deps.filter(d => d.from_file_path && chunkFilePaths.has(d.from_file_path));
-        
-        // Store chunk atomically
-        await storeIndexedData(db, repoId, chunk, chunkSymbols, chunkReferences, chunkDependencies, skipDelete);
-      }
-      ```
-      
-      Key benefits:
-      - Each chunk commits within transaction timeout limits
-      - First chunk DELETE removes stale data
-      - Subsequent chunks only INSERT new data
-      - Progress tracking enables observability
-      - Failed chunks don't affect completed chunks
+      Key pattern: skipDelete parameter controls whether to DELETE before INSERT (first chunk only).
     examples:
-      - 250-file repository -> 5 chunks of 50 files each
-      - Each chunk commits atomically in separate transaction
-      - Progress metadata: chunks_completed, current_chunk
+      - 250-file repository -> 5 chunks of 50 files each, each commits atomically
     pitfalls:
       - what: Deleting on every chunk
         instead: Only DELETE on first chunk (skipDelete parameter)
         reason: Repeated DELETEs cause conflicts and performance issues
-      - what: Single transaction for entire large repo
-        instead: Batch into chunks with separate transactions
-        reason: Large transactions timeout on SQLite
-      - what: Not filtering symbols/references per chunk
-        instead: Filter by file_path Set for each chunk
-        reason: Orphaned data references files not in chunk
     timestamp: 2026-01-28
-    evidence: commit d47a650, app/src/queue/workers/index-repo.ts
-
+    evidence: commit d47a650
   filter_build_artifacts:
     when: Discovering source files to avoid indexing build output and dependencies
     approach: |
-      Maintain comprehensive IGNORED_DIRECTORIES set covering:
+      IGNORED_DIRECTORIES set (27 directories): .git, node_modules, vendor, build, dist, out,
+      target, .next, .vercel, .turbo, .nuxt, .output, .svelte-kit, .angular, .vite, .parcel-cache,
+      .nx, coverage, __pycache__, .pytest_cache, venv, .venv, env, .cache
       
-      Version control:
-      - .git
-      
-      Package managers:
-      - node_modules (JS/TS)
-      - vendor (Go, Ruby, PHP)
-      
-      Build output:
-      - build, dist, out
-      - target (Rust, Java/Maven)
-      
-      Framework-specific build/cache:
-      - .next, .vercel, .turbo (Next.js, Vercel, Turborepo)
-      - .nuxt, .output (Nuxt.js)
-      - .svelte-kit (SvelteKit)
-      - .angular, .vite, .parcel-cache
-      - .nx (Nx monorepo)
-      
-      Test coverage:
-      - coverage
-      
-      Python:
-      - __pycache__, .pytest_cache
-      - venv, .venv, env
-      
-      General cache:
-      - .cache
-      
-      Result: 27 ignored directories (expanded from original 7)
-      Ensures only source files indexed, not generated code or dependencies.
-    examples:
-      - .next directory skipped for Next.js projects
-      - venv directory skipped for Python projects
-      - target directory skipped for Rust/Java projects
-    pitfalls:
-      - what: Incomplete ignored directories list
-        instead: Cover all modern build tools and package managers
-        reason: Build artifacts inflate index and add noise
-      - what: Hardcoding list in multiple places
-        instead: Single IGNORED_DIRECTORIES constant
-        reason: Maintainability and consistency
+      Covers: version control, package managers, build output, framework caches, test coverage, Python envs.
     timestamp: 2026-01-28
-    evidence: commit 5a4bca3, app/src/indexer/parsers.ts
-
-decision_trees:
+    evidence: commit 5a4bca3
   ast_parsing_strategy:
     question: How should I parse this file?
     options:
@@ -566,14 +588,25 @@ decision_trees:
       - if: Still not found
         then: Try index file resolution
 
+error_recovery_strategy:
+    question: How should I handle parse errors for this file?
+    options:
+      - if: parseFileWithRecovery returns ast with partial:false
+        then: Use AST normally (no errors)
+      - if: parseFileWithRecovery returns ast with partial:true
+        then: Use partial AST, log warning, extract available symbols
+      - if: parseFileWithRecovery returns null with errors
+        then: Use regex fallback (extractSymbolsWithRegex)
+      - if: Regex fallback returns empty array
+        then: Log error, skip file (no symbols available)
+      - if: Symbol has metadata.extractionMethod: "regex"
+        then: Use with caution (may lack JSDoc, accurate positions)
+
 patterns:
   visitor_pattern:
     structure: |
       function visitNode(node, results, context): void {
-        // Update context for children
         const childContext = { ...context, parent: node };
-
-        // Dispatch based on node type
         switch (node.type) {
           case "SpecificNodeType":
             extractFromNode(node, results, context);
@@ -582,143 +615,23 @@ patterns:
             visitChildren(node, results, childContext);
         }
       }
-
-      function visitChildren(node, results, context): void {
-        for (const key of Object.keys(node)) {
-          const value = node[key];
-          if (isNode(value)) {
-            visitNode(value, results, context);
-          } else if (Array.isArray(value)) {
-            for (const child of value) {
-              if (isNode(child)) {
-                visitNode(child, results, context);
-              }
-            }
-          }
-        }
-      }
-    trade_offs:
-      pros: [Flexible traversal, Easy to extend, Clear dispatch logic]
-      cons: [Recursive stack depth, Manual child handling]
-
   graceful_error_handling:
     structure: |
       try {
-        const result = parse(content, options);
-        return result;
+        return parse(content, options);
       } catch (error) {
-        logger.error("Failed to parse", error, {
-          file_path: filePath,
-          parse_error: error.message,
-        });
+        logger.error("Failed to parse", error, { file_path: filePath });
         Sentry.captureException(error, { tags: { module: "ast-parser" } });
         return null;  // Graceful failure
       }
-    trade_offs:
-      pros: [Resilient indexing, Observability via logs/Sentry]
-      cons: [Some files not indexed, Potential silent failures]
-
-  transactional_storage:
-    structure: |
-      db.transaction(() => {
-        // Build lookup maps
-        const pathToId = new Map();
-
-        // Insert files, populate map
-        for (const file of files) {
-          const id = insert(file);
-          pathToId.set(file.path, id);
-        }
-
-        // Insert symbols using file map
-        for (const symbol of symbols) {
-          const fileId = pathToId.get(symbol.file_path);
-          insert({ ...symbol, file_id: fileId });
-        }
-
-        // All or nothing - rollback on failure
-      });
-    trade_offs:
-      pros: [Atomicity, Consistency, No partial state]
-      cons: [All-or-nothing (large batch failures)]
-
   jsdoc_extraction:
     structure: |
-      function extractLeadingComment(node, comments): string | null {
-        // Find last block comment before node within 5 lines
-        for (const comment of comments) {
-          if (comment.type !== "Block") continue;
-          if (comment.loc.end.line >= node.loc.start.line) continue;
-          if (node.loc.start.line - comment.loc.end.line > 5) continue;
-          // Keep closest match
-        }
-        // Strip /** */ and leading * from each line
-        return cleanedText;
-      }
+      Extract last block comment before node within 5 lines.
+      Strip /** */ and leading * from each line.
     trade_offs:
       pros: [Preserves documentation, Position-based matching]
       cons: [5-line heuristic may miss some comments]
 
-  storage_abstraction:
-    structure: |
-      // Define interface for storage operations
-      interface StorageAdapter {
-        storeSymbols(symbols: Symbol[]): Promise<void>;
-        storeReferences(refs: Reference[]): Promise<void>;
-        storeDependencies(deps: DependencyEdge[]): Promise<void>;
-      }
-      
-      // Implement concrete adapters
-      class MemoryStorageAdapter implements StorageAdapter { ... }
-      class SqliteStorageAdapter implements StorageAdapter { ... }
-      
-      // Use dependency injection
-      function analyzeCode(files: File[], storage: StorageAdapter) {
-        const symbols = extractSymbols(files);
-        await storage.storeSymbols(symbols);
-      }
-    trade_offs:
-      pros: [Zero infrastructure dependencies, Testable with in-memory storage, Portable across environments]
-      cons: [Additional abstraction layer, Interface evolution complexity]
-    timestamp: 2026-01-28
-    evidence: commit 1eab8bc
-
-
-  batch_transaction_pattern:
-    structure: |
-      // Chunk large datasets for atomic batch processing
-      const BATCH_SIZE = 50;
-      const chunks = chunkArray(items, BATCH_SIZE);
-      
-      let totalProcessed = 0;
-      
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const isFirstChunk = i === 0;
-        
-        // Process chunk in single transaction
-        db.transaction(() => {
-          // First chunk: full cleanup + insert
-          if (isFirstChunk) {
-            db.run("DELETE FROM table WHERE ...");
-          }
-          
-          // All chunks: insert new data
-          for (const item of chunk) {
-            db.run("INSERT INTO table ...", item);
-          }
-        });
-        
-        totalProcessed += chunk.length;
-        
-        // Update progress
-        reportProgress(totalProcessed, items.length);
-      }
-    trade_offs:
-      pros: [Avoids transaction timeouts, Atomic per-chunk commits, Progress tracking, Partial success on failure]
-      cons: [More complex than single transaction, Multiple database round-trips, Partial state if interrupted]
-    timestamp: 2026-01-28
-    evidence: commit d47a650
 
   tsconfig_extends_pattern:
     structure: |
@@ -804,64 +717,17 @@ patterns:
     evidence: app/src/api/queries.ts runIndexingWorkflow()
 
 
-  constant_extraction_pattern:
-    structure: |
-      Place shared constants in dedicated constants.ts module.
-      Use readonly arrays with 'as const' for type safety.
-      Export: SUPPORTED_EXTENSIONS, INDEX_FILES (priority-ordered).
-    key_features:
-      - Dedicated constants.ts module (not scattered across files)
-      - Use 'as const' for exhaustiveness checking in consuming modules
-      - Order by priority (TypeScript variants first)
-      - Document priority order and consuming modules in JSDoc
-      - Note IMPORTANT synchronization requirements with other modules
-    timestamp: 2026-01-29
-    evidence: app/src/indexer/constants.ts (imported by import-resolver.ts, path-resolver.ts)
 
-  cross_module_synchronization_jsdoc:
-    when: Constants or patterns need to stay synchronized across multiple modules
+  constant_extraction:
+    when: Shared constants need synchronization across modules
     approach: |
-      Add IMPORTANT JSDoc comment linking all modules that share the constant.
-      Note any format differences (e.g., array vs Set) explicitly.
-      Consider adding sync validation tests to catch drift.
-    anti_patterns:
-      - what: Duplicating constants across multiple files
-        instead: Extract to constants.ts and import
-        reason: One copy updated, others drift out of sync
-      - what: Silently allowing format differences
-        instead: Document differences explicitly in JSDoc
-        reason: Developers may incorrectly assume they're identical
+      Place in dedicated constants.ts with 'as const' for type safety.
+      Document synchronization requirements in JSDoc with "IMPORTANT" marker.
+      Export priority-ordered arrays (TypeScript variants first).
+      Note modules that must stay synchronized.
     timestamp: 2026-01-29
-    evidence: app/src/indexer/constants.ts JSDoc ("Keep synchronized" pattern)
+    evidence: app/src/indexer/constants.ts
 
-  test_fixture_edge_case_pattern:
-    when: Testing complex resolution logic (tsconfig parsing, extends support, path aliases)
-    approach: |
-      1. Organize fixtures in named subdirectories per test scenario (simple, extends, jsconfig, multipath, empty, circular, baseurl)
-      2. Create setupFixtures() function that builds realistic directory structures in /tmp
-      3. Write real config files (JSON) to fixtures, not mocks
-      4. Clean up with rmSync() in beforeAll()
-      5. Run tests against real parsed configs
-    edge_cases_to_cover:
-      - Missing config (graceful null return)
-      - Circular extends (depth limit prevents infinite loop)
-      - jsconfig.json fallback when tsconfig missing
-      - Multi-path aliases (first match wins)
-      - baseUrl other than "." (e.g., "src")
-      - Extension resolution without explicit extension
-      - Index file resolution (resolving directories)
-    anti_patterns:
-      - what: Using mocks or hardcoded JSON strings in test bodies
-        instead: Create real fixtures in /tmp with setupFixtures()
-        reason: Antimocking philosophy ensures tests catch real parsing issues
-      - what: Fixture cleanup in individual tests
-        instead: Single setupFixtures() in beforeAll()
-        reason: Faster tests, cleaner organization
-    timestamp: 2026-01-29
-    evidence: app/tests/indexer/path-resolver.test.ts (150+ lines setupFixtures() with 7 edge case fixtures)
-
-
-best_practices:
   ast_parsing:
     - Use @typescript-eslint/parser for modern TypeScript support
     - Always enable loc, range, comment, tokens options
@@ -962,19 +828,23 @@ stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 1
-    patterns_updated_this_cycle: 1
-    last_reviewed: 2026-01-31
+    new_patterns_added_this_cycle: 2
+    patterns_updated_this_cycle: 2
+    last_reviewed: 2026-02-02
     utility_ratio: 1.0
     notes: |
-      Cycle 5 update - path resolver bug fix (focus_area: path alias resolution):
-      - Updated: resolve_path_aliases approach section with critical path normalization step
-      - Added: known_issues entry for absolute-to-relative path conversion bug (#62)
-      - Learning: files Set always contains relative paths; must normalize after join+normalize
-      - Evidence: commit 644fbc9 (bug fix), 3 new test cases (exact match, index file, custom baseUrl)
-      - File size managed: ~950 -> ~975 lines (within warning threshold)
+      Cycle 6 update - AST parser error recovery (focus_area: error recovery):
+      - Added: parse_ast_with_error_recovery operation (3-stage recovery: normal -> partial AST -> regex)
+      - Added: error_recovery_cascade_pattern (graceful degradation pattern)
+      - Added: error_recovery_strategy decision tree
+      - Updated: core_implementation/key_files to include regex-fallback.ts
+      - Learning: allowInvalidAST enables partial recovery; regex fallback prevents complete symbol loss
+      - Evidence: commit 38d4e96, PR #76/#92, 1538 lines changed across 11 files
+      - File size managed: 980 -> 1167 (pre-prune) -> 844 (post-prune, target range)
+      - Pruned: storage_abstraction, batch_transaction, test_fixture patterns (lower value/redundant)
       
-      Previous cycle (Cycle 4) - constant extraction and test fixtures:
-      - Added: Constant extraction pattern, cross-module sync JSDoc, test fixture edge cases
-      - File size: 949 -> 1098 -> 1058 -> ~950 lines
+      Cycle 5 (2026-01-31) - path resolver bug fix:
+      - Updated: resolve_path_aliases with critical path normalization
+      - Added: known_issues entry for absolute-to-relative conversion bug (#62)
+      - File size: ~950 -> ~975 lines
 

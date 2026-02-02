@@ -235,3 +235,15 @@ expertDomain: <domain>
 
 Agent implementation ready for review.
 ```
+
+### MCP Tool Usage Guidance
+
+*[2026-02-02]*: Include "KotaDB MCP Tool Usage" section in agent prompts after Instructions. Use PREFER/FALLBACK structure with numbered decision tree. Applied to build-agent.md, scout-agent.md, review-agent.md.
+
+*[2026-02-02]*: MCP tool naming must match .mcp.json server name exactly. Server "kotadb-bunx" requires prefix mcp__kotadb-bunx__. Fixed across 13 files in commit 2705560.
+
+### Documentation Standards
+
+*[2026-02-01]*: Create supplemental learnings files for large features that would bloat expertise.yaml. Format: <feature>-learnings.md with Overview, Operations, Patterns, Practices, Pitfalls sections.
+
+*[2026-02-01]*: Reference learnings files from expertise.yaml for comprehensive details while keeping core expertise focused on high-level patterns.
