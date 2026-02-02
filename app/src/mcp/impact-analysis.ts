@@ -21,6 +21,7 @@ import type {
 	TestScope,
 } from "@shared/types";
 import { Sentry } from "../instrument.js";
+import { resolveRepositoryIdentifier } from "./repository-resolver";
 
 const logger = createLogger({ module: "mcp-impact-analysis" });
 
@@ -44,8 +45,8 @@ export async function analyzeChangeImpact(
 			files_to_delete: request.files_to_delete?.length ?? 0,
 		});
 
-		// Resolve repository ID from SQLite
-		const repositoryId = resolveRepositoryId(request.repository);
+		// Resolve repository ID from SQLite (supports UUID or full_name)
+		const repositoryId = resolveRepositoryIdentifier(request.repository);
 
 		if (!repositoryId) {
 			logger.warn("Change impact analysis failed: no repository", {
@@ -135,24 +136,6 @@ export async function analyzeChangeImpact(
 		});
 		throw error;
 	}
-}
-
-/**
- * Resolve repository ID from request or use first available repository
- */
-function resolveRepositoryId(repositoryId: string | undefined): string | null {
-	if (repositoryId) {
-		return repositoryId;
-	}
-
-	// Get first repository from SQLite
-	const db = getGlobalDatabase();
-	const repo = db.queryOne<{ id: string }>(
-		"SELECT id FROM repositories ORDER BY created_at DESC LIMIT 1",
-		[],
-	);
-
-	return repo?.id ?? null;
 }
 
 /**

@@ -12,10 +12,10 @@
  */
 
 import { resolveFilePath } from "@api/queries";
-import { getGlobalDatabase } from "@db/sqlite/index.js";
 import { createLogger } from "@logging/logger.js";
 import type { ImplementationSpec, ValidationIssue, ValidationResult } from "@shared/types";
 import { Sentry } from "../instrument.js";
+import { resolveRepositoryIdentifier } from "./repository-resolver";
 
 const logger = createLogger({ module: "mcp-spec-validation" });
 
@@ -36,8 +36,8 @@ export async function validateImplementationSpec(
 	try {
 		logger.info("Starting spec validation", { feature_name: spec.feature_name, user_id: userId });
 
-		// Resolve repository ID from SQLite
-		const repositoryId = resolveRepositoryId(spec.repository);
+		// Resolve repository ID from SQLite (supports UUID or full_name)
+		const repositoryId = resolveRepositoryIdentifier(spec.repository);
 
 		if (!repositoryId) {
 			errors.push({
@@ -122,24 +122,6 @@ export async function validateImplementationSpec(
 		});
 		throw error;
 	}
-}
-
-/**
- * Resolve repository ID from request or use first available repository
- */
-function resolveRepositoryId(repositoryId: string | undefined): string | null {
-	if (repositoryId) {
-		return repositoryId;
-	}
-
-	// Get first repository from SQLite
-	const db = getGlobalDatabase();
-	const repo = db.queryOne<{ id: string }>(
-		"SELECT id FROM repositories ORDER BY created_at DESC LIMIT 1",
-		[],
-	);
-
-	return repo?.id ?? null;
 }
 
 /**

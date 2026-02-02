@@ -22,6 +22,7 @@ import { Sentry } from "../instrument.js";
 import { analyzeChangeImpact } from "./impact-analysis";
 import { invalidParams } from "./jsonrpc";
 import { validateImplementationSpec } from "./spec-validation";
+import { resolveRepositoryIdentifierWithError } from "./repository-resolver";
 
 const logger = createLogger({ module: "mcp-tools" });
 
@@ -588,30 +589,18 @@ export async function executeSearchDependencies(
 		repository: p.repository as string | undefined,
 	};
 
-	// Get repository ID - required for local mode
-	let repositoryId: string;
-	if (validatedParams.repository) {
-		repositoryId = validatedParams.repository;
-	} else {
-		// Try to get first repository from SQLite
-		const db = getGlobalDatabase();
-		const repo = db.queryOne<{ id: string }>(
-			"SELECT id FROM repositories ORDER BY created_at DESC LIMIT 1",
-			[],
-		);
 
-		if (!repo) {
-			return {
-				file_path: validatedParams.file_path,
-				message:
-					"No repositories found. Please index a repository first using index_repository tool.",
-				dependents: { direct: [], indirect: {}, cycles: [] },
-				dependencies: { direct: [], indirect: {}, cycles: [] },
-			};
-		}
-
-		repositoryId = repo.id;
+	// Resolve repository ID (supports UUID or full_name)
+	const repoResult = resolveRepositoryIdentifierWithError(validatedParams.repository);
+	if ("error" in repoResult) {
+		return {
+			file_path: validatedParams.file_path,
+			message: repoResult.error,
+			dependents: { direct: [], indirect: {}, cycles: [] },
+			dependencies: { direct: [], indirect: {}, cycles: [] },
+		};
 	}
+	const repositoryId = repoResult.id;
 
 	// Resolve file path to file ID
 	const fileId = resolveFilePath(validatedParams.file_path, repositoryId);
