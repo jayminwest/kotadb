@@ -1,6 +1,6 @@
 # Claude Code Configuration Expertise
 # Target: 400-600 lines | Domain: Operational knowledge for .claude/ configuration
-# Adapted for KotaDB project conventions
+# Last updated: 2026-02-02 (documentation accuracy patterns, 9 expert domains)
 
 overview:
   description: |
@@ -42,7 +42,7 @@ core_implementation:
         experts/<domain>/:
           purpose: 4-agent pattern (plan/build/improve/question + expertise.yaml)
           pattern: Domain experts with queryable knowledge
-          active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github]
+          active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github, automation, documentation]
       commands/:
         purpose: Slash commands by category
         workflows/: SDLC phase commands (prime, plan, implement, validate)
@@ -544,6 +544,19 @@ known_issues:
     discovered: 2026-01-28 (commit 446e999)
     status: resolved via systematic tool permission audit
 
+  - issue: Documentation accuracy drift over time
+    impact: Broken command references, non-existent file dependencies, user confusion
+    symptoms: CLAUDE.md commands that don't exist, settings.json referencing missing files
+    resolution: Systematic validation of all documentation references against actual files
+    discovered: 2026-02-02 (issue #77, claude-config-documentation-fixes-spec.md)
+    examples:
+      - /tools:bun_install, /tools:pr-review, /tools:question (non-existent commands)
+      - statusline.py referenced in settings.json (non-existent file)
+      - workflows/, homeserver/, app/ directories (non-existent in commands/)
+      - Expert domain count mismatches (documented 7 vs actual 9)
+    status: active remediation via systematic documentation cleanup
+    prevention: Add documentation accuracy validation to development workflow
+
 potential_enhancements:
   - Automated agent registry validation (compare files to registry)
   - Frontmatter linting for description colons
@@ -551,6 +564,8 @@ potential_enhancements:
   - Hook output validation
   - Expert domain registry validation (ensure CLAUDE.md, do.md, agent-registry.json in sync)
   - Tool permission consistency checker across agent types
+  - Documentation accuracy validation (check all referenced commands/files exist)
+  - Spec file location consistency enforcement (docs/specs/ vs .claude/.cache/specs/)
 
 stability:
   convergence_indicators:
@@ -558,14 +573,15 @@ stability:
     contradiction_count: 0
     new_patterns_added_this_cycle: 1
     patterns_updated_this_cycle: 2
-    last_reviewed: 2026-01-28
+    last_reviewed: 2026-02-02
     utility_ratio: 1.0
     notes: |
-      Expert domain expansion cycle (2 -> 7 domains):
-      Expert domain system stabilizing after 2->7 domain expansion:
-      - Added tool_permissions_philosophy operation documenting "permissive tools + strict prompts"
-      - Updated expert_domain_expansion pattern with tool permission consistency requirement
-      - Updated create_expert_domain to include tool specifications for all 4 agent types
-      - Updated best_practices with tool permission philosophy
-      - Added known_issue tracking restrictive tool permission problem and resolution
+      Expert domain expansion cycle (7 -> 9 domains) and documentation accuracy patterns:
+      - Added documentation accuracy issues pattern from claude-config-documentation-fixes-spec.md
+      - Updated expert domain count from 7 to 9 domains (automation + documentation)
+      - Identified systematic documentation accuracy issues (non-existent command references)
+      - Added spec file location pattern observations (docs/specs/ vs .claude/.cache/specs/)
+      - Updated registry expansion numbers and active domain lists
+      - Added documentation accuracy validation to potential enhancements
+      - Captured patterns from settings.json cleanup (statusline.py removal)
 

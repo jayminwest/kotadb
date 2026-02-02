@@ -269,7 +269,7 @@ app/                   # Application layer (TypeScript/Bun API service)
   tsconfig.json        # TypeScript configuration
   scripts/             # Application-specific bash scripts
 
-automation/            # Agentic layer (Python AI developer workflows)
+automation/            # Agentic layer (TypeScript AI developer workflows)
   adws/                # ADW automation scripts and modules
 
 .claude/commands/      # Claude Code slash commands

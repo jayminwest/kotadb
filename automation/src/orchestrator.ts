@@ -24,6 +24,16 @@ import {
   extractTextFromMessages 
 } from "./parser.ts";
 
+/**
+ * GitHub issue data fetched via gh CLI
+ */
+interface GitHubIssue {
+  title: string;
+  body: string;
+  labels: Array<{ name: string }>;
+  state: string;
+}
+
 export interface OrchestrationResult {
   domain: string;
   specPath: string | null;
@@ -225,18 +235,73 @@ export async function orchestrateWorkflow(
   };
 }
 
+/**
+ * Fetch GitHub issue content via gh CLI
+ */
+async function fetchIssueContent(issueNumber: number): Promise<GitHubIssue> {
+  const proc = Bun.spawn(
+    ["gh", "issue", "view", String(issueNumber), "--json", "title,body,labels,state"],
+    {
+      stdout: "pipe",
+      stderr: "pipe"
+    }
+  );
+
+  const output = await new Response(proc.stdout).text();
+  const exitCode = await proc.exited;
+
+  if (exitCode !== 0) {
+    const stderr = await new Response(proc.stderr).text();
+    throw new Error(`Failed to fetch issue #${issueNumber}: ${stderr}`);
+  }
+
+  const issueData = JSON.parse(output);
+  
+  return {
+    title: issueData.title || "",
+    body: issueData.body || "(No description provided)",
+    labels: Array.isArray(issueData.labels) ? issueData.labels : [],
+    state: issueData.state || "UNKNOWN"
+  };
+}
+
 async function analyzeIssue(
   issueNumber: number,
   options: AutomationSDKOptions,
   logger: WorkflowLogger
 ): Promise<string> {
+  // Fetch actual issue content from GitHub
+  logger.logEvent("FETCH_ISSUE", { issue_number: issueNumber });
+  
+  const issueData = await fetchIssueContent(issueNumber);
+  
+  logger.logEvent("ISSUE_FETCHED", { 
+    issue_number: issueNumber,
+    title: issueData.title,
+    labels: issueData.labels.map(l => l.name),
+    state: issueData.state
+  });
+  
   const prompt = `
 You are analyzing GitHub issue #${issueNumber} for automation orchestration.
 
-TASK: Provide structured analysis with:
+## Issue Content
+
+**Title**: ${issueData.title}
+
+**State**: ${issueData.state}
+
+**Labels**: ${issueData.labels.map(l => l.name).join(", ") || "none"}
+
+**Description**:
+${issueData.body}
+
+---
+
+TASK: Analyze the ACTUAL issue content above and provide structured analysis with:
 1. Issue type (feature/bug/chore/refactor)
 2. Expert domain (claude-config/agent-authoring/database/api/testing/indexer/github/automation)
-3. Core requirements (bullet points)
+3. Core requirements (bullet points extracted from the issue description)
 4. Recommended approach
 
 FORMAT:
