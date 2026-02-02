@@ -1,5 +1,5 @@
 # Documentation Expert Domain Expertise
-# Last reviewed: 2026-01-30
+# Last reviewed: 2026-02-02
 # Domain: technical documentation improvement and maintenance
 
 overview:
@@ -12,10 +12,13 @@ overview:
 
   scope:
     primary_codebase:
-      - web/docs/content/ (markdown documentation files)
+      - CLAUDE.md (main project documentation)
+      - .claude/commands/**/*.md (slash command templates)
+      - .claude/agents/**/*.md (agent documentation)
+      - web/docs/content/ (user-facing documentation)
       - .claude/.cache/specs/ (technical specifications)
       - automation/README.md (automation layer docs)
-      - .claude/agents/experts/ (agent documentation)
+      - .claude/agents/experts/ (expert domain knowledge)
 
     broader_scope:
       - MCP tool documentation validation against implementation
@@ -23,6 +26,7 @@ overview:
       - Architecture documentation sync with codebase
       - Installation guide testing and verification
       - Versioning metadata and freshness tracking
+      - Cross-file documentation consistency
 
     not_covered:
       - Code implementation (see respective expert domains)
@@ -37,6 +41,11 @@ overview:
 
 core_implementation:
   documentation_structure:
+    primary_docs:
+      - CLAUDE.md (entry point, command reference, expert domains, conventions)
+      - README.md (project overview, installation, quick start)
+      - .claude/commands/README.md (slash command organization, categories)
+
     web_docs_content:
       path: web/docs/content/
       purpose: User-facing documentation website
@@ -72,11 +81,13 @@ key_operations:
       3. Check examples use correct JSON structure and required fields
       4. Verify all 8 MCP tools are documented (common gap: missing tools)
       5. Test parameter combinations in examples for correctness
+      6. CRITICAL: Verify tool naming prefix (mcp__kotadb-bunx__ not mcp__kotadb__)
     patterns:
       - Tool documentation structure: description, parameters table, example, returns
       - Required/optional parameter indication with defaults
       - JSON examples with proper escaping and formatting
       - Cross-references between related tools
+      - Tool selection guidance with decision trees
     code_example: |
       ### search_code
 
@@ -99,6 +110,89 @@ key_operations:
       - Incorrect parameter names (index_repository used "path" instead of "repository")
       - Non-existent parameters (list_recent_files documented invalid "since" parameter)
       - Wrong default values or data types in documentation
+      - Wrong MCP tool prefix (mcp__kotadb__ vs mcp__kotadb-bunx__)
+
+  validate_slash_command_documentation:
+    when: Ensuring documented slash commands actually exist
+    approach: |
+      1. List all .md files in .claude/commands/ recursively
+      2. Cross-reference with commands listed in CLAUDE.md
+      3. Remove any phantom commands (documented but non-existent)
+      4. Update .claude/commands/README.md to match actual subdirectories
+      5. Verify command invocation syntax matches file structure
+    timestamp: 2026-02-02
+    evidence: Commit cbf171b (Issue #77)
+    patterns:
+      - Command invocation format: /subdirectory:filename
+      - Directory structure must match documented categories
+      - Commands README lists actual subdirectories not aspirational ones
+    code_example: |
+      # Before (incorrect - phantom commands)
+      | **Tools** | `/tools:install`, `/tools:bun_install`, `/tools:pr-review` |
+      
+      # After (correct - only existing commands)
+      | **Tools** | `/tools:install`, `/tools:tools` |
+    pitfalls:
+      - Documenting commands that were planned but never implemented
+      - Keeping outdated category lists after reorganization
+      - Forgetting to remove commands when files are deleted
+      - Listing subdirectories that don't exist
+
+  sync_cross_file_documentation:
+    when: Ensuring consistent information across multiple documentation files
+    approach: |
+      1. Identify documentation files that share overlapping content
+      2. Define canonical source for each piece of information
+      3. Update all files when canonical source changes
+      4. Check for contradictions between files
+      5. Ensure CLAUDE.md, README.md, and commands/README.md are consistent
+    timestamp: 2026-02-02
+    evidence: Commits cbf171b, 2705560 (Issues #77, #84)
+    patterns:
+      - CLAUDE.md is canonical for command tables and expert domain lists
+      - commands/README.md is canonical for directory structure
+      - README.md is canonical for project overview and quick start
+      - All three must agree on available features
+    pitfalls:
+      - Updating one file but forgetting related files
+      - Different expert domain counts in different files
+      - Command categories not matching actual directory structure
+      - Technology claims (TypeScript vs Python) inconsistent across files
+
+  add_tool_selection_guidance:
+    when: Documenting when to use which tools or approaches
+    approach: |
+      1. Identify tool categories that need usage guidance
+      2. Create decision tree with clear conditions
+      3. Document PREFER vs FALLBACK recommendations
+      4. Include specific use cases for each tool
+      5. Place guidance near tool documentation for discoverability
+    timestamp: 2026-02-02
+    evidence: Commit 2705560 (Issue #84)
+    patterns:
+      - PREFER section lists primary tools with use cases
+      - FALLBACK section explains when to use alternatives
+      - Decision tree provides step-by-step guidance
+      - Guidance placed in CLAUDE.md MCP Server section
+    code_example: |
+      ### Tool Selection Guide
+      
+      **PREFER KotaDB MCP tools for:**
+      - `mcp__kotadb-bunx__search_dependencies` - Understanding file relationships
+      - `mcp__kotadb-bunx__analyze_change_impact` - Risk assessment
+      
+      **FALLBACK to Grep for:**
+      - Exact regex pattern matching
+      - Unindexed files or live filesystem searches
+      
+      **Decision Tree:**
+      1. Refactoring? → Use `search_dependencies` first
+      2. Creating PR? → Use `analyze_change_impact`
+    pitfalls:
+      - Guidance too abstract without specific tool names
+      - Missing FALLBACK section for alternatives
+      - No decision tree for complex choices
+      - Guidance buried in wrong documentation section
 
   validate_http_endpoint_documentation:
     when: Ensuring HTTP API docs match route implementation
@@ -217,6 +311,11 @@ decision_trees:
         action: Test CLI commands and verify system requirements
         rationale: Installation steps must work end-to-end
 
+      - condition: Slash command documentation
+        action: List actual files in .claude/commands/ and verify against docs
+        timestamp: 2026-02-02
+        rationale: Phantom commands cause user confusion and workflow failures
+
   documentation_update_priority:
     question: What order should I update documentation sections?
     branches:
@@ -231,6 +330,11 @@ decision_trees:
       - condition: Architecture inaccuracies
         action: Update technology and component descriptions third
         rationale: Architecture understanding affects design decisions
+
+      - condition: Phantom commands
+        action: Remove non-existent commands from documentation
+        timestamp: 2026-02-02
+        rationale: Users attempt to invoke commands that don't exist
 
       - condition: Versioning metadata missing
         action: Add metadata and freshness tracking last
@@ -255,6 +359,27 @@ decision_trees:
         action: Validate links and dependencies between sections
         rationale: Broken references fragment user experience
 
+      - condition: Multi-file shared content
+        action: Define canonical source and sync on change
+        timestamp: 2026-02-02
+        rationale: Inconsistencies between files cause confusion
+
+  tool_naming_validation:
+    question: How should I validate tool naming in documentation?
+    timestamp: 2026-02-02
+    branches:
+      - condition: MCP tool references in agent files
+        action: Verify prefix is mcp__kotadb-bunx__ (not mcp__kotadb__)
+        rationale: Wrong prefix causes tool invocation failures
+
+      - condition: Tool selection guidance
+        action: Include full prefixed names in examples
+        rationale: Users copy-paste tool names directly
+
+      - condition: Cross-agent tool references
+        action: Search all agent files for consistent naming
+        rationale: One file with wrong naming undermines others
+
 patterns:
   comprehensive_specification_pattern:
     structure: Detailed technical specification with implementation guidance
@@ -277,6 +402,36 @@ patterns:
     usage: API tool documentation, installation guides, configuration
     trade_offs: Example maintenance vs developer usability
 
+  phantom_command_prevention_pattern:
+    structure: Validate documented commands against actual file existence
+    usage: Slash command documentation, feature lists, capability tables
+    trade_offs: Validation overhead vs documentation accuracy
+    timestamp: 2026-02-02
+    evidence: Issue #77 - removed 4 non-existent commands from CLAUDE.md
+    example: |
+      # Validation approach
+      1. Run: find .claude/commands -name "*.md" | sort
+      2. Compare against documented commands in CLAUDE.md
+      3. Remove any documented commands without corresponding files
+
+  tool_selection_guidance_pattern:
+    structure: PREFER/FALLBACK sections with decision tree
+    usage: MCP tool documentation, complex tooling decisions
+    trade_offs: Guidance maintenance vs user decision support
+    timestamp: 2026-02-02
+    evidence: Issue #84 - added Tool Selection Guide to CLAUDE.md
+
+  cross_file_sync_pattern:
+    structure: Define canonical source per topic, propagate changes
+    usage: Multi-file documentation with overlapping content
+    trade_offs: Sync effort vs consistency guarantee
+    timestamp: 2026-02-02
+    evidence: Issues #77, #84 - synced CLAUDE.md, README.md, commands/README.md
+    canonical_sources:
+      - CLAUDE.md: command tables, expert domain lists, MCP tool guidance
+      - README.md: project overview, installation quick start
+      - commands/README.md: directory structure, command categories
+
 best_practices:
   api_documentation:
     - Cross-reference all MCP tools with app/src/mcp/tools.ts
@@ -284,6 +439,7 @@ best_practices:
     - Test JSON examples for syntax and semantic correctness
     - Include all implemented tools (common gap: missing 3 of 8 tools)
     - Document parameter optionality and default behavior
+    - Use correct tool prefix (mcp__kotadb-bunx__)
 
   endpoint_documentation:
     - Match HTTP methods and paths exactly with app/src/api/routes.ts
@@ -309,6 +465,20 @@ best_practices:
     - Include reviewer attribution for accountability
     - Maintain navigation order for user experience
 
+  slash_command_documentation:
+    - Validate all documented commands exist as files
+    - Keep directory structure lists current
+    - Remove commands promptly when files are deleted
+    - Use /subdirectory:filename format consistently
+    timestamp: 2026-02-02
+
+  cross_file_consistency:
+    - Define canonical source for shared information
+    - Update all related files when canonical changes
+    - Expert domain counts must match across CLAUDE.md and README.md
+    - Technology stack claims must be consistent
+    timestamp: 2026-02-02
+
 known_issues:
   - issue: MCP tool documentation incomplete (5 of 8 tools documented)
     impact: Missing tools prevent full API utilization
@@ -325,20 +495,42 @@ known_issues:
     resolution: Updated parser information to reflect @typescript-eslint/parser usage
     status: Resolved (2026-01-30)
 
+  - issue: Phantom slash commands documented in CLAUDE.md
+    impact: Users attempt to invoke non-existent commands
+    resolution: Removed /tools:bun_install, /tools:pr-review, /tools:question, /validation:resolve_failed_validation
+    status: Resolved (2026-02-02)
+    evidence: Commit cbf171b (Issue #77)
+
+  - issue: MCP tool prefix inconsistent (mcp__kotadb__ vs mcp__kotadb-bunx__)
+    impact: Tool invocation failures in Claude Code
+    resolution: Updated all agent files to use mcp__kotadb-bunx__ prefix
+    status: Resolved (2026-02-02)
+    evidence: Commit 2705560 (Issue #84)
+
+  - issue: Expert domain count mismatch (7 vs 9 domains)
+    impact: Users unaware of automation and documentation experts
+    resolution: Updated CLAUDE.md to list all 9 expert domains
+    status: Resolved (2026-02-02)
+    evidence: Commit cbf171b (Issue #77)
+
 potential_enhancements:
   - Automated documentation validation against implementation
   - CLI command testing in CI/CD pipeline
   - Documentation freshness monitoring and alerts
   - Cross-reference validation between documentation sections
   - Example testing framework for code snippets
+  - Phantom command detection in pre-commit hooks
+  - Cross-file sync validation automation
 
 stability:
   convergence_indicators:
-    insight_rate_trend: new (initial domain creation)
+    insight_rate_trend: active (3 new patterns this cycle)
     contradiction_count: 0
-    last_reviewed: 2026-01-30
+    last_reviewed: 2026-02-02
     notes: |
-      Initial domain creation based on comprehensive documentation update (Issue #52).
-      Patterns extracted from successful synchronization of API reference, architecture,
-      and installation documentation with current implementation. Focus on validation
-      against source code and prevention of documentation drift.
+      Second review cycle. Extracted patterns from Issues #77 (phantom commands)
+      and #84 (MCP tool naming). Added key_operations for slash command validation,
+      cross-file sync, and tool selection guidance. Added patterns for phantom
+      command prevention, tool selection guidance, and cross-file sync. Three new
+      known_issues resolved. Domain showing healthy pattern accumulation without
+      contradictions. Next review should assess if patterns are stabilizing.

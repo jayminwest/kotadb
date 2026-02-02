@@ -291,6 +291,61 @@ key_operations:
       - package.json (workspaces array if monorepo)
       - .github/workflows/npm-publish.yml (CI adjustments)
 
+  maintain_openapi_spec:
+    when: Updating OpenAPI specification after architectural changes or feature removals
+    approach: |
+      1. Audit OpenAPI spec for spec-implementation drift:
+         - Check registered paths in paths.ts against actual routes in routes.ts
+         - Verify all referenced schemas exist and are used
+         - Confirm server definitions match deployment architecture
+      2. Remove unused/obsolete content:
+         - Delete schemas for removed features (check imports in paths.ts)
+         - Remove server definitions for non-existent environments
+         - Remove endpoint tags that don't match any paths
+         - Clean up auth scheme descriptions (remove cloud provider references in local mode)
+      3. Update documentation strings in builder.ts:
+         - Reflect current architecture (local-only vs cloud)
+         - Document MCP tools separately from HTTP endpoints
+         - Update rate limit header documentation to match implementation
+      4. Synchronize tests with spec changes:
+         - Update openapi-generation.test.ts assertions
+         - Verify all endpoint examples are valid
+      5. Test spec generation:
+         - Run tests: cd app && bun test openapi
+         - Verify spec serves correctly: GET /openapi.json
+         - Check for validation errors in OpenAPI validators
+    timestamp: 2026-02-02
+    evidence: Issues #74, #83 (commits 7195834, 52510fb)
+    rationale: |
+      OpenAPI specs accumulate drift as features are added/removed. Undocumented endpoints
+      mislead API consumers. Obsolete schemas increase cognitive load. Regular hygiene
+      maintains spec accuracy and prevents confusion between documented vs implemented APIs.
+      Critical for local-only transitions where cloud references must be removed.
+    key_patterns:
+      - Implement routes first, then add to OpenAPI (not spec-first)
+      - Remove schemas when last endpoint using them is removed
+      - Server definitions must match actual deployment architecture
+      - Separate MCP tool documentation from HTTP endpoint documentation
+      - Test spec generation after structural changes
+    pitfalls:
+      - what: "Adding OpenAPI paths without implementing routes"
+        instead: "Implement route in routes.ts first, then register in paths.ts"
+        reason: "Prevents documenting non-existent endpoints (Issue #74)"
+      - what: "Leaving cloud-only schemas in local-only mode"
+        instead: "Remove Jobs, Projects, API Keys schemas when features removed"
+        reason: "Dead schemas confuse developers and bloat spec"
+      - what: "Keeping production/staging server definitions in local-only mode"
+        instead: "Remove all non-localhost server definitions"
+        reason: "Misleads users about deployment options"
+      - what: "Updating paths.ts without checking schema imports"
+        instead: "Remove unused schema imports and definitions"
+        reason: "Orphaned schemas increase maintenance burden"
+    affected_files: |
+      - app/src/api/openapi/builder.ts (server defs, info, descriptions)
+      - app/src/api/openapi/paths.ts (endpoint registrations)
+      - app/src/api/openapi/schemas.ts (request/response schemas)
+      - app/tests/api/openapi-generation.test.ts (spec validation)
+
 patterns:
   cli_entry_point_pattern:
     structure: |
@@ -609,6 +664,14 @@ best_practices:
     - Add aliased directories to BOTH files and include arrays
     - Test with npm pack + bunx <tarball> before publishing
     - Update CI workflows when restructuring monorepo packages
+  
+  openapi: |
+    - Implement routes first, document in OpenAPI second
+    - Remove schemas when last using endpoint is removed
+    - Keep server definitions synchronized with deployment architecture
+    - Separate MCP tool docs from HTTP endpoint docs
+    - Run tests after spec changes (bun test openapi)
+    - Audit for spec-implementation drift during major refactors
 
 known_issues:
   - issue: OpenAPI spec cached at startup
@@ -631,32 +694,40 @@ known_issues:
     status: resolved (2026-01-29, Issue #49)
     resolution: Stdio transport eliminates port conflicts (uses stdin/stdout, not TCP)
 
+  - issue: OpenAPI spec documenting unimplemented POST /index endpoint
+    impact: Misleading API documentation, confusion about indexing methods
+    status: resolved (2026-02-02, Issue #74)
+    resolution: Remove endpoint from OpenAPI spec, clarify MCP-only indexing
+
+  - issue: Cloud-only schemas in local-only OpenAPI spec
+    impact: 303 lines of unused schemas (Jobs, Projects, API Keys) causing confusion
+    status: resolved (2026-02-02, Issue #83)
+    resolution: Remove cloud-only schemas, update server definitions, add MCP tools section
+
 stability:
   convergence_indicators:
-    insight_rate_trend: stable
+    insight_rate_trend: decreasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 3
-    patterns_updated_this_cycle: 1
-    last_reviewed: 2026-01-29
+    new_patterns_added_this_cycle: 0
+    patterns_updated_this_cycle: 0
+    new_operations_added_this_cycle: 1
+    last_reviewed: 2026-02-02
     utility_ratio: 1.0
     notes: |
-      Seventh review cycle - MCP stdio transport implementation:
+      Eighth review cycle - OpenAPI specification maintenance:
       
-      New operation: implement_mcp_stdio_transport
-      - Complete guidance on StdioServerTransport integration
-      - forceStderr logging pattern for JSON-RPC protocol compliance
-      - CLI mode routing (stdio vs HTTP)
-      - Transport lifecycle management
+      New operation: maintain_openapi_spec
+      - Guidance on spec-implementation drift detection
+      - Schema cleanup for removed features
+      - Server definition synchronization
+      - MCP vs HTTP documentation separation
+      - Test synchronization patterns
       
-      New patterns:
-      - mcp_stdio_mode_pattern (runStdioMode implementation)
-      - logger_stderr_routing_pattern (forceStderr support)
-      
-      Updated pattern:
-      - cli_entry_point_pattern (added --stdio flag, mode routing)
+      No new patterns - existing patterns cover implementation.
       
       Previously stable patterns:
       - CLI entry point (Issue #19)
+      - MCP stdio transport (Issue #49)
       - Optional parameter filtering (Issue #608)
       - MCP tool testing patterns
       - FTS5 search term escaping
@@ -665,11 +736,15 @@ stability:
       - npm package distribution
       
       Architecture stability: Very High
-      - Zero contradictions across 7 cycles
+      - Zero contradictions across 8 cycles
       - All core operations documented
       - All 8 MCP tools with comprehensive tests
       - CLI deployment pattern established
-      - Stdio transport eliminates port conflict issues
       - Both MCP transports (stdio + HTTP) fully documented
+      - OpenAPI maintenance patterns captured
+      - Decreasing insight rate indicates domain maturity
       
-      Next review: After 10-15 API commits or next MCP transport issue
+      Recent changes are refinements (documentation cleanup, spec accuracy)
+      rather than new architectural patterns, suggesting domain convergence.
+      
+      Next review: After 15-20 API commits or architectural changes
