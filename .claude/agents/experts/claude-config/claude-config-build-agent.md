@@ -116,7 +116,7 @@ What the command returns.
 - Tools as YAML array (NOT comma-separated)
 - Valid models: `haiku`, `sonnet`, `opus`
 - Valid colors: red, blue, green, yellow, purple, orange, pink, cyan
-- MCP tools: `mcp__kotadb__search_code`, etc.
+- MCP tools: `mcp__kotadb-bunx__search_code`, etc.
 - CRITICAL: Description MUST NOT contain colons
 
 **Agent Frontmatter:**
@@ -128,7 +128,7 @@ tools:
   - Read
   - Glob
   - Grep
-  - mcp__kotadb__search_code
+  - mcp__kotadb-bunx__search_code
 model: sonnet
 color: blue
 constraints:

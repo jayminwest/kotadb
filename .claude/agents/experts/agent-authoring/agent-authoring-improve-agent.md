@@ -96,7 +96,7 @@ When approaching limits:
 
 4. **Identify Effective Patterns**
    - New agent organization approaches
-   - MCP tool usage patterns (mcp__kotadb__)
+   - MCP tool usage patterns (mcp__kotadb-bunx__)
    - Improved prompt structure techniques
    - Registry update workflows
    - Expert domain patterns

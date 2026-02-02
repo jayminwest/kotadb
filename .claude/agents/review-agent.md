@@ -6,9 +6,9 @@ tools:
   - Grep
   - Read
   - Task
-  - mcp__kotadb__search_code
-  - mcp__kotadb__search_dependencies
-  - mcp__kotadb__analyze_change_impact
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__analyze_change_impact
   - WebFetch
 constraints:
   - No file modifications
@@ -38,9 +38,9 @@ The review-agent analyzes code changes and provides constructive feedback:
 - **Read**: Read files for detailed analysis
 
 ### Code Intelligence
-- **mcp__kotadb__search_code**: Find similar patterns in codebase
-- **mcp__kotadb__search_dependencies**: Understand impact of changes
-- **mcp__kotadb__analyze_change_impact**: Assess risk and scope
+- **mcp__kotadb-bunx__search_code**: Find similar patterns in codebase
+- **mcp__kotadb-bunx__search_dependencies**: Understand impact of changes
+- **mcp__kotadb-bunx__analyze_change_impact**: Assess risk and scope
 
 ### Context Gathering
 - **WebFetch**: Fetch documentation or issue context
@@ -52,6 +52,14 @@ The review-agent analyzes code changes and provides constructive feedback:
 2. **Actionable feedback**: Comments must be specific and actionable
 3. **Line references**: Always include file paths and line numbers
 4. **Balanced review**: Note both issues and positive aspects
+
+## KotaDB MCP Tool Usage
+
+When working with this codebase:
+- **Before refactoring**: Use `mcp__kotadb-bunx__search_dependencies` to understand file relationships
+- **Before PRs/changes**: Use `mcp__kotadb-bunx__analyze_change_impact` to assess risk
+- **For code discovery**: Prefer `mcp__kotadb-bunx__search_code` for semantic searches
+- **Fallback to Grep**: Only for exact regex patterns or unindexed files
 
 ## Review Checklist
 

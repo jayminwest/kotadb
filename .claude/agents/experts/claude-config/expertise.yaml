@@ -185,7 +185,7 @@ key_operations:
       9. Update /do command with domain detection patterns
     kotadb_adaptations:
       - Use YAML array format for tools (NOT comma-separated)
-      - Add MCP tools where appropriate (mcp__kotadb__*)
+      - Add MCP tools where appropriate (mcp__kotadb-bunx__*)
       - Update agent-registry.json capabilityIndex, modelIndex, toolMatrix
     pitfalls:
       - what: "CRITICAL - Using colons in agent description field"
@@ -399,7 +399,7 @@ patterns:
         - Read
         - Glob
         - Grep
-        - mcp__kotadb__search_code
+        - mcp__kotadb-bunx__search_code
       model: haiku|sonnet|opus
       color: yellow|green|purple|cyan
       constraints:
@@ -493,7 +493,7 @@ best_practices:
     - Include model and color fields for expert agents
     - Update agent-registry.json for every new agent
     - CRITICAL: Never use colons in description field
-    - Add MCP tools where appropriate (mcp__kotadb__*)
+    - Add MCP tools where appropriate (mcp__kotadb-bunx__*)
     - Apply "permissive tools + strict prompts" philosophy
 
   hooks:

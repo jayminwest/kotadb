@@ -88,4 +88,22 @@ cd app && bun run lint
 
 ## MCP Server
 
-KotaDB provides MCP tools for code search, indexing, and dependency analysis. 
+KotaDB provides MCP tools for code search, indexing, and dependency analysis.
+
+### Tool Selection Guide
+
+**PREFER KotaDB MCP tools for:**
+- `mcp__kotadb-bunx__search_dependencies` - Understanding file relationships before refactoring
+- `mcp__kotadb-bunx__analyze_change_impact` - Risk assessment before PRs or major changes
+- `mcp__kotadb-bunx__search_code` - Semantic/conceptual code discovery across indexed repos
+
+**FALLBACK to Grep for:**
+- Exact regex pattern matching
+- Unindexed files or live filesystem searches
+- Quick single-file searches
+
+**Decision Tree:**
+1. Refactoring or modifying files? → Use `search_dependencies` first
+2. Creating PR or significant change? → Use `analyze_change_impact`
+3. Finding code by concept/meaning? → Try `search_code`
+4. Need exact regex or live results? → Use Grep
