@@ -130,9 +130,9 @@ describe('OpenAPI Spec Generation', () => {
 		expect(Array.isArray(spec.servers)).toBe(true);
 		expect(spec.servers.length).toBeGreaterThan(0);
 		
-		// Should have production server
-		const prodServer = spec.servers.find((s: any) => s.url.includes('api.kotadb.com'));
-		expect(prodServer).toBeDefined();
+		// Local-only mode: should have localhost server
+		const localServer = spec.servers.find((s: any) => s.url.includes('localhost'));
+		expect(localServer).toBeDefined();
 	});
 
 	test('version matches package.json', () => {
@@ -162,9 +162,9 @@ describe('OpenAPI Spec Generation', () => {
 		const tagNames = spec.tags.map((t: any) => t.name);
 		expect(tagNames).toContain('Health');
 		expect(tagNames).toContain('Search');
-		// NOTE: Indexing tag may be absent since POST /index was removed
-		// NOTE: Subscriptions tag removed for local-only v2.0.0
-		// API Keys may or may not be present depending on local mode
+		expect(tagNames).toContain('MCP');
+		expect(tagNames).toContain('Validation');
+		// NOTE: Indexing, Jobs, Projects, API Keys tags removed for local-only mode
 	});
 
 	test('all paths have operation IDs or summaries', () => {
