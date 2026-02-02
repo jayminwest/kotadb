@@ -853,7 +853,7 @@ export async function runIndexingWorkflow(
 	const { resolve } = await import("node:path");
 	const { prepareRepository } = await import("@indexer/repos");
 	const { discoverSources, parseSourceFile } = await import("@indexer/parsers");
-	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
+	const { parseFileWithRecovery, isSupportedForAST } = await import("@indexer/ast-parser");
 	const { extractSymbols } = await import("@indexer/symbol-extractor");
 	const { extractReferences } = await import("@indexer/reference-extractor");
 	const { parseTsConfig } = await import("@indexer/path-resolver");
@@ -934,11 +934,11 @@ export async function runIndexingWorkflow(
 	for (const file of records) {
 		if (!isSupportedForAST(file.path)) continue;
 
-		const ast = parseFile(file.path, file.content);
-		if (!ast) continue;
+		const parseResult = parseFileWithRecovery(file.path, file.content);
+		if (!parseResult.ast) continue;
 
-		const symbols = extractSymbols(ast, file.path);
-		const references = extractReferences(ast, file.path);
+		const symbols = extractSymbols(parseResult.ast!, file.path);
+		const references = extractReferences(parseResult.ast!, file.path);
 
 		const fileRecord = db.queryOne<{ id: string }>(
 			"SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?",

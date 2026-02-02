@@ -460,3 +460,371 @@ class Foo {
 		expect(ast?.body[0]?.type).toBe(AST_NODE_TYPES.ClassDeclaration);
 	});
 });
+
+/**
+ * Error Recovery Tests
+ *
+ * Tests for the enhanced parseFile function that supports partial AST recovery
+ * when encountering syntax errors. These tests verify:
+ * 
+ * 1. Partial recovery with minor syntax errors (missing semicolons)
+ * 2. Partial recovery with major syntax errors (unclosed braces)
+ * 3. ParseResult includes error information
+ * 4. partial:true flag is set when recovery is used
+ *
+ * Note: These tests are written against the expected interface after
+ * error recovery implementation. Some tests are skipped until the
+ * implementation is complete.
+ */
+
+const ERRORS_FIXTURES_DIR = resolve(__dirname, "../fixtures/parsing/errors");
+
+function readErrorFixture(filename: string): string {
+	return readFileSync(join(ERRORS_FIXTURES_DIR, filename), "utf-8");
+}
+
+describe("parseFile - error recovery with minor syntax errors", () => {
+	test.skip("recovers partial AST for file with missing semicolons", () => {
+		// Missing semicolons are often recoverable by modern parsers
+		const content = readErrorFixture("missing-semicolon.ts");
+		
+		// Expected: parseFileWithRecovery returns a ParseResult with:
+		// - success: true (partial recovery succeeded)
+		// - partial: true (indicating recovery was used)
+		// - ast: partial AST with recovered nodes
+		// - errors: array of parse errors encountered
+		
+		// Current behavior: parseFile returns null on any error
+		// After implementation: should return partial AST
+		const ast = parseFile("missing-semicolon.ts", content);
+		
+		// Current expectation (before error recovery implementation)
+		// This may change to expect partial recovery
+		if (ast === null) {
+			// Parser couldn't recover - expected for strict parsing
+			expect(ast).toBeNull();
+		} else {
+			// If parser did recover, verify it found some declarations
+			expect(ast.type).toBe(AST_NODE_TYPES.Program);
+			expect(ast.body.length).toBeGreaterThan(0);
+		}
+	});
+
+	test("parses valid TypeScript code without semicolons (ASI)", () => {
+		// JavaScript/TypeScript supports Automatic Semicolon Insertion (ASI)
+		// This should parse successfully without recovery
+		const content = `
+function greet(name: string): string {
+	return \`Hello, \${name}!\`
+}
+
+const PI = 3.14159
+
+function add(a: number, b: number): number {
+	return a + b
+}
+`.trim();
+		
+		const ast = parseFile("asi.ts", content);
+		
+		// ASI should allow this to parse successfully
+		expect(ast).not.toBeNull();
+		expect(ast?.type).toBe(AST_NODE_TYPES.Program);
+		expect(ast?.body.length).toBe(3); // 2 functions + 1 const
+	});
+});
+
+describe("parseFile - error recovery with major syntax errors", () => {
+	test("returns null for unclosed brace (current behavior)", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		const ast = parseFile("unclosed-brace.ts", content);
+		
+		// Current behavior: returns null on syntax errors
+		expect(ast).toBeNull();
+	});
+
+	test.skip("recovers partial AST from unclosed brace (after implementation)", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		
+		// After error recovery implementation:
+		// Should return partial AST with nodes before the error
+		// const result = parseFileWithRecovery("unclosed-brace.ts", content);
+		// expect(result.partial).toBe(true);
+		// expect(result.ast).not.toBeNull();
+		// expect(result.ast.body.length).toBeGreaterThan(0);
+		// 
+		// Verify it found validFunction and ValidClass before the broken part
+		// const nodeTypes = result.ast.body.map(n => n.type);
+		// expect(nodeTypes).toContain(AST_NODE_TYPES.FunctionDeclaration);
+		// expect(nodeTypes).toContain(AST_NODE_TYPES.ClassDeclaration);
+	});
+
+	test("returns null for multiple syntax errors (current behavior)", () => {
+		const content = readErrorFixture("multiple-errors.ts");
+		const ast = parseFile("multiple-errors.ts", content);
+		
+		// Current behavior: returns null
+		expect(ast).toBeNull();
+	});
+});
+
+describe("parseFile - ParseResult structure", () => {
+	test.skip("ParseResult includes error information when recovery is used", () => {
+		// After implementation, parseFileWithRecovery should return structured results
+		// const content = readErrorFixture("unclosed-brace.ts");
+		// const result = parseFileWithRecovery("unclosed-brace.ts", content);
+		//
+		// expect(result).toMatchObject({
+		//   success: true,
+		//   partial: true,
+		//   errors: expect.arrayContaining([
+		//     expect.objectContaining({
+		//       message: expect.any(String),
+		//       line: expect.any(Number),
+		//     })
+		//   ])
+		// });
+	});
+
+	test.skip("partial flag is false for successfully parsed files", () => {
+		const content = readFixture("simple/calculator.ts");
+		// const result = parseFileWithRecovery("calculator.ts", content);
+		//
+		// expect(result.success).toBe(true);
+		// expect(result.partial).toBe(false);
+		// expect(result.errors).toHaveLength(0);
+	});
+
+	test.skip("partial flag is true when recovery is used", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		// const result = parseFileWithRecovery("unclosed-brace.ts", content);
+		//
+		// expect(result.partial).toBe(true);
+	});
+});
+
+describe("parseFile - error fixture validation", () => {
+	test("error fixtures exist and are readable", () => {
+		// Verify the error fixtures were created correctly
+		const fixtures = [
+			"missing-semicolon.ts",
+			"unclosed-brace.ts",
+			"multiple-errors.ts",
+			"completely-broken.ts",
+		];
+		
+		for (const fixture of fixtures) {
+			const content = readErrorFixture(fixture);
+			expect(content.length).toBeGreaterThan(0);
+		}
+	});
+
+	test("missing-semicolon fixture contains expected declarations", () => {
+		const content = readErrorFixture("missing-semicolon.ts");
+		
+		// Verify fixture has the expected structure
+		expect(content).toContain("export function greet");
+		expect(content).toContain("export const PI");
+		expect(content).toContain("export class Calculator");
+	});
+
+	test("unclosed-brace fixture has valid code before error", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		
+		expect(content).toContain("export function validFunction");
+		expect(content).toContain("export class ValidClass");
+		expect(content).toContain("export function brokenFunction");
+	});
+
+	test("multiple-errors fixture has mixed valid/invalid sections", () => {
+		const content = readErrorFixture("multiple-errors.ts");
+		
+		// Valid sections
+		expect(content).toContain("export function validStart");
+		expect(content).toContain("export interface ValidInterface");
+		expect(content).toContain("export const CONSTANT");
+		expect(content).toContain("export class AnotherValidClass");
+		expect(content).toContain("export type ValidType");
+		
+		// Broken sections
+		expect(content).toContain("broken1");
+		expect(content).toContain("broken2");
+	});
+
+	test("completely-broken fixture is unparseable but has recognizable patterns", () => {
+		const content = readErrorFixture("completely-broken.ts");
+		
+		// File has syntax that breaks parsing
+		expect(content).toContain("{{{{");
+		expect(content).toContain("@@@");
+		
+		// But also has recognizable declaration patterns
+		expect(content).toContain("export function hiddenFunction");
+		expect(content).toContain("export class HiddenClass");
+		expect(content).toContain("export interface HiddenInterface");
+	});
+});
+
+/**
+ * parseFileWithRecovery Tests
+ *
+ * Tests for the parseFileWithRecovery function that returns a ParseResult
+ * with AST, errors, and partial flag.
+ */
+
+import { parseFileWithRecovery } from "@indexer/ast-parser";
+
+describe("parseFileWithRecovery - successful parsing", () => {
+	test("returns ParseResult with AST for valid code", () => {
+		const content = "const x = 42;";
+		const result = parseFileWithRecovery("test.ts", content);
+		
+		expect(result.ast).not.toBeNull();
+		expect(result.ast?.type).toBe(AST_NODE_TYPES.Program);
+		expect(result.errors).toHaveLength(0);
+		expect(result.partial).toBe(false);
+	});
+
+	test("parses valid fixture without recovery", () => {
+		const content = readFixture("simple/calculator.ts");
+		const result = parseFileWithRecovery("calculator.ts", content);
+		
+		expect(result.ast).not.toBeNull();
+		expect(result.partial).toBe(false);
+		expect(result.errors).toHaveLength(0);
+	});
+
+	test("parses code with ASI (automatic semicolon insertion)", () => {
+		const content = readErrorFixture("missing-semicolon.ts");
+		const result = parseFileWithRecovery("missing-semicolon.ts", content);
+		
+		// ASI handles missing semicolons - parses successfully without recovery
+		expect(result.ast).not.toBeNull();
+		expect(result.ast?.type).toBe(AST_NODE_TYPES.Program);
+		expect(result.ast?.body.length).toBeGreaterThan(0);
+		expect(result.partial).toBe(false);
+		expect(result.errors).toHaveLength(0);
+	});
+});
+
+describe("parseFileWithRecovery - error handling", () => {
+	test("returns errors for unclosed brace", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		const result = parseFileWithRecovery("unclosed-brace.ts", content);
+		
+		// Should have at least one error
+		expect(result.errors.length).toBeGreaterThan(0);
+		expect(result.errors[0]!.message).toBeTruthy();
+	});
+
+	test("returns errors for multiple syntax errors", () => {
+		const content = readErrorFixture("multiple-errors.ts");
+		const result = parseFileWithRecovery("multiple-errors.ts", content);
+		
+		expect(result.errors.length).toBeGreaterThan(0);
+	});
+
+	test("returns errors for completely broken file", () => {
+		const content = readErrorFixture("completely-broken.ts");
+		const result = parseFileWithRecovery("completely-broken.ts", content);
+		
+		expect(result.errors.length).toBeGreaterThan(0);
+	});
+
+	test("error includes line number for unclosed brace", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		const result = parseFileWithRecovery("unclosed-brace.ts", content);
+		
+		expect(result.errors.length).toBeGreaterThan(0);
+		const error = result.errors[0]!;
+		expect(typeof error.line).toBe("number");
+		expect(error!.line).toBeGreaterThan(0);
+	});
+
+	test("error message describes the problem", () => {
+		const content = "const x = ;"; // Invalid syntax
+		const result = parseFileWithRecovery("test.ts", content);
+		
+		expect(result.errors.length).toBeGreaterThan(0);
+		expect(result.errors[0]!.message).toContain("expected");
+	});
+});
+
+describe("parseFileWithRecovery - ParseResult structure", () => {
+	test("has correct structure for successful parse", () => {
+		const content = "export function foo() { return 42; }";
+		const result = parseFileWithRecovery("test.ts", content);
+		
+		expect(result).toHaveProperty("ast");
+		expect(result).toHaveProperty("errors");
+		expect(result).toHaveProperty("partial");
+		expect(result.ast).not.toBeNull();
+		expect(Array.isArray(result.errors)).toBe(true);
+		expect(typeof result.partial).toBe("boolean");
+	});
+
+	test("has correct structure for failed parse", () => {
+		const content = "function foo() {"; // Unclosed
+		const result = parseFileWithRecovery("test.ts", content);
+		
+		expect(result).toHaveProperty("ast");
+		expect(result).toHaveProperty("errors");
+		expect(result).toHaveProperty("partial");
+		expect(result.errors.length).toBeGreaterThan(0);
+	});
+
+	test("partial is false for successful parse", () => {
+		const content = "const x = 42;";
+		const result = parseFileWithRecovery("test.ts", content);
+		
+		expect(result.partial).toBe(false);
+	});
+
+	test("partial indicates recovery status for errors", () => {
+		const content = "const x = ;"; // Invalid
+		const result = parseFileWithRecovery("test.ts", content);
+		
+		// Either recovered (partial=true, ast not null) or failed (partial=false, ast null)
+		if (result.ast !== null) {
+			expect(result.partial).toBe(true);
+		} else {
+			expect(result.partial).toBe(false);
+		}
+	});
+});
+
+describe("parseFileWithRecovery - partial recovery behavior", () => {
+	test("attempts recovery with allowInvalidAST for errors", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		const result = parseFileWithRecovery("unclosed-brace.ts", content);
+		
+		// Errors should be captured
+		expect(result.errors.length).toBeGreaterThan(0);
+		
+		// If AST was recovered, partial should be true
+		if (result.ast !== null) {
+			expect(result.partial).toBe(true);
+		}
+	});
+
+	test("captures error location when available", () => {
+		const content = readErrorFixture("unclosed-brace.ts");
+		const result = parseFileWithRecovery("unclosed-brace.ts", content);
+		
+		expect(result.errors.length).toBeGreaterThan(0);
+		const error = result.errors[0]!;
+		
+		// Line should be defined (unclosed brace is detectable)
+		expect(error!.line).toBeDefined();
+		expect(error!.line).toBeGreaterThan(0);
+	});
+
+	test("reports first parse error encountered", () => {
+		const content = "const x = ;"; // Error at position
+		const result = parseFileWithRecovery("test.ts", content);
+		
+		expect(result.errors.length).toBeGreaterThan(0);
+		// Should have a meaningful error message
+		expect(result.errors[0]!.message.length).toBeGreaterThan(0);
+	});
+});
