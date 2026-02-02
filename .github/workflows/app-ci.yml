@@ -129,7 +129,7 @@ jobs:
         run: bun install --frozen-lockfile
 
       - name: Install uv (required for ADW MCP tools)
-        uses: astral-sh/setup-uv@v5
+        uses: astral-sh/setup-uv@v7
         with:
           enable-cache: true
 
