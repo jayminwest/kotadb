@@ -12,7 +12,8 @@ export type WorkflowPhase =
   | "analysis" 
   | "plan" 
   | "build" 
-  | "improve";
+  | "improve"
+  | "pr";
 
 export interface WorkflowSummary {
   success: boolean;
@@ -111,6 +112,8 @@ export class ConsoleReporter {
           this.logProgress(`Domain identified: ${value}`);
         } else if (key === "status" && value === "skipped") {
           this.logProgress("Skipped (dry run)");
+        } else if (key === "pr_url" && value) {
+          this.logProgress(`PR created: ${value}`);
         }
       }
     }

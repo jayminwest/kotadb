@@ -26,13 +26,14 @@ export async function runWorkflow(
   issueNumber: number,
   dryRun = false,
   verbose = false,
-  workingDirectory?: string  // Optional worktree path
+  workingDirectory?: string,
+  branchName?: string
 ): Promise<WorkflowResult> {
-  const projectRoot = workingDirectory ?? getProjectRoot();  // Use worktree if provided
+  const projectRoot = workingDirectory ?? getProjectRoot();
   const logger = new WorkflowLogger({ 
     issueNumber, 
     dryRun, 
-    projectRoot  // Logger will write to worktree location
+    projectRoot
   });
   const reporter = new ConsoleReporter({ verbose, issueNumber });
   
@@ -58,6 +59,7 @@ export async function runWorkflow(
     const orchResult = await orchestrateWorkflow({
       issueNumber,
       projectRoot,
+      branchName: branchName ?? null,
       logger,
       reporter,
       dryRun,
@@ -75,13 +77,15 @@ export async function runWorkflow(
     result.inputTokens = inputTokens;
     result.outputTokens = outputTokens;
     result.totalCostUsd = totalCostUsd;
+    result.prUrl = orchResult.prUrl;
     result.logDir = logger.getLogDir();
     
     logger.logEvent("WORKFLOW_COMPLETE", {
       success: true,
       duration_ms: durationMs,
       domain: orchResult.domain,
-      files_modified: orchResult.filesModified.length
+      files_modified: orchResult.filesModified.length,
+      pr_url: orchResult.prUrl
     });
     
     // Finalize agent output with summary
