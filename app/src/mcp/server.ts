@@ -15,6 +15,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { Sentry } from "../instrument.js";
 import {
 	ANALYZE_CHANGE_IMPACT_TOOL,
+	GENERATE_TASK_CONTEXT_TOOL,
 	INDEX_REPOSITORY_TOOL,
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_CODE_TOOL,
@@ -23,6 +24,7 @@ import {
 	SYNC_IMPORT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 	executeAnalyzeChangeImpact,
+	executeGenerateTaskContext,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearchCode,
@@ -55,6 +57,7 @@ export interface McpServerContext {
  * - validate_implementation_spec: Validate implementation specs
  * - kota_sync_export: Export SQLite to JSONL
  * - kota_sync_import: Import JSONL to SQLite
+ * - generate_task_context: Generate context for hook-based seeding
  */
 export function createMcpServer(context: McpServerContext): Server {
 	const server = new Server(
@@ -81,6 +84,7 @@ export function createMcpServer(context: McpServerContext): Server {
 				VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 				SYNC_EXPORT_TOOL,
 				SYNC_IMPORT_TOOL,
+				GENERATE_TASK_CONTEXT_TOOL,
 			],
 		};
 	});
@@ -142,6 +146,13 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "kota_sync_import":
 					result = await executeSyncImport(toolArgs, "");
+					break;
+				case "generate_task_context":
+					result = await executeGenerateTaskContext(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
 					break;
 				default:
 					const error = new Error(`Unknown tool: ${name}`);
