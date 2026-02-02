@@ -129,6 +129,41 @@ key_operations:
     better: Single table with proper indexes + recursive CTEs
     migration: Add indexes, rewrite queries with CTEs, verify tests, remove unused table
     evidence: "Commit ba1e03a (~650 lines deleted), 2026-01-29"
+    lessons:
+      - "Remove unused tables aggressively to reduce maintenance burden"
+      - "Consolidate related operations into fewer, well-indexed tables"
+      - "Trust recursive CTEs over separate materialized dependency graphs"
+
+  deletion_manifest_security:
+    when: Tracking deletions in sync operations
+    pattern: |
+      const ALLOWED_DELETION_TABLES = ['repositories', 'indexed_files', ...] as const;
+      type AllowedDeletionTable = typeof ALLOWED_DELETION_TABLES[number];
+      function validateDeletionTableName(name: string): asserts name is AllowedDeletionTable {
+        if (!ALLOWED_DELETION_TABLES.includes(name)) throw new SecurityError(...);
+      }
+    security_controls:
+      - "Whitelist table names with readonly const array"
+      - "Type-safe table validation using TypeScript asserts"
+      - "Manifest size limits (10MB max) to prevent DoS"
+      - "Error rate thresholds (>10% errors = potential attack)"
+      - "Template literals safe only with validated table names"
+    evidence: "app/src/sync/deletion-manifest.ts, 2026-02-02"
+
+  sync_architecture_jsonl:
+    when: Implementing database synchronization
+    problem: "JSONL export only captures current state, deletions are invisible"
+    solution: ".deletions.jsonl manifest tracks explicit deletions"
+    lifecycle: |
+      1. Export: Record deletions in manifest during export
+      2. Git: Manifest syncs like any other file
+      3. Import: Apply deletions before importing new data
+      4. Cleanup: Clear manifest after successful import
+    patterns:
+      - "Append-only manifest with ISO timestamps"
+      - "Batch deletions by table in single transaction"
+      - "Defense-in-depth: whitelist + table existence check"
+    evidence: "app/src/sync/deletion-manifest.ts, 2026-02-02"
 
   wal_configuration:
     pragmas: |
@@ -209,6 +244,12 @@ best_practices:
     - batch in transactions
     - IMMEDIATE for writes
 
+  security:
+    - Whitelist table names for dynamic SQL
+    - Validate all user inputs with type assertions
+    - Size limits on external files (manifests, imports)
+    - Error rate monitoring for attack detection
+
   connections:
     - Pool pattern
     - single writer
@@ -242,14 +283,18 @@ known_issues:
     resolution: "Checkpoint periodically, smaller batches"
 
 stability:
-  last_reviewed: 2026-01-30
-  insight_rate_trend: stable
+  last_reviewed: 2026-02-02
+  insight_rate_trend: accelerating
   contradiction_count: 0
   notes: |
-    Consolidated from 967 to ~230 lines (2026-01-30) preserving all knowledge:
+    Major update (2026-02-02) - added sync and security patterns:
+    - Deletion manifest security controls (whitelist, validation, DoS protection)
+    - JSONL sync architecture with explicit deletion tracking
+    - Single source of truth lessons learned from dependency_graph removal
+
+    Previous consolidation (2026-01-30) preserved:
     - FTS5 + escapeFts5Term (issue #595)
     - Auto-init schema (issue #574)
     - Project-local storage (issue #592)
     - Recursive CTE dependencies (issue #37)
     - Path normalization, partial/composite indexes
-    - Single source of truth (removed dependency_graph)
