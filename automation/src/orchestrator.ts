@@ -23,6 +23,7 @@ import {
   extractFilePaths, 
   extractTextFromMessages 
 } from "./parser.ts";
+import { handlePRCreation } from "./pr.ts";
 
 /**
  * GitHub issue data fetched via gh CLI
@@ -39,11 +40,13 @@ export interface OrchestrationResult {
   specPath: string | null;
   filesModified: string[];
   improveStatus: "success" | "failed" | "skipped";
+  prUrl: string | null;
 }
 
 export interface OrchestrationOptions {
   issueNumber: number;
   projectRoot: string;
+  branchName: string | null;
   logger: WorkflowLogger;
   reporter: ConsoleReporter;
   dryRun: boolean;
@@ -142,7 +145,7 @@ function createNotificationHook(reporter: ConsoleReporter): HookCallback {
 export async function orchestrateWorkflow(
   opts: OrchestrationOptions
 ): Promise<OrchestrationResult> {
-  const { issueNumber, projectRoot, logger, reporter, dryRun, verbose } = opts;
+  const { issueNumber, projectRoot, branchName, logger, reporter, dryRun, verbose } = opts;
 
   // Build hooks configuration
   const hooks: Partial<Record<string, HookCallbackMatcher[]>> = {
@@ -227,11 +230,50 @@ export async function orchestrateWorkflow(
   logger.logEvent("PHASE_COMPLETE", { phase: "improve", status: improveStatus });
   reporter.completePhase("improve", { status: improveStatus });
 
+  // Phase 5: Create PR (after successful build)
+  let prUrl: string | null = null;
+  if (branchName && filesModified.length > 0) {
+    reporter.startPhase("pr");
+    logger.logEvent("PHASE_START", { phase: "pr" });
+    
+    try {
+      const prResult = await handlePRCreation({
+        worktreePath: projectRoot,
+        branchName,
+        issueNumber,
+        filesModified,
+        dryRun
+      });
+      
+      if (prResult.success && prResult.prUrl) {
+        prUrl = prResult.prUrl;
+        logger.logEvent("PHASE_COMPLETE", { phase: "pr", pr_url: prUrl });
+        reporter.completePhase("pr", { pr_url: prUrl });
+      } else if (prResult.success && dryRun) {
+        logger.logEvent("PHASE_COMPLETE", { phase: "pr", dry_run: true });
+        reporter.completePhase("pr", { status: "skipped" });
+      } else {
+        logger.logEvent("PHASE_COMPLETE", { phase: "pr", error: prResult.errorMessage });
+        reporter.logWarning(`PR creation: ${prResult.errorMessage ?? "unknown error"}`);
+        reporter.completePhase("pr", { status: "failed" });
+      }
+    } catch (error) {
+      logger.logError("pr_phase", error instanceof Error ? error : new Error(String(error)));
+      reporter.logWarning("PR creation failed (non-fatal)");
+      reporter.completePhase("pr", { status: "failed" });
+    }
+  } else if (!branchName) {
+    logger.logEvent("PHASE_SKIP", { phase: "pr", reason: "no branch name" });
+  } else {
+    logger.logEvent("PHASE_SKIP", { phase: "pr", reason: "no files modified" });
+  }
+
   return {
     domain,
     specPath,
     filesModified,
-    improveStatus
+    improveStatus,
+    prUrl
   };
 }
 

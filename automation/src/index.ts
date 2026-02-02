@@ -173,7 +173,8 @@ async function main(): Promise<number> {
       issueNumber, 
       dryRun, 
       verbose,
-      worktreeInfo?.path ?? projectRoot  // Use worktree or fallback to projectRoot
+      worktreeInfo?.path ?? projectRoot,
+      worktreeInfo?.branch
     );
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
