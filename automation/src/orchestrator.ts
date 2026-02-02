@@ -23,7 +23,7 @@ import {
   extractFilePaths, 
   extractTextFromMessages 
 } from "./parser.ts";
-import { handlePRCreation } from "./pr.ts";
+import { handlePRCreation, commitExpertiseChanges, type IssueType } from "./pr.ts";
 
 /**
  * GitHub issue data fetched via gh CLI
@@ -147,6 +147,10 @@ export async function orchestrateWorkflow(
 ): Promise<OrchestrationResult> {
   const { issueNumber, projectRoot, branchName, logger, reporter, dryRun, verbose } = opts;
 
+  // Fetch issue title early for PR creation
+  const issueData = await fetchIssueContent(issueNumber);
+  const issueTitle = issueData.title;
+
   // Build hooks configuration
   const hooks: Partial<Record<string, HookCallbackMatcher[]>> = {
     PreToolUse: [
@@ -194,7 +198,7 @@ export async function orchestrateWorkflow(
   reporter.startPhase("analysis");
   logger.logEvent("PHASE_START", { phase: "analysis" });
   const analysisResult = await analyzeIssue(issueNumber, sdkOptions, logger);
-  const { domain, requirements } = parseAnalysis(analysisResult);
+  const { domain, requirements, issueType } = parseAnalysis(analysisResult);
   logger.logEvent("PHASE_COMPLETE", { phase: "analysis", domain });
   reporter.completePhase("analysis", { domain });
 
@@ -230,6 +234,20 @@ export async function orchestrateWorkflow(
   logger.logEvent("PHASE_COMPLETE", { phase: "improve", status: improveStatus });
   reporter.completePhase("improve", { status: improveStatus });
 
+  // Commit expertise changes from improve phase (before PR)
+  if (!dryRun && improveStatus === "success") {
+    try {
+      const expertiseCommitSha = await commitExpertiseChanges(projectRoot, domain, issueNumber);
+      if (expertiseCommitSha) {
+        logger.logEvent("EXPERTISE_COMMITTED", { sha: expertiseCommitSha, domain });
+        reporter.logKeyAction(`Committed expertise update: ${expertiseCommitSha.substring(0, 7)}`);
+      }
+    } catch (error) {
+      logger.logError("expertise_commit", error instanceof Error ? error : new Error(String(error)));
+      reporter.logWarning("Failed to commit expertise changes (non-fatal)");
+    }
+  }
+
   // Phase 5: Create PR (after successful build)
   let prUrl: string | null = null;
   if (branchName && filesModified.length > 0) {
@@ -241,6 +259,9 @@ export async function orchestrateWorkflow(
         worktreePath: projectRoot,
         branchName,
         issueNumber,
+        issueType: issueType as IssueType,
+        issueTitle,
+        domain,
         filesModified,
         dryRun
       });
