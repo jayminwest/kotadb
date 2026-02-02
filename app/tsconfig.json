@@ -59,5 +59,8 @@
     "src/**/*.ts",
     "tests/**/*.ts",
     "shared/**/*.ts"
+  ],
+  "exclude": [
+    "tests/fixtures/parsing/errors/**"
   ]
 }
