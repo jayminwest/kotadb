@@ -7,8 +7,6 @@
 
 import type { OpenAPIRegistry } from '@asteasolutions/zod-to-openapi';
 import {
-	IndexRequestSchema,
-	IndexResponseSchema,
 	SearchRequestSchema,
 	SearchResponseSchema,
 	RecentFilesResponseSchema,
@@ -18,6 +16,8 @@ import {
 	McpRequestSchema,
 	McpResponseSchema,
 	McpHealthResponseSchema,
+	ValidationRequestSchema,
+	ValidationResponseSchema,
 } from './schemas.js';
 /**
  * Standard rate limit response headers
@@ -75,69 +75,6 @@ export function registerPaths(registry: OpenAPIRegistry): void {
 				content: {
 					'application/json': {
 						schema: HealthResponseSchema,
-					},
-				},
-			},
-		},
-	});
-
-	// ===== Indexing =====
-	registry.registerPath({
-		method: 'post',
-		path: '/index',
-		summary: 'Index repository',
-		description: 'Trigger indexing of a repository. Creates a background job to clone, parse, and index the repository code.',
-		tags: ['Indexing'],
-		security: [{ apiKey: [] }, { bearerAuth: [] }],
-		request: {
-			body: {
-				description: 'Repository indexing request',
-				content: {
-					'application/json': {
-						schema: IndexRequestSchema,
-					},
-				},
-			},
-		},
-		responses: {
-			200: {
-				description: 'Indexing job created successfully. Rate limit headers are included in the response.',
-				headers: rateLimitHeaders,
-				content: {
-					'application/json': {
-						schema: IndexResponseSchema,
-					},
-				},
-			},
-			400: {
-				description: 'Invalid request parameters',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			401: {
-				description: 'Unauthorized - Invalid or missing authentication',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
-					},
-				},
-			},
-			429: {
-				description: 'Rate limit exceeded',
-				content: {
-					'application/json': {
-						schema: RateLimitErrorResponseSchema,
-					},
-				},
-			},
-			500: {
-				description: 'Internal server error',
-				content: {
-					'application/json': {
-						schema: ErrorResponseSchema,
 					},
 				},
 			},
@@ -236,6 +173,69 @@ export function registerPaths(registry: OpenAPIRegistry): void {
 			},
 			500: {
 				description: 'Internal server error',
+				content: {
+					'application/json': {
+						schema: ErrorResponseSchema,
+					},
+				},
+			},
+		},
+	});
+
+	// ===== Validation =====
+	registry.registerPath({
+		method: 'post',
+		path: '/validate-output',
+		summary: 'Validate command output',
+		description: 'Validate command output against a Zod-compatible JSON schema. Used by automation layer to validate slash command outputs.',
+		tags: ['Validation'],
+		security: [{ apiKey: [] }, { bearerAuth: [] }],
+		request: {
+			body: {
+				description: 'Validation request with schema and output',
+				content: {
+					'application/json': {
+						schema: ValidationRequestSchema,
+					},
+				},
+			},
+		},
+		responses: {
+			200: {
+				description: 'Validation completed successfully',
+				headers: rateLimitHeaders,
+				content: {
+					'application/json': {
+						schema: ValidationResponseSchema,
+					},
+				},
+			},
+			400: {
+				description: 'Invalid request parameters (missing schema or output)',
+				content: {
+					'application/json': {
+						schema: ErrorResponseSchema,
+					},
+				},
+			},
+			401: {
+				description: 'Unauthorized - Invalid or missing authentication',
+				content: {
+					'application/json': {
+						schema: ErrorResponseSchema,
+					},
+				},
+			},
+			429: {
+				description: 'Rate limit exceeded',
+				content: {
+					'application/json': {
+						schema: RateLimitErrorResponseSchema,
+					},
+				},
+			},
+			500: {
+				description: 'Validation failed due to internal error',
 				content: {
 					'application/json': {
 						schema: ErrorResponseSchema,
