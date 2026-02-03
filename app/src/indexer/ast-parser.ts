@@ -43,6 +43,24 @@ export interface ParseError {
 }
 
 /**
+ * Type guard to validate that an AST node is a valid Program.
+ * Provides runtime type validation to prevent version compatibility issues.
+ *
+ * @param ast - Unknown AST node to validate
+ * @returns true if ast is a valid Program node
+ */
+function isValidProgram(ast: unknown): ast is TSESTree.Program {
+	return (
+		ast !== null &&
+		typeof ast === "object" &&
+		"type" in ast &&
+		ast.type === "Program" &&
+		"body" in ast &&
+		Array.isArray(ast.body)
+	);
+}
+
+/**
  * Result of parsing a file, including partial AST recovery information.
  */
 export interface ParseResult {
@@ -103,7 +121,7 @@ function createParseError(error: unknown): ParseError {
 
 /**
  * Parse a file with error-tolerant options enabled.
- * Uses allowInvalidAST to attempt partial recovery.
+ * Uses allowInvalidAST to attempt partial recovery and validates result.
  */
 function parseWithRecoveryOptions(filePath: string, content: string): TSESTree.Program | null {
 	try {
@@ -119,6 +137,18 @@ function parseWithRecoveryOptions(filePath: string, content: string): TSESTree.P
 			allowInvalidAST: true,
 			errorOnUnknownASTType: false,
 		});
+
+		// Validate the returned AST is actually a Program node
+		if (!isValidProgram(ast)) {
+			const astType = typeof ast === "object" && ast !== null && "type" in ast ? (ast as any).type : typeof ast;
+			logger.warn(`Parser returned invalid Program type for ${filePath}`, {
+				file_path: filePath,
+				ast_type: astType,
+				recovery: "failed_validation",
+			});
+			return null;
+		}
+
 		return ast;
 	} catch {
 		// Even with recovery options, parsing can still fail
@@ -159,6 +189,18 @@ export function parseFileWithRecovery(filePath: string, content: string): ParseR
 			tokens: true,
 			filePath,
 		});
+
+		// Validate the returned AST is actually a Program node
+		if (!isValidProgram(ast)) {
+			const astType = typeof ast === "object" && ast !== null && "type" in ast ? (ast as any).type : typeof ast;
+			logger.warn(`Parser returned invalid Program type for ${filePath}`, {
+				file_path: filePath,
+				ast_type: astType,
+				recovery: "failed_validation",
+			});
+			throw new Error(`Invalid AST type returned: expected Program, got ${astType}`);
+		}
+
 		return {
 			ast,
 			errors: [],
