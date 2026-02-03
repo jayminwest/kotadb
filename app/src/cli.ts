@@ -11,6 +11,7 @@
  *   kotadb --port 4000  Start on custom port
  *   kotadb --version    Show version
  *   kotadb --help       Show help
+ *   kotadb deps         Query dependency information for a file
  */
 
 import { createExpressApp } from "@api/routes";
@@ -48,6 +49,16 @@ kotadb v${version} - Local code intelligence for CLI agents
 
 USAGE:
   kotadb [OPTIONS]
+  kotadb deps [OPTIONS]
+
+COMMANDS:
+  deps              Query dependency information for a file
+                    Options:
+                      --file, -f <path>     Target file to analyze (required)
+                      --format json|text    Output format (default: text)
+                      --depth, -d <n>       Dependency traversal depth 1-5 (default: 1)
+                      --include-tests       Include test files in output
+                      --repository, -r <id> Repository ID or full_name
 
 OPTIONS:
   --stdio           Use stdio transport (for Claude Code integration)
@@ -62,10 +73,12 @@ ENVIRONMENT VARIABLES:
   LOG_LEVEL         Logging level: debug, info, warn, error (default: info)
 
 EXAMPLES:
-  kotadb --stdio            Start in stdio mode (for Claude Code)
-  kotadb                    Start HTTP server on port 3000
-  kotadb --port 4000        Start HTTP server on port 4000
-  PORT=8080 kotadb          Start HTTP server on port 8080
+  kotadb --stdio                              Start in stdio mode (for Claude Code)
+  kotadb                                      Start HTTP server on port 3000
+  kotadb --port 4000                          Start HTTP server on port 4000
+  kotadb deps --file src/db/client.ts         Query deps for a file (text)
+  kotadb deps --file src/db/client.ts --format json   Query deps (JSON)
+  kotadb deps -f src/api/routes.ts -d 2       Query deps with depth 2
 
 MCP CONFIGURATION (stdio mode - RECOMMENDED):
   Add to your .mcp.json or Claude Code settings:
@@ -181,6 +194,16 @@ async function runStdioMode(): Promise<void> {
 async function main(): Promise<void> {
   // Parse command line arguments (skip first two: bun/node and script path)
   const args = process.argv.slice(2);
+
+  // Check for subcommands first
+  const firstArg = args[0];
+  if (firstArg === "deps") {
+    // Handle deps subcommand
+    const { runDepsCommand } = await import("./cli/deps.js");
+    runDepsCommand(args.slice(1));
+    return;
+  }
+
   const options = parseArgs(args);
 
   // Handle --version

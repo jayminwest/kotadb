@@ -333,6 +333,46 @@ export const SYNC_IMPORT_TOOL: ToolDefinition = {
 };
 
 /**
+ * Tool: generate_task_context
+ *
+ * Generates structured context for hook-based context seeding.
+ * Used by PreToolUse and SubagentStart hooks to inject dependency info.
+ * Target: <100ms response time
+ */
+export const GENERATE_TASK_CONTEXT_TOOL: ToolDefinition = {
+	name: "generate_task_context",
+	description:
+		"Generate structured context for a set of files including dependency counts, impacted files, test files, and recent changes. Designed for hook-based context injection with <100ms performance target.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			files: {
+				type: "array",
+				items: { type: "string" },
+				description: "List of file paths to analyze (relative to repository root)",
+			},
+			include_tests: {
+				type: "boolean",
+				description: "Include test file discovery (default: true)",
+			},
+			include_symbols: {
+				type: "boolean",
+				description: "Include symbol information for each file (default: false)",
+			},
+			max_impacted_files: {
+				type: "number",
+				description: "Maximum number of impacted files to return (default: 20)",
+			},
+			repository: {
+				type: "string",
+				description: "Repository ID or full_name (optional, uses most recent if not specified)",
+			},
+		},
+		required: ["files"],
+	},
+};
+
+/**
  * Get all available tool definitions
  */
 export function getToolDefinitions(): ToolDefinition[] {
@@ -345,6 +385,7 @@ export function getToolDefinitions(): ToolDefinition[] {
 		VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 		SYNC_EXPORT_TOOL,
 		SYNC_IMPORT_TOOL,
+		GENERATE_TASK_CONTEXT_TOOL,
 	];
 }
 
@@ -878,6 +919,218 @@ export async function executeSyncImport(
 	};
 }
 
+
+/**
+ * Execute generate_task_context tool
+ *
+ * Generates structured context for hook-based context seeding.
+ * Performance target: <100ms
+ */
+export async function executeGenerateTaskContext(
+	params: unknown,
+	_requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	const startTime = performance.now();
+
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: files
+	if (p.files === undefined) {
+		throw new Error("Missing required parameter: files");
+	}
+	if (!Array.isArray(p.files)) {
+		throw new Error("Parameter 'files' must be an array");
+	}
+	for (const file of p.files) {
+		if (typeof file !== "string") {
+			throw new Error("Each file in 'files' must be a string");
+		}
+	}
+
+	// Validate optional parameters
+	if (p.include_tests !== undefined && typeof p.include_tests !== "boolean") {
+		throw new Error("Parameter 'include_tests' must be a boolean");
+	}
+	if (p.include_symbols !== undefined && typeof p.include_symbols !== "boolean") {
+		throw new Error("Parameter 'include_symbols' must be a boolean");
+	}
+	if (p.max_impacted_files !== undefined && typeof p.max_impacted_files !== "number") {
+		throw new Error("Parameter 'max_impacted_files' must be a number");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const validatedParams = {
+		files: p.files as string[],
+		include_tests: (p.include_tests as boolean | undefined) ?? true,
+		include_symbols: (p.include_symbols as boolean | undefined) ?? false,
+		max_impacted_files: Math.min(Math.max((p.max_impacted_files as number | undefined) ?? 20, 1), 50),
+		repository: p.repository as string | undefined,
+	};
+
+	// Resolve repository ID
+	const repoResult = resolveRepositoryIdentifierWithError(validatedParams.repository);
+	if ("error" in repoResult) {
+		return {
+			targetFiles: [],
+			impactedFiles: [],
+			testFiles: [],
+			recentChanges: [],
+			indexStale: true,
+			staleReason: repoResult.error,
+			durationMs: Math.round(performance.now() - startTime),
+		};
+	}
+	const repositoryId = repoResult.id;
+
+	const db = getGlobalDatabase();
+
+	// Check index freshness
+	const lastIndexed = db.queryOne<{ last_indexed_at: string | null }>(
+		"SELECT last_indexed_at FROM repositories WHERE id = ?",
+		[repositoryId],
+	);
+	const indexStale = !lastIndexed?.last_indexed_at;
+
+	// Process each target file
+	interface TargetFileInfo {
+		path: string;
+		dependentCount: number;
+		symbols: Array<{ name: string; kind: string; line: number }>;
+	}
+	const targetFiles: TargetFileInfo[] = [];
+	const allImpactedFiles = new Set<string>();
+	const allTestFiles = new Set<string>();
+
+	for (const filePath of validatedParams.files) {
+		// Resolve file ID
+		const fileId = resolveFilePath(filePath, repositoryId);
+
+		if (!fileId) {
+			// File not indexed yet - add with zero dependents
+			targetFiles.push({
+				path: filePath,
+				dependentCount: 0,
+				symbols: [],
+			});
+			continue;
+		}
+
+		// Query dependents (depth 1 for performance)
+		const dependents = queryDependents(fileId, 1, validatedParams.include_tests);
+		
+		// Add target file info
+		const fileInfo: TargetFileInfo = {
+			path: filePath,
+			dependentCount: dependents.direct.length,
+			symbols: [],
+		};
+
+		// Optionally include symbols
+		if (validatedParams.include_symbols) {
+			const symbols = db.query<{ name: string; kind: string; line_start: number }>(
+				`SELECT name, kind, line_start 
+				 FROM indexed_symbols 
+				 WHERE file_id = ? 
+				 ORDER BY line_start 
+				 LIMIT 20`,
+				[fileId],
+			);
+			fileInfo.symbols = symbols.map((s) => ({
+				name: s.name,
+				kind: s.kind,
+				line: s.line_start,
+			}));
+		}
+
+		targetFiles.push(fileInfo);
+
+		// Collect impacted files (direct dependents only for speed)
+		for (const dep of dependents.direct) {
+			if (allImpactedFiles.size < validatedParams.max_impacted_files) {
+				allImpactedFiles.add(dep);
+			}
+		}
+
+		// Discover test files for this file
+		if (validatedParams.include_tests) {
+			const testPatterns = generateTestFilePatterns(filePath);
+			for (const pattern of testPatterns) {
+				const testFileId = resolveFilePath(pattern, repositoryId);
+				if (testFileId) {
+					allTestFiles.add(pattern);
+				}
+			}
+		}
+	}
+
+	// Query recent changes (files modified in last 7 days based on indexed_at)
+	const recentChanges = db.query<{ path: string; indexed_at: string }>(
+		`SELECT path, indexed_at 
+		 FROM indexed_files 
+		 WHERE repository_id = ? 
+		 AND indexed_at > datetime('now', '-7 days')
+		 ORDER BY indexed_at DESC 
+		 LIMIT 10`,
+		[repositoryId],
+	);
+
+	const durationMs = Math.round(performance.now() - startTime);
+
+	logger.debug("generate_task_context completed", {
+		user_id: userId,
+		files_requested: validatedParams.files.length,
+		impacted_count: allImpactedFiles.size,
+		test_count: allTestFiles.size,
+		duration_ms: durationMs,
+	});
+
+	return {
+		targetFiles,
+		impactedFiles: Array.from(allImpactedFiles),
+		testFiles: Array.from(allTestFiles),
+		recentChanges: recentChanges.map((r) => ({
+			path: r.path,
+			indexedAt: r.indexed_at,
+		})),
+		indexStale,
+		staleReason: indexStale ? "Repository has not been indexed" : undefined,
+		durationMs,
+	};
+}
+
+/**
+ * Generate potential test file patterns for a source file
+ */
+function generateTestFilePatterns(sourcePath: string): string[] {
+	const patterns: string[] = [];
+	const withoutExt = sourcePath.replace(/\.(ts|tsx|js|jsx)$/, "");
+	
+	// Common test file naming conventions
+	patterns.push(withoutExt + ".test.ts");
+	patterns.push(withoutExt + ".spec.ts");
+	patterns.push(withoutExt + ".test.tsx");
+	patterns.push(withoutExt + ".spec.tsx");
+	
+	// Tests in __tests__ or tests directory
+	const fileName = sourcePath.split("/").pop();
+	if (fileName) {
+		const fileNameWithoutExt = fileName.replace(/\.(ts|tsx|js|jsx)$/, "");
+		const dirPath = sourcePath.substring(0, sourcePath.lastIndexOf("/"));
+		patterns.push(dirPath + "/__tests__/" + fileNameWithoutExt + ".test.ts");
+		patterns.push("tests/" + sourcePath.replace(/\.(ts|tsx)$/, ".test.ts"));
+	}
+	
+	return patterns;
+}
+
 /**
  * Main tool call dispatcher
  */
@@ -904,6 +1157,8 @@ export async function handleToolCall(
 			return await executeSyncExport(params, requestId);
 		case "kota_sync_import":
 			return await executeSyncImport(params, requestId);
+		case "generate_task_context":
+			return await executeGenerateTaskContext(params, requestId, userId);
 		default:
 			throw invalidParams(requestId, "Unknown tool: " + toolName);
 	}

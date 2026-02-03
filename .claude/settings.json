@@ -15,5 +15,21 @@
       "Write",
       "Edit"
     ]
+  },
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Edit|Write|MultiEdit",
+      "hooks": [{
+        "type": "command",
+        "command": "python3 .claude/hooks/kotadb/pre-edit-context.py"
+      }]
+    }],
+    "SubagentStart": [{
+      "matcher": "build|Explore",
+      "hooks": [{
+        "type": "command",
+        "command": "python3 .claude/hooks/kotadb/agent-context.py"
+      }]
+    }]
   }
 }
