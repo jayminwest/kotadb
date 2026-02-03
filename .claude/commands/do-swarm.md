@@ -47,6 +47,7 @@ Classify the requirement to identify the target domain(s):
 | **agent-authoring** | agent, expert domain, tool selection, registry | .claude/agents/ |
 | **automation** | ADW, automated workflow, script, CI/CD | .claude/commands/automation/ |
 | **documentation** | docs, README, API reference, architecture docs | web/docs/content/ |
+| **web** | homepage, blog, CSS, design system, Liquid Glass, kotadb.io, marketing site, static site | web/ |
 
 Get the expertise path:
 ```
