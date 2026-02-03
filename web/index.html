@@ -3,22 +3,38 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="KotaDB - Local-first code intelligence. Index, search, and analyze your codebase with a lightweight SQLite-powered API.">
-  <meta name="keywords" content="code search, code intelligence, SQLite, local-first, developer tools">
-  <meta name="author" content="KotaDB">
-  <meta property="og:title" content="KotaDB - Local-first Code Intelligence">
+  <meta name="description" content="kotadb - Local-first code intelligence. Index, search, and analyze your codebase with a lightweight SQLite-powered API.">
+  <meta name="keywords" content="code search, code intelligence, SQLite, local-first, developer tools, MCP">
+  <meta name="author" content="kotadb">
+  <meta property="og:title" content="kotadb - Local-first Code Intelligence">
   <meta property="og:description" content="Index, search, and analyze your codebase with a lightweight SQLite-powered API.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="KotaDB - Local-first Code Intelligence">
+  <meta name="twitter:title" content="kotadb - Local-first Code Intelligence">
   <meta name="twitter:description" content="Index, search, and analyze your codebase with a lightweight SQLite-powered API.">
-  <title>KotaDB - Local-first Code Intelligence</title>
+  <meta name="theme-color" content="#0a0a0f">
+  <title>kotadb - Local-first Code Intelligence</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="stylesheet" href="css/main.css">
 </head>
 <body>
   <header class="site-header">
     <div class="container">
-      <a href="/" class="logo">KotaDB</a>
+      <a href="/" class="logo">
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22d3ee"/>
+              <stop offset="100%" stop-color="#0891b2"/>
+            </linearGradient>
+          </defs>
+          <rect x="8" y="8" width="12" height="64" rx="3" fill="url(#logoGrad)"/>
+          <polygon points="20,40 20,30 50,8 60,8 60,18 32,40" fill="#22d3ee" opacity="0.9"/>
+          <polygon points="20,40 20,50 50,72 60,72 60,62 32,40" fill="#0891b2" opacity="0.85"/>
+          <polygon points="25,40 48,20 55,20 55,27 35,40 55,53 55,60 48,60 25,40" fill="#22d3ee"/>
+        </svg>
+        <span class="logo-text">kota<span class="accent">db</span></span>
+      </a>
       <nav class="main-nav">
         <a href="/docs/">Docs</a>
         <a href="/blog/">Blog</a>
@@ -30,36 +46,93 @@
   <main>
     <section class="hero">
       <div class="container">
-        <h1>Local-first code intelligence</h1>
-        <p class="hero-subtitle">Index, search, and analyze your codebase with a lightweight SQLite-powered API. No cloud required.</p>
-        <div class="hero-actions">
+        <h1 class="fade-in">Local-first code intelligence</h1>
+        <p class="hero-subtitle fade-in">Index, search, and analyze your codebase with a lightweight SQLite-powered API. No cloud required.</p>
+        
+        <div class="hero-actions fade-in">
           <a href="/docs/" class="btn btn-primary">Get Started</a>
-          <a href="https://github.com/jayminwest/kotadb" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">View on GitHub</a>
+          <a href="https://github.com/jayminwest/kotadb" class="btn btn-secondary" target="_blank" rel="noopener noreferrer">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+              <path d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"/>
+            </svg>
+            View on GitHub
+          </a>
+        </div>
+
+        <!-- Terminal Demo -->
+        <div class="terminal-wrapper fade-in">
+          <div class="terminal">
+            <div class="terminal-header">
+              <span class="terminal-dot"></span>
+              <span class="terminal-dot"></span>
+              <span class="terminal-dot"></span>
+              <span class="terminal-title">terminal</span>
+            </div>
+            <div class="terminal-body" id="terminal-demo">
+              <div class="terminal-line">
+                <span class="terminal-prompt">$</span>
+                <span class="terminal-command" id="cmd-1"></span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- GitHub Stats -->
+        <div class="stats-bar fade-in">
+          <div class="stat-item">
+            <a href="https://github.com/jayminwest/kotadb/stargazers" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+              <span class="stat-value" id="github-stars">--</span>
+              <span>Stars</span>
+            </a>
+          </div>
+          <div class="stat-item">
+            <a href="https://github.com/jayminwest/kotadb/network/members" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+              <span class="stat-value" id="github-forks">--</span>
+              <span>Forks</span>
+            </a>
+          </div>
+          <div class="stat-item">
+            <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">
+              <svg viewBox="0 0 24 24"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><polyline points="10 9 9 9 8 9"/></svg>
+              <span>MIT License</span>
+            </a>
+          </div>
         </div>
       </div>
     </section>
 
     <section class="features">
       <div class="container">
+        <div class="features-header fade-in">
+          <h2>Built for developers</h2>
+          <p>Everything you need to understand and navigate your codebase, running entirely on your machine.</p>
+        </div>
+        
         <div class="features-grid">
-          <article class="feature">
-            <h2>Fast Code Search</h2>
+          <article class="feature fade-in">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+            </div>
+            <h3>Fast Code Search</h3>
             <p>Full-text search powered by SQLite FTS5. Find symbols, functions, and patterns across your entire codebase in milliseconds.</p>
           </article>
 
-          <article class="feature">
-            <h2>Dependency Analysis</h2>
+          <article class="feature fade-in">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><line x1="6" y1="3" x2="6" y2="15"/><circle cx="18" cy="6" r="3"/><circle cx="6" cy="18" r="3"/><path d="M18 9a9 9 0 0 1-9 9"/></svg>
+            </div>
+            <h3>Dependency Analysis</h3>
             <p>Understand how your code connects. Trace imports, find dependents, and analyze impact before making changes.</p>
           </article>
 
-          <article class="feature">
-            <h2>MCP Integration</h2>
+          <article class="feature fade-in">
+            <div class="feature-icon">
+              <svg viewBox="0 0 24 24"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            </div>
+            <h3>MCP Integration</h3>
             <p>Works seamlessly with Claude and other AI assistants through the Model Context Protocol. Give your tools code awareness.</p>
-          </article>
-
-          <article class="feature">
-            <h2>Zero Cloud Dependencies</h2>
-            <p>Everything runs locally. Your code never leaves your machine. Fast, private, and always available offline.</p>
           </article>
         </div>
       </div>
@@ -67,15 +140,17 @@
 
     <section class="quickstart">
       <div class="container">
-        <h2>Quick Start</h2>
-        <pre><code><span class="comment"># Install globally</span>
-npm install -g kotadb
+        <h2 class="fade-in">Quick Start</h2>
+        <div class="quickstart-code fade-in">
+          <pre><code><span class="comment"># Install globally</span>
+bun add -g kotadb
 
 <span class="comment"># Index your repository</span>
 kotadb index /path/to/your/repo
 
 <span class="comment"># Start the server</span>
 kotadb serve</code></pre>
+        </div>
       </div>
     </section>
   </main>
@@ -83,7 +158,7 @@ kotadb serve</code></pre>
   <footer class="site-footer">
     <div class="container">
       <div class="footer-content">
-        <p>&copy; 2026 KotaDB. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
+        <p>2026 kotadb. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
         <nav class="footer-nav">
           <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
           <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
@@ -91,5 +166,107 @@ kotadb serve</code></pre>
       </div>
     </div>
   </footer>
+
+  <script src="js/main.js" type="module"></script>
+  <script>
+    // Terminal typing animation
+    const terminalDemo = document.getElementById('terminal-demo');
+    const commands = [
+      { type: 'command', text: 'bunx kotadb index ./my-project' },
+      { type: 'output', text: 'Indexing repository...' },
+      { type: 'success', text: 'Indexed 1,247 files in 2.3s' },
+      { type: 'command', text: 'bunx kotadb search "useAuth"' },
+      { type: 'output', text: 'Found 12 matches in 4 files' },
+    ];
+    
+    let lineIndex = 0;
+    let charIndex = 0;
+    let currentElement = null;
+    
+    function typeCharacter() {
+      if (lineIndex >= commands.length) {
+        // Add cursor at the end
+        const cursorLine = document.createElement('div');
+        cursorLine.className = 'terminal-line';
+        cursorLine.innerHTML = '<span class="terminal-prompt">$</span><span class="terminal-cursor"></span>';
+        terminalDemo.appendChild(cursorLine);
+        return;
+      }
+      
+      const cmd = commands[lineIndex];
+      
+      if (charIndex === 0) {
+        // Create new line
+        const line = document.createElement('div');
+        line.className = 'terminal-line';
+        
+        if (cmd.type === 'command') {
+          line.innerHTML = '<span class="terminal-prompt">$</span><span class="terminal-command"></span>';
+          currentElement = line.querySelector('.terminal-command');
+        } else if (cmd.type === 'success') {
+          line.innerHTML = '<span class="terminal-output terminal-success"></span>';
+          currentElement = line.querySelector('.terminal-output');
+        } else {
+          line.innerHTML = '<span class="terminal-output"></span>';
+          currentElement = line.querySelector('.terminal-output');
+        }
+        
+        // Clear initial placeholder on first command
+        if (lineIndex === 0) {
+          terminalDemo.innerHTML = '';
+        }
+        
+        terminalDemo.appendChild(line);
+      }
+      
+      if (charIndex < cmd.text.length) {
+        currentElement.textContent += cmd.text[charIndex];
+        charIndex++;
+        const delay = cmd.type === 'command' ? 50 : 15;
+        setTimeout(typeCharacter, delay);
+      } else {
+        charIndex = 0;
+        lineIndex++;
+        const delay = cmd.type === 'command' ? 800 : 400;
+        setTimeout(typeCharacter, delay);
+      }
+    }
+    
+    // Start animation after a short delay
+    setTimeout(typeCharacter, 1000);
+    
+    // Fetch GitHub stats
+    async function fetchGitHubStats() {
+      try {
+        const response = await fetch('https://api.github.com/repos/jayminwest/kotadb');
+        const data = await response.json();
+        
+        const starsEl = document.getElementById('github-stars');
+        const forksEl = document.getElementById('github-forks');
+        
+        if (starsEl && data.stargazers_count !== undefined) {
+          starsEl.textContent = data.stargazers_count;
+        }
+        if (forksEl && data.forks_count !== undefined) {
+          forksEl.textContent = data.forks_count;
+        }
+      } catch (e) {
+        // Silently fail - stats will show "--"
+      }
+    }
+    
+    fetchGitHubStats();
+    
+    // Scroll animations
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach(entry => {
+        if (entry.isIntersecting) {
+          entry.target.classList.add('visible');
+        }
+      });
+    }, { threshold: 0.1, rootMargin: '0px 0px -50px 0px' });
+    
+    document.querySelectorAll('.fade-in').forEach(el => observer.observe(el));
+  </script>
 </body>
 </html>

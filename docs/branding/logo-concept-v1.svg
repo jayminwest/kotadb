@@ -1,0 +1,53 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  KotaDB Logo Concept v1
+  
+  Design: Geometric "K" with layered depth
+  Represents: Database layers, code structure, intelligence
+  
+  Color palette:
+  - Cyan primary: #22d3ee
+  - Cyan deep: #0891b2
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 100">
+  <defs>
+    <linearGradient id="iconGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="1.5" result="coloredBlur"/>
+      <feMerge>
+        <feMergeNode in="coloredBlur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- ICON: Geometric K with stacked layers -->
+  <g id="icon" transform="translate(10, 10)">
+    <!-- K vertical stem -->
+    <rect x="0" y="0" width="14" height="80" rx="3" fill="url(#iconGradient)" filter="url(#glow)"/>
+    
+    <!-- K upper diagonal -->
+    <polygon points="14,40 14,28 52,0 64,0 64,12 26,40" fill="#22d3ee" opacity="0.9"/>
+    
+    <!-- K lower diagonal -->
+    <polygon points="14,40 14,52 52,80 64,80 64,68 26,40" fill="#0891b2" opacity="0.85"/>
+    
+    <!-- Accent layer - creates depth -->
+    <polygon points="20,40 48,16 56,16 56,24 32,40 56,56 56,64 48,64 20,40" fill="#22d3ee" filter="url(#glow)"/>
+  </g>
+  
+  <!-- WORDMARK (lowercase) -->
+  <text 
+    x="95" 
+    y="70" 
+    font-family="-apple-system, BlinkMacSystemFont, Inter, Segoe UI, sans-serif" 
+    font-size="48" 
+    font-weight="600"
+    fill="#f4f4f5"
+    letter-spacing="-1"
+  >kota<tspan fill="#22d3ee">db</tspan></text>
+</svg>

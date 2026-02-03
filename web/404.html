@@ -3,8 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Page not found - KotaDB">
-  <title>404 - Page Not Found | KotaDB</title>
+  <meta name="description" content="Page not found - kotadb">
+  <meta name="theme-color" content="#0a0a0f">
+  <title>404 - Page Not Found | kotadb</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="stylesheet" href="/css/main.css">
   <style>
     .error-page {
@@ -20,9 +22,10 @@
     .error-code {
       font-size: 6rem;
       font-weight: 700;
-      color: var(--color-text-muted);
+      color: var(--color-primary);
       line-height: 1;
       margin-bottom: var(--space-md);
+      opacity: 0.3;
     }
     
     .error-page h1 {
@@ -47,7 +50,21 @@
 <body>
   <header class="site-header">
     <div class="container">
-      <a href="/" class="logo">KotaDB</a>
+      <a href="/" class="logo">
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22d3ee"/>
+              <stop offset="100%" stop-color="#0891b2"/>
+            </linearGradient>
+          </defs>
+          <rect x="8" y="8" width="12" height="64" rx="3" fill="url(#logoGrad)"/>
+          <polygon points="20,40 20,30 50,8 60,8 60,18 32,40" fill="#22d3ee" opacity="0.9"/>
+          <polygon points="20,40 20,50 50,72 60,72 60,62 32,40" fill="#0891b2" opacity="0.85"/>
+          <polygon points="25,40 48,20 55,20 55,27 35,40 55,53 55,60 48,60 25,40" fill="#22d3ee"/>
+        </svg>
+        <span class="logo-text">kota<span class="accent">db</span></span>
+      </a>
       <nav class="main-nav">
         <a href="/docs/">Docs</a>
         <a href="/blog/">Blog</a>
@@ -69,7 +86,7 @@
   <footer class="site-footer">
     <div class="container">
       <div class="footer-content">
-        <p>&copy; 2026 KotaDB. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
+        <p>2026 kotadb. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
         <nav class="footer-nav">
           <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
           <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
