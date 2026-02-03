@@ -30,6 +30,7 @@
     .blog-post-content {
       padding: var(--space-2xl) 0;
       max-width: 48rem;
+      margin: 0 auto;
     }
     
     .blog-post-content h1,
@@ -94,6 +95,27 @@
     .error-message p {
       color: var(--color-text-muted);
       margin-bottom: var(--space-lg);
+    }
+
+    /* Hide heading anchors by default, show on hover */
+    .blog-post-content .heading-anchor {
+      color: var(--color-text-muted);
+      text-decoration: none;
+      margin-right: var(--space-sm);
+      opacity: 0;
+      transition: opacity var(--transition-fast);
+    }
+
+    .blog-post-content h1:hover .heading-anchor,
+    .blog-post-content h2:hover .heading-anchor,
+    .blog-post-content h3:hover .heading-anchor,
+    .blog-post-content h4:hover .heading-anchor {
+      opacity: 1;
+    }
+
+    /* Hide duplicate H1 since title is in header */
+    #post-content > h1:first-child {
+      display: none;
     }
   </style>
 </head>
@@ -177,8 +199,8 @@
     }
     
     function getSlugFromUrl() {
-      const params = new URLSearchParams(window.location.search);
-      return params.get('slug');
+      // Support both hash and query param for slug
+      const hash = window.location.hash.slice(1); if (hash) return decodeURIComponent(hash); const params = new URLSearchParams(window.location.search); return params.get('slug');
     }
     
     function showError(message) {

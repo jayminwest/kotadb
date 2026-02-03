@@ -206,7 +206,7 @@
       container.innerHTML = posts.map(function(post) {
         var dateHtml = post.date ? '<div class="blog-post-date">' + formatDate(post.date) + '</div>' : '';
         var descHtml = post.description ? '<p class="blog-post-description">' + escapeHtml(post.description) + '</p>' : '';
-        return '<article class="blog-post-card"><a href="post.html?slug=' + encodeURIComponent(post.slug) + '"><h2>' + escapeHtml(post.title) + '</h2>' + dateHtml + descHtml + '</a></article>';
+        return '<article class="blog-post-card"><a href="post.html#' + encodeURIComponent(post.slug) + '"><h2>' + escapeHtml(post.title) + '</h2>' + dateHtml + descHtml + '</a></article>';
       }).join('');
     }
     

@@ -133,20 +133,49 @@ function tokenizeCode(code, language) {
 
 /**
  * Custom renderer for marked.js with syntax highlighting
+ * Handles both new marked.js format (token objects) and legacy format (strings)
  * @returns {Object} - Marked renderer extension
  */
 function createRenderer() {
   return {
-    code(code, language) {
-      const lang = language || '';
-      const highlighted = tokenizeCode(code, lang);
+    code(codeOrToken, language) {
+      // Handle both new marked.js format (token object) and legacy format (string)
+      let code, lang;
+      if (typeof codeOrToken === 'object' && codeOrToken !== null && 'text' in codeOrToken) {
+        // New format: code({ text, lang, escaped })
+        code = codeOrToken.text;
+        lang = codeOrToken.lang || '';
+      } else {
+        // Legacy format: code(code, language)
+        code = codeOrToken;
+        lang = language || '';
+      }
+      
+      // Ensure code is a string
+      const codeStr = String(code || '');
+      const highlighted = tokenizeCode(codeStr, lang);
       const langLabel = lang ? `<span class="code-language">${lang}</span>` : '';
       return `<pre class="code-block" data-language="${lang}">${langLabel}<code class="language-${lang}">${highlighted}</code></pre>`;
     },
     
     // Add IDs to headings for anchor links
-    heading(text, level) {
-      const slug = text
+    heading(textOrToken, level) {
+      // Handle both new marked.js format (token object) and legacy format (string)
+      let text, headingLevel;
+      if (typeof textOrToken === 'object' && textOrToken !== null && 'text' in textOrToken) {
+        // New format: heading({ text, depth, ... })
+        text = textOrToken.text;
+        headingLevel = textOrToken.depth;
+      } else {
+        // Legacy format: heading(text, level)
+        text = textOrToken;
+        headingLevel = level;
+      }
+      
+      // Ensure text is a string before calling string methods
+      const textStr = String(text || '');
+      
+      const slug = textStr
         .toLowerCase()
         .replace(/<[^>]*>/g, '') // Remove HTML tags
         .replace(/[^\w\s-]/g, '') // Remove special chars
@@ -154,19 +183,42 @@ function createRenderer() {
         .replace(/-+/g, '-') // Remove duplicate dashes
         .trim();
       
-      return `<h${level} id="${slug}"><a href="#${slug}" class="heading-anchor">#</a>${text}</h${level}>`;
+      return `<h${headingLevel} id="${slug}"><a href="#${slug}" class="heading-anchor">#</a>${textStr}</h${headingLevel}>`;
     },
     
     // External links open in new tab
-    link(href, title, text) {
+    link(hrefOrToken, title, text) {
+      // Handle both new marked.js format (token object) and legacy format
+      let href, linkTitle, linkText;
+      if (typeof hrefOrToken === 'object' && hrefOrToken !== null && 'href' in hrefOrToken) {
+        // New format: link({ href, title, text, tokens })
+        href = hrefOrToken.href;
+        linkTitle = hrefOrToken.title;
+        linkText = hrefOrToken.text;
+      } else {
+        // Legacy format: link(href, title, text)
+        href = hrefOrToken;
+        linkTitle = title;
+        linkText = text;
+      }
+      
       const isExternal = href && (href.startsWith('http://') || href.startsWith('https://'));
-      const titleAttr = title ? ` title="${title}"` : '';
+      const titleAttr = linkTitle ? ` title="${linkTitle}"` : '';
       const externalAttrs = isExternal ? ' target="_blank" rel="noopener noreferrer"' : '';
-      return `<a href="${href}"${titleAttr}${externalAttrs}>${text}</a>`;
+      return `<a href="${href}"${titleAttr}${externalAttrs}>${linkText}</a>`;
     },
     
     // Add copy button to inline code
-    codespan(code) {
+    codespan(codeOrToken) {
+      // Handle both new marked.js format (token object) and legacy format (string)
+      let code;
+      if (typeof codeOrToken === 'object' && codeOrToken !== null && 'text' in codeOrToken) {
+        // New format: codespan({ text })
+        code = codeOrToken.text;
+      } else {
+        // Legacy format: codespan(code)
+        code = codeOrToken;
+      }
       return `<code class="inline-code">${code}</code>`;
     },
   };
