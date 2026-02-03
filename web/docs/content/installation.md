@@ -2,8 +2,8 @@
 title: Installation
 description: Get KotaDB running locally
 order: 1
-last_updated: 2026-01-30
-version: 2.0.0
+last_updated: 2026-02-03
+version: 2.0.1
 reviewed_by: documentation-build-agent
 ---
 
@@ -41,6 +41,8 @@ kotadb --version
 
 You should see the version number printed to your terminal.
 
+> **Note**: KotaDB CLI outputs structured data to stdout and logs to stderr, making it suitable for piping and scripting.
+
 ## First Steps
 
 1. **Index a repository** - Point KotaDB at your codebase:
@@ -63,6 +65,8 @@ kotadb serve
 curl http://localhost:3000/health
 # Default port is 3000, configurable via PORT environment variable
 ```
+
+On first use, KotaDB automatically runs database migrations, including tables for the memory layer (decisions, failures, and patterns tracking).
 
 ## Troubleshooting
 
