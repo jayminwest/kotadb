@@ -30,6 +30,12 @@
         "type": "command",
         "command": "python3 .claude/hooks/kotadb/agent-context.py"
       }]
+    }],
+    "SessionStart": [{
+      "hooks": [{
+        "type": "command",
+        "command": "python3 .claude/hooks/kotadb/session-expertise.py"
+      }]
     }]
   }
 }

@@ -44,7 +44,7 @@ core_implementation:
     - pattern: describe/test blocks
       usage: Group related tests with describe, individual tests with test or it
     - pattern: In-memory SQLite
-      usage: createDatabase({ path: ":memory:" }) for fast isolated tests
+      usage: 'createDatabase({ path: ":memory:" }) for fast isolated tests'
     - pattern: beforeEach/afterEach
       usage: Setup and cleanup per test for isolation
     - pattern: Real implementations

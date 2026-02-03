@@ -258,7 +258,7 @@ key_operations:
       kotadb index --local-path /path/to/your/repo
       ```
     pitfalls:
-      - Incorrect CLI parameter format (old: kotadb index /path vs new: --local-path)
+      - "Incorrect CLI parameter format (old: kotadb index /path vs new: --local-path)"
       - Wrong default ports (3000 vs 8080)
       - Missing environment variable configuration
       - Untested troubleshooting advice
@@ -466,17 +466,19 @@ best_practices:
     - Maintain navigation order for user experience
 
   slash_command_documentation:
-    - Validate all documented commands exist as files
-    - Keep directory structure lists current
-    - Remove commands promptly when files are deleted
-    - Use /subdirectory:filename format consistently
+    items:
+      - Validate all documented commands exist as files
+      - Keep directory structure lists current
+      - Remove commands promptly when files are deleted
+      - "Use /subdirectory:filename format consistently"
     timestamp: 2026-02-02
 
   cross_file_consistency:
-    - Define canonical source for shared information
-    - Update all related files when canonical changes
-    - Expert domain counts must match across CLAUDE.md and README.md
-    - Technology stack claims must be consistent
+    items:
+      - Define canonical source for shared information
+      - Update all related files when canonical changes
+      - Expert domain counts must match across CLAUDE.md and README.md
+      - Technology stack claims must be consistent
     timestamp: 2026-02-02
 
 known_issues:

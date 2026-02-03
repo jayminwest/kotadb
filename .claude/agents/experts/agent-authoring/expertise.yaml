@@ -166,9 +166,9 @@ key_operations:
       - Reserved for future complex orchestration needs
       - Only when complexity justifies cost
     examples:
-      - agent: scout-agent | model: haiku | reason: Fast read-only search
-      - agent: automation-question-agent | model: haiku | reason: Fast Q&A on SDK patterns
-      - agent: automation-build-agent | model: sonnet | reason: Complex SDK implementation
+      - "agent: scout-agent | model: haiku | reason: Fast read-only search"
+      - "agent: automation-question-agent | model: haiku | reason: Fast Q&A on SDK patterns"
+      - "agent: automation-build-agent | model: sonnet | reason: Complex SDK implementation"
 
   write_agent_description:
     name: Write Effective Agent Description
@@ -196,7 +196,7 @@ key_operations:
       - good: "Plans automation layer changes for kotadb. Expects USER_PROMPT (SDK or workflow requirement)"
       - good: "Automation expertise evolution specialist"
       - good: "Automation Q&A specialist. Answers questions about SDK patterns and workflow execution"
-      - bad: "Plans: implementation" (colon breaks parser)
+      - bad: "Plans: implementation (colon breaks parser)"
 
   structure_agent_prompt:
     name: Structure Agent System Prompt Content (kotadb)
@@ -649,6 +649,18 @@ recent_changes:
       5. Preserve worktrees on failure for debugging, on success for PR review
     timestamp: 2026-02-01
 
+  - category: Documentation Patterns (NEW LEARNING [2026-02-01])
+    practices:
+      - practice: Create supplemental learnings files for large feature implementations
+        evidence: automation/worktree-learnings.md (101 lines) documents worktree isolation separately from expertise.yaml
+        timestamp: 2026-02-01
+      - practice: Structure learnings files with Overview, Operations, Patterns, Practices, Pitfalls, Integration
+        evidence: worktree-learnings.md demonstrates comprehensive yet focused structure
+        timestamp: 2026-02-01
+      - practice: Reference learnings files from expertise.yaml for deep dives
+        evidence: Keeps expertise.yaml focused on high-level patterns while preserving implementation details
+        timestamp: 2026-02-01
+
 stability:
   convergence_indicators:
     insight_rate_trend: "stabilizing"
@@ -684,15 +696,4 @@ stability:
       - Tool selection guidance standardized across core and expert agents
       
       Domain showing maturation with meta-patterns for documentation and knowledge capture.
-  - category: Documentation Patterns (NEW LEARNING [2026-02-01])
-    practices:
-      - practice: Create supplemental learnings files for large feature implementations
-        evidence: automation/worktree-learnings.md (101 lines) documents worktree isolation separately from expertise.yaml
-        timestamp: 2026-02-01
-      - practice: Structure learnings files with Overview, Operations, Patterns, Practices, Pitfalls, Integration
-        evidence: worktree-learnings.md demonstrates comprehensive yet focused structure
-        timestamp: 2026-02-01
-      - practice: Reference learnings files from expertise.yaml for deep dives
-        evidence: Keeps expertise.yaml focused on high-level patterns while preserving implementation details
-        timestamp: 2026-02-01
 

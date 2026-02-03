@@ -13,6 +13,7 @@ import {
 	runIndexingWorkflow,
 	searchFiles,
 } from "@api/queries";
+import { getDomainKeyFiles } from "@api/expertise-queries.js";
 import { getGlobalDatabase } from "@db/sqlite/index.js";
 import type { KotaDatabase } from "@db/sqlite/sqlite-client.js";
 import { buildSnippet } from "@indexer/extractors";
@@ -23,6 +24,8 @@ import { analyzeChangeImpact } from "./impact-analysis";
 import { invalidParams } from "./jsonrpc";
 import { validateImplementationSpec } from "./spec-validation";
 import { resolveRepositoryIdentifierWithError } from "./repository-resolver";
+import { readFileSync, existsSync } from "node:fs";
+import { parse as parseYaml } from "yaml";
 
 const logger = createLogger({ module: "mcp-tools" });
 
@@ -596,6 +599,109 @@ export const RECORD_INSIGHT_TOOL: ToolDefinition = {
 };
 
 
+// ============================================================================
+// Dynamic Expertise Tool Definitions
+// ============================================================================
+
+/**
+ * Tool: get_domain_key_files
+ */
+export const GET_DOMAIN_KEY_FILES_TOOL: ToolDefinition = {
+	name: "get_domain_key_files",
+	description:
+		"Get the most-depended-on files for a domain. Key files are core infrastructure that many other files depend on.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			domain: {
+				type: "string",
+				description: "Domain name (e.g., 'database', 'api', 'indexer', 'testing', 'claude-config', 'agent-authoring', 'automation', 'github', 'documentation')",
+			},
+			limit: {
+				type: "number",
+				description: "Optional: Maximum number of files to return (default: 10)",
+			},
+			repository: {
+				type: "string",
+				description: "Optional: Filter to a specific repository ID",
+			},
+		},
+		required: ["domain"],
+	},
+};
+
+/**
+ * Tool: validate_expertise
+ */
+export const VALIDATE_EXPERTISE_TOOL: ToolDefinition = {
+	name: "validate_expertise",
+	description:
+		"Validate that key_files defined in expertise.yaml exist in the indexed codebase. Checks for stale or missing file references.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			domain: {
+				type: "string",
+				description: "Domain name to validate (e.g., 'database', 'api', 'indexer')",
+			},
+		},
+		required: ["domain"],
+	},
+};
+
+/**
+ * Tool: sync_expertise
+ */
+export const SYNC_EXPERTISE_TOOL: ToolDefinition = {
+	name: "sync_expertise",
+	description:
+		"Sync patterns from expertise.yaml files to the patterns table. Extracts pattern definitions and stores them for future reference.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			domain: {
+				type: "string",
+				description: "Optional: Specific domain to sync. If not provided, syncs all domains.",
+			},
+			force: {
+				type: "boolean",
+				description: "Optional: Force sync even if patterns already exist (default: false)",
+			},
+		},
+	},
+};
+
+/**
+ * Tool: get_recent_patterns
+ */
+export const GET_RECENT_PATTERNS_TOOL: ToolDefinition = {
+	name: "get_recent_patterns",
+	description:
+		"Get recently observed patterns from the patterns table. Useful for understanding codebase conventions.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			domain: {
+				type: "string",
+				description: "Optional: Filter patterns by domain",
+			},
+			days: {
+				type: "number",
+				description: "Optional: Only return patterns from the last N days (default: 30)",
+			},
+			limit: {
+				type: "number",
+				description: "Optional: Maximum number of patterns to return (default: 20)",
+			},
+			repository: {
+				type: "string",
+				description: "Optional: Filter to a specific repository ID",
+			},
+		},
+	},
+};
+
+
 /**
  * Get all available tool definitions
  */
@@ -617,6 +723,11 @@ export function getToolDefinitions(): ToolDefinition[] {
 		RECORD_FAILURE_TOOL,
 		SEARCH_PATTERNS_TOOL,
 		RECORD_INSIGHT_TOOL,
+		// Dynamic Expertise tools
+		GET_DOMAIN_KEY_FILES_TOOL,
+		VALIDATE_EXPERTISE_TOOL,
+		SYNC_EXPERTISE_TOOL,
+		GET_RECENT_PATTERNS_TOOL,
 	];
 }
 
@@ -1876,6 +1987,436 @@ export async function executeRecordInsight(
 	};
 }
 
+
+// ============================================================================
+// Expertise Layer Tool Executors
+// ============================================================================
+
+/**
+ * Execute get_domain_key_files tool
+ * Returns files with highest dependent counts for a domain
+ */
+export async function executeGetDomainKeyFiles(
+	params: unknown,
+	_requestId: string | number,
+	_userId: string,
+): Promise<unknown> {
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	if (p.domain === undefined || typeof p.domain !== "string") {
+		throw new Error("Missing or invalid required parameter: domain");
+	}
+	if (p.limit !== undefined && typeof p.limit !== "number") {
+		throw new Error("Parameter 'limit' must be a number");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const domain = p.domain as string;
+	const limit = Math.min(Math.max((p.limit as number) || 10, 1), 50);
+
+	// Resolve repository if provided
+	let repositoryId: string | undefined;
+	if (p.repository) {
+		const repoResult = resolveRepositoryIdentifierWithError(p.repository as string);
+		if (!("error" in repoResult)) {
+			repositoryId = repoResult.id;
+		}
+	}
+
+	// Use getDomainKeyFiles from expertise-queries
+	const keyFiles = getDomainKeyFiles(domain, limit, repositoryId);
+
+	// Transform to expected output format with purpose field
+	const results = keyFiles.map((file) => {
+		const pathParts = file.path.split("/");
+		const fileName = pathParts.pop() || "";
+		const directory = pathParts.pop() || "";
+		const purpose = directory ? directory + "/" + fileName : fileName;
+		
+		return {
+			path: file.path,
+			dependent_count: file.dependentCount,
+			purpose,
+		};
+	});
+
+	logger.debug("get_domain_key_files completed", {
+		domain,
+		files_found: results.length,
+	});
+
+	return {
+		domain,
+		key_files: results,
+	};
+}
+
+/**
+ * Execute validate_expertise tool
+ * Validates expertise.yaml patterns against indexed code
+ */
+export async function executeValidateExpertise(
+	params: unknown,
+	_requestId: string | number,
+	_userId: string,
+): Promise<unknown> {
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	if (p.domain === undefined || typeof p.domain !== "string") {
+		throw new Error("Missing or invalid required parameter: domain");
+	}
+	if (p.expertise_path !== undefined && typeof p.expertise_path !== "string") {
+		throw new Error("Parameter 'expertise_path' must be a string");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const domain = p.domain as string;
+	const defaultPath = ".claude/agents/experts/" + domain + "/expertise.yaml";
+	const expertisePath = (p.expertise_path as string) || defaultPath;
+
+	// Check if expertise file exists
+	if (!existsSync(expertisePath)) {
+		return {
+			domain,
+			valid: false,
+			error: "Expertise file not found: " + expertisePath,
+			valid_patterns: [],
+			stale_patterns: [],
+			missing_key_files: [],
+			summary: { total: 0, valid: 0, stale: 0 },
+		};
+	}
+
+	// Read and parse expertise.yaml
+	let expertise: Record<string, unknown>;
+	try {
+		const content = readFileSync(expertisePath, "utf-8");
+		expertise = parseYaml(content) as Record<string, unknown>;
+	} catch (error) {
+		return {
+			domain,
+			valid: false,
+			error: "Failed to parse expertise.yaml: " + (error instanceof Error ? error.message : String(error)),
+			valid_patterns: [],
+			stale_patterns: [],
+			missing_key_files: [],
+			summary: { total: 0, valid: 0, stale: 0 },
+		};
+	}
+
+	const db = getGlobalDatabase();
+
+	// Resolve repository if provided
+	let repositoryId: string | null = null;
+	if (p.repository) {
+		const repoResult = resolveRepositoryIdentifierWithError(p.repository as string);
+		if (!("error" in repoResult)) {
+			repositoryId = repoResult.id;
+		}
+	}
+
+	const validPatterns: Array<{ name: string; file_path?: string }> = [];
+	const stalePatterns: Array<{ name: string; reason: string }> = [];
+	const missingKeyFiles: string[] = [];
+
+	// Extract patterns from expertise.yaml
+	const patterns = (expertise.patterns as Record<string, unknown>) || {};
+	for (const [patternName, patternData] of Object.entries(patterns)) {
+		const pattern = patternData as Record<string, unknown>;
+		const filePath = pattern.file_path as string | undefined;
+		
+		if (filePath) {
+			// Check if file exists in indexed files
+			let sql = "SELECT id FROM indexed_files WHERE path LIKE ?";
+			const queryParams: string[] = ["%" + filePath];
+			
+			if (repositoryId) {
+				sql += " AND repository_id = ?";
+				queryParams.push(repositoryId);
+			}
+			sql += " LIMIT 1";
+			
+			const result = db.queryOne<{ id: string }>(sql, queryParams);
+			
+			if (result) {
+				validPatterns.push({ name: patternName, file_path: filePath });
+			} else {
+				stalePatterns.push({ name: patternName, reason: "File not found: " + filePath });
+			}
+		} else {
+			// Pattern without file path - consider valid
+			validPatterns.push({ name: patternName });
+		}
+	}
+
+	// Check key_files from core_implementation
+	const coreImpl = (expertise.core_implementation as Record<string, unknown>) || {};
+	const keyFiles = (coreImpl.key_files as Array<{ path?: string }>) || [];
+	
+	for (const keyFile of keyFiles) {
+		const filePath = keyFile.path;
+		if (filePath) {
+			let sql = "SELECT id FROM indexed_files WHERE path LIKE ?";
+			const queryParams: string[] = ["%" + filePath];
+			
+			if (repositoryId) {
+				sql += " AND repository_id = ?";
+				queryParams.push(repositoryId);
+			}
+			sql += " LIMIT 1";
+			
+			const result = db.queryOne<{ id: string }>(sql, queryParams);
+			
+			if (!result) {
+				missingKeyFiles.push(filePath);
+			}
+		}
+	}
+
+	const total = validPatterns.length + stalePatterns.length;
+	
+	logger.debug("validate_expertise completed", {
+		domain,
+		valid_count: validPatterns.length,
+		stale_count: stalePatterns.length,
+		missing_key_files: missingKeyFiles.length,
+	});
+
+	return {
+		domain,
+		valid: stalePatterns.length === 0 && missingKeyFiles.length === 0,
+		valid_patterns: validPatterns,
+		stale_patterns: stalePatterns,
+		missing_key_files: missingKeyFiles,
+		summary: {
+			total,
+			valid: validPatterns.length,
+			stale: stalePatterns.length,
+		},
+	};
+}
+
+/**
+ * Execute sync_expertise tool
+ * Extracts patterns from expertise.yaml and stores in patterns table
+ */
+export async function executeSyncExpertise(
+	params: unknown,
+	_requestId: string | number,
+	_userId: string,
+): Promise<unknown> {
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	if (p.domain === undefined || typeof p.domain !== "string") {
+		throw new Error("Missing or invalid required parameter: domain");
+	}
+	if (p.expertise_path !== undefined && typeof p.expertise_path !== "string") {
+		throw new Error("Parameter 'expertise_path' must be a string");
+	}
+	if (p.dry_run !== undefined && typeof p.dry_run !== "boolean") {
+		throw new Error("Parameter 'dry_run' must be a boolean");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const domain = p.domain as string;
+	const defaultPath = ".claude/agents/experts/" + domain + "/expertise.yaml";
+	const expertisePath = (p.expertise_path as string) || defaultPath;
+	const dryRun = (p.dry_run as boolean) || false;
+
+	// Check if expertise file exists
+	if (!existsSync(expertisePath)) {
+		return {
+			success: false,
+			error: "Expertise file not found: " + expertisePath,
+			patterns_synced: 0,
+			patterns_skipped: 0,
+		};
+	}
+
+	// Read and parse expertise.yaml
+	let expertise: Record<string, unknown>;
+	try {
+		const content = readFileSync(expertisePath, "utf-8");
+		expertise = parseYaml(content) as Record<string, unknown>;
+	} catch (error) {
+		return {
+			success: false,
+			error: "Failed to parse expertise.yaml: " + (error instanceof Error ? error.message : String(error)),
+			patterns_synced: 0,
+			patterns_skipped: 0,
+		};
+	}
+
+	// Resolve repository if provided
+	let repositoryId: string | null = null;
+	if (p.repository) {
+		const repoResult = resolveRepositoryIdentifierWithError(p.repository as string);
+		if (!("error" in repoResult)) {
+			repositoryId = repoResult.id;
+		}
+	}
+
+	const db = getGlobalDatabase();
+	const { randomUUID } = await import("node:crypto");
+
+	let patternsSynced = 0;
+	let patternsSkipped = 0;
+	const syncedPatterns: Array<{ name: string; type: string }> = [];
+
+	// Extract patterns from expertise.yaml
+	const patterns = (expertise.patterns as Record<string, unknown>) || {};
+	
+	for (const [patternName, patternData] of Object.entries(patterns)) {
+		const pattern = patternData as Record<string, unknown>;
+		const patternType = domain + ":" + patternName;
+		const filePath = (pattern.file_path as string) || null;
+		const description = (pattern.description as string) || (pattern.structure as string) || patternName;
+		const example = (pattern.example as string) || (pattern.notes as string) || null;
+
+		// Check if pattern already exists
+		const existing = db.queryOne<{ id: string }>(
+			"SELECT id FROM patterns WHERE pattern_type = ?",
+			[patternType],
+		);
+
+		if (existing) {
+			patternsSkipped++;
+			continue;
+		}
+
+		if (!dryRun) {
+			const id = randomUUID();
+			db.run(
+				"INSERT INTO patterns (id, repository_id, pattern_type, file_path, description, example, created_at) VALUES (?, ?, ?, ?, ?, ?, datetime('now'))",
+				[id, repositoryId, patternType, filePath, description, example],
+			);
+		}
+
+		patternsSynced++;
+		syncedPatterns.push({ name: patternName, type: patternType });
+	}
+
+	logger.info("sync_expertise completed", {
+		domain,
+		patterns_synced: patternsSynced,
+		patterns_skipped: patternsSkipped,
+		dry_run: dryRun,
+	});
+
+	return {
+		success: true,
+		dry_run: dryRun,
+		patterns_synced: patternsSynced,
+		patterns_skipped: patternsSkipped,
+		synced_patterns: syncedPatterns,
+	};
+}
+
+/**
+ * Execute get_recent_patterns tool
+ * Returns recently observed patterns from the patterns table
+ */
+export async function executeGetRecentPatterns(
+	params: unknown,
+	_requestId: string | number,
+	_userId: string,
+): Promise<unknown> {
+	if (params !== undefined && (typeof params !== "object" || params === null)) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = (params as Record<string, unknown>) || {};
+
+	if (p.domain !== undefined && typeof p.domain !== "string") {
+		throw new Error("Parameter 'domain' must be a string");
+	}
+	if (p.days !== undefined && typeof p.days !== "number") {
+		throw new Error("Parameter 'days' must be a number");
+	}
+	if (p.limit !== undefined && typeof p.limit !== "number") {
+		throw new Error("Parameter 'limit' must be a number");
+	}
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const db = getGlobalDatabase();
+	const domain = p.domain as string | undefined;
+	const days = Math.min(Math.max((p.days as number) || 30, 1), 365);
+	const limit = Math.min(Math.max((p.limit as number) || 20, 1), 100);
+
+	let sql = "SELECT id, repository_id, pattern_type, file_path, description, example, created_at FROM patterns WHERE created_at > datetime('now', '-' || ? || ' days')";
+	const queryParams: (string | number)[] = [days];
+
+	// Filter by domain prefix if provided
+	if (domain) {
+		sql += " AND pattern_type LIKE ?";
+		queryParams.push(domain + ":%");
+	}
+
+	// Filter by repository if provided
+	if (p.repository) {
+		const repoResult = resolveRepositoryIdentifierWithError(p.repository as string);
+		if (!("error" in repoResult)) {
+			sql += " AND repository_id = ?";
+			queryParams.push(repoResult.id);
+		}
+	}
+
+	sql += " ORDER BY created_at DESC LIMIT ?";
+	queryParams.push(limit);
+
+	const rows = db.query<{
+		id: string;
+		repository_id: string | null;
+		pattern_type: string;
+		file_path: string | null;
+		description: string;
+		example: string | null;
+		created_at: string;
+	}>(sql, queryParams);
+
+	logger.debug("get_recent_patterns completed", {
+		domain,
+		days,
+		patterns_found: rows.length,
+	});
+
+	return {
+		patterns: rows.map((row) => ({
+			id: row.id,
+			pattern_type: row.pattern_type,
+			file_path: row.file_path,
+			description: row.description,
+			example: row.example,
+			created_at: row.created_at,
+		})),
+		count: rows.length,
+		filter: {
+			domain: domain || null,
+			days,
+		},
+	};
+}
+
 /**
  * Main tool call dispatcher
  */
@@ -1917,6 +2458,15 @@ export async function handleToolCall(
 			return await executeSearchPatterns(params, requestId, userId);
 		case "record_insight":
 			return await executeRecordInsight(params, requestId, userId);
+		// Expertise Layer tools
+		case "get_domain_key_files":
+			return await executeGetDomainKeyFiles(params, requestId, userId);
+		case "validate_expertise":
+			return await executeValidateExpertise(params, requestId, userId);
+		case "sync_expertise":
+			return await executeSyncExpertise(params, requestId, userId);
+		case "get_recent_patterns":
+			return await executeGetRecentPatterns(params, requestId, userId);
 		default:
 			throw invalidParams(requestId, "Unknown tool: " + toolName);
 	}

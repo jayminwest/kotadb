@@ -129,7 +129,7 @@ core_implementation:
       - anti_mock_statement: Confirmation no new mocks introduced
       - plan_link: Link to spec file if exists
       - closes: "Closes #<issue_number>"
-      - adw_id: "ADW ID: <id>" if applicable
+      - adw_id: "ADW ID: <id> if applicable"
 
   key_files:
     - path: .claude/commands/issues/feature.md
