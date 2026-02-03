@@ -11,6 +11,12 @@ tools:
   - mcp__kotadb-bunx__search_code
   - mcp__kotadb-bunx__search_dependencies
   - mcp__kotadb-bunx__analyze_change_impact
+  - mcp__kotadb-bunx__search_decisions
+  - mcp__kotadb-bunx__search_failures
+  - mcp__kotadb-bunx__search_patterns
+  - mcp__kotadb-bunx__record_decision
+  - mcp__kotadb-bunx__record_failure
+  - mcp__kotadb-bunx__record_insight
 model: sonnet
 color: green
 expertDomain: agent-authoring
@@ -89,7 +95,34 @@ NOT comma-separated: `tools: Read, Glob, Grep, Write`
 2. Brief intro paragraph
 3. `## Input Format` or `## Variables` - Expected inputs
 4. `## Capabilities` - What agent can do
-5. `## Workflow` - Numbered steps
+5. `## Memory Integration
+
+Before implementing, search for relevant past context:
+
+1. **Check Past Failures**
+   ```
+   search_failures("relevant keywords from your task")
+   ```
+   Apply learnings to avoid repeating mistakes.
+
+2. **Check Past Decisions**
+   ```
+   search_decisions("relevant architectural keywords")
+   ```
+   Follow established patterns and rationale.
+
+3. **Check Discovered Patterns**
+   ```
+   search_patterns(pattern_type: "relevant-type")
+   ```
+   Use consistent patterns across implementations.
+
+**During Implementation:**
+- Record significant architectural decisions with `record_decision`
+- Record failed approaches immediately with `record_failure`
+- Record workarounds or discoveries with `record_insight`
+
+## Workflow` - Numbered steps
 6. `## KotaDB Conventions` - REQUIRED for build agents
 7. `## Output Format` - Success/failure templates
 8. `## Error Handling` - Recovery patterns
