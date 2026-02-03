@@ -680,7 +680,7 @@ known_issues:
     resolution: Call clearSpecCache() during development
 
   - issue: FTS5 syntax errors from unescaped input
-    impact: "no such column" errors on hyphenated/multi-word searches
+    impact: '"no such column" errors on hyphenated/multi-word searches'
     status: resolved (2026-01-28, commit 5af086f)
     resolution: Always use escapeFts5Term() before MATCH
 

@@ -588,11 +588,12 @@ best_practices:
 
   expert_expansion:
     timestamp: 2026-01-28
-    - Document all expert domains in CLAUDE.md for discoverability
-    - Use multi-line JSON arrays in agent-registry.json for git diffs
-    - Keep /do domain detection patterns specific and non-overlapping
-    - Update all 3 files (CLAUDE.md, do.md, agent-registry.json) atomically
-    - Grant consistent tool permissions across agent types within domain
+    insights:
+      - Document all expert domains in CLAUDE.md for discoverability
+      - Use multi-line JSON arrays in agent-registry.json for git diffs
+      - Keep /do domain detection patterns specific and non-overlapping
+      - Update all 3 files (CLAUDE.md, do.md, agent-registry.json) atomically
+      - Grant consistent tool permissions across agent types within domain
 
 known_issues:
   - issue: Colons in frontmatter description values break YAML parsing
