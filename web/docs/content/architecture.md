@@ -2,8 +2,8 @@
 title: Architecture
 description: Understanding KotaDB internals
 order: 4
-last_updated: 2026-01-30
-version: 2.0.0
+last_updated: 2026-02-03
+version: 2.0.1
 reviewed_by: documentation-build-agent
 ---
 
@@ -38,9 +38,13 @@ KotaDB is designed as a local-first code intelligence tool that runs entirely on
 |                    |                    |                          |
 |                    +--------+----------++                          |
 |                             |                                      |
-|                    +--------v--------+                             |
-|                    |   SQLite DB     |                             |
-|                    +-----------------+                             |
+|  +---------------+  +-------v--------+  +-------------------+      |
+|  | Memory Layer  |--|   SQLite DB    |--| Expertise Layer   |      |
+|  +---------------+  +----------------+  +-------------------+      |
+|                                                                    |
+|  +------------------------------------------------------------+   |
+|  |                   Context Seeding (Hooks)                   |   |
+|  +------------------------------------------------------------+   |
 +--------------------------------------------------------------------+
 ```
 
@@ -112,6 +116,122 @@ JWT-based authentication protects all endpoints (except health checks):
 - **Header sanitization** - Removes sensitive data from logs
 - **CORS support** - Configurable origin policies
 
+### Memory Layer
+
+The Memory Layer provides persistent cross-session intelligence, enabling agents to learn from past decisions and avoid repeating mistakes. All tables use FTS5 for full-text search.
+
+**Database Tables:**
+
+- **`decisions`** - Architectural decisions with status tracking (active, superseded, deprecated)
+  - Stores title, context, decision, rationale, and alternatives considered
+  - Scoped by category: architecture, pattern, convention, workaround
+  - Searchable via `search_decisions` MCP tool
+
+- **`failures`** / **`failed_approaches`** - Records what didn't work
+  - Captures problem, approach tried, and why it failed
+  - Links to related files for context
+  - Searchable via `search_failures` MCP tool
+
+- **`patterns`** / **`pattern_annotations`** - Codebase patterns for consistency
+  - Pattern type, name, description, and example code
+  - Evidence counting and confidence scoring (0.0-1.0)
+  - Searchable via `search_patterns` MCP tool
+
+- **`insights`** / **`session_insights`** - Session discoveries and workarounds
+  - Types: discovery, failure, workaround
+  - Links to agent sessions and related files
+  - Recorded via `record_insight` MCP tool
+
+- **`agent_sessions`** - Tracks agent work sessions
+  - Agent type, task summary, outcome (success/failure/partial)
+  - Files modified during session
+  - Enables learning and analysis across sessions
+
+**MCP Tools:**
+
+| Tool | Purpose |
+|------|---------|
+| `search_decisions` | Search past architectural decisions using FTS5 |
+| `record_decision` | Record a new architectural decision |
+| `search_failures` | Search failed approaches to avoid repeating mistakes |
+| `record_failure` | Record a failed approach |
+| `search_patterns` | Find codebase patterns by type or file |
+| `record_insight` | Store a session insight |
+| `get_recent_patterns` | Get recently observed patterns |
+
+### Dynamic Expertise Layer
+
+The Dynamic Expertise Layer provides real-time expertise based on indexed code, enabling domain-specific knowledge to stay synchronized with the actual codebase.
+
+**Core Capabilities:**
+
+- **Domain Key File Discovery** - Identifies the most-depended-on files for each domain using dependency graph analysis. Key files are core infrastructure that many other files depend on.
+
+- **Pattern Validation** - Validates that patterns defined in `expertise.yaml` files exist in the indexed codebase. Checks for stale or missing file references.
+
+- **Expertise Synchronization** - Syncs patterns from `expertise.yaml` files to the patterns table, extracting pattern definitions and storing them for future reference.
+
+**Supported Domains:**
+
+- `database` - SQLite schema, FTS5, migrations, queries
+- `api` - HTTP endpoints, MCP tools, Express patterns
+- `indexer` - AST parsing, symbol extraction, code analysis
+- `testing` - Antimocking, Bun tests, SQLite test patterns
+- `claude-config` - .claude/ configuration (commands, hooks, settings)
+- `agent-authoring` - Agent creation (frontmatter, tools, registry)
+- `automation` - ADW workflows, agent orchestration, worktree isolation
+- `github` - Issues, PRs, branches, GitHub CLI workflows
+- `documentation` - Documentation management, content organization
+
+**MCP Tools:**
+
+| Tool | Purpose |
+|------|---------|
+| `get_domain_key_files` | Get most-depended-on files for a domain |
+| `validate_expertise` | Validate expertise.yaml against indexed code |
+| `sync_expertise` | Sync patterns from expertise.yaml to patterns table |
+
+### Context Seeding
+
+Context Seeding provides hook-based context injection with a target of less than 100ms response time. It automatically injects relevant context into agent workflows.
+
+**Hook Integration:**
+
+Context seeding integrates with Claude Code hooks defined in `.claude/settings.json`:
+
+- **PreToolUse** - Injects context before Edit/Write/MultiEdit operations
+  - Runs: `pre-edit-context.py`
+  - Provides dependency counts, impacted files, and test files for files being modified
+
+- **SubagentStart** - Injects context when build or Explore agents start
+  - Runs: `agent-context.py`
+  - Provides relevant context for the agent's task
+
+- **SessionStart** - Loads domain expertise at session start
+  - Runs: `session-expertise.py`
+  - Seeds relevant expertise based on working context
+
+**generate_task_context Tool:**
+
+The `generate_task_context` MCP tool generates structured context for a set of files:
+
+```json
+{
+  "files": ["src/api/routes.ts", "src/db/queries.ts"],
+  "include_tests": true,
+  "include_symbols": false,
+  "max_impacted_files": 20
+}
+```
+
+**Returns:**
+- Dependency counts for each file
+- List of impacted files (files that depend on the target files)
+- Related test files for test scope discovery
+- Recent changes to the files
+
+**Performance Target:** <100ms for typical file sets, enabling real-time context injection without noticeable latency.
+
 ## Data Flow
 
 ### Indexing Flow
@@ -138,6 +258,41 @@ JWT-based authentication protects all endpoints (except health checks):
 3. **Filtering** - Apply depth limits and test file filters
 4. **Impact scoring** - Calculate change impact metrics
 
+### Memory Layer Flow
+
+1. **Recording** - Agent makes a decision, encounters a failure, or discovers a pattern
+2. **Storage** - Record stored in appropriate table with FTS5 indexing
+3. **Retrieval** - Future agents search memory before making similar decisions
+4. **Learning** - Patterns reinforce through evidence counting and confidence scoring
+
+```
++------------------+     +------------------+     +------------------+
+|  Agent Session   |---->|   Record Entry   |---->|   SQLite + FTS5  |
++------------------+     +------------------+     +------------------+
+                                                          |
++------------------+     +------------------+              |
+|  Future Agent    |<----|  Search Memory   |<------------+
++------------------+     +------------------+
+```
+
+### Context Seeding Flow
+
+1. **Hook Trigger** - PreToolUse, SubagentStart, or SessionStart event fires
+2. **Context Generation** - Hook script calls `generate_task_context`
+3. **Dependency Analysis** - Tool queries dependency graph for impacted files
+4. **Test Discovery** - Related test files identified
+5. **Context Injection** - Structured context returned to agent workflow
+
+```
++------------------+     +------------------+     +------------------+
+|   Hook Event     |---->|   Python Script  |---->|  MCP Tool Call   |
++------------------+     +------------------+     +------------------+
+                                                          |
++------------------+                                       |
+|  Agent Context   |<--------------------------------------+
++------------------+
+```
+
 ## Design Principles
 
 ### Local-First
@@ -162,6 +317,13 @@ Optimize for the common case:
 - Full re-index only when needed
 - Cache parsed ASTs where beneficial
 
+### Cross-Session Learning
+
+Enable agents to build on past work:
+- Persistent memory layer survives session boundaries
+- Decisions and failures inform future agents
+- Pattern confidence grows with evidence
+
 ## File Structure
 
 ```
@@ -170,9 +332,19 @@ kotadb/
 │   └── src/
 │       ├── api/        # HTTP endpoints
 │       ├── db/         # SQLite operations
+│       │   └── migrations/  # Schema migrations including memory layer
 │       ├── indexer/    # File parsing and indexing
 │       ├── mcp/        # MCP server implementation
 │       └── cli.ts      # Command-line interface
+├── .claude/
+│   ├── hooks/          # Context seeding hook scripts
+│   │   └── kotadb/
+│   │       ├── pre-edit-context.py
+│   │       ├── agent-context.py
+│   │       └── session-expertise.py
+│   ├── agents/
+│   │   └── experts/    # Domain expertise definitions
+│   └── settings.json   # Hook configuration
 └── .kotadb/           # Project-local directory
     ├── kota.db        # SQLite database
     └── export/        # JSONL export files for git sync
