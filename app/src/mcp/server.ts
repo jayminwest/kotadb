@@ -23,6 +23,14 @@ import {
 	SYNC_EXPORT_TOOL,
 	SYNC_IMPORT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
+	// Memory Layer tools
+	SEARCH_DECISIONS_TOOL,
+	RECORD_DECISION_TOOL,
+	SEARCH_FAILURES_TOOL,
+	RECORD_FAILURE_TOOL,
+	SEARCH_PATTERNS_TOOL,
+	RECORD_INSIGHT_TOOL,
+	// Execute functions
 	executeAnalyzeChangeImpact,
 	executeGenerateTaskContext,
 	executeIndexRepository,
@@ -32,6 +40,13 @@ import {
 	executeSyncExport,
 	executeSyncImport,
 	executeValidateImplementationSpec,
+	// Memory Layer execute functions
+	executeSearchDecisions,
+	executeRecordDecision,
+	executeSearchFailures,
+	executeRecordFailure,
+	executeSearchPatterns,
+	executeRecordInsight,
 } from "./tools";
 
 const logger = createLogger({ module: "mcp-server" });
@@ -58,6 +73,12 @@ export interface McpServerContext {
  * - kota_sync_export: Export SQLite to JSONL
  * - kota_sync_import: Import JSONL to SQLite
  * - generate_task_context: Generate context for hook-based seeding
+ * - search_decisions: Search past architectural decisions
+ * - record_decision: Record a new architectural decision
+ * - search_failures: Search failed approaches
+ * - record_failure: Record a failed approach
+ * - search_patterns: Find codebase patterns
+ * - record_insight: Store a session insight
  */
 export function createMcpServer(context: McpServerContext): Server {
 	const server = new Server(
@@ -85,6 +106,13 @@ export function createMcpServer(context: McpServerContext): Server {
 				SYNC_EXPORT_TOOL,
 				SYNC_IMPORT_TOOL,
 				GENERATE_TASK_CONTEXT_TOOL,
+				// Memory Layer tools
+				SEARCH_DECISIONS_TOOL,
+				RECORD_DECISION_TOOL,
+				SEARCH_FAILURES_TOOL,
+				RECORD_FAILURE_TOOL,
+				SEARCH_PATTERNS_TOOL,
+				RECORD_INSIGHT_TOOL,
 			],
 		};
 	});
@@ -149,6 +177,49 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "generate_task_context":
 					result = await executeGenerateTaskContext(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				// Memory Layer tools
+				case "search_decisions":
+					result = await executeSearchDecisions(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_decision":
+					result = await executeRecordDecision(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "search_failures":
+					result = await executeSearchFailures(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_failure":
+					result = await executeRecordFailure(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "search_patterns":
+					result = await executeSearchPatterns(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_insight":
+					result = await executeRecordInsight(
 						toolArgs,
 						"", // requestId not used
 						context.userId,
