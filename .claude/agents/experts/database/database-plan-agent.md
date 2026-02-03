@@ -7,6 +7,9 @@ tools:
   - Grep
   - Write
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
 ---
@@ -154,7 +157,7 @@ app/
    - Rollback strategy
 
 7. **Save Specification**
-   - Save spec to `docs/specs/database-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/database-<descriptive-name>-spec.md`
    - Include example queries
    - Document validation criteria
    - Return the spec path when complete
@@ -190,5 +193,5 @@ app/
 - Transaction Scope: <description>
 
 **Specification Location:**
-- Path: `docs/specs/database-<name>-spec.md`
+- Path: `.claude/.cache/specs/database-<name>-spec.md`
 ```

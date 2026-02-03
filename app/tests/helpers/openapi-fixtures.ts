@@ -6,6 +6,7 @@
  * 
  * NOTE: Updated for local-only v2.0.0 (Issue #591)
  * Cloud-only endpoints (subscriptions, API keys, jobs, projects) have been removed.
+ * POST /index removed - indexing available via MCP tool only.
  */
 
 /**
@@ -25,6 +26,7 @@ export const minimalValidSpec = {
  * 
  * NOTE: Local-only mode - these are the only endpoints in the OpenAPI spec.
  * Removed endpoints:
+ * - /index (indexing available via MCP tool index_repository)
  * - /jobs/{jobId} (job tracking removed)
  * - /api/projects (projects removed)  
  * - /api/keys/* (API keys removed)
@@ -32,9 +34,10 @@ export const minimalValidSpec = {
  */
 export const expectedCoreEndpoints = [
 	{ path: '/health', method: 'get' },
-	{ path: '/index', method: 'post' },
 	{ path: '/search', method: 'get' },
 	{ path: '/files/recent', method: 'get' },
+	{ path: '/validate-output', method: 'post' },
+	{ path: '/mcp', method: 'get' },
 	{ path: '/mcp', method: 'post' },
 ];
 

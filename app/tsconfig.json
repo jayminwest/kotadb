@@ -32,7 +32,7 @@
         "src/indexer/*"
       ],
       "@shared/*": [
-        "../shared/*"
+        "./shared/*"
       ],
       "@mcp/*": [
         "src/mcp/*"
@@ -57,6 +57,10 @@
   },
   "include": [
     "src/**/*.ts",
-    "tests/**/*.ts"
+    "tests/**/*.ts",
+    "shared/**/*.ts"
+  ],
+  "exclude": [
+    "tests/fixtures/parsing/errors/**"
   ]
 }

@@ -10,50 +10,80 @@ on:
       - 'chore/**'
       - 'fix/**'
       - 'refactor/**'
-      - 'interactive-*'
     paths:
       - 'web/**'
-      - 'shared/**'
       - '.github/workflows/web-ci.yml'
-      - 'package.json'
-      - 'bun.lock'
   pull_request:
     branches: [main, develop]
     paths:
       - 'web/**'
-      - 'shared/**'
       - '.github/workflows/web-ci.yml'
-      - 'package.json'
-      - 'bun.lock'
 
 jobs:
-  test:
+  validate:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 5
 
     steps:
       - name: Checkout code
         uses: actions/checkout@v4
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v1
-        with:
-          bun-version: '1.2.9'
-
-      - name: Install dependencies
+      - name: Verify static files exist
         run: |
-          bun install --frozen-lockfile
-          cd web && bun install --frozen-lockfile
+          echo "Checking required files..."
+          test -f web/index.html || (echo "Missing web/index.html" && exit 1)
+          test -f web/404.html || (echo "Missing web/404.html" && exit 1)
+          test -f web/docs/index.html || (echo "Missing web/docs/index.html" && exit 1)
+          test -f web/blog/index.html || (echo "Missing web/blog/index.html" && exit 1)
+          test -f web/css/main.css || (echo "Missing web/css/main.css" && exit 1)
+          test -f web/js/main.js || (echo "Missing web/js/main.js" && exit 1)
+          test -f web/js/render.js || (echo "Missing web/js/render.js" && exit 1)
+          test -f web/assets/lib/marked.min.js || (echo "Missing marked.min.js" && exit 1)
+          echo "✅ All required files present"
 
-      - name: Type check
-        run: cd web && bunx tsc --noEmit
+      - name: Validate HTML syntax
+        run: |
+          echo "Checking HTML files for basic validity..."
+          for file in web/*.html web/**/*.html; do
+            if [ -f "$file" ]; then
+              # Check for DOCTYPE and basic HTML structure
+              if ! grep -q "<!DOCTYPE html>" "$file"; then
+                echo "Warning: $file missing DOCTYPE"
+              fi
+              if ! grep -q "<html" "$file"; then
+                echo "Error: $file missing <html> tag" && exit 1
+              fi
+              echo "✓ $file"
+            fi
+          done
+          echo "✅ HTML validation passed"
 
-      - name: Lint
-        run: cd web && bun run lint
+      - name: Check for broken internal links
+        run: |
+          echo "Checking for broken internal references..."
+          # Check that CSS/JS files referenced in HTML exist
+          for html in web/*.html web/**/*.html; do
+            if [ -f "$html" ]; then
+              # Extract href and src attributes and check local files
+              grep -oP '(href|src)="(?!http|//|#|mailto:)[^"]+' "$html" | \
+                sed 's/.*="//' | while read -r ref; do
+                  # Resolve relative path
+                  dir=$(dirname "$html")
+                  target="$dir/$ref"
+                  # Normalize path
+                  target=$(cd "$(dirname "$target")" 2>/dev/null && pwd)/$(basename "$target") 2>/dev/null || target=""
+                  if [ -n "$target" ] && [ ! -f "$target" ] && [ ! -d "${target%/}" ]; then
+                    # Check from web root as fallback
+                    if [ ! -f "web/$ref" ] && [ ! -d "web/${ref%/}" ]; then
+                      echo "Warning: $html references $ref which may not exist"
+                    fi
+                  fi
+                done
+            fi
+          done
+          echo "✅ Link check complete"
 
-      - name: Build
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: http://localhost:54321
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZS1kZW1vIiwicm9sZSI6ImFub24iLCJleHAiOjE5ODM4MTI5OTZ9.CRXP1A7WOeoJeXxjNni43kdQwgnWNReilDMblYTn_I0
-          NEXT_PUBLIC_STRIPE_PUBLISHABLE_KEY: pk_test_placeholder
-        run: cd web && bun run build
+      - name: List static site structure
+        run: |
+          echo "📁 Static site structure:"
+          find web -type f | sort | head -50

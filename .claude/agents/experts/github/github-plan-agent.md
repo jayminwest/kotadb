@@ -7,6 +7,9 @@ tools:
   - Grep
   - Write
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
 ---
@@ -86,6 +89,15 @@ Use Bash for git operations, file statistics, or verification commands.
 - Include Co-Authored-By for AI-assisted commits
 - Types match issue types: feat, fix, chore, refactor, docs, test
 
+**Release Workflows:**
+- Trigger: Semantic version tags (v<major>.<minor>.<patch>)
+- Location: .github/workflows/npm-publish.yml
+- Validation: Full Level 3 (lint, typecheck, test, build) before publishing
+- Version verification: Tag version must match package.json version
+- Publishing: Uses bun publish --access public with NODE_AUTH_TOKEN secret
+- Release creation: Automatic GitHub Release with gh CLI, includes npm registry URL
+- Runtime consistency: Bun 1.1.29 across all workflows
+
 ### Planning Standards
 
 **Specification Structure:**
@@ -147,7 +159,7 @@ Use Bash for git operations, file statistics, or verification commands.
    - Examples and usage scenarios
 
 7. **Save Specification**
-   - Save spec to `docs/specs/github-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/github-<descriptive-name>-spec.md`
    - Include example workflows
    - Document validation criteria
    - Return the spec path when complete
@@ -181,5 +193,5 @@ Use Bash for git operations, file statistics, or verification commands.
 - Commands: <validation commands>
 
 **Specification Location:**
-- Path: `docs/specs/github-<name>-spec.md`
+- Path: `.claude/.cache/specs/github-<name>-spec.md`
 ```

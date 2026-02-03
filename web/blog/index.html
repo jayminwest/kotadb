@@ -1,0 +1,207 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="KotaDB Blog - Updates, tutorials, and insights about local-first code intelligence.">
+  <meta name="keywords" content="KotaDB, blog, code intelligence, SQLite, developer tools">
+  <meta name="author" content="KotaDB">
+  <meta property="og:title" content="KotaDB Blog">
+  <meta property="og:description" content="Updates, tutorials, and insights about local-first code intelligence.">
+  <meta property="og:type" content="website">
+  <meta name="twitter:card" content="summary">
+  <meta name="twitter:title" content="KotaDB Blog">
+  <meta name="twitter:description" content="Updates, tutorials, and insights about local-first code intelligence.">
+  <title>Blog - KotaDB</title>
+  <link rel="stylesheet" href="../css/main.css">
+  <style>
+    .blog-header {
+      padding: var(--space-3xl) 0 var(--space-xl);
+      border-bottom: 1px solid var(--color-border);
+    }
+    
+    .blog-header h1 {
+      margin-bottom: var(--space-sm);
+    }
+    
+    .blog-header p {
+      color: var(--color-text-muted);
+      margin-bottom: 0;
+    }
+    
+    .blog-list {
+      padding: var(--space-2xl) 0;
+    }
+    
+    .blog-posts {
+      display: flex;
+      flex-direction: column;
+      gap: var(--space-xl);
+    }
+    
+    .blog-post-card {
+      padding: var(--space-lg);
+      background-color: var(--color-bg-alt);
+      border: 1px solid var(--color-border);
+      border-radius: var(--border-radius);
+      transition: border-color 0.15s ease;
+    }
+    
+    .blog-post-card:hover {
+      border-color: var(--color-primary);
+    }
+    
+    .blog-post-card a {
+      text-decoration: none;
+    }
+    
+    .blog-post-card h2 {
+      font-size: var(--font-size-xl);
+      margin-bottom: var(--space-sm);
+      color: var(--color-text);
+    }
+    
+    .blog-post-card:hover h2 {
+      color: var(--color-primary);
+    }
+    
+    .blog-post-date {
+      font-size: var(--font-size-sm);
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-sm);
+    }
+    
+    .blog-post-description {
+      color: var(--color-text-muted);
+      margin-bottom: 0;
+      line-height: 1.6;
+    }
+    
+    .loading {
+      text-align: center;
+      padding: var(--space-3xl);
+      color: var(--color-text-muted);
+    }
+    
+    .error-message {
+      text-align: center;
+      padding: var(--space-3xl);
+      color: var(--color-text-muted);
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="logo">KotaDB</a>
+      <nav class="main-nav">
+        <a href="/docs/">Docs</a>
+        <a href="/blog/">Blog</a>
+        <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="blog-header">
+      <div class="container">
+        <h1>Blog</h1>
+        <p>Updates, tutorials, and insights about KotaDB and local-first development.</p>
+      </div>
+    </section>
+
+    <section class="blog-list">
+      <div class="container">
+        <div id="blog-posts" class="blog-posts">
+          <div class="loading">Loading posts...</div>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+        <p>&copy; 2026 KotaDB. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
+        <nav class="footer-nav">
+          <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
+
+  <script type="module">
+    import { parseFrontmatter } from '../js/render.js';
+    
+    const blogPosts = [
+      'content/2026-01-20-local-first-philosophy.md',
+      'content/2026-01-15-launch-announcement.md'
+    ];
+    
+    function formatDate(dateStr) {
+      const date = new Date(dateStr + 'T00:00:00');
+      return date.toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    }
+    
+    async function loadBlogPosts() {
+      const container = document.getElementById('blog-posts');
+      const posts = [];
+      
+      for (const postPath of blogPosts) {
+        try {
+          const response = await fetch(postPath);
+          if (!response.ok) continue;
+          
+          const content = await response.text();
+          const { frontmatter } = parseFrontmatter(content);
+          
+          if (frontmatter.title && frontmatter.slug) {
+            posts.push({
+              title: frontmatter.title,
+              description: frontmatter.description || '',
+              date: frontmatter.date || '',
+              slug: frontmatter.slug
+            });
+          }
+        } catch (error) {
+          console.error('Failed to load ' + postPath + ':', error);
+        }
+      }
+      
+      posts.sort(function(a, b) {
+        if (!a.date) return 1;
+        if (!b.date) return -1;
+        return new Date(b.date) - new Date(a.date);
+      });
+      
+      if (posts.length === 0) {
+        container.innerHTML = '<div class="error-message"><p>No blog posts found.</p></div>';
+        return;
+      }
+      
+      container.innerHTML = posts.map(function(post) {
+        var dateHtml = post.date ? '<div class="blog-post-date">' + formatDate(post.date) + '</div>' : '';
+        var descHtml = post.description ? '<p class="blog-post-description">' + escapeHtml(post.description) + '</p>' : '';
+        return '<article class="blog-post-card"><a href="post.html?slug=' + encodeURIComponent(post.slug) + '"><h2>' + escapeHtml(post.title) + '</h2>' + dateHtml + descHtml + '</a></article>';
+      }).join('');
+    }
+    
+    function escapeHtml(str) {
+      const div = document.createElement('div');
+      div.textContent = str;
+      return div.innerHTML;
+    }
+    
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', loadBlogPosts);
+    } else {
+      loadBlogPosts();
+    }
+  </script>
+</body>
+</html>

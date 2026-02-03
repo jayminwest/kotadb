@@ -7,6 +7,9 @@ tools:
   - Grep
   - Write
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
 ---
@@ -166,7 +169,7 @@ app/src/indexer/
    - Performance considerations
 
 7. **Save Specification**
-   - Save spec to `docs/specs/indexer-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/indexer-<descriptive-name>-spec.md`
    - Include code examples
    - Document validation criteria
    - Return the spec path when complete
@@ -201,5 +204,5 @@ app/src/indexer/
 - Integration tests: <scenarios>
 
 **Specification Location:**
-- Path: `docs/specs/indexer-<name>-spec.md`
+- Path: `.claude/.cache/specs/indexer-<name>-spec.md`
 ```

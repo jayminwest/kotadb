@@ -1,5 +1,8 @@
 /**
  * Unit tests for structured logger
+ * 
+ * Note: All log levels output to stderr to keep stdout clean for JSON output.
+ * This is intentional - see issue #117.
  */
 
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
@@ -7,15 +10,12 @@ import { createLogger } from "@logging/logger";
 import type { LogEntry } from "@logging/logger";
 
 describe("Logger", () => {
-	let stdoutSpy: ReturnType<typeof mock>;
 	let stderrSpy: ReturnType<typeof mock>;
 	let originalLogLevel: string | undefined;
 
 	beforeEach(() => {
-		// Capture stdout and stderr
-		stdoutSpy = mock(() => {});
+		// Capture stderr (all logs go to stderr)
 		stderrSpy = mock(() => {});
-		process.stdout.write = stdoutSpy;
 		process.stderr.write = stderrSpy;
 
 		// Save original log level
@@ -38,8 +38,8 @@ describe("Logger", () => {
 
 			logger.info("test message");
 
-			expect(stdoutSpy).toHaveBeenCalledTimes(1);
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			expect(stderrSpy).toHaveBeenCalledTimes(1);
+			const output = stderrSpy.mock.calls[0]?.[0];
 			expect(typeof output).toBe("string");
 
 			// Parse JSON to verify it's valid
@@ -76,8 +76,8 @@ describe("Logger", () => {
 			logger.warn("warn");
 			logger.error("error");
 
-			expect(stdoutSpy).toHaveBeenCalledTimes(3); // debug, info, warn
-			expect(stderrSpy).toHaveBeenCalledTimes(1); // error
+			// All logs go to stderr now
+			expect(stderrSpy).toHaveBeenCalledTimes(4);
 		});
 
 		it("should respect LOG_LEVEL=info and filter debug logs", () => {
@@ -89,8 +89,8 @@ describe("Logger", () => {
 			logger.warn("warn");
 			logger.error("error");
 
-			expect(stdoutSpy).toHaveBeenCalledTimes(2); // info, warn
-			expect(stderrSpy).toHaveBeenCalledTimes(1); // error
+			// info, warn, error (debug filtered)
+			expect(stderrSpy).toHaveBeenCalledTimes(3);
 		});
 
 		it("should respect LOG_LEVEL=warn and filter debug/info logs", () => {
@@ -102,8 +102,8 @@ describe("Logger", () => {
 			logger.warn("warn");
 			logger.error("error");
 
-			expect(stdoutSpy).toHaveBeenCalledTimes(1); // warn
-			expect(stderrSpy).toHaveBeenCalledTimes(1); // error
+			// warn, error (debug, info filtered)
+			expect(stderrSpy).toHaveBeenCalledTimes(2);
 		});
 
 		it("should respect LOG_LEVEL=error and only show errors", () => {
@@ -115,8 +115,8 @@ describe("Logger", () => {
 			logger.warn("warn");
 			logger.error("error");
 
-			expect(stdoutSpy).toHaveBeenCalledTimes(0);
-			expect(stderrSpy).toHaveBeenCalledTimes(1); // error
+			// error only
+			expect(stderrSpy).toHaveBeenCalledTimes(1);
 		});
 
 		it("should default to info level when LOG_LEVEL is not set", () => {
@@ -126,7 +126,8 @@ describe("Logger", () => {
 			logger.debug("debug");
 			logger.info("info");
 
-			expect(stdoutSpy).toHaveBeenCalledTimes(1); // info only
+			// info only (debug filtered)
+			expect(stderrSpy).toHaveBeenCalledTimes(1);
 		});
 	});
 
@@ -137,7 +138,7 @@ describe("Logger", () => {
 
 			logger.info("test");
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.request_id).toBe("req-123");
 			expect(parsed.context?.user_id).toBe("user-456");
@@ -149,7 +150,7 @@ describe("Logger", () => {
 
 			logger.info("test", { job_id: "job-789" });
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.request_id).toBe("req-123");
 			expect(parsed.context?.job_id).toBe("job-789");
@@ -161,7 +162,7 @@ describe("Logger", () => {
 
 			logger.info("test");
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context).toBeUndefined();
 		});
@@ -174,7 +175,7 @@ describe("Logger", () => {
 
 			logger.info("test", { apiKey: "secret123" });
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.apiKey).toBe("[REDACTED]");
 		});
@@ -185,7 +186,7 @@ describe("Logger", () => {
 
 			logger.info("test", { token: "secret-token", access_token: "bearer-token" });
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.token).toBe("[REDACTED]");
 			expect(parsed.context?.access_token).toBe("[REDACTED]");
@@ -197,7 +198,7 @@ describe("Logger", () => {
 
 			logger.info("test", { password: "secret123", user_password: "pass123" });
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.password).toBe("[REDACTED]");
 			expect(parsed.context?.user_password).toBe("[REDACTED]");
@@ -209,7 +210,7 @@ describe("Logger", () => {
 
 			logger.info("test", { ApiKey: "secret", API_TOKEN: "token" });
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.ApiKey).toBe("[REDACTED]");
 			expect(parsed.context?.API_TOKEN).toBe("[REDACTED]");
@@ -226,7 +227,7 @@ describe("Logger", () => {
 				},
 			});
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			const user = parsed.context?.user as { id: string; apiKey: string } | undefined;
 			expect(user?.id).toBe("user-123");
@@ -239,7 +240,7 @@ describe("Logger", () => {
 
 			logger.info("test", { userId: "user-123", requestId: "req-456" });
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.userId).toBe("user-123");
 			expect(parsed.context?.requestId).toBe("req-456");
@@ -310,7 +311,7 @@ describe("Logger", () => {
 
 			child.info("test");
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.request_id).toBe("req-123");
 			expect(parsed.context?.job_id).toBe("job-789");
@@ -324,12 +325,12 @@ describe("Logger", () => {
 			parent.info("parent");
 			child.info("child");
 
-			const parentOutput = stdoutSpy.mock.calls[0]?.[0];
+			const parentOutput = stderrSpy.mock.calls[0]?.[0];
 			const parentParsed = JSON.parse(parentOutput as string) as LogEntry;
 			expect(parentParsed.context?.request_id).toBe("req-123");
 			expect(parentParsed.context?.job_id).toBeUndefined();
 
-			const childOutput = stdoutSpy.mock.calls[1]?.[0];
+			const childOutput = stderrSpy.mock.calls[1]?.[0];
 			const childParsed = JSON.parse(childOutput as string) as LogEntry;
 			expect(childParsed.context?.request_id).toBe("req-123");
 			expect(childParsed.context?.job_id).toBe("job-789");
@@ -343,7 +344,7 @@ describe("Logger", () => {
 
 			child2.info("test");
 
-			const output = stdoutSpy.mock.calls[0]?.[0];
+			const output = stderrSpy.mock.calls[0]?.[0];
 			const parsed = JSON.parse(output as string) as LogEntry;
 			expect(parsed.context?.request_id).toBe("req-123");
 			expect(parsed.context?.job_id).toBe("job-789");

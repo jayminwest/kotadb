@@ -3,10 +3,12 @@
  * 
  * Generates complete OpenAPI specification document with:
  * - Info section (title, version, description)
- * - Server definitions (production, staging, local)
+ * - Server definitions (local only)
  * - Security schemes (API key, JWT bearer)
  * - Path operations from paths.ts
  * - Component schemas from schemas.ts
+ * 
+ * NOTE: Local-only mode - cloud infrastructure references removed.
  */
 
 import { OpenAPIRegistry, OpenApiGeneratorV31 } from '@asteasolutions/zod-to-openapi';
@@ -41,7 +43,7 @@ export function buildOpenAPISpec(): unknown {
 		type: 'http',
 		scheme: 'bearer',
 		bearerFormat: 'JWT',
-		description: 'JWT bearer token authentication. Obtained from Supabase Auth.',
+		description: 'JWT bearer token authentication.',
 	});
 
 	// Register all path operations
@@ -58,7 +60,8 @@ export function buildOpenAPISpec(): unknown {
 			description: `
 # KotaDB API Documentation
 
-KotaDB provides a code intelligence API for indexing, searching, and analyzing code repositories.
+KotaDB is a local-only code intelligence API for indexing, searching, and analyzing code repositories.
+Data is stored in SQLite and all operations run locally.
 
 ## Authentication
 
@@ -72,11 +75,9 @@ Use Bearer token format with your API key:
 Authorization: Bearer kota_free_key123_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
 \`\`\`
 
-API keys can be generated via the \`POST /api/keys/generate\` endpoint (requires JWT authentication first).
-
 ### 2. JWT Bearer Token (For web applications)
 
-Use Supabase Auth JWT tokens:
+Use JWT tokens:
 
 \`\`\`
 Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
@@ -84,20 +85,21 @@ Authorization: Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9...
 
 ## Rate Limiting
 
-All authenticated endpoints are rate-limited with dual limits enforced:
+All authenticated endpoints are rate-limited:
 
-- **Hourly limit**: 100 requests/hour (free tier)
-- **Daily limit**: 1000 requests/day (free tier)
-
-Both limits are checked on each request. Whichever limit is reached first will block the request.
+- **Hourly limit**: 100 requests/hour
+- **Daily limit**: 1000 requests/day
 
 Rate limit headers are included in all authenticated endpoint responses:
 
-- \`X-RateLimit-Limit\`: Hourly threshold for the tier
-- \`X-RateLimit-Remaining\`: Remaining requests (minimum of hourly and daily remaining)
-- \`X-RateLimit-Reset\`: Unix timestamp when the hourly limit resets
+- \`X-RateLimit-Limit-Hour\`: Hourly threshold
+- \`X-RateLimit-Remaining-Hour\`: Remaining hourly requests
+- \`X-RateLimit-Reset-Hour\`: Unix timestamp when hourly limit resets
+- \`X-RateLimit-Limit-Day\`: Daily threshold
+- \`X-RateLimit-Remaining-Day\`: Remaining daily requests
+- \`X-RateLimit-Reset-Day\`: Unix timestamp when daily limit resets
 
-When rate limit is exceeded, the API returns HTTP 429 with a \`Retry-After\` header indicating seconds until the limit resets.
+When rate limit is exceeded, the API returns HTTP 429 with a \`Retry-After\` header.
 
 ## Error Responses
 
@@ -121,12 +123,23 @@ Common HTTP status codes:
 ## Endpoints Overview
 
 - **Health**: Service availability check
-- **Indexing**: Trigger repository indexing jobs
-- **Jobs**: Track indexing job status and progress
 - **Search**: Search indexed code content
 - **Files**: Retrieve recently indexed files
-- **Projects**: Manage multi-repository projects
-- **API Keys**: Generate and manage API keys
+- **Validation**: Validate command output against schemas
+- **MCP**: Model Context Protocol tools for code intelligence
+
+## MCP Tools
+
+Repository indexing and advanced code intelligence operations are available via MCP tools:
+
+- \`index_repository\`: Index a git repository
+- \`search_code\`: Search indexed code
+- \`list_recent_files\`: List recently indexed files
+- \`search_dependencies\`: Find file dependencies
+- \`analyze_change_impact\`: Analyze impact of code changes
+- \`validate_implementation_spec\`: Validate implementation specifications
+- \`kota_sync_export\`: Export database to JSONL
+- \`kota_sync_import\`: Import JSONL to database
 
 			`.trim(),
 			contact: {
@@ -140,14 +153,6 @@ Common HTTP status codes:
 		},
 		servers: [
 			{
-				url: 'https://api.kotadb.com',
-				description: 'Production server',
-			},
-			{
-				url: 'https://staging-api.kotadb.com',
-				description: 'Staging server',
-			},
-			{
 				url: 'http://localhost:3001',
 				description: 'Local development server',
 			},
@@ -158,14 +163,6 @@ Common HTTP status codes:
 				description: 'Service health and status endpoints',
 			},
 			{
-				name: 'Indexing',
-				description: 'Repository indexing operations',
-			},
-			{
-				name: 'Jobs',
-				description: 'Indexing job status and tracking',
-			},
-			{
 				name: 'Search',
 				description: 'Code search operations',
 			},
@@ -174,12 +171,12 @@ Common HTTP status codes:
 				description: 'File listing and retrieval',
 			},
 			{
-				name: 'Projects',
-				description: 'Multi-repository project management',
+				name: 'Validation',
+				description: 'Output validation operations',
 			},
 			{
-				name: 'API Keys',
-				description: 'API key generation and management',
+				name: 'MCP',
+				description: 'Model Context Protocol tools for code intelligence',
 			},
 		],
 	});
@@ -187,7 +184,7 @@ Common HTTP status codes:
 	const duration = Date.now() - startTime;
 	const pathCount = Object.keys(spec.paths || {}).length;
 
-	process.stdout.write(JSON.stringify({
+	process.stderr.write(JSON.stringify({
 		level: 'info',
 		module: 'openapi-builder',
 		message: 'OpenAPI spec generated',

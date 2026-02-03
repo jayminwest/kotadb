@@ -22,9 +22,22 @@
  * @see https://en.wikipedia.org/wiki/Cycle_(graph_theory) - Cycle detection theory
  */
 
-import type { DependencyEdge } from "./dependency-extractor";
 import { Sentry } from "../instrument.js";
 import { createLogger } from "@logging/logger.js";
+
+/**
+ * Dependency edge representing a relationship between files or symbols.
+ */
+export interface DependencyEdge {
+	repositoryId: string;
+	fromFileId: string | null;
+	toFileId: string | null;
+	fromSymbolId: string | null;
+	toSymbolId: string | null;
+	dependencyType: "file_import" | "symbol_usage";
+	metadata: Record<string, unknown>;
+}
+
 
 const logger = createLogger({ module: "indexer-circular-detector" });
 

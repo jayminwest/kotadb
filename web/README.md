@@ -1,202 +1,128 @@
-# KotaDB Web Application
+# KotaDB Documentation Website
 
-Next.js web interface for KotaDB MCP-first onboarding.
+Static documentation site for [KotaDB](https://github.com/jayminwest/kotadb) - a local-first code intelligence tool.
 
-## Product Philosophy
+## Overview
 
-KotaDB makes AI agents more effective by providing code intelligence through MCP (Model Context Protocol). The web frontend supports the onboarding flow: sign up → generate API key → copy config → better agents.
+This is a static site built with vanilla HTML, CSS, and JavaScript. Content is written in Markdown and rendered client-side using [marked.js](https://marked.js.org/).
 
-## Features
-
-- **GitHub OAuth Authentication**: Secure sign-up and login via GitHub
-- **API Key Management**: Generate, reset, and revoke API keys for MCP access
-- **MCP Configuration**: Copy-paste configuration for Claude Code CLI integration
-- **Stripe Integration**: Upgrade from free to solo/team tiers
-- **Rate Limiting**: Visual rate limit quota tracking with countdown timer
-- **Type-Safe API Client**: Shared TypeScript types with backend for compile-time safety
-
-## User Journey
-
-1. Sign up via GitHub OAuth (`/login`)
-2. Generate API key (`/dashboard`)
-3. Copy MCP configuration (`/mcp`)
-4. Paste config into Claude Code CLI
-5. AI agents can now search code, analyze dependencies, and more
-
-## Archived Pages
-
-The following pages have been archived to `web/app/_archive/` to reduce maintenance burden and clarify product focus:
-
-- `/search` - Full-text search interface (duplicates `mcp__kotadb__search-code` tool)
-- `/repository-index` - Repository indexing UI (duplicates `mcp__kotadb__index-repository` tool)
-- `/files` - Recent files browser (duplicates `mcp__kotadb__list-recent-files` tool)
-
-These pages duplicate MCP tool functionality and are not part of the core onboarding flow. Users interact with KotaDB via AI agents, not web forms.
-
-## Getting Started
-
-### Prerequisites
-
-- Bun 1.2.9 or later
-- KotaDB API running on `http://localhost:3000` (default)
-- Valid API key (format: `kota_<tier>_<key_id>_<secret>`)
-
-### Development
-
-```bash
-# Install dependencies (from repository root)
-bun install
-
-# Start development server
-cd web && bun run dev
-```
-
-The web app will be available at `http://localhost:3001`.
-
-### Environment Variables
-
-Create a `.env.local` file in the `web/` directory:
-
-```env
-NEXT_PUBLIC_API_URL=http://localhost:3000
-```
-
-See `.env.sample` for full configuration options.
-
-### Production Build
-
-```bash
-cd web && bun run build
-cd web && bun run start
-```
-
-### Docker
-
-```bash
-# Start web service with Docker Compose
-docker compose up web
-
-# Build web service container
-docker compose build web
-```
-
-## Architecture
-
-### Shared Types
-
-The web app consumes backend types from `../shared/types/`:
-
-```typescript
-import type { SearchRequest, SearchResponse } from '@shared/types/api'
-import type { AuthContext, Tier } from '@shared/types/auth'
-```
-
-TypeScript path alias `@shared/*` points to `../shared/*` (configured in `tsconfig.json`).
-
-### API Client
-
-Type-safe fetch wrappers in `lib/api-client.ts`:
-
-```typescript
-import { apiClient } from '@/lib/api-client'
-
-const { response, headers } = await apiClient.search({ term: 'function' }, apiKey)
-```
-
-All API methods return rate limit headers for quota tracking.
-
-### Authentication
-
-API keys stored in `localStorage` and passed via `Authorization: Bearer` header.
-Managed by `AuthContext` provider in `context/AuthContext.tsx`.
-
-## Project Structure
+## File Structure
 
 ```
 web/
-├── app/                      # Next.js 14 App Router
-│   ├── _archive/             # Archived pages (ignored by Next.js routing)
-│   │   ├── components/       # Components only used by archived pages
-│   │   │   ├── SearchBar.tsx
-│   │   │   └── FileList.tsx
-│   │   ├── search/page.tsx   # Archived search interface
-│   │   ├── repository-index/page.tsx  # Archived indexing UI
-│   │   └── files/page.tsx    # Archived files browser
-│   ├── auth/                 # Authentication routes
-│   │   └── dev-session/route.ts  # Dev-mode session endpoint
-│   ├── layout.tsx            # Root layout with navigation
-│   ├── page.tsx              # Landing page
-│   ├── login/page.tsx        # GitHub OAuth authentication
-│   ├── dashboard/page.tsx    # API key management + billing
-│   ├── pricing/page.tsx      # Stripe checkout
-│   └── mcp/page.tsx          # MCP configuration copy-paste
-├── components/               # Reusable React components
-│   ├── Navigation.tsx        # Top navigation bar
-│   ├── ApiKeyInput.tsx       # API key management
-│   ├── RateLimitStatus.tsx   # Rate limit indicator
-│   ├── KeyResetModal.tsx     # API key reset confirmation
-│   ├── KeyRevokeModal.tsx    # API key revoke confirmation
-│   └── mcp/                  # MCP page components
-│       ├── ConfigurationDisplay.tsx
-│       ├── CopyButton.tsx
-│       └── ToolReference.tsx
-├── context/                  # React context providers
-│   └── AuthContext.tsx       # Authentication state
-├── lib/                      # Utility libraries
-│   ├── api-client.ts         # Type-safe API client
-│   └── playwright-helpers.ts # Test session management
-└── public/                   # Static assets
+├── index.html              # Homepage
+├── 404.html                # Custom 404 error page
+├── vercel.json             # Vercel deployment configuration
+├── sitemap.xml             # SEO sitemap
+├── robots.txt              # Search engine directives
+├── .nojekyll               # Disable Jekyll processing
+├── css/
+│   ├── main.css            # Core styles
+│   └── syntax.css          # Code syntax highlighting
+├── js/
+│   ├── main.js             # Main JavaScript
+│   └── render.js           # Markdown rendering utilities
+├── assets/
+│   └── lib/
+│       └── marked.min.js   # Markdown parser
+├── docs/
+│   ├── index.html          # Documentation shell
+│   └── content/            # Markdown documentation files
+│       ├── installation.md
+│       ├── configuration.md
+│       ├── api-reference.md
+│       └── architecture.md
+└── blog/
+    ├── index.html          # Blog listing page
+    ├── post.html           # Individual blog post template
+    └── content/            # Markdown blog posts
+        ├── 2026-01-15-launch-announcement.md
+        └── 2026-01-20-local-first-philosophy.md
 ```
 
-## Testing
+## Local Development
 
-### Type Checking
+To run the site locally, you need a static file server. Here are a few options:
+
+### Using Python
 
 ```bash
-cd web && bunx tsc --noEmit
+cd web
+python3 -m http.server 8000
 ```
 
-### Linting
+Then open http://localhost:8000
+
+### Using Node.js (npx)
 
 ```bash
-cd web && bun run lint
+cd web
+npx serve
 ```
 
-### Build Validation
+### Using PHP
 
 ```bash
-cd web && bun run build
+cd web
+php -S localhost:8000
 ```
 
 ## Deployment
 
-### Vercel
+This site is configured for deployment on [Vercel](https://vercel.com/).
 
-When deploying to Vercel, configure the following environment variables in Project Settings → Environment Variables:
+### Automatic Deployment
 
-**Required Variables:**
-- `NEXT_PUBLIC_SUPABASE_URL`: Production Supabase project URL (from Supabase dashboard → Settings → API)
-- `NEXT_PUBLIC_SUPABASE_ANON_KEY`: Production Supabase anon key (from Supabase dashboard → Settings → API)
-- `NEXT_PUBLIC_API_URL`: Production KotaDB API URL (e.g., `https://api.kotadb.com`)
+The site automatically deploys when changes are pushed to the `main` branch. Vercel watches the repository and triggers a new deployment on each push.
 
-**Scope:** Apply to Production, Preview, and Development environments
+### Manual Deployment
 
-**Security Notes:**
-- Never commit credentials to git repository
-- Use `.env.local` for local development (excluded by `.gitignore`)
-- Production credentials should only exist in Vercel dashboard
+To deploy manually using the Vercel CLI:
 
-**Build Configuration:**
-- Build Command: `cd web && bun run build`
-- Output Directory: `web/.next`
-- Install Command: `bun install`
+```bash
+# Install Vercel CLI
+npm install -g vercel
 
-See `docs/deployment.md` for backend API deployment instructions.
+# Deploy from the web directory
+cd web
+vercel
+```
 
-## Contributing
+### Configuration
 
-Follow KotaDB contribution guidelines. Ensure all changes pass:
+Vercel configuration is in `vercel.json`:
 
-- Type checking: `bunx tsc --noEmit`
-- Linting: `bun run lint`
-- Production build: `bun run build`
+- **Clean URLs**: Removes `.html` extensions from URLs
+- **Security Headers**: Adds X-Content-Type-Options, X-Frame-Options, X-XSS-Protection
+- **Asset Caching**: Long-term caching for assets in `/assets/`
+- **Rewrites**: Routes `/docs` and `/blog` to their respective index files
+
+## Adding Content
+
+### New Documentation Page
+
+1. Create a new `.md` file in `docs/content/`
+2. Add the page to `DOCS_PAGES` in `docs/index.html`
+3. Add a navigation link in the sidebar
+
+### New Blog Post
+
+1. Create a new `.md` file in `blog/content/` with the naming convention `YYYY-MM-DD-slug.md`
+2. Add YAML frontmatter with `title`, `description`, `date`, and `slug`
+3. Add the file path to the `blogPosts` array in `blog/index.html`
+4. Add the slug mapping to `postMap` in `blog/post.html`
+
+Example frontmatter:
+
+```yaml
+---
+title: Your Post Title
+description: A brief description for SEO
+date: 2026-01-29
+slug: your-post-slug
+---
+```
+
+## License
+
+MIT License - see [LICENSE](https://github.com/jayminwest/kotadb/blob/main/LICENSE)

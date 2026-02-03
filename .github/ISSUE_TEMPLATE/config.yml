@@ -1,0 +1,8 @@
+blank_issues_enabled: false
+contact_links:
+  - name: 📖 Documentation
+    url: https://github.com/jayminwest/kotadb#readme
+    about: Check the README and docs before opening an issue
+  - name: 🔍 Search Existing Issues
+    url: https://github.com/jayminwest/kotadb/issues?q=is%3Aissue
+    about: Search to see if your issue has already been reported

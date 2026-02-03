@@ -23,7 +23,6 @@ overview:
     - Path aliases (@api/*, @indexer/*, @shared/*, etc.)
     - Logging via createLogger (never console.*)
     - TSESTree types from @typescript-eslint/types
-    - Storage abstraction pattern for portability (@kotadb/core package)
 
     Does NOT cover MCP tool implementation (see MCP expert) or API routes.
   rationale: |
@@ -40,6 +39,7 @@ core_implementation:
       symbol-extractor.ts: Visitor pattern for symbol extraction
       reference-extractor.ts: Visitor pattern for reference extraction
       import-resolver.ts: Import path resolution utilities
+      path-resolver.ts: TypeScript path alias resolution (tsconfig.json parsing)
       dependency-extractor.ts: Dependency graph construction
       circular-detector.ts: Circular dependency detection algorithms
       storage.ts: SQLite storage layer with transactional writes
@@ -47,18 +47,14 @@ core_implementation:
       extractors.ts: High-level extraction orchestration
       parsers.ts: File type detection and parsing coordination
     
-    packages/core/:
-      purpose: Standalone @kotadb/core package (zero DB dependencies)
-      src/parsers/: AST parsing modules
-      src/analysis/: Symbol, reference, dependency extraction
-      src/storage/: Storage abstraction (Memory + SQLite adapters)
-      src/types/: Type definitions for symbols, references, dependencies
-      tests/: Comprehensive test suite with real fixtures
 
   key_files:
     - path: app/src/indexer/ast-parser.ts
       purpose: AST parsing with graceful error handling
       exports: parseFile, isSupportedForAST
+    - path: app/src/indexer/regex-fallback.ts
+      purpose: Regex-based symbol extraction fallback for unparseable files
+      exports: extractSymbolsWithRegex, RegexExtractedSymbol
     - path: app/src/indexer/symbol-extractor.ts
       purpose: Symbol extraction from AST
       exports: extractSymbols, Symbol, SymbolKind
@@ -68,6 +64,9 @@ core_implementation:
     - path: app/src/indexer/import-resolver.ts
       purpose: Import path resolution
       exports: resolveImport, resolveExtensions, handleIndexFiles
+    - path: app/src/indexer/path-resolver.ts
+      purpose: TypeScript path alias resolution
+      exports: parseTsConfig, resolvePathAlias, PathMappings
     - path: app/src/indexer/dependency-extractor.ts
       purpose: Dependency graph construction
       exports: extractDependencies, DependencyEdge
@@ -77,9 +76,6 @@ core_implementation:
     - path: app/src/api/queries.ts
       purpose: FTS5 search with proper term escaping
       exports: searchFilesLocal, escapeFts5Term
-    - path: packages/core/src/storage/sqlite-adapter.ts
-      purpose: Storage abstraction for portability
-      exports: SqliteStorageAdapter, MemoryStorageAdapter
 
 key_operations:
   parse_ast:
@@ -119,6 +115,95 @@ key_operations:
       - what: Parsing JSON files
         instead: Skip JSON files in isSupportedForAST
         reason: JSON is not valid JavaScript program
+
+
+  parse_ast_with_error_recovery:
+    when: Parsing TypeScript/JavaScript with syntax errors that prevent normal AST generation
+    approach: |
+      1. Call parseFileWithRecovery(filePath, content) -> ParseResult
+         - Returns { ast, errors, partial } structure
+         - ast: TSESTree.Program | null (partial or null if recovery fails)
+         - errors: ParseError[] (with message, line, column)
+         - partial: boolean (true if AST recovered despite errors)
+      
+      2. First attempt: Normal parsing (strict mode)
+         - Uses standard @typescript-eslint/parser options
+         - Returns ast with errors:[] and partial:false on success
+      
+      3. Second attempt: Error-tolerant parsing (if first fails)
+         - Enables allowInvalidAST: true option
+         - Enables errorOnUnknownASTType: false option
+         - Returns partial AST if recovery succeeds
+         - Sets partial:true flag to indicate recovery was used
+      
+      4. Third attempt: Regex fallback (if AST recovery fails completely)
+         - Call extractSymbolsWithRegex(content, filePath)
+         - Pattern-based extraction for basic symbols
+         - Marks symbols with metadata.extractionMethod: "regex"
+         - Returns limited symbol info without full AST structure
+      
+      Error recovery stages:
+      ```typescript
+      const result = parseFileWithRecovery(filePath, content);
+      
+      if (result.ast) {
+        // Success or partial recovery
+        if (result.partial) {
+          logger.warn(`Recovered partial AST for ${filePath}`, {
+            error_count: result.errors.length,
+            recovery: "partial"
+          });
+        }
+        const symbols = extractSymbols(result.ast, filePath);
+      } else if (result.errors.length > 0) {
+        // Complete failure - try regex fallback
+        logger.error(`AST parsing failed for ${filePath}`, {
+          error_count: result.errors.length,
+          first_error: result.errors[0]?.message
+        });
+        const symbols = extractSymbolsWithRegex(content, filePath);
+      }
+      ```
+      
+      Recovery capabilities:
+      Recovery capabilities:
+      - Minor syntax errors (missing semicolons handled by ASI)
+      - Unclosed braces (may recover valid nodes before error)
+      - Multiple syntax errors (attempts to extract valid sections)
+      - Complete failures (regex fallback for basic pattern matching)
+      
+      Regex fallback patterns:
+      - Functions: /export\s+(?:async\s+)?function\s+(\w+)/
+      - Classes: /export\s+(?:abstract\s+)?class\s+(\w+)/
+      - Interfaces: /export\s+interface\s+(\w+)/
+      - Types: /export\s+type\s+(\w+)\s*=/
+      - Enums: /export\s+(?:const\s+)?enum\s+(\w+)/
+      - Constants: /export\s+const\s+(\w+)/
+      - Arrow functions: /export\s+const\s+(\w+)\s*=\s*(?:async\s+)?\([^)]*\)\s*=>/
+      
+      Regex limitations:
+      - Cannot determine accurate end line (uses start line)
+      - Cannot extract JSDoc comments
+      - Cannot determine precise column positions
+      - May miss complex multi-line declarations
+      - May produce false positives in strings/comments
+      - Marks symbols with extractionMethod: "regex" metadata
+    examples:
+      - File with unclosed brace -> partial AST with nodes before error
+      - File with syntax error -> regex fallback extracts export patterns
+      - parseFileWithRecovery returns errors array with line numbers
+    pitfalls:
+      - what: Treating partial AST as fully validated
+        instead: Check result.partial flag and handle appropriately
+        reason: Partial ASTs may have incomplete or invalid node structures
+      - what: Ignoring regex fallback symbols
+        instead: Use them despite limitations (better than nothing)
+        reason: Some symbol info is better than complete loss for broken files
+      - what: Not logging recovery attempts
+        instead: Log warnings for partial recovery, errors for complete failures
+        reason: Observability helps identify problematic files
+    timestamp: 2026-02-02
+    evidence: "commit 38d4e96, PR #76/#92, app/src/indexer/ast-parser.ts, app/src/indexer/regex-fallback.ts"
 
   extract_symbols:
     when: Extracting functions, classes, interfaces, types from AST
@@ -196,39 +281,101 @@ key_operations:
         reason: Cannot resolve obj[key] statically
 
   resolve_imports:
-    when: Resolving import paths to absolute file paths
+    when: Resolving import paths to absolute file paths (relative and path aliases)
     approach: |
-      1. Call resolveImport(importSource, fromFilePath, files)
-      2. Skip non-relative imports (node_modules, absolute paths)
-         - Only handle imports starting with ./ or ../
-      3. Resolve relative to importing file's directory
-      4. Try extension resolution
-         - Check .ts, .tsx, .js, .jsx, .mjs, .cjs in order
-      5. Try index file resolution
-         - Check index.ts, index.tsx, index.js, index.jsx
-      6. Return null if not found (graceful failure)
+      1. Call resolveImport(importSource, fromFilePath, files, pathMappings)
+      2. If starts with ./ or ../ -> relative import resolution
+         - Resolve relative to importing file's directory
+         - Try extension resolution (.ts, .tsx, .js, .jsx, .mjs, .cjs)
+         - Try index file resolution (index.ts, index.tsx, etc.)
+         - Return result or null
+      3. If pathMappings provided -> path alias resolution
+         - Match import against alias patterns (e.g., "@api/*")
+         - Try each resolution path for matched alias
+         - Check files Set for existence (not filesystem)
+         - Return first match or null
+      4. Otherwise -> external import (node_modules, etc.)
+         - Return null (out of scope)
 
       Resolution priority:
-      1. Exact path (if has extension)
-      2. Path + .ts, .tsx, .js, .jsx, .mjs, .cjs
-      3. Directory + index.ts, index.tsx, index.js, index.jsx
+      1. Relative imports (./ or ../)
+      2. Path aliases (tsconfig.json paths)
+      3. External imports (null)
 
-      Non-goals (out of scope):
-      - tsconfig.json path mapping (paths, baseUrl)
-      - node_modules resolution
-      - Absolute imports (/foo, @scope/pkg)
-      - Dynamic imports
+      Path alias features (NEW):
+      - Parses tsconfig.json/jsconfig.json at project root
+      - Supports extends inheritance (recursive, depth-limited)
+      - First-match-wins for multi-path mappings
+      - Graceful fallback if no config found
+
     examples:
-      - "./utils" -> "/repo/src/utils.ts"
-      - "./api" -> "/repo/src/api/index.ts"
-      - "lodash" -> null (node_modules, skip)
+      - '"./utils" -> "/repo/src/utils.ts" (relative)'
+      - '"./api" -> "/repo/src/api/index.ts" (relative with index)'
+      - '"@api/routes" -> "/repo/src/api/routes.ts" (path alias)'
+      - '"lodash" -> null (node_modules, skip)'
     pitfalls:
       - what: Resolving node_modules imports
-        instead: Return null for non-relative imports
+        instead: Return null for non-relative, non-alias imports
         reason: External dependencies handled separately
       - what: Using path.resolve (creates absolute paths)
         instead: Use path.join + path.normalize
         reason: Preserves relative path structure
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/import-resolver.ts
+
+  resolve_path_aliases:
+    when: Resolving path alias imports (@api/*, @db/*, etc.) to absolute file paths
+    approach: |
+      1. Parse tsconfig.json (or jsconfig.json) at project root
+         - Extract compilerOptions.paths and compilerOptions.baseUrl
+         - Support extends inheritance (recursive with MAX_EXTENDS_DEPTH = 10)
+         - Merge child paths with parent (child takes precedence)
+      2. Match import against each alias pattern
+         - Exact match (no wildcard): "@api" === "@api"
+         - Wildcard match: "@api/*" matches "@api/routes" -> suffix "routes"
+      3. Try each resolution path for matched alias (first-match-wins)
+         - Substitute wildcard with matched suffix: "src/api/*" -> "src/api/routes"
+         - Resolve relative to baseUrl: join(projectRoot, baseUrl, substituted)
+         - Normalize path for consistent format
+      4. **CRITICAL: Convert absolute path to relative for files Set lookup**
+         - After normalize(), path is absolute (e.g., "/repo/src/api/routes")
+         - files Set contains relative paths (e.g., "src/api/routes.ts")
+         - Convert: `resolved.startsWith(projectRoot) ? resolved.slice(projectRoot.length + 1) : resolved`
+         - Use normalized relative path for tryExtensions() and tryIndexFiles()
+      5. Try extension variants (.ts, .tsx, .js, .jsx, .mjs, .cjs)
+      6. Try index file resolution (index.ts, index.tsx, index.js, index.jsx)
+      7. Return first match or null if not found
+      
+      Project root determination:
+      - Walk up directory tree looking for package.json, tsconfig.json, or .git
+      - Limit to 10 levels (maxDepth)
+      - Fallback to first two path segments if markers not found
+      
+      Key features:
+      - Recursive extends support (child tsconfig extends parent)
+      - Circular extends detection with depth limit
+      - Fallback from tsconfig.json to jsconfig.json (JavaScript projects)
+      - First-match-wins for multi-path mappings (e.g., monorepo fallbacks)
+      - Graceful error handling (return null on parse errors)
+    examples:
+      - '"@api/routes" with { "@api/*": ["src/api/*"] } -> "/repo/src/api/routes.ts"'
+      - '"@shared/utils" with { "@shared/*": ["src/shared/*", "packages/shared/*"] } -> first match wins'
+      - Child tsconfig extends parent -> merges path mappings
+    pitfalls:
+      - what: Not supporting tsconfig extends
+        instead: Parse parent recursively and merge configs
+        reason: Monorepos often use base tsconfig with child overrides
+      - what: Using existsSync to check resolved paths
+        instead: Check against files Set (indexed files only)
+        reason: Avoids filesystem access, matches indexed data
+      - what: Failing on circular extends
+        instead: Implement depth limit and return null gracefully
+        reason: Some projects have malformed tsconfig chains
+      - what: Testing with mocks
+        instead: Use real filesystem fixtures in /tmp
+        reason: Antimocking philosophy - test real tsconfig parsing
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/path-resolver.ts, app/tests/indexer/path-resolver.test.ts
 
   build_dependencies:
     when: Constructing file-to-file and symbol-to-symbol dependency graph
@@ -341,109 +488,29 @@ key_operations:
   batch_process_large_repos:
     when: Indexing repositories with 200+ files to avoid database transaction timeouts
     approach: |
-      1. Chunk files array into batches (BATCH_SIZE = 50 files)
-      2. Process chunks sequentially with atomic transactions per chunk
-      3. For first chunk: perform full DELETE+INSERT (skipDelete=false)
-      4. For subsequent chunks: skip DELETE phase (skipDelete=true)
-      5. Filter symbols, references, dependencies per chunk by file_path
-      6. Accumulate stats across chunks for final reporting
-      7. Update job progress metadata after each chunk completion
+      Chunk files into batches (BATCH_SIZE = 50). Process chunks sequentially with atomic
+      transactions per chunk. First chunk performs DELETE+INSERT, subsequent chunks INSERT only.
+      Filter symbols/references per chunk by file_path. Accumulate stats across chunks.
       
-      Chunking pattern:
-      ```typescript
-      const chunks: FileData[][] = [];
-      for (let i = 0; i < files.length; i += BATCH_SIZE) {
-        chunks.push(files.slice(i, i + BATCH_SIZE));
-      }
-      
-      for (let chunkIndex = 0; chunkIndex < chunks.length; chunkIndex++) {
-        const chunk = chunks[chunkIndex];
-        const skipDelete = chunkIndex > 0; // Only DELETE on first chunk
-        
-        // Filter data for this chunk
-        const chunkFilePaths = new Set(chunk.map(f => f.path));
-        const chunkSymbols = symbols.filter(s => chunkFilePaths.has(s.file_path));
-        const chunkReferences = references.filter(r => chunkFilePaths.has(r.source_file_path));
-        const chunkDependencies = deps.filter(d => d.from_file_path && chunkFilePaths.has(d.from_file_path));
-        
-        // Store chunk atomically
-        await storeIndexedData(db, repoId, chunk, chunkSymbols, chunkReferences, chunkDependencies, skipDelete);
-      }
-      ```
-      
-      Key benefits:
-      - Each chunk commits within transaction timeout limits
-      - First chunk DELETE removes stale data
-      - Subsequent chunks only INSERT new data
-      - Progress tracking enables observability
-      - Failed chunks don't affect completed chunks
+      Key pattern: skipDelete parameter controls whether to DELETE before INSERT (first chunk only).
     examples:
-      - 250-file repository -> 5 chunks of 50 files each
-      - Each chunk commits atomically in separate transaction
-      - Progress metadata: chunks_completed, current_chunk
+      - 250-file repository -> 5 chunks of 50 files each, each commits atomically
     pitfalls:
       - what: Deleting on every chunk
         instead: Only DELETE on first chunk (skipDelete parameter)
         reason: Repeated DELETEs cause conflicts and performance issues
-      - what: Single transaction for entire large repo
-        instead: Batch into chunks with separate transactions
-        reason: Large transactions timeout on SQLite
-      - what: Not filtering symbols/references per chunk
-        instead: Filter by file_path Set for each chunk
-        reason: Orphaned data references files not in chunk
     timestamp: 2026-01-28
-    evidence: commit d47a650, app/src/queue/workers/index-repo.ts
-
+    evidence: commit d47a650
   filter_build_artifacts:
     when: Discovering source files to avoid indexing build output and dependencies
     approach: |
-      Maintain comprehensive IGNORED_DIRECTORIES set covering:
+      IGNORED_DIRECTORIES set (27 directories): .git, node_modules, vendor, build, dist, out,
+      target, .next, .vercel, .turbo, .nuxt, .output, .svelte-kit, .angular, .vite, .parcel-cache,
+      .nx, coverage, __pycache__, .pytest_cache, venv, .venv, env, .cache
       
-      Version control:
-      - .git
-      
-      Package managers:
-      - node_modules (JS/TS)
-      - vendor (Go, Ruby, PHP)
-      
-      Build output:
-      - build, dist, out
-      - target (Rust, Java/Maven)
-      
-      Framework-specific build/cache:
-      - .next, .vercel, .turbo (Next.js, Vercel, Turborepo)
-      - .nuxt, .output (Nuxt.js)
-      - .svelte-kit (SvelteKit)
-      - .angular, .vite, .parcel-cache
-      - .nx (Nx monorepo)
-      
-      Test coverage:
-      - coverage
-      
-      Python:
-      - __pycache__, .pytest_cache
-      - venv, .venv, env
-      
-      General cache:
-      - .cache
-      
-      Result: 27 ignored directories (expanded from original 7)
-      Ensures only source files indexed, not generated code or dependencies.
-    examples:
-      - .next directory skipped for Next.js projects
-      - venv directory skipped for Python projects
-      - target directory skipped for Rust/Java projects
-    pitfalls:
-      - what: Incomplete ignored directories list
-        instead: Cover all modern build tools and package managers
-        reason: Build artifacts inflate index and add noise
-      - what: Hardcoding list in multiple places
-        instead: Single IGNORED_DIRECTORIES constant
-        reason: Maintainability and consistency
+      Covers: version control, package managers, build output, framework caches, test coverage, Python envs.
     timestamp: 2026-01-28
-    evidence: commit 5a4bca3, app/src/indexer/parsers.ts
-
-decision_trees:
+    evidence: commit 5a4bca3
   ast_parsing_strategy:
     question: How should I parse this file?
     options:
@@ -472,7 +539,7 @@ decision_trees:
       - if: VariableDeclaration and isExported
         then: Extract variable/constant/function symbol
       - if: ExportNamedDeclaration or ExportDefaultDeclaration
-        then: Recurse into declaration with isExported: true
+        then: 'Recurse into declaration with isExported: true'
       - if: Other node type
         then: Skip (no symbol to extract)
 
@@ -497,10 +564,10 @@ decision_trees:
     options:
       - if: Starts with ./ or ../
         then: Relative import, resolve with extensions/index files
-      - if: Starts with / or @ scope
-        then: Absolute import, return null (out of scope)
-      - if: No prefix (bare module)
-        then: Node modules import, return null (out of scope)
+      - if: Matches path alias pattern (pathMappings provided)
+        then: Resolve using tsconfig.json path mappings
+      - if: Starts with / or bare module (no alias match)
+        then: Absolute/external import, return null (out of scope)
       - if: Has extension already
         then: Check exact path in files Set
       - if: No extension
@@ -508,14 +575,25 @@ decision_trees:
       - if: Still not found
         then: Try index file resolution
 
+  error_recovery_strategy:
+    question: How should I handle parse errors for this file?
+    options:
+      - if: parseFileWithRecovery returns ast with partial:false
+        then: Use AST normally (no errors)
+      - if: parseFileWithRecovery returns ast with partial:true
+        then: Use partial AST, log warning, extract available symbols
+      - if: parseFileWithRecovery returns null with errors
+        then: Use regex fallback (extractSymbolsWithRegex)
+      - if: Regex fallback returns empty array
+        then: Log error, skip file (no symbols available)
+      - if: 'Symbol has metadata.extractionMethod: "regex"'
+        then: Use with caution (may lack JSDoc, accurate positions)
+
 patterns:
   visitor_pattern:
     structure: |
       function visitNode(node, results, context): void {
-        // Update context for children
         const childContext = { ...context, parent: node };
-
-        // Dispatch based on node type
         switch (node.type) {
           case "SpecificNodeType":
             extractFromNode(node, results, context);
@@ -524,145 +602,119 @@ patterns:
             visitChildren(node, results, childContext);
         }
       }
-
-      function visitChildren(node, results, context): void {
-        for (const key of Object.keys(node)) {
-          const value = node[key];
-          if (isNode(value)) {
-            visitNode(value, results, context);
-          } else if (Array.isArray(value)) {
-            for (const child of value) {
-              if (isNode(child)) {
-                visitNode(child, results, context);
-              }
-            }
-          }
-        }
-      }
-    trade_offs:
-      pros: [Flexible traversal, Easy to extend, Clear dispatch logic]
-      cons: [Recursive stack depth, Manual child handling]
-
   graceful_error_handling:
     structure: |
       try {
-        const result = parse(content, options);
-        return result;
+        return parse(content, options);
       } catch (error) {
-        logger.error("Failed to parse", error, {
-          file_path: filePath,
-          parse_error: error.message,
-        });
+        logger.error("Failed to parse", error, { file_path: filePath });
         Sentry.captureException(error, { tags: { module: "ast-parser" } });
         return null;  // Graceful failure
       }
-    trade_offs:
-      pros: [Resilient indexing, Observability via logs/Sentry]
-      cons: [Some files not indexed, Potential silent failures]
-
-  transactional_storage:
-    structure: |
-      db.transaction(() => {
-        // Build lookup maps
-        const pathToId = new Map();
-
-        // Insert files, populate map
-        for (const file of files) {
-          const id = insert(file);
-          pathToId.set(file.path, id);
-        }
-
-        // Insert symbols using file map
-        for (const symbol of symbols) {
-          const fileId = pathToId.get(symbol.file_path);
-          insert({ ...symbol, file_id: fileId });
-        }
-
-        // All or nothing - rollback on failure
-      });
-    trade_offs:
-      pros: [Atomicity, Consistency, No partial state]
-      cons: [All-or-nothing (large batch failures)]
-
   jsdoc_extraction:
     structure: |
-      function extractLeadingComment(node, comments): string | null {
-        // Find last block comment before node within 5 lines
-        for (const comment of comments) {
-          if (comment.type !== "Block") continue;
-          if (comment.loc.end.line >= node.loc.start.line) continue;
-          if (node.loc.start.line - comment.loc.end.line > 5) continue;
-          // Keep closest match
-        }
-        // Strip /** */ and leading * from each line
-        return cleanedText;
-      }
+      Extract last block comment before node within 5 lines.
+      Strip /** */ and leading * from each line.
     trade_offs:
       pros: [Preserves documentation, Position-based matching]
       cons: [5-line heuristic may miss some comments]
 
-  storage_abstraction:
+
+  tsconfig_extends_pattern:
     structure: |
-      // Define interface for storage operations
-      interface StorageAdapter {
-        storeSymbols(symbols: Symbol[]): Promise<void>;
-        storeReferences(refs: Reference[]): Promise<void>;
-        storeDependencies(deps: DependencyEdge[]): Promise<void>;
+      function parseTsConfigWithExtends(
+        configPath: string,
+        depth: number,
+        maxDepth: number
+      ): TsConfig | null {
+        // Prevent infinite recursion
+        if (depth >= maxDepth) {
+          logger.warn("Circular extends detected");
+          return null;
+        }
+        
+        const config = JSON.parse(readFileSync(configPath, "utf-8"));
+        
+        // No extends - return as-is
+        if (!config.extends) return config;
+        
+        // Parse parent config
+        const extendsPath = isAbsolute(config.extends)
+          ? config.extends
+          : join(dirname(configPath), config.extends);
+        
+        // Add .json extension if missing
+        const resolved = extendsPath.endsWith(".json")
+          ? extendsPath
+          : `${extendsPath}.json`;
+        
+        const parent = parseTsConfigWithExtends(resolved, depth + 1, maxDepth);
+        
+        // Merge parent and child configs
+        return mergeTsConfigs(config, parent);
       }
       
-      // Implement concrete adapters
-      class MemoryStorageAdapter implements StorageAdapter { ... }
-      class SqliteStorageAdapter implements StorageAdapter { ... }
-      
-      // Use dependency injection
-      function analyzeCode(files: File[], storage: StorageAdapter) {
-        const symbols = extractSymbols(files);
-        await storage.storeSymbols(symbols);
+      function mergeTsConfigs(child: TsConfig, parent: TsConfig): TsConfig {
+        return {
+          ...parent,
+          ...child,
+          compilerOptions: {
+            ...parent.compilerOptions,
+            ...child.compilerOptions,
+            paths: {
+              ...parent.compilerOptions?.paths,
+              ...child.compilerOptions?.paths,  // Child overrides parent
+            }
+          }
+        };
       }
     trade_offs:
-      pros: [Zero infrastructure dependencies, Testable with in-memory storage, Portable across environments]
-      cons: [Additional abstraction layer, Interface evolution complexity]
-    timestamp: 2026-01-28
-    evidence: commit 1eab8bc, packages/core/src/storage/
+      pros: [Supports monorepo base configs, Matches tsc behavior, Prevents infinite loops]
+      cons: [Recursive parsing overhead, Depth limit may miss deep chains]
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/path-resolver.ts
 
-
-  batch_transaction_pattern:
+  path_alias_integration_pattern:
     structure: |
-      // Chunk large datasets for atomic batch processing
-      const BATCH_SIZE = 50;
-      const chunks = chunkArray(items, BATCH_SIZE);
-      
-      let totalProcessed = 0;
-      
-      for (let i = 0; i < chunks.length; i++) {
-        const chunk = chunks[i];
-        const isFirstChunk = i === 0;
-        
-        // Process chunk in single transaction
-        db.transaction(() => {
-          // First chunk: full cleanup + insert
-          if (isFirstChunk) {
-            db.run("DELETE FROM table WHERE ...");
-          }
-          
-          // All chunks: insert new data
-          for (const item of chunk) {
-            db.run("INSERT INTO table ...", item);
-          }
+      // 1. Parse tsconfig at workflow start
+      const pathMappings = parseTsConfig(projectRoot);
+      if (pathMappings) {
+        logger.info("Loaded path mappings", {
+          aliasCount: Object.keys(pathMappings.paths).length,
+          baseUrl: pathMappings.baseUrl
         });
-        
-        totalProcessed += chunk.length;
-        
-        // Update progress
-        reportProgress(totalProcessed, items.length);
+      }
+      
+      // 2. Pass through resolution pipeline
+      const resolved = resolveImport(
+        importSource,
+        fromFilePath,
+        files,
+        pathMappings  // Optional parameter
+      );
+      
+      // 3. Store resolved path in database
+      if (resolved) {
+        targetFilePath = normalizePath(resolved);
       }
     trade_offs:
-      pros: [Avoids transaction timeouts, Atomic per-chunk commits, Progress tracking, Partial success on failure]
-      cons: [More complex than single transaction, Multiple database round-trips, Partial state if interrupted]
-    timestamp: 2026-01-28
-    evidence: commit d47a650
+      pros: [Single parse per indexing run, Optional enhancement (graceful if null), Clean parameter threading]
+      cons: [Additional parameter in call chain, Null handling complexity]
+    timestamp: 2026-01-29
+    evidence: app/src/api/queries.ts runIndexingWorkflow()
 
-best_practices:
+
+
+  constant_extraction:
+    when: Shared constants need synchronization across modules
+    approach: |
+      Place in dedicated constants.ts with 'as const' for type safety.
+      Document synchronization requirements in JSDoc with "IMPORTANT" marker.
+      Export priority-ordered arrays (TypeScript variants first).
+      Note modules that must stay synchronized.
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/constants.ts
+
   ast_parsing:
     - Use @typescript-eslint/parser for modern TypeScript support
     - Always enable loc, range, comment, tokens options
@@ -683,14 +735,24 @@ best_practices:
     - Distinguish function calls from method calls
     - Track optional chaining (?.) in metadata
 
+
   import_resolution:
-    - Only resolve relative imports (./ and ../)
-    - Try extensions in priority order (.ts first)
-    - Handle index file resolution
-    - Return null for unresolvable imports (graceful)
-    - Use path.join + path.normalize (NOT path.resolve)
-    - Preserve relative path structure for database matching
-    timestamp: 2026-01-28
+    items:
+      - Resolve relative imports (./ and ../) AND path aliases (@alias/*)
+      - Parse tsconfig.json once at indexing start (not per file)
+      - Pass pathMappings through entire resolution pipeline
+      - Try relative resolution first, then path alias resolution
+      - Return null for unresolvable imports (node_modules, missing configs)
+      - Use path.join + path.normalize (NOT path.resolve)
+      - Check files Set instead of filesystem (indexed files only)
+      - Support jsconfig.json fallback for JavaScript projects
+      - Handle extends recursively with circular detection
+      - Try extensions in priority order (.ts first)
+      - Handle index file resolution
+      - Preserve relative path structure for database matching
+    timestamp: 2026-01-29
+    evidence: "app/src/indexer/import-resolver.ts, app/src/indexer/path-resolver.ts"
+
   storage:
     - Use single transaction for atomicity
     - Build lookup maps for efficient foreign key resolution
@@ -698,16 +760,18 @@ best_practices:
     - Log storage results for observability
 
   fts5_search:
-    - Always escape user search terms before FTS5 MATCH queries
-    - Wrap terms in double quotes for exact phrase matching
-    - Escape internal quotes by doubling them ("" not \")
-    - Prevents SQL errors on hyphens, spaces, AND/OR/NOT keywords
-    - Test with: hyphenated-terms, multi-word phrases, FTS keywords
+    items:
+      - Always escape user search terms before FTS5 MATCH queries
+      - Wrap terms in double quotes for exact phrase matching
+      - 'Escape internal quotes by doubling them ("" not \")'
+      - Prevents SQL errors on hyphens, spaces, AND/OR/NOT keywords
+      - "Test with: hyphenated-terms, multi-word phrases, FTS keywords"
     timestamp: 2026-01-28
     evidence: commit 5af086f
 
+
   logging:
-    - Use createLogger({ module: "indexer-<name>" })
+    - 'Use createLogger({ module: "indexer-<name>" })'
     - Log errors with structured metadata
     - Use debug level for expected failures (unresolved imports)
     - Use warn level for unexpected but recoverable failures
@@ -720,95 +784,59 @@ known_issues:
     prevention: |
       Never use path.resolve() in import resolution.
       Always use: path.normalize(path.join(fromDir, importSource))
-      This preserves relative paths matching database storage format.
     status: resolved
     timestamp: 2026-01-28
-    evidence: commit 5713a52, app/src/indexer/import-resolver.ts
+    evidence: commit 5713a52
 
   - issue: tsconfig.json path mapping not supported
     impact: Absolute imports with path aliases not resolved
-    resolution: Only relative imports currently supported
-    prevention: Document limitation, plan future enhancement
-    status: known limitation
-
-  - issue: Dynamic imports not tracked
-    impact: import() expressions not in dependency graph
-    resolution: Could add CallExpression with import callee handling
-    prevention: Document limitation
-    status: known limitation
-
-  - issue: Type-only imports not distinguished
-    impact: import type { Foo } treated same as import { Foo }
-    resolution: Could check importKind in TSESTree
-    prevention: Minor impact on dependency analysis
-    status: low priority
-
-  - issue: Overloaded functions create multiple symbols
-    impact: Same name appears multiple times in symbol table
-    resolution: Could merge by name and deduplicate
-    prevention: Acceptable for now, may confuse "find usages"
-    status: known limitation
+    resolution: Implemented in path-resolver.ts with full extends support
+    status: resolved
+    timestamp: 2026-01-29
+    evidence: app/src/indexer/path-resolver.ts
 
   - issue: Schema CHECK constraint must match all reference types
     impact: Insertion failures when reference extractor produces new types
     resolution: property_access was missing from CHECK constraint list
-    prevention: |
-      When adding new reference types:
-      1. Update reference extractor enum/type
-      2. Update SQLite schema CHECK constraint
-      3. Add integration test for new type
+    prevention: 'When adding reference types: update extractor, schema, tests'
     status: resolved
     timestamp: 2026-01-28
     evidence: commit 91415ad
 
-potential_enhancements:
-  - enhancement: tsconfig.json path mapping support
-    rationale: Enable resolution of @alias/* imports
-    effort: medium
-    approach: Parse tsconfig.json, apply paths mapping in resolveImport
-
-  - enhancement: Dynamic import tracking
-    rationale: Complete dependency graph for code splitting
-    effort: low
-    approach: Handle CallExpression with import callee
-
-  - enhancement: Call graph visualization
-    rationale: Visual dependency analysis
-    effort: medium
-    approach: Generate DOT format from dependency graph
-
-  - enhancement: Incremental indexing
-    rationale: Faster re-indexing for changed files only
-    effort: high
-    approach: Track file hashes, re-index only changed files
-
-  - enhancement: Cross-repository symbol resolution
-    rationale: Find usages across multiple repositories
-    effort: high
-    approach: Global symbol index with repository context
-
-  - enhancement: Extract @kotadb/core as standalone package
-    rationale: Enable code analysis in other tools without DB dependencies
-    effort: completed
-    approach: Storage abstraction with MemoryAdapter and SqliteAdapter
-    status: implemented
-    timestamp: 2026-01-28
-    evidence: commit 1eab8bc, packages/core/
+  - issue: Path alias resolution used absolute paths for files Set lookup
+    impact: resolvePathAlias() failed to find files despite correct resolution
+    resolution: |
+      Convert absolute paths to relative before files Set lookup.
+      Code: `resolved.startsWith(projectRoot) ? resolved.slice(projectRoot.length + 1) : resolved`
+    prevention: |
+      files Set ALWAYS contains relative paths (no leading slash).
+      After join(projectRoot, ...) + normalize(), convert to relative for lookup.
+      Pass relative path to tryExtensions() and tryIndexFiles().
+    status: resolved
+    timestamp: 2026-01-31
+    evidence: commit 644fbc9, app/src/indexer/path-resolver.ts lines 265-268, app/tests/indexer/path-resolver.test.ts (added relative path test)
 
 stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 5
-    patterns_updated_this_cycle: 1
-    last_reviewed: 2026-01-28
+    new_patterns_added_this_cycle: 2
+    patterns_updated_this_cycle: 2
+    last_reviewed: 2026-02-02
     utility_ratio: 1.0
     notes: |
-      Cycle 2 update - added batch processing and build artifact filtering:
-      - Previous: FTS5 term escaping, storage abstraction, schema validation
-      - New: Batch processing for large repos, build artifact filtering (27 dirs)
-      - New: Path resolution fix (path.join + normalize vs resolve)
-      - Updated: @kotadb/core extraction completed with storage abstraction
-      - Storage abstraction pattern from @kotadb/core extraction
-      - Schema constraint validation alignment
-      - Updated local-only v2 architecture patterns
+      Cycle 6 update - AST parser error recovery (focus_area: error recovery):
+      - Added: parse_ast_with_error_recovery operation (3-stage recovery: normal -> partial AST -> regex)
+      - Added: error_recovery_cascade_pattern (graceful degradation pattern)
+      - Added: error_recovery_strategy decision tree
+      - Updated: core_implementation/key_files to include regex-fallback.ts
+      - Learning: allowInvalidAST enables partial recovery; regex fallback prevents complete symbol loss
+      - Evidence: commit 38d4e96, PR #76/#92, 1538 lines changed across 11 files
+      - File size managed: 980 -> 1167 (pre-prune) -> 844 (post-prune, target range)
+      - Pruned: storage_abstraction, batch_transaction, test_fixture patterns (lower value/redundant)
+      
+      Cycle 5 (2026-01-31) - path resolver bug fix:
+      - Updated: resolve_path_aliases with critical path normalization
+      - Added: known_issues entry for absolute-to-relative conversion bug (#62)
+      - File size: ~950 -> ~975 lines
+

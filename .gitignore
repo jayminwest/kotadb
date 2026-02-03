@@ -90,3 +90,11 @@ supabase/
 .vscode/
 # KotaDB local storage
 .kotadb/
+
+.eraser/
+
+# Automation data directory (keep .gitkeep for directory structure)
+automation/.data/*
+!automation/.data/.gitkeep
+# Automation worktrees (isolated git working directories)
+automation/.worktrees/

@@ -32,7 +32,7 @@ Filter options:
   - **Supersedes**: Issues that replace or deprecate previous work
   - **Child Of**: Issues that are part of larger epics
   - **Follow-Up**: Planned next steps after current work completes
-- Check corresponding spec files in `docs/specs/` for additional relationship context
+- Check corresponding spec files in `.claude/.cache/specs/` for additional relationship context
 - Use `gh issue view <number>` to inspect individual issues for relationship details
 
 4. **Build dependency graph**

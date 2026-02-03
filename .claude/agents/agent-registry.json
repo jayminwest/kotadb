@@ -20,9 +20,9 @@
         "Grep",
         "Read",
         "Task",
-        "mcp__kotadb__search_code",
-        "mcp__kotadb__search_dependencies",
-        "mcp__kotadb__list_recent_files"
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
     },
@@ -48,9 +48,9 @@
         "NotebookEdit",
         "Task",
         "TodoWrite",
-        "mcp__kotadb__search_code",
-        "mcp__kotadb__search_dependencies",
-        "mcp__kotadb__analyze_change_impact"
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
       ],
       "readOnly": false
     },
@@ -71,9 +71,9 @@
         "Grep",
         "Read",
         "Task",
-        "mcp__kotadb__search_code",
-        "mcp__kotadb__search_dependencies",
-        "mcp__kotadb__analyze_change_impact",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact",
         "WebFetch"
       ],
       "readOnly": true
@@ -109,7 +109,10 @@
         "Read",
         "Glob",
         "Grep",
-        "Write"
+        "Write",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": false
     },
@@ -126,7 +129,10 @@
         "Write",
         "Edit",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
       ],
       "readOnly": false
     },
@@ -144,7 +150,9 @@
         "Edit",
         "Glob",
         "Grep",
-        "Bash"
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
       ],
       "readOnly": false
     },
@@ -159,7 +167,10 @@
       "tools": [
         "Read",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
     },
@@ -176,7 +187,10 @@
         "Read",
         "Glob",
         "Grep",
-        "Write"
+        "Write",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": false
     },
@@ -193,7 +207,10 @@
         "Write",
         "Edit",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
       ],
       "readOnly": false
     },
@@ -211,7 +228,9 @@
         "Edit",
         "Glob",
         "Grep",
-        "Bash"
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
       ],
       "readOnly": false
     },
@@ -226,7 +245,10 @@
       "tools": [
         "Read",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
     },
@@ -243,7 +265,10 @@
         "Read",
         "Glob",
         "Grep",
-        "Write"
+        "Write",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": false
     },
@@ -260,7 +285,10 @@
         "Write",
         "Edit",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
       ],
       "readOnly": false
     },
@@ -278,7 +306,9 @@
         "Edit",
         "Glob",
         "Grep",
-        "Bash"
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
       ],
       "readOnly": false
     },
@@ -293,7 +323,10 @@
       "tools": [
         "Read",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
     },
@@ -310,7 +343,10 @@
         "Read",
         "Glob",
         "Grep",
-        "Write"
+        "Write",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": false
     },
@@ -327,7 +363,10 @@
         "Write",
         "Edit",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
       ],
       "readOnly": false
     },
@@ -345,7 +384,9 @@
         "Edit",
         "Glob",
         "Grep",
-        "Bash"
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
       ],
       "readOnly": false
     },
@@ -360,7 +401,10 @@
       "tools": [
         "Read",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
     },
@@ -378,7 +422,10 @@
         "Read",
         "Glob",
         "Grep",
-        "Write"
+        "Write",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": false
     },
@@ -397,7 +444,10 @@
         "Write",
         "Edit",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
       ],
       "readOnly": false
     },
@@ -415,7 +465,9 @@
         "Edit",
         "Glob",
         "Grep",
-        "Bash"
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
       ],
       "readOnly": false
     },
@@ -430,7 +482,10 @@
       "tools": [
         "Read",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
     },
@@ -447,7 +502,10 @@
         "Read",
         "Glob",
         "Grep",
-        "Write"
+        "Write",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": false
     },
@@ -464,7 +522,10 @@
         "Write",
         "Edit",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
       ],
       "readOnly": false
     },
@@ -482,7 +543,9 @@
         "Edit",
         "Glob",
         "Grep",
-        "Bash"
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
       ],
       "readOnly": false
     },
@@ -497,7 +560,175 @@
       "tools": [
         "Read",
         "Glob",
-        "Grep"
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": true
+    },
+    "github-plan-agent": {
+      "name": "github-plan-agent",
+      "description": "Plans GitHub workflow tasks for kotadb. Expects USER_PROMPT (requirement)",
+      "file": "experts/github/github-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "github-planning",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": false
+    },
+    "github-build-agent": {
+      "name": "github-build-agent",
+      "description": "Implements GitHub workflows from specs. Expects SPEC (path to spec file)",
+      "file": "experts/github/github-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "github-implementation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
+      ],
+      "readOnly": false
+    },
+    "github-improve-agent": {
+      "name": "github-improve-agent",
+      "description": "Updates github expertise from workflow changes. Expects CHANGE_SUMMARY",
+      "file": "experts/github/github-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "github-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Task",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
+      ],
+      "readOnly": false
+    },
+    "github-question-agent": {
+      "name": "github-question-agent",
+      "description": "Answers GitHub workflow questions. Expects QUESTION (user query)",
+      "file": "experts/github/github-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "github-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": true
+    },
+    "automation-plan-agent": {
+      "name": "automation-plan-agent",
+      "description": "Plans automation layer changes for kotadb. Expects USER_PROMPT (SDK or workflow requirement)",
+      "file": "experts/automation/automation-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "automation-planning",
+        "sdk-analysis",
+        "workflow-design"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": false
+    },
+    "automation-build-agent": {
+      "name": "automation-build-agent",
+      "description": "Implements automation layer features from specs. Expects SPEC (path to spec file)",
+      "file": "experts/automation/automation-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "automation-implementation",
+        "sdk-integration"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact"
+      ],
+      "readOnly": false
+    },
+    "automation-improve-agent": {
+      "name": "automation-improve-agent",
+      "description": "Automation expertise evolution specialist",
+      "file": "experts/automation/automation-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "automation-learning",
+        "expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Task",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
+      ],
+      "readOnly": false
+    },
+    "automation-question-agent": {
+      "name": "automation-question-agent",
+      "description": "Automation Q&A specialist. Answers questions about SDK patterns and workflow execution",
+      "file": "experts/automation/automation-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "automation-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
     }
@@ -609,7 +840,8 @@
       "api-plan-agent",
       "indexer-plan-agent",
       "database-plan-agent",
-      "testing-plan-agent"
+      "testing-plan-agent",
+      "github-plan-agent"
     ],
     "database-planning": [
       "database-plan-agent"
@@ -643,6 +875,42 @@
     ],
     "testing-qa": [
       "testing-question-agent"
+    ],
+    "github-planning": [
+      "github-plan-agent"
+    ],
+    "github-implementation": [
+      "github-build-agent"
+    ],
+    "github-expertise-evolution": [
+      "github-improve-agent"
+    ],
+    "github-qa": [
+      "github-question-agent"
+    ],
+    "automation-planning": [
+      "automation-plan-agent"
+    ],
+    "sdk-analysis": [
+      "automation-plan-agent"
+    ],
+    "workflow-design": [
+      "automation-plan-agent"
+    ],
+    "automation-implementation": [
+      "automation-build-agent"
+    ],
+    "sdk-integration": [
+      "automation-build-agent"
+    ],
+    "automation-learning": [
+      "automation-improve-agent"
+    ],
+    "automation-qa": [
+      "automation-question-agent"
+    ],
+    "expertise-evolution": [
+      "automation-improve-agent"
     ]
   },
   "modelIndex": {
@@ -654,7 +922,9 @@
       "api-question-agent",
       "indexer-question-agent",
       "database-question-agent",
-      "testing-question-agent"
+      "testing-question-agent",
+      "github-question-agent",
+      "automation-question-agent"
     ],
     "sonnet": [
       "build-agent",
@@ -676,151 +946,199 @@
       "database-improve-agent",
       "testing-plan-agent",
       "testing-build-agent",
-      "testing-improve-agent"
+      "testing-improve-agent",
+      "github-plan-agent",
+      "github-build-agent",
+      "github-improve-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ]
   },
   "toolMatrix": {
     "Glob": [
-      "scout-agent",
-      "build-agent",
-      "review-agent",
-      "claude-config-plan-agent",
-      "claude-config-build-agent",
-      "claude-config-improve-agent",
-      "claude-config-question-agent",
-      "agent-authoring-plan-agent",
       "agent-authoring-build-agent",
       "agent-authoring-improve-agent",
+      "agent-authoring-plan-agent",
       "agent-authoring-question-agent",
-      "api-plan-agent",
       "api-build-agent",
       "api-improve-agent",
+      "api-plan-agent",
       "api-question-agent",
-      "indexer-plan-agent",
-      "indexer-build-agent",
-      "indexer-improve-agent",
-      "indexer-question-agent",
-      "database-plan-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-plan-agent",
+      "claude-config-question-agent",
       "database-build-agent",
       "database-improve-agent",
+      "database-plan-agent",
       "database-question-agent",
-      "testing-plan-agent",
+      "github-build-agent",
+      "github-improve-agent",
+      "github-plan-agent",
+      "github-question-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-plan-agent",
+      "indexer-question-agent",
+      "review-agent",
+      "scout-agent",
       "testing-build-agent",
       "testing-improve-agent",
-      "testing-question-agent"
+      "testing-plan-agent",
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "Grep": [
-      "scout-agent",
-      "build-agent",
-      "review-agent",
-      "claude-config-plan-agent",
-      "claude-config-build-agent",
-      "claude-config-improve-agent",
-      "claude-config-question-agent",
-      "agent-authoring-plan-agent",
       "agent-authoring-build-agent",
       "agent-authoring-improve-agent",
+      "agent-authoring-plan-agent",
       "agent-authoring-question-agent",
-      "api-plan-agent",
       "api-build-agent",
       "api-improve-agent",
+      "api-plan-agent",
       "api-question-agent",
-      "indexer-plan-agent",
-      "indexer-build-agent",
-      "indexer-improve-agent",
-      "indexer-question-agent",
-      "database-plan-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-plan-agent",
+      "claude-config-question-agent",
       "database-build-agent",
       "database-improve-agent",
+      "database-plan-agent",
       "database-question-agent",
-      "testing-plan-agent",
+      "github-build-agent",
+      "github-improve-agent",
+      "github-plan-agent",
+      "github-question-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-plan-agent",
+      "indexer-question-agent",
+      "review-agent",
+      "scout-agent",
       "testing-build-agent",
       "testing-improve-agent",
-      "testing-question-agent"
+      "testing-plan-agent",
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "Read": [
-      "scout-agent",
-      "build-agent",
-      "review-agent",
-      "claude-config-plan-agent",
-      "claude-config-build-agent",
-      "claude-config-improve-agent",
-      "claude-config-question-agent",
-      "agent-authoring-plan-agent",
       "agent-authoring-build-agent",
       "agent-authoring-improve-agent",
+      "agent-authoring-plan-agent",
       "agent-authoring-question-agent",
-      "api-plan-agent",
       "api-build-agent",
       "api-improve-agent",
+      "api-plan-agent",
       "api-question-agent",
-      "indexer-plan-agent",
-      "indexer-build-agent",
-      "indexer-improve-agent",
-      "indexer-question-agent",
-      "database-plan-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-plan-agent",
+      "claude-config-question-agent",
       "database-build-agent",
       "database-improve-agent",
+      "database-plan-agent",
       "database-question-agent",
-      "testing-plan-agent",
+      "github-build-agent",
+      "github-improve-agent",
+      "github-plan-agent",
+      "github-question-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-plan-agent",
+      "indexer-question-agent",
+      "review-agent",
+      "scout-agent",
       "testing-build-agent",
       "testing-improve-agent",
-      "testing-question-agent"
+      "testing-plan-agent",
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
     ],
     "Edit": [
-      "build-agent",
-      "docs-scraper",
-      "claude-config-build-agent",
-      "claude-config-improve-agent",
       "agent-authoring-build-agent",
       "agent-authoring-improve-agent",
       "api-build-agent",
       "api-improve-agent",
-      "indexer-build-agent",
-      "indexer-improve-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
       "database-build-agent",
       "database-improve-agent",
+      "docs-scraper",
+      "github-build-agent",
+      "github-improve-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
       "testing-build-agent",
-      "testing-improve-agent"
+      "testing-improve-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ],
     "Write": [
-      "build-agent",
-      "docs-scraper",
-      "claude-config-plan-agent",
-      "claude-config-build-agent",
-      "claude-config-improve-agent",
-      "agent-authoring-plan-agent",
       "agent-authoring-build-agent",
       "agent-authoring-improve-agent",
-      "api-plan-agent",
+      "agent-authoring-plan-agent",
       "api-build-agent",
       "api-improve-agent",
-      "indexer-plan-agent",
-      "indexer-build-agent",
-      "indexer-improve-agent",
-      "database-plan-agent",
+      "api-plan-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-plan-agent",
       "database-build-agent",
       "database-improve-agent",
-      "testing-plan-agent",
+      "database-plan-agent",
+      "docs-scraper",
+      "github-build-agent",
+      "github-improve-agent",
+      "github-plan-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-plan-agent",
       "testing-build-agent",
-      "testing-improve-agent"
+      "testing-improve-agent",
+      "testing-plan-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ],
     "Bash": [
-      "build-agent",
-      "claude-config-improve-agent",
       "agent-authoring-improve-agent",
       "api-improve-agent",
-      "indexer-improve-agent",
+      "build-agent",
+      "claude-config-improve-agent",
       "database-improve-agent",
-      "testing-improve-agent"
+      "github-build-agent",
+      "github-improve-agent",
+      "github-plan-agent",
+      "indexer-improve-agent",
+      "testing-improve-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent"
     ],
     "NotebookEdit": [
       "build-agent"
     ],
     "Task": [
-      "scout-agent",
       "build-agent",
-      "review-agent"
+      "github-improve-agent",
+      "review-agent",
+      "scout-agent",
+      "automation-improve-agent"
     ],
     "TodoWrite": [
       "build-agent"
@@ -829,25 +1147,113 @@
       "review-agent",
       "docs-scraper"
     ],
-    "mcp__kotadb__search_code": [
-      "scout-agent",
-      "build-agent",
-      "review-agent"
-    ],
-    "mcp__kotadb__search_dependencies": [
-      "scout-agent",
-      "build-agent",
-      "review-agent"
-    ],
-    "mcp__kotadb__list_recent_files": [
-      "scout-agent"
-    ],
-    "mcp__kotadb__analyze_change_impact": [
-      "build-agent",
-      "review-agent"
-    ],
     "mcp__firecrawl-mcp__firecrawl_scrape": [
       "docs-scraper"
+    ],
+    "mcp__kotadb-bunx__search_code": [
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "agent-authoring-plan-agent",
+      "agent-authoring-question-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "api-plan-agent",
+      "api-question-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-plan-agent",
+      "claude-config-question-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "database-plan-agent",
+      "database-question-agent",
+      "github-build-agent",
+      "github-improve-agent",
+      "github-plan-agent",
+      "github-question-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-plan-agent",
+      "indexer-question-agent",
+      "review-agent",
+      "scout-agent",
+      "testing-build-agent",
+      "testing-improve-agent",
+      "testing-plan-agent",
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
+    ],
+    "mcp__kotadb-bunx__search_dependencies": [
+      "agent-authoring-build-agent",
+      "agent-authoring-improve-agent",
+      "agent-authoring-plan-agent",
+      "agent-authoring-question-agent",
+      "api-build-agent",
+      "api-improve-agent",
+      "api-plan-agent",
+      "api-question-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "claude-config-improve-agent",
+      "claude-config-plan-agent",
+      "claude-config-question-agent",
+      "database-build-agent",
+      "database-improve-agent",
+      "database-plan-agent",
+      "database-question-agent",
+      "github-build-agent",
+      "github-improve-agent",
+      "github-plan-agent",
+      "github-question-agent",
+      "indexer-build-agent",
+      "indexer-improve-agent",
+      "indexer-plan-agent",
+      "indexer-question-agent",
+      "review-agent",
+      "scout-agent",
+      "testing-build-agent",
+      "testing-improve-agent",
+      "testing-plan-agent",
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-build-agent",
+      "automation-improve-agent",
+      "automation-question-agent"
+    ],
+    "mcp__kotadb-bunx__list_recent_files": [
+      "agent-authoring-plan-agent",
+      "agent-authoring-question-agent",
+      "api-plan-agent",
+      "api-question-agent",
+      "claude-config-plan-agent",
+      "claude-config-question-agent",
+      "database-plan-agent",
+      "database-question-agent",
+      "github-plan-agent",
+      "github-question-agent",
+      "indexer-plan-agent",
+      "indexer-question-agent",
+      "scout-agent",
+      "testing-plan-agent",
+      "testing-question-agent",
+      "automation-plan-agent",
+      "automation-question-agent"
+    ],
+    "mcp__kotadb-bunx__analyze_change_impact": [
+      "agent-authoring-build-agent",
+      "api-build-agent",
+      "build-agent",
+      "claude-config-build-agent",
+      "database-build-agent",
+      "github-build-agent",
+      "indexer-build-agent",
+      "review-agent",
+      "testing-build-agent",
+      "automation-build-agent"
     ]
   }
 }

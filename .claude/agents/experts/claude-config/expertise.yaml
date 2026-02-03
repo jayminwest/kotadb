@@ -1,6 +1,6 @@
 # Claude Code Configuration Expertise
 # Target: 400-600 lines | Domain: Operational knowledge for .claude/ configuration
-# Adapted for KotaDB project conventions
+# Last updated: 2026-02-02 (MCP tool naming, tool selection guidance)
 
 overview:
   description: |
@@ -42,7 +42,7 @@ core_implementation:
         experts/<domain>/:
           purpose: 4-agent pattern (plan/build/improve/question + expertise.yaml)
           pattern: Domain experts with queryable knowledge
-          active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github]
+          active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github, automation, documentation]
       commands/:
         purpose: Slash commands by category
         workflows/: SDLC phase commands (prime, plan, implement, validate)
@@ -185,7 +185,7 @@ key_operations:
       9. Update /do command with domain detection patterns
     kotadb_adaptations:
       - Use YAML array format for tools (NOT comma-separated)
-      - Add MCP tools where appropriate (mcp__kotadb__*)
+      - Add MCP tools where appropriate (mcp__kotadb-bunx__*)
       - Update agent-registry.json capabilityIndex, modelIndex, toolMatrix
     pitfalls:
       - what: "CRITICAL - Using colons in agent description field"
@@ -331,6 +331,74 @@ key_operations:
       - Improve agent uses Task to spawn scout-agent for pattern analysis
 
 
+
+  mcp_tool_naming_and_usage:
+    timestamp: 2026-02-02
+    evidence: commit 2705560 (issue #84)
+    discovered: MCP tool naming includes transport in server name
+    pattern: |
+      KotaDB MCP tools use server name "kotadb-bunx" (not "kotadb") because
+      the server is configured with bunx transport in Claude Desktop config:
+      
+      {
+        "mcpServers": {
+          "kotadb-bunx": {
+            "command": "bunx",
+            "args": ["kotadb"]
+          }
+        }
+      }
+      
+      This means tool names are: mcp__kotadb-bunx__search_code (NOT mcp__kotadb__search_code)
+    
+    when: Adding MCP tools to agent frontmatter or documentation
+    correct_naming:
+      - mcp__kotadb-bunx__search_code
+      - mcp__kotadb-bunx__search_dependencies
+      - mcp__kotadb-bunx__analyze_change_impact
+      - mcp__kotadb-bunx__list_recent_files
+    
+    incorrect_naming:
+      - mcp__kotadb__search_code (WRONG - missing transport suffix)
+      - mcp__kotadb__search_dependencies (WRONG)
+    
+    documentation_pattern:
+      location: CLAUDE.md MCP Server section
+      include_tool_selection_guide: |
+        Add decision tree for when to use MCP tools vs Grep:
+        
+        PREFER KotaDB MCP tools for:
+        - search_dependencies - Understanding file relationships before refactoring
+        - analyze_change_impact - Risk assessment before PRs or major changes
+        - search_code - Semantic/conceptual code discovery across indexed repos
+        
+        FALLBACK to Grep for:
+        - Exact regex pattern matching
+        - Unindexed files or live filesystem searches
+        - Quick single-file searches
+      
+      agent_integration: |
+        Add "KotaDB MCP Tool Usage" section to core agents (build, scout, review):
+        
+        ## KotaDB MCP Tool Usage
+        
+        When working with this codebase:
+        - Before refactoring: Use search_dependencies to understand file relationships
+        - Before PRs/changes: Use analyze_change_impact to assess risk
+        - For code discovery: Prefer search_code for semantic searches
+        - Fallback to Grep: Only for exact regex patterns or unindexed files
+    
+    impact:
+      symptom: Agents could not find MCP tools, fell back to Grep unnecessarily
+      files_affected: 13 files (agent definitions, README, CLAUDE.md)
+      resolution: Bulk rename mcp__kotadb__ to mcp__kotadb-bunx__
+    
+    best_practices:
+      - Server names in Claude Desktop config determine tool prefixes
+      - Transport method (bunx, npx, node, python) often appears in server name
+      - Document tool selection criteria in CLAUDE.md for user clarity
+      - Add tool usage guidance to agent prompts for correct usage patterns
+      - Validate MCP tool names match actual server configuration
 decision_trees:
   command_vs_agent_vs_expert:
     question: What am I creating?
@@ -399,7 +467,7 @@ patterns:
         - Read
         - Glob
         - Grep
-        - mcp__kotadb__search_code
+        - mcp__kotadb-bunx__search_code
       model: haiku|sonnet|opus
       color: yellow|green|purple|cyan
       constraints:
@@ -493,9 +561,18 @@ best_practices:
     - Include model and color fields for expert agents
     - Update agent-registry.json for every new agent
     - CRITICAL: Never use colons in description field
-    - Add MCP tools where appropriate (mcp__kotadb__*)
+    - Add MCP tools where appropriate (mcp__kotadb-bunx__*)
     - Apply "permissive tools + strict prompts" philosophy
 
+
+  mcp_tools:
+    - Server names include transport method (kotadb-bunx, not kotadb)
+    - Tool naming: mcp__<server-name>__<tool-name> format
+    - Validate tool names match Claude Desktop mcpServers config
+    - Document tool selection criteria in CLAUDE.md
+    - Add tool usage guidance sections to core agent prompts
+    - Prefer MCP tools for semantic search, dependencies, impact analysis
+    - Fallback to Grep for exact regex or unindexed files
   hooks:
     - Standard Python shebang (#!/usr/bin/env python3)
     - Import from hooks.utils.hook_helpers
@@ -511,11 +588,12 @@ best_practices:
 
   expert_expansion:
     timestamp: 2026-01-28
-    - Document all expert domains in CLAUDE.md for discoverability
-    - Use multi-line JSON arrays in agent-registry.json for git diffs
-    - Keep /do domain detection patterns specific and non-overlapping
-    - Update all 3 files (CLAUDE.md, do.md, agent-registry.json) atomically
-    - Grant consistent tool permissions across agent types within domain
+    insights:
+      - Document all expert domains in CLAUDE.md for discoverability
+      - Use multi-line JSON arrays in agent-registry.json for git diffs
+      - Keep /do domain detection patterns specific and non-overlapping
+      - Update all 3 files (CLAUDE.md, do.md, agent-registry.json) atomically
+      - Grant consistent tool permissions across agent types within domain
 
 known_issues:
   - issue: Colons in frontmatter description values break YAML parsing
@@ -544,6 +622,19 @@ known_issues:
     discovered: 2026-01-28 (commit 446e999)
     status: resolved via systematic tool permission audit
 
+  - issue: Documentation accuracy drift over time
+    impact: Broken command references, non-existent file dependencies, user confusion
+    symptoms: CLAUDE.md commands that don't exist, settings.json referencing missing files
+    resolution: Systematic validation of all documentation references against actual files
+    discovered: 2026-02-02 (issue #77, claude-config-documentation-fixes-spec.md)
+    examples:
+      - /tools:bun_install, /tools:pr-review, /tools:question (non-existent commands)
+      - statusline.py referenced in settings.json (non-existent file)
+      - workflows/, homeserver/, app/ directories (non-existent in commands/)
+      - Expert domain count mismatches (documented 7 vs actual 9)
+    status: active remediation via systematic documentation cleanup
+    prevention: Add documentation accuracy validation to development workflow
+
 potential_enhancements:
   - Automated agent registry validation (compare files to registry)
   - Frontmatter linting for description colons
@@ -551,21 +642,25 @@ potential_enhancements:
   - Hook output validation
   - Expert domain registry validation (ensure CLAUDE.md, do.md, agent-registry.json in sync)
   - Tool permission consistency checker across agent types
+  - Documentation accuracy validation (check all referenced commands/files exist)
+  - Spec file location consistency enforcement (docs/specs/ vs .claude/.cache/specs/)
+
 
 stability:
   convergence_indicators:
     insight_rate_trend: growing
     contradiction_count: 0
     new_patterns_added_this_cycle: 1
-    patterns_updated_this_cycle: 2
-    last_reviewed: 2026-01-28
+    patterns_updated_this_cycle: 1
+    last_reviewed: 2026-02-02
     utility_ratio: 1.0
     notes: |
-      Expert domain expansion cycle (2 -> 7 domains):
-      Expert domain system stabilizing after 2->7 domain expansion:
-      - Added tool_permissions_philosophy operation documenting "permissive tools + strict prompts"
-      - Updated expert_domain_expansion pattern with tool permission consistency requirement
-      - Updated create_expert_domain to include tool specifications for all 4 agent types
-      - Updated best_practices with tool permission philosophy
-      - Added known_issue tracking restrictive tool permission problem and resolution
-
+      MCP tool naming and tool selection guidance cycle:
+      - Added mcp_tool_naming_and_usage operation (key_operations)
+      - Pattern: Server names include transport method (kotadb-bunx vs kotadb)
+      - Impact: 13 files corrected (commit 2705560, issue #84)
+      - Added mcp_tools best practices section
+      - Documentation pattern: Tool selection decision tree in CLAUDE.md
+      - Agent integration: Add "KotaDB MCP Tool Usage" sections to core agents
+      - Lesson: MCP tool names derived from Claude Desktop config server names
+      - Size: 664 lines (above 600 target, under 800 warning threshold)

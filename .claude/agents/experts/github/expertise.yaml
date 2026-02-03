@@ -129,7 +129,7 @@ core_implementation:
       - anti_mock_statement: Confirmation no new mocks introduced
       - plan_link: Link to spec file if exists
       - closes: "Closes #<issue_number>"
-      - adw_id: "ADW ID: <id>" if applicable
+      - adw_id: "ADW ID: <id> if applicable"
 
   key_files:
     - path: .claude/commands/issues/feature.md
@@ -291,6 +291,162 @@ key_operations:
         - "chore(deps): update bun to v1.2.0"
         - "refactor(db): simplify connection pool logic"
 
+  release_workflow:
+    when: Publishing package to npm registry with automated GitHub Release
+    approach: |
+      Release workflows provide automated publishing triggered by semantic version tags.
+      Unlike PR workflows, releases run comprehensive validation and publish to registries.
+      
+      1. Tag trigger mechanism:
+         - Create annotated tag: git tag -a v<major>.<minor>.<patch>
+         - Push tag to trigger workflow: git push origin v<major>.<minor>.<patch>
+      
+      2. Version verification (prevents mismatches):
+         - Extract version from git tag: ${GITHUB_REF#refs/tags/v}
+         - Extract version from package.json: grep '"version"' | awk
+         - Compare and fail if versions don't match
+      
+      3. Full validation chain (Level 3 + publishing):
+         - bun run lint
+         - bun run typecheck
+         - bun install --frozen-lockfile
+         - bun test --coverage
+         - bun run build
+      
+      4. Package metadata verification:
+         - Check 'bin' field exists in package.json
+         - Warn if 'files' field missing (will publish everything)
+         - Validates publishability before attempting push
+      
+      5. Publishing to npm:
+         - Use NODE_AUTH_TOKEN secret for authentication
+         - Command: bun publish --access public
+         - Respects package.json version and bin configuration
+      
+      6. GitHub Release creation:
+         - Use gh CLI: gh release create "${TAG}" --verify-tag
+         - Include release notes with npm registry link
+         - Automatic release discovery for user notifications
+    
+    considerations:
+      - Version must be in semver format (v<major>.<minor>.<patch>)
+      - Tag version MUST match package.json version exactly
+      - Use semantic versioning for all releases
+      - Include release notes URL in GitHub Release
+      - Verify uv is installed (required for MCP tools in test phase)
+    
+    example_commands:
+      - "git tag -a v2.1.0 -m 'Release v2.1.0'"
+      - "git push origin v2.1.0"
+      - "gh release create v2.1.0 --verify-tag"
+    
+    pitfalls:
+      - what: "Version mismatch between tag and package.json"
+        instead: "Update package.json version before creating tag"
+        reason: "Workflow fails if versions don't match, prevents accidental misversioning"
+      - what: "Missing NODE_AUTH_TOKEN secret"
+        instead: "Configure NPM_TOKEN secret in GitHub Actions secrets"
+        reason: "Publishing fails without authentication token"
+      - what: "Skipping validation before publishing"
+        instead: "Release workflow runs full Level 3 validation automatically"
+        reason: "Published packages must pass all checks to prevent broken releases"
+      - what: "Creating release without --verify-tag flag"
+        instead: "Always use --verify-tag to ensure release is properly signed"
+        reason: "Verification ensures release integrity and discoverability"
+
+  automated_pr_creation:
+    when: Automation workflow completes successfully with modified files
+    approach: |
+      Automated PR creation integrates into workflow orchestration as Phase 5,
+      executing after build phase completes. Used by automation/src/pr.ts module.
+      
+      1. Prerequisites verification:
+         - branchName provided to orchestrator
+         - filesModified array contains entries
+         - All prior phases (analysis, plan, build, improve) succeeded
+      
+      2. Expertise commit (separate from implementation commit):
+         - Check git status --porcelain for uncommitted changes
+         - Filter for expertise.yaml and docs/specs/ files
+         - Stage and commit with: chore(expertise): update {domain} expertise from #{issue}
+         - Extracts commit SHA for tracking
+         - Happens BEFORE main implementation commit
+      
+      3. Implementation commit:
+         - Stage specific files from filesModified array (fallback to git add -A)
+         - Format commit message: {issueType}({domain}): implement issue #{issueNumber}
+         - Extract issueType from analysis phase (feat/fix/chore/refactor)
+         - Include domain scope in commit message
+         - Return commit SHA for PR body
+      
+      4. Branch push:
+         - Push with upstream tracking: git push -u origin {branchName}
+         - Verify push success before PR creation
+         - Non-zero exit code aborts PR creation
+      
+      5. PR creation via gh CLI:
+         - Format PR title: {issueType}({domain}): {truncatedTitle} (#{issue})
+         - Title length limit: 70 characters (conventional commits standard)
+         - Truncate issue title with "..." if needed to fit limit
+         - Build PR body with sections:
+           - Summary: auto-generated info, domain, file count
+           - Metrics: token counts, cost, duration (if available)
+           - Test plan: bulleted checklist
+           - Closes #{issueNumber} reference
+           - Claude Code attribution footer
+         - Target develop branch: gh pr create --base develop
+         - Capture and return PR URL from stdout
+      
+      6. Error handling:
+         - All failures are non-fatal to workflow
+         - Log warnings but continue to reporting phase
+         - Return PRCreationResult with success/failure status
+         - Respect --dry-run flag (log actions without executing)
+    
+    pr_title_format:
+      structure: "{type}({domain}): {title} (#{issue})"
+      max_length: 70
+      truncation: "Truncate title with '...' if needed"
+      examples:
+        - "feat(api): add MCP tool for dependency analysis (#123)"
+        - "fix(indexer): resolve race condition in file watcher (#456)"
+        - "chore(docs): update installation guide (#789)"
+    
+    pr_body_sections:
+      summary:
+        - "Auto-generated implementation for issue #{N}"
+        - "Domain: {domain}"
+        - "Files modified: {count}"
+      metrics:
+        - "Input/Output tokens with locale formatting"
+        - "Cost in USD (4 decimal places)"
+        - "Duration in human-readable format (Xm Ys)"
+      test_plan:
+        - "Verify implementation matches issue requirements"
+        - "Run bun test to validate changes"
+        - "Review modified files for correctness"
+      footer:
+        - "Closes #{issueNumber}"
+        - "🤖 Generated with Claude Code link"
+    
+    expertise_commit_pattern:
+      trigger: "After improve phase, before implementation commit"
+      target_files:
+        - "**/*expertise.yaml"
+        - "docs/specs/**/*.md"
+      message_format: "chore(expertise): update {domain} expertise from #{issue}"
+      behavior: "Separate commit from implementation changes"
+      rationale: "Isolates knowledge updates from implementation for cleaner history"
+    
+    integration_points:
+      orchestrator: "automation/src/orchestrator.ts - Phase 5 execution"
+      pr_module: "automation/src/pr.ts - handlePRCreation() entry point"
+      workflow_result: "OrchestrationResult includes prUrl field"
+      reporter: "ConsoleReporter tracks PR phase progress"
+    
+    timestamp: 2026-02-02
+    evidence: "Commits ca54809, d4ecd73"
+    implementation: "automation/src/pr.ts"
 decision_trees:
   issue_type_selection:
     question: What is the primary outcome of this work?
@@ -333,7 +489,7 @@ decision_trees:
   pr_type_determination:
     question: What files are being changed?
     options:
-      - if: Only docs/specs/*.md files
+      - if: Only .claude/.cache/specs/*.md files
         then: Planning PR (title uses "add specification/plan for")
       - if: app/src/, automation/, or >50 lines outside docs/
         then: Implementation PR (title uses imperative verb)
@@ -356,6 +512,13 @@ patterns:
       - "gh api repos/{owner}/{repo}/issues/<number>"
       - "gh api repos/{owner}/{repo}/pulls/<number>/comments"
 
+    release_operations:
+      - "git tag -a v<major>.<minor>.<patch> -m 'Release v<major>.<minor>.<patch>'"
+      - "git push origin v<major>.<minor>.<patch>"
+      - "gh release create v<major>.<minor>.<patch> --verify-tag"
+      - "gh release list --limit 10"
+      - "bun publish --access public"
+
   pr_body_structure:
     template: |
       ## Summary
@@ -372,7 +535,7 @@ patterns:
       - [or] Temporary exception: [description] - follow-up: #<issue>
 
       ## References
-      - [Plan](./docs/specs/<spec-file>.md) (if applicable)
+      - [Plan](./.claude/.cache/specs/<spec-file>.md) (if applicable)
       - Closes #<issue_number>
       - ADW ID: <id> (if applicable)
 
@@ -470,6 +633,16 @@ best_practices:
     - Check gh auth status before operations
     - Use environment variables for tokens
 
+  release_management:
+    - Tag releases with semantic versioning (v<major>.<minor>.<patch>)
+    - Always verify version matches between git tag and package.json
+    - Run full Level 3 validation before publishing
+    - Include release notes with npm registry URL
+    - Use --verify-tag flag when creating GitHub Releases
+    - Ensure NODE_AUTH_TOKEN secret is configured in GitHub Actions
+    - Test package.json bin and files fields before release
+    - Create GitHub Release after successful npm publish
+
 known_issues:
   - issue: gh auth may expire during long sessions
     impact: GitHub operations fail with 401 errors
@@ -504,16 +677,22 @@ potential_enhancements:
 
 stability:
   convergence_indicators:
-    insight_rate_trend: initial
+    insight_rate_trend: growing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 0
+    new_patterns_added_this_cycle: 1
     patterns_updated_this_cycle: 0
-    last_reviewed: 2026-01-28
+    last_reviewed: 2026-02-02
     utility_ratio: 1.0
     notes: |
-      Initial creation for github expert domain:
-      - Issue classification (feature, bug, chore, refactor)
-      - PR validation levels (1/2/3)
-      - Branch naming conventions
-      - GitHub CLI patterns
-      - KotaDB-specific adaptations
+      Cycle 3 additions from automation PR workflow implementation:
+      - Added automated_pr_creation operation for Phase 5 workflow integration
+      - Discovered patterns: expertise commit separation, PR title formatting (70 char limit),
+        structured PR body with metrics, issue type extraction for conventional commits
+      - Implementation examples: automation/src/pr.ts (commits ca54809, d4ecd73)
+      - Key learnings: Separate expertise commits before implementation commits for cleaner history,
+        conventional commit format in PR titles with domain scope, non-fatal PR creation errors
+      - No contradictions with existing patterns found
+      
+      Prior cycle: npm-publish.yml workflow (2026-01-28)
+      - Added release_workflow operation for tag-triggered npm publishing
+      - Added release_management best practices section

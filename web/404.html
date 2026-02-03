@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Page not found - KotaDB">
+  <title>404 - Page Not Found | KotaDB</title>
+  <link rel="stylesheet" href="/css/main.css">
+  <style>
+    .error-page {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      min-height: calc(100vh - var(--header-height) - 8rem);
+      text-align: center;
+      padding: var(--space-2xl);
+    }
+    
+    .error-code {
+      font-size: 6rem;
+      font-weight: 700;
+      color: var(--color-text-muted);
+      line-height: 1;
+      margin-bottom: var(--space-md);
+    }
+    
+    .error-page h1 {
+      font-size: var(--font-size-2xl);
+      margin-bottom: var(--space-md);
+    }
+    
+    .error-page p {
+      color: var(--color-text-muted);
+      margin-bottom: var(--space-xl);
+      max-width: 30rem;
+    }
+    
+    .error-actions {
+      display: flex;
+      gap: var(--space-md);
+      flex-wrap: wrap;
+      justify-content: center;
+    }
+  </style>
+</head>
+<body>
+  <header class="site-header">
+    <div class="container">
+      <a href="/" class="logo">KotaDB</a>
+      <nav class="main-nav">
+        <a href="/docs/">Docs</a>
+        <a href="/blog/">Blog</a>
+        <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="error-page">
+    <div class="error-code">404</div>
+    <h1>Page Not Found</h1>
+    <p>The page you're looking for doesn't exist or has been moved. Check the URL or navigate back to the homepage.</p>
+    <div class="error-actions">
+      <a href="/" class="btn btn-primary">Go to Homepage</a>
+      <a href="/docs/" class="btn btn-secondary">View Documentation</a>
+    </div>
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <div class="footer-content">
+        <p>&copy; 2026 KotaDB. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
+        <nav class="footer-nav">
+          <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
+          <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>
+        </nav>
+      </div>
+    </div>
+  </footer>
+</body>
+</html>

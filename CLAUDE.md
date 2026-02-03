@@ -31,14 +31,13 @@ For specific operations, these commands remain available:
 |----------|----------|
 | **Git** | `/git:commit`, `/git:pull_request` |
 | **Issues** | `/issues:feature`, `/issues:bug`, `/issues:chore`, `/issues:refactor`, `/issues:classify_issue`, `/issues:audit`, `/issues:prioritize` |
-| **Tools** | `/tools:install`, `/tools:bun_install`, `/tools:pr-review`, `/tools:question`, `/tools:tools` |
-| **Docs** | `/docs:load-ai-docs`, `/docs:mcp-integration`, `/docs:mcp-usage-guidance`, `/docs:kotadb-agent-usage` |
+| **Tools** | `/tools:install`, `/tools:tools` |
+| **Docs** | `/docs:load-ai-docs` |
 | **Release** | `/release:release` |
-| **Validation** | `/validation:resolve_failed_validation` |
 
 ## Expert Domains
 
-Seven expert domains provide specialized knowledge with plan, build, improve, and question agents:
+Nine expert domains provide specialized knowledge with plan, build, improve, and question agents:
 
 | Domain | Purpose | Location |
 |--------|---------|----------|
@@ -49,6 +48,8 @@ Seven expert domains provide specialized knowledge with plan, build, improve, an
 | `testing` | Antimocking, Bun tests, SQLite test patterns | `.claude/agents/experts/testing/` |
 | `indexer` | AST parsing, symbol extraction, code analysis | `.claude/agents/experts/indexer/` |
 | `github` | Issues, PRs, branches, GitHub CLI workflows | `.claude/agents/experts/github/` |
+| `automation` | ADW workflows, agent orchestration, worktree isolation | `.claude/agents/experts/automation/` |
+| `documentation` | Documentation management, content organization | `.claude/agents/experts/documentation/` |
 
 **Usage via /do:**
 - Implementation: `/do "Add new hook for X"` (plan -> approval -> build -> improve)
@@ -87,4 +88,22 @@ cd app && bun run lint
 
 ## MCP Server
 
-KotaDB provides MCP tools for code search, indexing, and dependency analysis. See `/docs:mcp-usage-guidance` for the decision matrix on when to use MCP vs direct operations.
+KotaDB provides MCP tools for code search, indexing, and dependency analysis.
+
+### Tool Selection Guide
+
+**PREFER KotaDB MCP tools for:**
+- `mcp__kotadb-bunx__search_dependencies` - Understanding file relationships before refactoring
+- `mcp__kotadb-bunx__analyze_change_impact` - Risk assessment before PRs or major changes
+- `mcp__kotadb-bunx__search_code` - Semantic/conceptual code discovery across indexed repos
+
+**FALLBACK to Grep for:**
+- Exact regex pattern matching
+- Unindexed files or live filesystem searches
+- Quick single-file searches
+
+**Decision Tree:**
+1. Refactoring or modifying files? → Use `search_dependencies` first
+2. Creating PR or significant change? → Use `analyze_change_impact`
+3. Finding code by concept/meaning? → Try `search_code`
+4. Need exact regex or live results? → Use Grep

@@ -5,6 +5,9 @@ tools:
   - Read
   - Glob
   - Grep
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: haiku
 color: cyan
 ---
@@ -101,7 +104,7 @@ constraints:
 
 **"How do I list tools in agent frontmatter?"**
 - Use YAML array format (NOT comma-separated)
-- MCP tools: `mcp__kotadb__search_code`, etc.
+- MCP tools: `mcp__kotadb-bunx__search_code`, etc.
 - Valid tools: Read, Write, Edit, Bash, Glob, Grep, Task, etc.
 
 **"Why isn't my agent appearing in discovery?"**

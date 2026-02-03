@@ -617,6 +617,113 @@ function extractLeadingComment(
 }
 
 /**
+ * Extract return type string from TypeScript type annotation AST node.
+ *
+ * Handles common TypeScript type patterns:
+ * - Primitive types (string, number, boolean)
+ * - Union types (string | null)
+ * - Generic types (Promise<User>)
+ * - Array types (User[])
+ * - Object types ({ id: string })
+ * - Function types (() => void)
+ *
+ * @param typeNode - TSTypeAnnotation AST node
+ * @returns Type string representation or "unknown" if extraction fails
+ */
+function extractReturnType(typeNode: TSESTree.TypeNode): string {
+	switch (typeNode.type) {
+		case "TSStringKeyword":
+			return "string";
+		case "TSNumberKeyword":
+			return "number";
+		case "TSBooleanKeyword":
+			return "boolean";
+		case "TSVoidKeyword":
+			return "void";
+		case "TSNullKeyword":
+			return "null";
+		case "TSUndefinedKeyword":
+			return "undefined";
+		case "TSAnyKeyword":
+			return "any";
+		case "TSUnknownKeyword":
+			return "unknown";
+		case "TSNeverKeyword":
+			return "never";
+		case "TSUnionType":
+			return typeNode.types
+				.map(t => extractReturnType(t))
+				.join(" | ");
+		case "TSIntersectionType":
+			return typeNode.types
+				.map(t => extractReturnType(t))
+				.join(" & ");
+		case "TSArrayType":
+			return extractReturnType(typeNode.elementType) + "[]";
+		case "TSTypeReference":
+			if (typeNode.typeName.type === "Identifier") {
+				let result = typeNode.typeName.name;
+				// Try typeArguments (newer versions) first, then typeParameters for backwards compatibility
+				const typeArgs = (typeNode as any).typeArguments || (typeNode as any).typeParameters;
+				if (typeArgs && typeArgs.params) {
+					const params = typeArgs.params
+						.map((p: TSESTree.TypeNode) => extractReturnType(p))
+						.join(", ");
+					result += `<${params}>`;
+				}
+				return result;
+			}
+			// Handle qualified names like A.B.C
+			if (typeNode.typeName.type === "TSQualifiedName") {
+				return "unknown"; // Simplified for complex qualified names
+			}
+			return "unknown";
+		case "TSLiteralType":
+			if (typeNode.literal.type === "Literal") {
+				return typeof typeNode.literal.value === "string"
+					? `"${typeNode.literal.value}"`
+					: String(typeNode.literal.value);
+			}
+			if (typeNode.literal.type === "TemplateLiteral") {
+				return "string"; // Simplified template literal handling
+			}
+			return "unknown";
+		case "TSFunctionType":
+			// Use params property for TSFunctionType
+			const paramTypes = (typeNode as any).params
+				? (typeNode as any).params
+					.map((param: any) => {
+						if (param.type === "Identifier" && param.typeAnnotation) {
+							return extractReturnType(param.typeAnnotation.typeAnnotation);
+						}
+						return "any";
+					})
+					.join(", ")
+				: "";
+			const returnTypeStr = (typeNode as any).returnType
+				? extractReturnType((typeNode as any).returnType.typeAnnotation)
+				: "void";
+			return `(${paramTypes}) => ${returnTypeStr}`;
+		case "TSTypeLiteral":
+			// Simplified object type representation
+			if (typeNode.members.length === 0) {
+				return "{}";
+			}
+			// For complex object types, show simplified version
+			return "object";
+		case "TSTupleType":
+			const elementTypes = typeNode.elementTypes
+				.map(el => extractReturnType(el))
+				.join(", ");
+			return `[${elementTypes}]`;
+		default:
+			// For any unhandled type, try to use location text if available
+			// or return unknown as fallback
+			return "unknown";
+	}
+}
+
+/**
  * Build function signature string.
  *
  * Extracts parameter names and return type (if present).
@@ -651,9 +758,19 @@ function buildFunctionSignature(
 
 	// Extract return type if present (TypeScript)
 	let returnType = "";
-	if (node.returnType) {
-		// Simplify return type extraction - just note it exists
-		returnType = " => <return-type>";
+	if (node.returnType?.typeAnnotation) {
+		try {
+			const extractedType = extractReturnType(node.returnType.typeAnnotation);
+			returnType = " => " + extractedType;
+		} catch (error) {
+			logger.warn("Failed to extract return type", {
+				error: error instanceof Error ? error.message : String(error),
+				nodeType: node.type,
+				line: node.loc?.start.line,
+			});
+			// Fallback to placeholder if extraction fails
+			returnType = " => <return-type>";
+		}
 	}
 
 	return `(${paramStr})${returnType}`;

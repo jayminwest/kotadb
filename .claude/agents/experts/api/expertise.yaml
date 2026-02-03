@@ -5,71 +5,41 @@
 overview:
   description: |
     KotaDB API expertise covering Express HTTP server patterns, MCP SDK integration with
-    StreamableHTTPServerTransport, OpenAPI specification generation, route organization,
-    and query layer patterns. This expertise enables correct API endpoint and MCP tool
-    implementation within KotaDB's local-only, SQLite-based architecture.
+    StreamableHTTPServerTransport and StdioServerTransport, OpenAPI specification generation, 
+    CLI entry point, and query layer patterns. This expertise enables correct API endpoint, 
+    MCP tool, and CLI command implementation within KotaDB's local-only, SQLite-based architecture.
   scope: |
     Covers Express app structure (app/src/api/), route patterns, MCP server and transport
-    configuration, MCP tool definitions and executors, OpenAPI spec generation with Zod schemas,
-    query layer functions for SQLite, middleware patterns (CORS, logging, error handling), and
-    authentication bypass in local mode.
+    configuration (stdio and HTTP), MCP tool definitions and executors, OpenAPI spec generation 
+    with Zod schemas, CLI entry point (app/src/cli.ts), query layer functions for SQLite, and 
+    middleware patterns.
 
     KOTADB ADAPTATIONS:
     - Local-only mode (no Supabase, no cloud auth)
     - SQLite database via getGlobalDatabase()
     - Authentication bypassed in local mode
     - Synchronous operations (no queue)
-    - MCP uses StreamableHTTPServerTransport with JSON mode
+    - MCP supports StdioServerTransport (recommended) and StreamableHTTPServerTransport
     - Path aliases (@api/*, @mcp/*, @db/*, @logging/*, etc.)
-    - Logging via process.stdout.write (never console.*)
-
-    Does NOT cover frontend/web UI (no frontend in local mode) or orchestration patterns.
+    - Logging via process.stdout.write (never console.*), forceStderr for stdio mode
+    - CLI entry point via bin field in package.json
   rationale: |
-    Consistent API implementation enables reliable MCP tool usage, proper HTTP endpoint design,
-    and maintainable query patterns. Poor API structure leads to inconsistent responses,
-    broken tool contracts, and difficult debugging.
+    Consistent API implementation enables reliable MCP tool usage and proper endpoint design.
+    CLI patterns ensure seamless npm package distribution. Poor structure leads to 
+    inconsistent responses, broken tool contracts, and difficult debugging.
 
 core_implementation:
-  directory_structure:
-    app/src/:
-      api/:
-        purpose: HTTP routes and Express app factory
-        routes.ts: Express app factory with all routes registered
-        queries.ts: SQLite query layer for all data operations
-        openapi/:
-          builder.ts: OpenAPI 3.1 spec generator
-          paths.ts: Path operation registrations
-          schemas.ts: Zod schemas for request/response validation
-        auto-reindex.ts: Auto-reindex functionality for file watching
-      mcp/:
-        purpose: MCP server and tool implementations
-        server.ts: MCP Server factory and StreamableHTTPServerTransport
-        tools.ts: Tool definitions (ToolDefinition) and execute* functions
-        impact-analysis.ts: Change impact analysis logic
-        spec-validation.ts: Implementation spec validation
-        jsonrpc.ts: JSON-RPC error helpers
-        lifecycle.ts: Session lifecycle management
-        headers.ts: MCP header utilities
-        session.ts: Session management
-      auth/:
-        middleware.ts: Authentication middleware (bypassed in local mode)
-      logging/:
-        logger.ts: Structured logger factory
-        middleware.ts: Request/error logging middleware
-        context.ts: Logging context management
-      db/:
-        client.ts: Database client factory
-        sqlite/:
-          index.ts: SQLite database exports
-          sqlite-client.ts: KotaDatabase class implementation
-
   key_files:
+    - path: app/src/cli.ts
+      purpose: CLI entry point - argument parsing, server startup, graceful shutdown, stdio transport
+      exports: (none - direct execution)
+      patterns: shebang, arg parsing, signal handlers, version resolution, stdio mode routing
     - path: app/src/api/routes.ts
       purpose: Express app factory - createExpressApp()
       exports: createExpressApp
     - path: app/src/api/queries.ts
       purpose: SQLite query functions - searchFiles, listRecentFiles, runIndexingWorkflow
-      exports: searchFiles, listRecentFiles, ensureRepository, saveIndexedFiles, etc.
+      exports: searchFiles, listRecentFiles, ensureRepository, saveIndexedFiles
     - path: app/src/mcp/server.ts
       purpose: MCP Server factory - createMcpServer(), createMcpTransport()
       exports: createMcpServer, createMcpTransport
@@ -77,728 +47,704 @@ core_implementation:
       purpose: MCP tool definitions and executors
       exports: SEARCH_CODE_TOOL, executeSearchCode, handleToolCall, etc.
     - path: app/src/api/openapi/builder.ts
-      purpose: OpenAPI spec generator
+      purpose: OpenAPI 3.1 spec generator
       exports: buildOpenAPISpec, clearSpecCache
+    - path: app/src/logging/logger.ts
+      purpose: Structured logging with stderr routing support
+      exports: createLogger, Logger, LogContext
 
 key_operations:
+  create_cli_entry_point:
+    when: Creating npm bin entry point for distributed package
+    approach: |
+      1. Create app/src/cli.ts with #!/usr/bin/env bun shebang (first line, no BOM)
+      2. Import createExpressApp, getEnvironmentConfig, createLogger
+      3. Implement getVersion(): Reads package.json at runtime
+      4. Implement parseArgs() to handle --help, -h, --version, -v, --port <number>, --stdio
+      5. In main(): parse args -> handle --version/--help -> route stdio/HTTP mode
+      6. Set up graceful shutdown handlers for SIGTERM and SIGINT (HTTP mode only):
+         - Close server and exit(0) on success
+         - Force exit(1) after 10-second timeout
+      7. Add global error handlers for unhandledRejection and uncaughtException
+      8. Export cli.ts in package.json bin field: { "kotadb": "./src/cli.ts" }
+    timestamp: 2026-01-28
+    evidence: app/src/cli.ts (full implementation)
+    rationale: |
+      Enables KotaDB distribution as installable npm package via `npx kotadb` or `bunx kotadb`.
+      Bun shebang allows direct execution. Graceful shutdown prevents database corruption.
+    key_patterns:
+      - getVersion() reads package.json at runtime (supports bundled packages)
+      - process.argv.slice(2) skips executable and script path
+      - Timeout-based forced shutdown (10s) prevents hanging processes (HTTP mode)
+      - process.stdout.write for output, process.stderr.write for errors
+    pitfalls:
+      - what: "Using console.log instead of process.stdout.write"
+        instead: "Use process.stdout.write for all CLI output"
+        reason: "console.log adds overhead, process.stdout.write is pure"
+      - what: "Hardcoding package version in CLI code"
+        instead: "Read from package.json at runtime"
+        reason: "Must stay in sync with package.json during releases"
+      - what: "Missing timeout in shutdown handler"
+        instead: "Always include 10-second timeout for forced shutdown"
+        reason: "Prevents process hanging if close() doesn't complete"
+
+  implement_mcp_stdio_transport:
+    when: Adding stdio transport for MCP server (Claude Code integration)
+    approach: |
+      1. Import StdioServerTransport from @modelcontextprotocol/sdk/server/stdio.js
+      2. Add --stdio flag to CLI option parsing (CliOptions interface)
+      3. Create runStdioMode() function:
+         - Create logger with forceStderr: true (CRITICAL for JSON-RPC protocol)
+         - Create MCP server with createMcpServer(context)
+         - Instantiate new StdioServerTransport()
+         - Connect server to transport via server.connect(transport)
+         - Let transport manage process lifecycle (no explicit shutdown handler)
+      4. Update main() to route --stdio flag to runStdioMode()
+      5. Add forceStderr support to logger:
+         - Add forceStderr?: boolean to LogContext interface
+         - Update createLogger() to extract and pass forceStderr flag
+         - Update writeLog() to accept forceStderr parameter
+         - Route all logs to stderr when forceStderr is true
+      6. Update help text to document --stdio flag and stdio configuration
+    timestamp: 2026-01-29
+    evidence: Issue #49, app/src/cli.ts, app/src/logging/logger.ts
+    rationale: |
+      Stdio transport eliminates port conflicts (EADDRINUSE on 3000) by using stdin/stdout
+      instead of TCP. This is the MCP-recommended pattern for local CLI tools. CRITICAL:
+      stdout MUST be reserved for JSON-RPC protocol messages - all logs go to stderr.
+    key_patterns:
+      - StdioServerTransport from @modelcontextprotocol/sdk/server/stdio.js (v1.25+)
+      - forceStderr: true in logger ensures stdout is protocol-only
+      - Transport manages process lifecycle (stdin close triggers shutdown)
+      - No graceful shutdown handler needed (unlike HTTP mode)
+      - Mode selection via CLI flag (--stdio), not environment variable
+    pitfalls:
+      - what: "Logging to stdout in stdio mode"
+        instead: "Use forceStderr: true in createLogger() options"
+        reason: "stdout is reserved for JSON-RPC messages, logs corrupt protocol"
+      - what: "Adding SIGTERM/SIGINT handlers in stdio mode"
+        instead: "Let transport manage lifecycle via stdin close"
+        reason: "Transport handles shutdown when Claude Code closes stdin"
+      - what: "Using PORT environment variable in stdio mode"
+        instead: "Ignore port configuration when --stdio is set"
+        reason: "Stdio doesn't use TCP ports, PORT is meaningless"
+      - what: "Starting HTTP server when --stdio is set"
+        instead: "Route to runStdioMode() and return early"
+        reason: "Modes are mutually exclusive - stdio XOR HTTP"
+    affected_files: |
+      - app/src/cli.ts (CliOptions, parseArgs, runStdioMode, main routing)
+      - app/src/logging/logger.ts (LogContext.forceStderr, createLogger, writeLog)
+      - README.md (stdio-first documentation)
+      - app/tests/cli.test.ts (--stdio flag validation)
+
   add_express_route:
     when: Adding new HTTP endpoint to the API
     approach: |
-      1. Open app/src/api/routes.ts
-      2. Add route inside createExpressApp() function after existing routes
-      3. Pattern for authenticated route:
-         ```typescript
-         app.get("/endpoint", async (req: AuthenticatedRequest, res: Response) => {
-             const context = req.authContext!;
-             // Validate query params
-             // Call query function from @api/queries
-             addRateLimitHeaders(res, context.rateLimit);
-             res.json({ results });
-         });
-         ```
-      4. Pattern for public route (health, openapi):
-         ```typescript
-         app.get("/public-endpoint", (_req: Request, res: Response) => {
-             res.json({ data });
-         });
-         ```
-      5. Register in OpenAPI spec via app/src/api/openapi/paths.ts
+      1. Add route inside createExpressApp() in app/src/api/routes.ts
+      2. Use AuthenticatedRequest for authenticated routes, Request for public
+      3. Always call addRateLimitHeaders(res, context.rateLimit) before response
+      4. Extract and validate query params early, return 400 on missing params
+      5. Call query functions from @api/queries, handle errors with 500 status
+      6. Register in OpenAPI spec via app/src/api/openapi/paths.ts
     examples:
-      - endpoint: GET /search
-        location: routes.ts line 146
-      - endpoint: POST /mcp
-        location: routes.ts line 220
+      - GET /search (authenticated, rate-limited)
+      - POST /mcp (public, JSON-RPC)
+      - GET /health (public, no auth)
     pitfalls:
       - what: "Forgetting addRateLimitHeaders call"
-        instead: "Always call addRateLimitHeaders with context.rateLimit"
-        reason: "Clients expect rate limit headers on all authenticated endpoints"
-      - what: "Using console.log instead of logger"
-        instead: "Use createLogger from @logging/logger"
-        reason: "Logging standard requires structured JSON output"
+        instead: "Always call it before sending response"
+        reason: "Clients expect rate limit headers on all endpoints"
 
   register_mcp_tool:
     when: Adding new MCP tool for Claude Code integration
     approach: |
-      1. Define tool in app/src/mcp/tools.ts:
-         ```typescript
-         export const NEW_TOOL: ToolDefinition = {
-             name: "tool_name",
-             description: "Tool description for LLM",
-             inputSchema: {
-                 type: "object",
-                 properties: {
-                     param: { type: "string", description: "..." },
-                 },
-                 required: ["param"],
-             },
-         };
-         ```
-      2. Create executor function:
-         ```typescript
-         export async function executeNewTool(
-             params: unknown,
-             requestId: string | number,
-             userId: string,
-         ): Promise<unknown> {
-             // Validate params structure
-             if (typeof params !== "object" || params === null) {
-                 throw new Error("Parameters must be an object");
-             }
-             const p = params as Record<string, unknown>;
-             // Validate required params
-             // Call query functions from @api/queries
-             return { result };
-         }
-         ```
-      3. Register in createMcpServer (app/src/mcp/server.ts):
-         - Add to ListToolsRequestSchema handler
-         - Add case to CallToolRequestSchema handler switch
-      4. Export tool and executor from tools.ts
-      5. Add to getToolDefinitions() return array
+      1. Define ToolDefinition in app/src/mcp/tools.ts with name, description, inputSchema
+      2. Create executor function: validate params -> call query functions -> return result
+      3. Register in createMcpServer: add to ListToolsRequestSchema and CallToolRequestSchema
+      4. Validate ALL parameters including types before processing
+      5. Return structured objects that serialize well to JSON
     examples:
-      - tool: search_code
-        definition: SEARCH_CODE_TOOL
-        executor: executeSearchCode
-      - tool: index_repository
-        definition: INDEX_REPOSITORY_TOOL
-        executor: executeIndexRepository
+      - search_code: searches indexed files using FTS5
+      - index_repository: runs indexing workflow
+      - list_recent_files: lists recently indexed files with optional filtering
     pitfalls:
-      - what: "Returning raw objects instead of content blocks"
-        instead: "MCP response must be { content: [{ type: 'text', text: JSON.stringify(result) }] }"
-        reason: "SDK expects content blocks format"
-      - what: "Missing validation of required parameters"
-        instead: "Always check for undefined/null and correct types"
+      - what: "Missing parameter validation"
+        instead: "Always type-check all params before using"
         reason: "LLM may pass incorrect parameters"
-
-  update_openapi_schema:
-    when: Documenting new endpoint or updating existing
-    approach: |
-      1. Define Zod schemas in app/src/api/openapi/schemas.ts:
-         ```typescript
-         export const NewResponseSchema = z.object({
-             results: z.array(z.object({
-                 field: z.string(),
-             })),
-         });
-         ```
-      2. Register path in app/src/api/openapi/paths.ts:
-         ```typescript
-         registry.registerPath({
-             method: "get",
-             path: "/endpoint",
-             tags: ["Category"],
-             summary: "Short summary",
-             description: "Longer description",
-             security: [{ apiKey: [] }],
-             responses: {
-                 200: {
-                     description: "Success",
-                     content: {
-                         "application/json": {
-                             schema: NewResponseSchema,
-                         },
-                     },
-                 },
-             },
-         });
-         ```
-      3. Clear cached spec after changes: clearSpecCache()
-    examples:
-      - schema: SearchResponseSchema
-        location: schemas.ts
-    pitfalls:
-      - what: "Forgetting to clear spec cache during development"
-        instead: "Call clearSpecCache() or restart server"
-        reason: "OpenAPI spec is cached at startup"
 
   add_query_function:
     when: Adding new database query operation
     approach: |
-      1. Open app/src/api/queries.ts
-      2. Create internal function with db parameter:
-         ```typescript
-         function queryInternal(
-             db: KotaDatabase,
-             param: string,
-         ): Result[] {
-             const sql = `SELECT ... FROM ... WHERE ...`;
-             const rows = db.query<ResultRow>(sql, [param]);
-             return rows.map(transformRow);
-         }
-         ```
-      3. Create public function using getGlobalDatabase():
-         ```typescript
-         export function query(param: string): Result[] {
-             return queryInternal(getGlobalDatabase(), param);
-         }
-         ```
-      4. Optionally add backward-compatible Local variant for tests:
-         ```typescript
-         export function queryLocal(db: KotaDatabase, param: string): Result[] {
-             return queryInternal(db, param);
-         }
-         ```
+      1. Create internal function with db parameter (for testability)
+      2. Create public function using getGlobalDatabase()
+      3. Internal functions: db.query<T>(), db.queryOne<T>(), db.run(), db.transaction()
+      4. Use db.prepare() for bulk operations
+      5. Always escape FTS5 terms with escapeFts5Term() for user input
     kotadb_conventions:
       - Use getGlobalDatabase() from @db/sqlite/index.js for public functions
-      - Internal functions take db parameter for testability
+      - Internal functions take db parameter for testing
       - Transaction wrapper via db.transaction(() => { ... })
-      - Prepared statements via db.prepare() for bulk operations
-      - FTS5 search with escapeFts5Term() for user input
-    examples:
-      - function: searchFiles
-        internal: searchFilesInternal
-        public: searchFiles
-        local: searchFilesLocal
+      - Prepared statements for bulk inserts
 
   implement_fts5_search:
     when: Adding or modifying FTS5 full-text search operations
     approach: |
-      1. Define escapeFts5Term() helper if not present:
-         ```typescript
-         function escapeFts5Term(term: string): string {
-             // Escape internal double quotes by doubling them
-             const escaped = term.replace(/"/g, '""');
-             // Wrap in double quotes for exact phrase matching
-             return `"${escaped}"`;
-         }
-         ```
-      2. Use FTS5 table with MATCH operator and escaped terms:
-         ```typescript
-         function searchInternal(db: KotaDatabase, term: string): Result[] {
-             const sql = `
-                 SELECT f.*, snippet(table_fts, 1, '<mark>', '</mark>', '...', 32) AS snippet
-                 FROM table_fts fts
-                 JOIN table f ON fts.rowid = f.rowid
-                 WHERE table_fts MATCH ?
-                 ORDER BY bm25(table_fts)
-                 LIMIT ?
-             `;
-             const escapedTerm = escapeFts5Term(term);
-             return db.query<Result>(sql, [escapedTerm, 100]);
-         }
-         ```
-      3. Test edge cases:
-         - Hyphenated terms: "pre-commit", "mom-and-pop"
-         - Multi-word phrases: "planType smb"
-         - FTS5 keywords as literals: "search and find", "OR", "NOT"
-         - Embedded quotes: 'say "hello"'
-         - Operator-like terms: "AND", "NEAR"
-    timestamp: 2026-01-28
-    evidence: commit 5af086f
+      1. Always escape user input: escapeFts5Term(term) wraps in double quotes
+      2. Use FTS5 MATCH operator with escaped terms
+      3. Use bm25() for relevance ranking and snippet() for context
+      4. Test edge cases: hyphenated terms, multi-word phrases, FTS5 keywords, quotes
     rationale: |
-      Prevents SQL errors when users search for multi-word phrases, hyphenated terms,
-      or FTS5 reserved keywords. Without escaping, FTS5 interprets:
-      - Spaces as AND operators (e.g., "planType smb" becomes planType AND smb)
-      - Hyphens as NOT operators (e.g., "pre-commit" becomes pre NOT commit)
-      - Keywords (AND, OR, NOT) as query syntax instead of literals
-      
-      Wrapping in double quotes forces exact phrase matching and treats all input as literals.
+      Prevents SQL errors on multi-word phrases, hyphens, and FTS5 keywords.
+      Double-quote escaping forces exact phrase matching and treats input as literal.
     pitfalls:
-      - what: "Passing raw user input directly to FTS5 MATCH"
-        instead: "Always use escapeFts5Term() before MATCH"
-        reason: "FTS5 syntax errors break search functionality"
-      - what: "Using single quotes for FTS5 escaping"
-        instead: "Use double quotes - they're the FTS5 standard"
-        reason: "Single quotes don't prevent operator interpretation"
+      - what: "Passing raw user input to MATCH"
+        instead: "Always use escapeFts5Term() first"
+        reason: "Unescaped input breaks FTS5 query parsing"
 
   validate_local_file_paths:
     when: Accepting file paths in local mode API operations
     approach: |
-      1. Import path and fs modules
-      2. Validate path is within workspace:
-         ```typescript
-         import path from "node:path";
-         
-         function validateLocalPath(localPath: string): void {
-             const workspaceRoot = process.cwd();
-             const resolvedPath = path.resolve(localPath);
-             
-             if (!resolvedPath.startsWith(workspaceRoot)) {
-                 throw new Error(`Path traversal detected: ${localPath} is outside workspace`);
-             }
-         }
-         ```
-      3. Check directory/file existence if needed:
-         ```typescript
-         import fs from "node:fs";
-         
-         if (!fs.existsSync(resolvedPath)) {
-             throw new Error(`Path does not exist: ${localPath}`);
-         }
-         ```
-      4. Use validated path for indexing/reading operations
-    timestamp: 2026-01-28
-    evidence: commit efecf9c (PR #589 review feedback)
+      1. Use path.resolve(localPath) to convert to absolute path
+      2. Verify path.startsWith(process.cwd()) to prevent traversal attacks
+      3. Check fs.existsSync(resolvedPath) if needed
     rationale: |
-      Local mode indexing accepts user-provided file paths. Without validation,
-      malicious paths like "../../../etc/passwd" could expose sensitive files.
-      Restrict all paths to within process.cwd() workspace directory.
-    pitfalls:
-      - what: "Trusting user-provided paths without validation"
-        instead: "Always validate with path.resolve() and startsWith()"
-        reason: "Path traversal attacks can read arbitrary files"
-      - what: "Using relative paths directly"
-        instead: "Resolve to absolute paths before validation"
-        reason: "Relative paths can bypass naive validation"
+      Local mode indexing accepts user-provided paths. Without validation,
+      "../../../etc/passwd" could expose sensitive files. Restrict all paths 
+      to within process.cwd() workspace directory.
 
   add_optional_parameter_filters:
     when: Adding optional filtering parameters to query functions and MCP tools
     approach: |
-      1. In query layer (app/src/api/queries.ts), create internal function with optional parameter:
-         ```typescript
-         function listRecentFilesInternal(
-             db: KotaDatabase,
-             limit: number,
-             repositoryId?: string,
-         ): IndexedFile[] {
-             const hasRepoFilter = repositoryId !== undefined;
-             const sql = hasRepoFilter
-                 ? `
-                     SELECT ... FROM indexed_files
-                     WHERE repository_id = ?
-                     ORDER BY indexed_at DESC
-                     LIMIT ?
-                 `
-                 : `
-                     SELECT ... FROM indexed_files
-                     ORDER BY indexed_at DESC
-                     LIMIT ?
-                 `;
-             
-             const params = hasRepoFilter ? [repositoryId, limit] : [limit];
-             const rows = db.query<ResultType>(sql, params);
-             return rows.map(transformRow);
-         }
-         ```
-         
-      2. In MCP tool (app/src/mcp/tools.ts), add type guard for optional parameters:
-         ```typescript
-         function isListRecentParams(params: unknown): 
-             params is { limit?: number; repository?: string } | undefined {
-             if (params === undefined) return true;
-             if (typeof params !== "object" || params === null) return false;
-             const p = params as Record<string, unknown>;
-             if (p.limit !== undefined && typeof p.limit !== "number") return false;
-             if (p.repository !== undefined && typeof p.repository !== "string") return false;
-             return true;
-         }
-         ```
-      
-      3. Extract optional parameter in executor with safe casting:
-         ```typescript
-         const repository =
-             params && typeof params === "object" && "repository" in params 
-                 ? (params.repository as string | undefined) 
-                 : undefined;
-         ```
-      
-      4. Update tool schema to document optional parameter:
-         ```typescript
-         export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
-             name: "list_recent_files",
-             description: "List recently indexed files...",
-             inputSchema: {
-                 type: "object",
-                 properties: {
-                     limit: {
-                         type: "number",
-                         description: "Optional: Maximum number of files (default: 10)",
-                     },
-                     repository: {
-                         type: "string",
-                         description: "Optional: Filter results to a specific repository ID",
-                     },
-                 },
-             },
-         };
-         ```
-      
-      5. Pass optional parameter through to query function:
-         ```typescript
-         const files = listRecentFiles(limit, repository);
-         ```
-
+      1. Create internal function with optional parameter (e.g., repositoryId?: string)
+      2. Use hasFilter flag to control both SQL string AND params array
+      3. Type guard in executor: validate optional param type before using
+      4. Extract with safe casting: (params.prop as string | undefined)
+      5. Document optional parameter in tool inputSchema with description
     timestamp: 2026-01-28
     evidence: Issue #608 (repository filtering for list_recent_files)
-    related_files:
-      - app/src/mcp/tools.ts (lines 344-351 type guard, 482-500 executor)
-      - app/src/api/queries.ts (lines 328-372 listRecentFilesInternal)
-      - app/tests/mcp/list-recent-files.test.ts (repository filtering tests)
-    
     rationale: |
-      Optional parameter filtering enables multi-repository support without breaking
-      backward compatibility. The hasRepoFilter conditional pattern avoids SQL concatenation
-      and ensures parameter arrays always match query placeholders.
-      
-      Key insight: Use conditional SQL strings based on hasRepoFilter flag rather than
-      building WHERE clauses dynamically. This is safer and more maintainable.
-    
-    applied_to_tools:
-      - search_code: filters by repository (existing pattern)
-      - list_recent_files: filters by repository (new in #608)
-      - search_dependencies: filters by repository (existing pattern)
-    
+      Enables multi-repository support without breaking backward compatibility.
+      hasRepoFilter conditional pattern avoids dynamic SQL and ensures parameter 
+      arrays match query placeholders.
     pitfalls:
-      - what: "Forgetting to validate optional parameter type in type guard"
-        instead: "Check both !== undefined AND correct type before using"
-        reason: "LLM may pass wrong type; validation prevents crashes"
       - what: "Parameter array length mismatch with SQL placeholders"
-        instead: "Use hasFilter flag to control both SQL and params array"
+        instead: "Use hasFilter flag to control both SQL and params"
         reason: "Mismatched params cause binding errors"
-      - what: "Not documenting optional parameter in tool schema"
-        instead: "Add description to inputSchema properties"
-        reason: "LLM needs guidance on when to use optional filters"
-      - what: "Using hasParameter ? value : undefined in executor"
-        instead: "Extract with safe casting: (params.prop as string | undefined)"
-        reason: "Type safety and clarity"
 
   test_mcp_tool:
     when: Testing MCP tool implementations for correctness and edge cases
     approach: |
-      1. Create two test files in app/tests/mcp/:
-         - <tool-name>.test.ts - Unit tests with validation checks
-         - <tool-name>.integration.test.ts - Integration tests with real database
-      
-      2. Unit test pattern covers parameter validation and error handling
-      3. Integration test pattern uses file-based database via KOTADB_PATH
-      4. Coverage checklist per tool:
-         - Parameter validation (missing, wrong type, invalid values)
-         - Empty results and results with data cases
-         - Optional parameters (limit, filters)
-         - Edge cases (special characters, FTS5 keywords)
-    
+      1. Create <tool-name>.test.ts (unit) and <tool-name>.integration.test.ts (integration)
+      2. Unit tests: parameter validation, error cases, type checking
+      3. Integration tests: database operations using KOTADB_PATH env var
+      4. Cover: parameter validation, empty/populated results, optional params, edge cases
     timestamp: 2026-01-28
-    evidence: commit 8156491 (added 43 tests across 8 MCP tools)
+    evidence: commit 8156491 (43 tests across 8 MCP tools)
     rationale: |
-      Comprehensive MCP tool testing ensures reliability for Claude Code integration.
-      Two-tier approach: unit tests verify parameter validation, integration tests
-      verify database operations. Using KOTADB_PATH env var allows file-based test
-      databases, working around global database singleton pattern.
-    
+      Two-tier approach ensures parameter validation and database operations work.
+      KOTADB_PATH allows file-based test databases, working around global singleton.
     pitfalls:
       - what: "Using in-memory databases with getGlobalDatabase()"
-        instead: "Use KOTADB_PATH env var to point to file-based test database"
-        reason: "Global database singleton needs file path for proper isolation"
-      - what: "Skipping parameter type validation tests"
-        instead: "Test all parameter types and missing required parameters"
-        reason: "LLM can pass incorrect types, validation must be robust"
+        instead: "Use KOTADB_PATH env var for file-based test database"
+        reason: "Global singleton needs file path for proper isolation"
 
-decision_trees:
-  endpoint_vs_mcp_tool:
-    question: Should this be an HTTP endpoint or MCP tool?
-    options:
-      - if: Direct user-facing API consumption (REST clients, web apps)
-        then: HTTP endpoint in routes.ts
-      - if: LLM/Claude Code integration for agentic use
-        then: MCP tool in tools.ts
-      - if: Both human and LLM consumers needed
-        then: Both - HTTP endpoint calls same query function as MCP tool
+  configure_npm_package_distribution:
+    when: Publishing TypeScript package with path aliases for direct execution (Bun/ts-node)
+    approach: |
+      1. Include tsconfig.json in package.json files array (required for alias resolution)
+      2. Relocate shared dependencies from external monorepo siblings into package root
+      3. Update path aliases in tsconfig.json to reference internal paths
+      4. Add all aliased directories to files array (e.g., "shared/**/*.ts")
+      5. Add all aliased directories to tsconfig.json include array
+      6. Update monorepo workspace configuration to remove relocated packages
+      7. Update CI workflows to remove separate type-checking steps for relocated code
+      8. Test locally: npm pack -> bunx <tarball> to verify module resolution
+    timestamp: 2026-01-29
+    evidence: Issue #39, pending changes for v2.0.1
+    rationale: |
+      When Bun executes TypeScript directly (not transpiled), it uses tsconfig.json to
+      resolve path aliases at runtime. Without this file in the published package, imports
+      like @api/routes fail with "Cannot find module" errors. External path aliases
+      (../shared/*) break because npm only publishes files within package directory.
+    key_patterns:
+      - tsconfig.json MUST be in files array for runtime alias resolution
+      - Path aliases must reference internal paths (./shared/*, not ../shared/*)
+      - All aliased directories must be included in both files array AND include array
+      - Test with npm pack + bunx before publishing to catch resolution issues
+    pitfalls:
+      - what: "Excluding tsconfig.json from published package"
+        instead: "Always include tsconfig.json in files array"
+        reason: "Bun needs it to resolve path aliases at runtime"
+      - what: "Path aliases pointing outside package root (../shared/*)"
+        instead: "Relocate dependencies into package or reference internally (./shared/*)"
+        reason: "npm only publishes files within package directory"
+      - what: "Adding to files array but not include array"
+        instead: "Add aliased directories to BOTH files and include arrays"
+        reason: "Type-checking needs include, runtime needs files"
+      - what: "Publishing without local testing"
+        instead: "Always test with npm pack + bunx <tarball> first"
+        reason: "Catches module resolution issues before public publish"
+    affected_files: |
+      When restructuring for npm distribution:
+      - app/package.json (files array, version bump)
+      - app/tsconfig.json (paths, include array)
+      - package.json (workspaces array if monorepo)
+      - .github/workflows/npm-publish.yml (CI adjustments)
 
-  auth_placement:
-    question: Does this endpoint need authentication?
-    options:
-      - if: Health check, OpenAPI spec, public info
-        then: No auth - check path in middleware skip list
-      - if: Any data access or mutation
-        then: Yes auth - uses AuthenticatedRequest type
-      - note: In local mode, all auth is bypassed (returns local-user context)
-
-  query_vs_mcp:
-    question: Where should business logic live?
-    options:
-      - if: Pure database query (search, list, fetch)
-        then: queries.ts - reusable by both routes and MCP
-      - if: Complex analysis (impact, validation)
-        then: Dedicated module in mcp/ (impact-analysis.ts, spec-validation.ts)
-      - if: Indexing workflow
-        then: queries.ts - runIndexingWorkflow orchestrates parsers
+  maintain_openapi_spec:
+    when: Updating OpenAPI specification after architectural changes or feature removals
+    approach: |
+      1. Audit OpenAPI spec for spec-implementation drift:
+         - Check registered paths in paths.ts against actual routes in routes.ts
+         - Verify all referenced schemas exist and are used
+         - Confirm server definitions match deployment architecture
+      2. Remove unused/obsolete content:
+         - Delete schemas for removed features (check imports in paths.ts)
+         - Remove server definitions for non-existent environments
+         - Remove endpoint tags that don't match any paths
+         - Clean up auth scheme descriptions (remove cloud provider references in local mode)
+      3. Update documentation strings in builder.ts:
+         - Reflect current architecture (local-only vs cloud)
+         - Document MCP tools separately from HTTP endpoints
+         - Update rate limit header documentation to match implementation
+      4. Synchronize tests with spec changes:
+         - Update openapi-generation.test.ts assertions
+         - Verify all endpoint examples are valid
+      5. Test spec generation:
+         - Run tests: cd app && bun test openapi
+         - Verify spec serves correctly: GET /openapi.json
+         - Check for validation errors in OpenAPI validators
+    timestamp: 2026-02-02
+    evidence: Issues #74, #83 (commits 7195834, 52510fb)
+    rationale: |
+      OpenAPI specs accumulate drift as features are added/removed. Undocumented endpoints
+      mislead API consumers. Obsolete schemas increase cognitive load. Regular hygiene
+      maintains spec accuracy and prevents confusion between documented vs implemented APIs.
+      Critical for local-only transitions where cloud references must be removed.
+    key_patterns:
+      - Implement routes first, then add to OpenAPI (not spec-first)
+      - Remove schemas when last endpoint using them is removed
+      - Server definitions must match actual deployment architecture
+      - Separate MCP tool documentation from HTTP endpoint documentation
+      - Test spec generation after structural changes
+    pitfalls:
+      - what: "Adding OpenAPI paths without implementing routes"
+        instead: "Implement route in routes.ts first, then register in paths.ts"
+        reason: "Prevents documenting non-existent endpoints (Issue #74)"
+      - what: "Leaving cloud-only schemas in local-only mode"
+        instead: "Remove Jobs, Projects, API Keys schemas when features removed"
+        reason: "Dead schemas confuse developers and bloat spec"
+      - what: "Keeping production/staging server definitions in local-only mode"
+        instead: "Remove all non-localhost server definitions"
+        reason: "Misleads users about deployment options"
+      - what: "Updating paths.ts without checking schema imports"
+        instead: "Remove unused schema imports and definitions"
+        reason: "Orphaned schemas increase maintenance burden"
+    affected_files: |
+      - app/src/api/openapi/builder.ts (server defs, info, descriptions)
+      - app/src/api/openapi/paths.ts (endpoint registrations)
+      - app/src/api/openapi/schemas.ts (request/response schemas)
+      - app/tests/api/openapi-generation.test.ts (spec validation)
 
 patterns:
+  cli_entry_point_pattern:
+    structure: |
+      // app/src/cli.ts (with #!/usr/bin/env bun shebang on first line)
+      function getVersion(): string {
+        const packageJsonPath = join(__dirname, "..", "package.json");
+        const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
+        return packageJson.version || "unknown";
+      }
+      
+      function parseArgs(args: string[]): CliOptions {
+        const options: CliOptions = { port: 3000, help: false, version: false, stdio: false };
+        for (let i = 0; i < args.length; i++) {
+          if (args[i] === "--help" || args[i] === "-h") options.help = true;
+          else if (args[i] === "--version" || args[i] === "-v") options.version = true;
+          else if (args[i] === "--stdio") options.stdio = true;
+          else if (args[i] === "--port") options.port = Number(args[++i]);
+        }
+        return options;
+      }
+      
+      async function main(): Promise<void> {
+        const options = parseArgs(process.argv.slice(2));
+        if (options.version) {
+          process.stdout.write(`kotadb v${getVersion()}\n`);
+          process.exit(0);
+        }
+        
+        // Route to stdio mode
+        if (options.stdio) {
+          await runStdioMode();
+          return;
+        }
+        
+        // HTTP mode
+        const server = createExpressApp().listen(options.port);
+        const shutdown = () => {
+          server.close(() => process.exit(0));
+          setTimeout(() => process.exit(1), 10000);
+        };
+        process.on("SIGTERM", shutdown);
+        process.on("SIGINT", shutdown);
+      }
+    notes:
+      - First line MUST be #!/usr/bin/env bun (no BOM)
+      - process.argv.slice(2) skips executable and script path
+      - getVersion() reads package.json at runtime
+      - Use process.stdout.write / process.stderr.write (not console.*)
+      - 10-second timeout in shutdown handler (HTTP mode only)
+      - Stdio mode requires no shutdown handler (transport manages lifecycle)
+    timestamp: 2026-01-29
+    evidence: app/src/cli.ts
+
+  mcp_stdio_mode_pattern:
+    structure: |
+      // app/src/cli.ts (stdio transport mode)
+      import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
+      import { createMcpServer, type McpServerContext } from "@mcp/server";
+      
+      async function runStdioMode(): Promise<void> {
+        // CRITICAL: All logs must go to stderr in stdio mode
+        const logger = createLogger({
+          module: "mcp-stdio",
+          forceStderr: true,  // stdout reserved for JSON-RPC
+        });
+      
+        logger.info("KotaDB MCP server starting in stdio mode", {
+          version: getVersion(),
+        });
+      
+        // Create MCP server (same as HTTP mode)
+        const context: McpServerContext = {
+          userId: "local",  // Local-only mode
+        };
+        const server = createMcpServer(context);
+      
+        // Create and connect stdio transport
+        const transport = new StdioServerTransport();
+        await server.connect(transport);
+      
+        logger.info("KotaDB MCP server connected via stdio");
+      
+        // Process stays alive until stdin closes (Claude Code manages lifecycle)
+      }
+      
+      async function main(): Promise<void> {
+        const options = parseArgs(process.argv.slice(2));
+        
+        // Route to stdio mode
+        if (options.stdio) {
+          await runStdioMode();
+          return;  // runStdioMode() keeps process alive
+        }
+        
+        // Otherwise start HTTP server (existing code)
+        // ...
+      }
+    notes:
+      - StdioServerTransport requires @modelcontextprotocol/sdk v1.25+
+      - forceStderr: true is CRITICAL - stdout is reserved for JSON-RPC protocol
+      - No graceful shutdown handler needed - transport manages lifecycle
+      - Process terminates when Claude Code closes stdin
+      - Same MCP server works with both stdio and HTTP transports
+    timestamp: 2026-01-29
+    evidence: app/src/cli.ts (runStdioMode implementation)
+
+  logger_stderr_routing_pattern:
+    structure: |
+      // app/src/logging/logger.ts (stderr routing for stdio mode)
+      export interface LogContext {
+        request_id?: string;
+        user_id?: string;
+        forceStderr?: boolean;  // NEW: route all logs to stderr
+        [key: string]: unknown;
+      }
+      
+      export function createLogger(baseContext?: LogContext): Logger {
+        const context = baseContext ? maskSensitiveData(baseContext) : {};
+        const forceStderr = context.forceStderr === true;
+        
+        return {
+          info(message: string, additionalContext?: LogContext): void {
+            const entry: LogEntry = { /* ... */ };
+            writeLog(entry, forceStderr);  // Pass forceStderr flag
+          },
+          // ... other log methods
+        };
+      }
+      
+      function writeLog(entry: LogEntry, forceStderr = false): void {
+        const json = JSON.stringify(entry);
+        const output = `${json}\n`;
+        
+        if (forceStderr || entry.level === "error") {
+          process.stderr.write(output);
+        } else {
+          process.stdout.write(output);
+        }
+      }
+    notes:
+      - forceStderr flag routes ALL log levels to stderr (including info/debug)
+      - Default behavior: info/debug/warn to stdout, error to stderr
+      - Stdio mode behavior: ALL logs to stderr (stdout is protocol channel)
+      - Flag is set once at logger creation, not per log call
+    timestamp: 2026-01-29
+    evidence: app/src/logging/logger.ts (forceStderr implementation)
+
   express_route_pattern:
     structure: |
-      app.METHOD("/path", async (req: AuthenticatedRequest, res: Response) => {
+      app.get("/path", async (req: AuthenticatedRequest, res: Response) => {
           const context = req.authContext!;
-          // 1. Extract and validate query params
           const param = req.query.param as string;
           if (!param) {
               addRateLimitHeaders(res, context.rateLimit);
               return res.status(400).json({ error: "Missing param" });
           }
-          // 2. Call query function
-          try {
-              const results = queryFunction(param);
-              addRateLimitHeaders(res, context.rateLimit);
-              res.json({ results });
-          } catch (error) {
-              addRateLimitHeaders(res, context.rateLimit);
-              res.status(500).json({ error: (error as Error).message });
-          }
+          const results = queryFunction(param);
+          addRateLimitHeaders(res, context.rateLimit);
+          res.json({ results });
       });
     notes:
       - AuthenticatedRequest for authenticated routes
-      - Request for public routes
-      - Always call addRateLimitHeaders before response
+      - Always addRateLimitHeaders before response
       - Return early with status code on validation failure
 
   mcp_tool_pattern:
     structure: |
-      // 1. Tool Definition (tools.ts)
       export const TOOL_NAME: ToolDefinition = {
           name: "tool_name",
-          description: "LLM-oriented description",
+          description: "When/why to use",
           inputSchema: {
               type: "object",
-              properties: { param: { type: "string" } },
+              properties: { param: { type: "string", description: "..." } },
               required: ["param"],
           },
       };
-
-      // 2. Executor Function (tools.ts)
+      
       export async function executeTool(
           params: unknown,
-          requestId: string | number,
+          _requestId: string | number,
           userId: string,
       ): Promise<unknown> {
-          // Validate params
-          if (typeof params !== "object" || params === null) {
+          if (typeof params !== "object" || params === null)
               throw new Error("Parameters must be an object");
-          }
           const p = params as Record<string, unknown>;
-          if (p.param === undefined) {
-              throw new Error("Missing required parameter: param");
-          }
-          // Call query functions
-          const result = await queryFunction(p.param as string);
-          return { result };
+          if (p.param === undefined) throw new Error("Missing: param");
+          return await queryFunction(p.param as string);
       }
-
-      // 3. Register in server.ts
-      // In ListToolsRequestSchema handler:
-      return { tools: [..., TOOL_NAME] };
-      // In CallToolRequestSchema handler:
-      case "tool_name":
-          result = await executeTool(toolArgs, "", context.userId);
-          break;
     notes:
-      - Tool description should guide LLM on when/how to use
-      - Input schema properties need descriptions for LLM
-      - Executor validates all params before processing
-      - Server wraps result in content blocks format
+      - Tool description guides LLM on when/how to use
+      - Properties need descriptions in inputSchema
+      - Validate all params including types and ranges
 
   sqlite_query_pattern:
     structure: |
-      // Internal function (testable)
-      function queryInternal(
-          db: KotaDatabase,
-          param: string,
-          options: QueryOptions = {},
-      ): Result[] {
-          const sql = `
-              SELECT column1, column2
-              FROM table
-              WHERE condition = ?
-              LIMIT ?
-          `;
-          const limit = options.limit ?? 20;
-          const rows = db.query<RowType>(sql, [param, limit]);
-          return rows.map(row => ({ ...row }));
+      function queryInternal(db: KotaDatabase, param: string): Result[] {
+          const sql = `SELECT * FROM table WHERE condition = ? LIMIT ?`;
+          const rows = db.query<RowType>(sql, [param, 20]);
+          return rows.map(transform);
       }
-
-      // Public function (uses global db)
-      export function query(param: string, options?: QueryOptions): Result[] {
-          return queryInternal(getGlobalDatabase(), param, options);
+      export function query(param: string): Result[] {
+          return queryInternal(getGlobalDatabase(), param);
       }
     notes:
-      - KotaDatabase type from @db/sqlite/sqlite-client.js
-      - db.query<T>() for SELECT returning rows
-      - db.queryOne<T>() for single row or null
-      - db.run() for INSERT/UPDATE/DELETE
-      - db.transaction(() => {}) for atomic operations
-      - db.prepare() for bulk prepared statements
+      - Internal function takes db param (testable)
+      - Public function uses getGlobalDatabase()
+      - db.query<T>(), db.queryOne<T>(), db.run(), db.transaction(), db.prepare()
 
   fts5_search_pattern:
     structure: |
       function escapeFts5Term(term: string): string {
-          const escaped = term.replace(/"/g, '""');
-          return `"${escaped}"`;
+          return `"${term.replace(/"/g, '""')}"`;
       }
-
       function searchInternal(db: KotaDatabase, term: string): Result[] {
           const sql = `
-              SELECT f.*, snippet(table_fts, 1, '<mark>', '</mark>', '...', 32) AS snippet
+              SELECT f.*, snippet(fts, 1, '<mark>', '</mark>', '...', 32) AS snippet
               FROM table_fts fts
               JOIN table f ON fts.rowid = f.rowid
               WHERE table_fts MATCH ?
-              ORDER BY bm25(table_fts)
-              LIMIT ?
+              ORDER BY bm25(table_fts) LIMIT 100
           `;
-          const escapedTerm = escapeFts5Term(term);
-          return db.query<Result>(sql, [escapedTerm, 100]);
+          return db.query<Result>(sql, [escapeFts5Term(term)]);
       }
     notes:
-      - Always escape user input with escapeFts5Term
-      - FTS5 MATCH for full-text search
-      - bm25() for relevance ranking
-      - snippet() for context around matches
-    timestamp: 2026-01-28
-    evidence: app/src/api/queries.ts lines 257-262, 304
+      - Always escape with escapeFts5Term before MATCH
+      - Use bm25() for relevance, snippet() for context
+      - Test: hyphens, phrases, FTS5 keywords, quotes
 
-  local_auth_bypass_pattern:
+  npm_package_files_pattern:
     structure: |
-      // app/src/auth/middleware.ts
-      const LOCAL_AUTH_CONTEXT: AuthContext = {
-          userId: "local-user",
-          tier: "team", // Full access in local mode
-          keyId: "local-key",
-          rateLimitPerHour: Number.MAX_SAFE_INTEGER, // No rate limits
-      };
-
-      export async function authenticateRequest(_request: Request): Promise<AuthResult> {
-          logger.debug("Local mode: Bypassing authentication");
-          return { context: LOCAL_AUTH_CONTEXT };
+      // app/package.json (TypeScript package with path aliases for Bun)
+      {
+        "name": "kotadb",
+        "version": "2.0.1",
+        "bin": {
+          "kotadb": "./src/cli.ts"
+        },
+        "files": [
+          "src/**/*.ts",
+          "src/**/*.js",
+          "!src/**/*.test.ts",
+          "!src/**/*.spec.ts",
+          "tsconfig.json",        // Required for path alias resolution
+          "shared/**/*.ts"        // Include all aliased dependencies
+        ]
+      }
+      
+      // app/tsconfig.json
+      {
+        "compilerOptions": {
+          "baseUrl": ".",
+          "paths": {
+            "@api/*": ["src/api/*"],
+            "@shared/*": ["./shared/*"]  // Internal reference, not ../shared/*
+          }
+        },
+        "include": [
+          "src/**/*.ts",
+          "tests/**/*.ts",
+          "shared/**/*.ts"  // Must include aliased directories
+        ]
       }
     notes:
-      - All requests in local mode receive full-access context
-      - No API key validation or JWT verification
-      - Rate limits set to MAX_SAFE_INTEGER (effectively unlimited)
-      - requireAdmin() always returns true
-    timestamp: 2026-01-28
-    evidence: commit d669841 (local-only v2 refactor)
-    rationale: |
-      Local-only architecture eliminates cloud authentication complexity.
-      Simplifies development and dogfooding while maintaining security boundary
-      (local access = trusted access).
+      - tsconfig.json in files array enables runtime path alias resolution
+      - All path aliases must reference internal paths relative to package root
+      - Aliased directories must appear in BOTH files and include arrays
+      - Test with npm pack + bunx before publishing
+      - Alternative: transpile to JS with resolved imports (different trade-offs)
+    timestamp: 2026-01-29
+    evidence: Issue #39 fix for v2.0.1
 
 best_practices:
-  routes:
-    - Always use addRateLimitHeaders before sending response
-    - Extract and validate all query parameters early
-    - Use typed AuthenticatedRequest for authenticated routes
-    - Return JSON errors with { error: "message" } format
-
-  testing:
-    - Create both unit and integration tests for each MCP tool
-    - Unit tests: parameter validation, error cases, type checking
-    - Integration tests: database operations with seeded fixtures
-    - Use KOTADB_PATH env var for file-based test database isolation
-    - Clear test data in afterEach to prevent test pollution
-    - Aim for 5-8 tests per tool covering all code paths
-    - Log errors with createLogger before returning 500
-
-  mcp:
-    - Tool descriptions should explain when/why to use the tool
-    - Input schema properties need clear descriptions
-    - Validate ALL parameters including types and ranges
-    - Return structured objects that serialize well to JSON
+  cli: |
+    - Include #!/usr/bin/env bun shebang on first line (no BOM)
+    - Use process.stdout.write for output, process.stderr.write for errors
+    - Read version from package.json at runtime, not hardcoded
+    - Register BOTH SIGTERM and SIGINT handlers (HTTP mode only)
+    - Include 10-second forced shutdown timeout (HTTP mode only)
+  
+  routes: |
+    - Always addRateLimitHeaders before response
+    - Extract and validate params early
+    - Use AuthenticatedRequest for authenticated routes
+    - Return JSON errors: { error: "message" }
+  
+  mcp: |
+    - Tool descriptions explain when/why to use
+    - Validate ALL parameters including types
+    - Return structured objects that serialize to JSON
     - Log tool calls with tool_name and user_id
-
-  queries:
-    - Use internal functions with db param for testability
+  
+  mcp_transports: |
+    - Use stdio transport for Claude Code integration (recommended)
+    - Use HTTP transport for multi-client scenarios or remote access
+    - CRITICAL: In stdio mode, ALL logs must go to stderr (forceStderr: true)
+    - Stdio: Transport manages lifecycle, no shutdown handlers needed
+    - HTTP: Requires graceful shutdown handlers for SIGTERM/SIGINT
+    - Mode selection via CLI flag (--stdio), not environment variable
+    - Document both transports in README with stdio-first recommendation
+  
+  queries: |
+    - Internal functions take db param (testable)
     - Public functions use getGlobalDatabase()
+    - Always escape FTS5 terms with escapeFts5Term()
     - Use transactions for multi-statement operations
-    - Use prepared statements for bulk inserts
-    - Always escape FTS5 search terms with escapeFts5Term()
-  openapi:
-    - Define Zod schemas for all request/response bodies
-    - Include security requirements for authenticated endpoints
-    - Use descriptive summaries and longer descriptions
-    - Tag endpoints by category (Health, Search, Indexing, etc.)
-
-  logging:
-    - Use createLogger({ module: "module-name" })
-    - Never use console.log/error/warn
-    - Include context (userId, requestId, params) in log objects
-    - Use logger.info for operations, logger.error for failures
-
-  security:
-    - Validate all file paths with path.resolve() and startsWith(process.cwd())
-    - Escape all user input for FTS5 queries
-    - Use prepared statements for all SQL queries
-    - Never expose raw error stack traces to API responses
+  
+  testing: |
+    - Unit tests: parameter validation, error cases
+    - Integration tests: database operations with KOTADB_PATH
+    - Aim for 5-8 tests per tool covering all paths
+    - Clear test data in afterEach
+  
+  npm_distribution: |
+    - Include tsconfig.json in files array for path alias resolution
+    - Relocate external dependencies into package root (./shared/*, not ../shared/*)
+    - Add aliased directories to BOTH files and include arrays
+    - Test with npm pack + bunx <tarball> before publishing
+    - Update CI workflows when restructuring monorepo packages
+  
+  openapi: |
+    - Implement routes first, document in OpenAPI second
+    - Remove schemas when last using endpoint is removed
+    - Keep server definitions synchronized with deployment architecture
+    - Separate MCP tool docs from HTTP endpoint docs
+    - Run tests after spec changes (bun test openapi)
+    - Audit for spec-implementation drift during major refactors
 
 known_issues:
-  - issue: MCP Accept header requires both application/json AND text/event-stream
-    impact: Clients missing Accept header get 406 errors
-    resolution: Log warning but continue (SDK validates internally)
-    prevention: Document Accept header requirement for MCP clients
-    status: ongoing vigilance required
-
-  - issue: OpenAPI spec is cached at startup
-    impact: Changes to schemas/paths not reflected until restart
-    resolution: Call clearSpecCache() during development
+  - issue: OpenAPI spec cached at startup
+    impact: Changes not reflected until restart
     status: by-design for performance
+    resolution: Call clearSpecCache() during development
 
-  - issue: Local mode authentication always succeeds
-    impact: No real auth in local development
-    resolution: Expected behavior for local-only mode
-    status: by-design
-
-
-  - issue: FTS5 syntax errors from unescaped user input
-    impact: "no such column" errors on hyphenated/multi-word/keyword searches
-    resolution: Use escapeFts5Term() before all MATCH operations
-    prevention: Add FTS5 edge case tests for each search endpoint
+  - issue: FTS5 syntax errors from unescaped input
+    impact: '"no such column" errors on hyphenated/multi-word searches'
     status: resolved (2026-01-28, commit 5af086f)
-    timestamp: 2026-01-28
+    resolution: Always use escapeFts5Term() before MATCH
 
-potential_enhancements:
-  - enhancement: OpenAPI spec hot reload in development mode
-    rationale: Avoid restarts when updating API docs
-    effort: low
+  - issue: npm package missing tsconfig.json and shared types
+    impact: bunx kotadb fails with "Cannot find module @api/routes" 
+    status: resolved (2026-01-29, Issue #39)
+    resolution: Include tsconfig.json and shared/**/*.ts in files array, relocate shared/ into app/
 
-  - enhancement: Automated MCP tool registration
-    rationale: Reduce boilerplate when adding tools
-    effort: medium
+  - issue: MCP server port conflicts (EADDRINUSE on 3000)
+    impact: Cannot start multiple instances or when port occupied
+    status: resolved (2026-01-29, Issue #49)
+    resolution: Stdio transport eliminates port conflicts (uses stdin/stdout, not TCP)
 
-  - enhancement: Request validation middleware using Zod schemas
-    rationale: DRY validation between OpenAPI and routes
-    effort: medium
+  - issue: OpenAPI spec documenting unimplemented POST /index endpoint
+    impact: Misleading API documentation, confusion about indexing methods
+    status: resolved (2026-02-02, Issue #74)
+    resolution: Remove endpoint from OpenAPI spec, clarify MCP-only indexing
 
-  - enhancement: Response compression middleware
-    rationale: Reduce bandwidth for large search results
-    effort: low
-
-
+  - issue: Cloud-only schemas in local-only OpenAPI spec
+    impact: 303 lines of unused schemas (Jobs, Projects, API Keys) causing confusion
+    status: resolved (2026-02-02, Issue #83)
+    resolution: Remove cloud-only schemas, update server definitions, add MCP tools section
 
 stability:
   convergence_indicators:
-    insight_rate_trend: stable
+    insight_rate_trend: decreasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 2
+    new_patterns_added_this_cycle: 0
     patterns_updated_this_cycle: 0
-    last_reviewed: 2026-01-28
+    new_operations_added_this_cycle: 1
+    last_reviewed: 2026-02-02
     utility_ratio: 1.0
     notes: |
-      Fourth review cycle - Multi-repository filtering support (Issue #608):
+      Eighth review cycle - OpenAPI specification maintenance:
       
-      New patterns added:
-      1. Optional parameter filtering (add_optional_parameter_filters operation)
-         - hasRepoFilter conditional SQL pattern for safe filtering
-         - Type guard validation for optional parameters
-         - Backward compatibility via conditional SQL strings
-         - Applied to list_recent_files, search_code, search_dependencies
+      New operation: maintain_openapi_spec
+      - Guidance on spec-implementation drift detection
+      - Schema cleanup for removed features
+      - Server definition synchronization
+      - MCP vs HTTP documentation separation
+      - Test synchronization patterns
       
-      2. MCP tool testing (test_mcp_tool operation) [from previous cycle]
-         - 43 tests across 8 tools (5-8 per tool)
-         - Two-tier: unit (validation) + integration (database)
-         - KOTADB_PATH isolation for file-based test databases
+      No new patterns - existing patterns cover implementation.
       
-      Previous patterns remain stable:
-      - FTS5 search term escaping (5af086f)
-      - Local file path validation (efecf9c)
-      - Local auth bypass (d669841)
+      Previously stable patterns:
+      - CLI entry point (Issue #19)
+      - MCP stdio transport (Issue #49)
+      - Optional parameter filtering (Issue #608)
+      - MCP tool testing patterns
+      - FTS5 search term escaping
+      - Local file path validation
+      - Local auth bypass
+      - npm package distribution
       
       Architecture stability: Very High
-      - Local-only v2 patterns fully converged
-      - Testing patterns standardized across MCP tools
-      - Optional filtering pattern consistent across 3+ tools
-      - Zero contradictions across 4 review cycles
-      - Insight rate trending stable
-      
-      Domain maturity: High
+      - Zero contradictions across 8 cycles
       - All core operations documented
-      - All 8 MCP tools have comprehensive test coverage
-      - Error handling and validation patterns established
-      - Multi-repository filtering pattern standardized
+      - All 8 MCP tools with comprehensive tests
+      - CLI deployment pattern established
+      - Both MCP transports (stdio + HTTP) fully documented
+      - OpenAPI maintenance patterns captured
+      - Decreasing insight rate indicates domain maturity
       
-      Next review: After 10-15 API commits or architectural changes
+      Recent changes are refinements (documentation cleanup, spec accuracy)
+      rather than new architectural patterns, suggesting domain convergence.
+      
+      Next review: After 15-20 API commits or architectural changes

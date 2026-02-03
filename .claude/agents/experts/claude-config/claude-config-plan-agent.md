@@ -7,6 +7,9 @@ tools:
   - Grep
   - Write
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
 ---
@@ -96,7 +99,7 @@ Use Bash for git operations, file statistics, or verification commands.
 - Tools as YAML array (NOT comma-separated)
 - Valid models: `haiku`, `sonnet`, `opus`
 - Valid colors: red, blue, green, yellow, purple, orange, pink, cyan
-- MCP tools: `mcp__kotadb__search_code`, `mcp__kotadb__search_dependencies`, `mcp__kotadb__analyze_change_impact`
+- MCP tools: `mcp__kotadb-bunx__search_code`, `mcp__kotadb-bunx__search_dependencies`, `mcp__kotadb-bunx__analyze_change_impact`
 - CRITICAL: Description must NOT contain colons
 
 **Agent Registry:**
@@ -197,7 +200,7 @@ Use Bash for git operations, file statistics, or verification commands.
    - Examples and usage scenarios
 
 7. **Save Specification**
-   - Save spec to `docs/specs/claude-config-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/claude-config-<descriptive-name>-spec.md`
    - Include example configurations
    - Document validation criteria
    - Return the spec path when complete
@@ -233,5 +236,5 @@ Use Bash for git operations, file statistics, or verification commands.
 - Tool matrix: <tools to register>
 
 **Specification Location:**
-- Path: `docs/specs/claude-config-<name>-spec.md`
+- Path: `.claude/.cache/specs/claude-config-<name>-spec.md`
 ```

@@ -13,8 +13,42 @@ import { createLogger } from "@logging/logger.js";
 import type { IndexRequest, IndexedFile } from "@shared/types";
 import { detectLanguage } from "@shared/language-utils";
 import { getGlobalDatabase, type KotaDatabase } from "@db/sqlite/index.js";
+import { resolveImport } from "@indexer/import-resolver.js";
+import { parseTsConfig, type PathMappings } from "@indexer/path-resolver.js";
 
 const logger = createLogger({ module: "api-queries" });
+
+
+/**
+ * Normalize file path to consistent format for database storage.
+ * 
+ * Rules:
+ * - No leading slashes
+ * - Forward slashes only (replace backslashes)
+ * - No ./ prefix
+ * - Consistent relative-to-repo-root format
+ * 
+ * @param filePath - Absolute or relative file path
+ * @returns Normalized relative path
+ */
+function normalizePath(filePath: string): string {
+	let normalized = filePath;
+	
+	// Replace backslashes with forward slashes
+	normalized = normalized.replace(/\\/g, '/');
+	
+	// Remove leading slash if present
+	if (normalized.startsWith('/')) {
+		normalized = normalized.slice(1);
+	}
+	
+	// Remove ./ prefix
+	if (normalized.startsWith('./')) {
+		normalized = normalized.slice(2);
+	}
+	
+	return normalized;
+}
 
 export interface SearchOptions {
 	repositoryId?: string;
@@ -134,24 +168,17 @@ function storeSymbolsInternal(
 
 function storeReferencesInternal(
 	db: KotaDatabase,
-	references: Reference[],
 	fileId: string,
+	repositoryId: string,
+	filePath: string,
+	references: Reference[],
+	allFiles: Array<{ path: string }>,
+	pathMappings?: PathMappings | null,
 ): number {
 	if (references.length === 0) {
 		return 0;
 	}
 
-	// Get repository_id from the file
-	const fileResult = db.queryOne<{ repository_id: string }>(
-		"SELECT repository_id FROM indexed_files WHERE id = ?",
-		[fileId]
-	);
-
-	if (!fileResult) {
-		throw new Error(`File not found: ${fileId}`);
-	}
-
-	const repositoryId = fileResult.repository_id;
 	let count = 0;
 
 	db.transaction(() => {
@@ -172,6 +199,22 @@ function storeReferencesInternal(
 				column_number: ref.columnNumber,
 				...ref.metadata,
 			});
+			
+			// Resolve target_file_path for import references
+			let targetFilePath: string | null = null;
+			if (ref.referenceType === 'import' && ref.metadata?.importSource) {
+				const resolved = resolveImport(
+					ref.metadata.importSource,
+					filePath,
+					allFiles,
+					pathMappings
+				);
+				
+				// Normalize path if resolved
+				if (resolved) {
+					targetFilePath = normalizePath(resolved);
+				}
+			}
 
 			stmt.run([
 				id,
@@ -179,7 +222,7 @@ function storeReferencesInternal(
 				repositoryId,
 				ref.targetName || "unknown",
 				null, // target_symbol_id - deferred
-				null, // target_file_path - deferred
+				targetFilePath, // NOW RESOLVED for imports
 				ref.lineNumber,
 				ref.columnNumber || 0,
 				ref.referenceType,
@@ -190,54 +233,6 @@ function storeReferencesInternal(
 	});
 
 	logger.info("Stored references to SQLite", { count, fileId });
-	return count;
-}
-
-function storeDependenciesInternal(
-	db: KotaDatabase,
-	dependencies: Array<{
-		repositoryId: string;
-		fromFileId: string | null;
-		toFileId: string | null;
-		fromSymbolId: string | null;
-		toSymbolId: string | null;
-		dependencyType: "file_import" | "symbol_usage";
-		metadata: Record<string, unknown>;
-	}>,
-): number {
-	if (dependencies.length === 0) {
-		return 0;
-	}
-
-	let count = 0;
-
-	db.transaction(() => {
-		const stmt = db.prepare(`
-			INSERT INTO dependency_graph (
-				id, repository_id, from_file_id, to_file_id,
-				from_symbol_id, to_symbol_id, dependency_type, metadata
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-		`);
-
-		for (const dep of dependencies) {
-			const id = randomUUID();
-			const metadata = JSON.stringify(dep.metadata);
-
-			stmt.run([
-				id,
-				dep.repositoryId,
-				dep.fromFileId,
-				dep.toFileId,
-				dep.fromSymbolId,
-				dep.toSymbolId,
-				dep.dependencyType,
-				metadata
-			]);
-			count++;
-		}
-	});
-
-	logger.info("Stored dependencies to SQLite", { count });
 	return count;
 }
 
@@ -478,30 +473,33 @@ export function storeSymbols(
  * @returns Number of references stored
  */
 export function storeReferences(
-	references: Reference[],
 	fileId: string,
+	filePath: string,
+	references: Reference[],
+	allFiles: Array<{ path: string }>,
+	pathMappings?: PathMappings | null
 ): number {
-	return storeReferencesInternal(getGlobalDatabase(), references, fileId);
-}
+	const db = getGlobalDatabase();
 
-/**
- * Store dependency graph edges into SQLite database.
- *
- * @param dependencies - Array of dependency edges
- * @returns Number of dependencies stored
- */
-export function storeDependencies(
-	dependencies: Array<{
-		repositoryId: string;
-		fromFileId: string | null;
-		toFileId: string | null;
-		fromSymbolId: string | null;
-		toSymbolId: string | null;
-		dependencyType: "file_import" | "symbol_usage";
-		metadata: Record<string, unknown>;
-	}>,
-): number {
-	return storeDependenciesInternal(getGlobalDatabase(), dependencies);
+	// Get repository_id from file
+	const result = db.queryOne<{ repository_id: string }>(
+		"SELECT repository_id FROM indexed_files WHERE id = ?",
+		[fileId]
+	);
+
+	if (!result) {
+		throw new Error(`File not found: ${fileId}`);
+	}
+
+	return storeReferencesInternal(
+		db, 
+		fileId, 
+		result.repository_id, 
+		filePath,
+		references,
+		allFiles,
+		pathMappings
+	);
 }
 
 /**
@@ -560,14 +558,28 @@ export interface DependencyResult {
  * @param includeTests - Whether to include test files
  * @returns Dependency result with direct/indirect relationships and cycles
  */
+/**
+ * Query files that depend on the given file (reverse lookup).
+ *
+ * Uses recursive CTE on indexed_references table to traverse the dependency graph.
+ * Supports depth limiting, cycle detection, and test file filtering.
+ *
+ * @param fileId - Target file UUID
+ * @param depth - Recursion depth (1-5)
+ * @param includeTests - Whether to include test files
+ * @returns Dependency result with direct/indirect relationships and cycles
+ */
 export function queryDependents(
 	fileId: string,
 	depth: number,
 	includeTests: boolean,
+	referenceTypes: string[] = ["import", "re_export", "export_all"],
 ): DependencyResult {
 	const db = getGlobalDatabase();
-	const fileRecord = db.queryOne<{ repository_id: string }>(
-		"SELECT repository_id FROM indexed_files WHERE id = ?",
+	
+	// Get repository_id and path for target file
+	const fileRecord = db.queryOne<{ repository_id: string; path: string }>(
+		"SELECT repository_id, path FROM indexed_files WHERE id = ?",
 		[fileId]
 	);
 	
@@ -575,12 +587,85 @@ export function queryDependents(
 		throw new Error(`File not found: ${fileId}`);
 	}
 	
-	const results = queryDependentsRaw(db, fileRecord.repository_id, fileId, null, depth);
+	// Build IN clause placeholders for reference types
+	const refTypePlaceholders = referenceTypes.map(() => "?").join(", ");
+	
+	const sql = `
+		WITH RECURSIVE 
+		dependents AS (
+			SELECT
+				f.id AS file_id,
+				f.path AS file_path,
+				1 AS depth,
+				'|' || f.path || '|' AS path_tracker
+			FROM indexed_references r
+			JOIN indexed_files f ON r.file_id = f.id
+			WHERE r.reference_type IN (${refTypePlaceholders})
+				AND r.repository_id = ?
+				AND r.target_file_path = ?
+			
+			UNION ALL
+			
+			SELECT
+				f2.id AS file_id,
+				f2.path AS file_path,
+				d.depth + 1 AS depth,
+				d.path_tracker || f2.path || '|' AS path_tracker
+			FROM indexed_references r2
+			JOIN indexed_files f2 ON r2.file_id = f2.id
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependents d ON target2.id = d.file_id
+			WHERE r2.reference_type IN (${refTypePlaceholders})
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '|' || f2.path || '|') = 0
+		),
+		cycles AS (
+			SELECT DISTINCT
+				d.path_tracker || f2.path || '|' AS cycle_path
+			FROM indexed_references r2
+			JOIN indexed_files f2 ON r2.file_id = f2.id
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependents d ON target2.id = d.file_id
+			WHERE r2.reference_type IN (${refTypePlaceholders})
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '|' || f2.path || '|') > 0
+		)
+		SELECT 
+			file_path,
+			depth,
+			NULL AS cycle_path
+		FROM dependents
+		UNION ALL
+		SELECT
+			NULL AS file_path,
+			NULL AS depth,
+			cycle_path
+		FROM cycles
+		ORDER BY depth ASC, file_path ASC
+	`;
+	
+	// Build params array: [refTypes..., repoId, path, refTypes..., repoId, depth, refTypes..., repoId, depth]
+	const results = db.query<{
+		file_path: string | null;
+		depth: number | null;
+		cycle_path: string | null;
+	}>(sql, [
+		...referenceTypes, fileRecord.repository_id, fileRecord.path,
+		...referenceTypes, fileRecord.repository_id, depth,
+		...referenceTypes, fileRecord.repository_id, depth
+	]);
+	
 	return processDepthResults(results, includeTests);
 }
 
+
 /**
  * Query files that the given file depends on (forward lookup).
+ *
+ * Uses recursive CTE on indexed_references table to traverse the dependency graph.
+ * Supports depth limiting and cycle detection.
  *
  * @param fileId - Source file UUID
  * @param depth - Recursion depth (1-5)
@@ -589,8 +674,11 @@ export function queryDependents(
 export function queryDependencies(
 	fileId: string,
 	depth: number,
+	referenceTypes: string[] = ["import", "re_export", "export_all"],
 ): DependencyResult {
 	const db = getGlobalDatabase();
+	
+	// Get repository_id for source file
 	const fileRecord = db.queryOne<{ repository_id: string }>(
 		"SELECT repository_id FROM indexed_files WHERE id = ?",
 		[fileId]
@@ -600,28 +688,119 @@ export function queryDependencies(
 		throw new Error(`File not found: ${fileId}`);
 	}
 	
-	const results = queryDependenciesRaw(db, fileRecord.repository_id, fileId, null, depth);
-	return processDepthResults(results, true);
+	// Build IN clause placeholders for reference types
+	const refTypePlaceholders = referenceTypes.map(() => "?").join(", ");
+	
+	const sql = `
+		WITH RECURSIVE 
+		dependencies AS (
+			SELECT
+				target.id AS file_id,
+				target.path AS file_path,
+				1 AS depth,
+				'|' || target.path || '|' AS path_tracker
+			FROM indexed_references r
+			JOIN indexed_files target ON r.target_file_path = target.path
+			WHERE r.reference_type IN (${refTypePlaceholders})
+				AND r.repository_id = ?
+				AND r.file_id = ?
+			
+			UNION ALL
+			
+			SELECT
+				target2.id AS file_id,
+				target2.path AS file_path,
+				d.depth + 1 AS depth,
+				d.path_tracker || target2.path || '|' AS path_tracker
+			FROM indexed_references r2
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependencies d ON r2.file_id = d.file_id
+			WHERE r2.reference_type IN (${refTypePlaceholders})
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '|' || target2.path || '|') = 0
+		),
+		cycles AS (
+			SELECT DISTINCT
+				d.path_tracker || target2.path || '|' AS cycle_path
+			FROM indexed_references r2
+			JOIN indexed_files target2 ON r2.target_file_path = target2.path
+			JOIN dependencies d ON r2.file_id = d.file_id
+			WHERE r2.reference_type IN (${refTypePlaceholders})
+				AND r2.repository_id = ?
+				AND d.depth < ?
+				AND INSTR(d.path_tracker, '|' || target2.path || '|') > 0
+		)
+		SELECT 
+			file_path,
+			depth,
+			NULL AS cycle_path
+		FROM dependencies
+		UNION ALL
+		SELECT
+			NULL AS file_path,
+			NULL AS depth,
+			cycle_path
+		FROM cycles
+		ORDER BY depth ASC, file_path ASC
+	`;
+	
+	// Build params array: [refTypes..., repoId, fileId, refTypes..., repoId, depth, refTypes..., repoId, depth]
+	const results = db.query<{
+		file_path: string | null;
+		depth: number | null;
+		cycle_path: string | null;
+	}>(sql, [
+		...referenceTypes, fileRecord.repository_id, fileId,
+		...referenceTypes, fileRecord.repository_id, depth,
+		...referenceTypes, fileRecord.repository_id, depth
+	]);
+	
+	return processDepthResults(results, true); // Always include tests for dependencies
 }
+
 
 function processDepthResults(
 	results: Array<{
 		file_path: string | null;
-		depth: number;
+		depth: number | null;
+		cycle_path: string | null;
 	}>,
 	includeTests: boolean
 ): DependencyResult {
 	const direct: string[] = [];
 	const indirect: Record<string, string[]> = {};
 	const cycles: string[][] = [];
+	const seenCycles = new Set<string>();
 	
 	for (const result of results) {
-		if (!result.file_path) continue;
+		// Handle cycle detection
+		if (result.cycle_path) {
+			const cycleKey = result.cycle_path;
+			if (!seenCycles.has(cycleKey)) {
+				seenCycles.add(cycleKey);
+				const cyclePaths = result.cycle_path
+					.split('|')
+					.filter(path => path.length > 0);
+				
+				if (cyclePaths.length > 1) {
+					cycles.push(cyclePaths);
+				}
+			}
+			continue;  // Don't add cycles to direct/indirect
+		}
 		
+		// Skip if file_path is null (cycle-only rows)
+		if (!result.file_path || result.depth === null) {
+			continue;
+		}
+		
+		// Filter test files if requested
 		if (!includeTests && (result.file_path.includes("test") || result.file_path.includes("spec"))) {
 			continue;
 		}
 		
+		// Categorize by depth
 		if (result.depth === 1) {
 			if (!direct.includes(result.file_path)) {
 				direct.push(result.file_path);
@@ -640,163 +819,12 @@ function processDepthResults(
 	return { direct, indirect, cycles };
 }
 
+
 /**
  * Query dependents (reverse lookup): files/symbols that depend on the target
  * 
  * @internal - Use queryDependents() for the wrapped version
  */
-export function queryDependentsRaw(
-	db: KotaDatabase,
-	repositoryId: string,
-	fileId: string | null,
-	symbolId: string | null = null,
-	depth: number = 5
-): Array<{
-	file_id: string | null;
-	file_path: string | null;
-	symbol_id: string | null;
-	symbol_name: string | null;
-	dependency_type: string;
-	depth: number;
-}> {
-	const targetCondition = symbolId
-		? 'AND dg.to_symbol_id = ?'
-		: 'AND dg.to_file_id = ?';
-	
-	const recursiveJoinCondition = symbolId
-		? 'dg.to_symbol_id = d.from_symbol_id'
-		: 'dg.to_file_id = d.from_file_id';
-
-	const sql = `
-		WITH RECURSIVE dependents AS (
-			SELECT
-				dg.id,
-				dg.from_file_id,
-				dg.from_symbol_id,
-				dg.dependency_type,
-				1 AS depth,
-				'/' || dg.id || '/' AS path
-			FROM dependency_graph dg
-			WHERE dg.repository_id = ?
-				${targetCondition}
-			
-			UNION ALL
-			
-			SELECT
-				dg.id,
-				dg.from_file_id,
-				dg.from_symbol_id,
-				dg.dependency_type,
-				d.depth + 1,
-				d.path || dg.id || '/'
-			FROM dependency_graph dg
-			JOIN dependents d ON ${recursiveJoinCondition}
-			WHERE dg.repository_id = ?
-				AND d.depth < ?
-				AND INSTR(d.path, '/' || dg.id || '/') = 0
-		)
-		SELECT DISTINCT
-			d.from_file_id AS file_id,
-			f.path AS file_path,
-			d.from_symbol_id AS symbol_id,
-			s.name AS symbol_name,
-			d.dependency_type,
-			d.depth
-		FROM dependents d
-		LEFT JOIN indexed_files f ON d.from_file_id = f.id
-		LEFT JOIN indexed_symbols s ON d.from_symbol_id = s.id
-		ORDER BY d.depth ASC
-	`;
-
-	const targetParam = symbolId || fileId;
-	return db.query<{
-		file_id: string | null;
-		file_path: string | null;
-		symbol_id: string | null;
-		symbol_name: string | null;
-		dependency_type: string;
-		depth: number;
-	}>(sql, [repositoryId, targetParam, repositoryId, depth]);
-}
-
-/**
- * Query dependencies (forward lookup): files/symbols that the source depends on
- * 
- * @internal - Use queryDependencies() for the wrapped version
- */
-export function queryDependenciesRaw(
-	db: KotaDatabase,
-	repositoryId: string,
-	fileId: string | null,
-	symbolId: string | null = null,
-	depth: number = 5
-): Array<{
-	file_id: string | null;
-	file_path: string | null;
-	symbol_id: string | null;
-	symbol_name: string | null;
-	dependency_type: string;
-	depth: number;
-}> {
-	const sourceCondition = symbolId
-		? 'AND dg.from_symbol_id = ?'
-		: 'AND dg.from_file_id = ?';
-	
-	const recursiveJoinCondition = symbolId
-		? 'dg.from_symbol_id = d.to_symbol_id'
-		: 'dg.from_file_id = d.to_file_id';
-
-	const sql = `
-		WITH RECURSIVE dependencies AS (
-			SELECT
-				dg.id,
-				dg.to_file_id,
-				dg.to_symbol_id,
-				dg.dependency_type,
-				1 AS depth,
-				'/' || dg.id || '/' AS path
-			FROM dependency_graph dg
-			WHERE dg.repository_id = ?
-				${sourceCondition}
-			
-			UNION ALL
-			
-			SELECT
-				dg.id,
-				dg.to_file_id,
-				dg.to_symbol_id,
-				dg.dependency_type,
-				d.depth + 1,
-				d.path || dg.id || '/'
-			FROM dependency_graph dg
-			JOIN dependencies d ON ${recursiveJoinCondition}
-			WHERE dg.repository_id = ?
-				AND d.depth < ?
-				AND INSTR(d.path, '/' || dg.id || '/') = 0
-		)
-		SELECT DISTINCT
-			d.to_file_id AS file_id,
-			f.path AS file_path,
-			d.to_symbol_id AS symbol_id,
-			s.name AS symbol_name,
-			d.dependency_type,
-			d.depth
-		FROM dependencies d
-		LEFT JOIN indexed_files f ON d.to_file_id = f.id
-		LEFT JOIN indexed_symbols s ON d.to_symbol_id = s.id
-		ORDER BY d.depth ASC
-	`;
-
-	const sourceParam = symbolId || fileId;
-	return db.query<{
-		file_id: string | null;
-		file_path: string | null;
-		symbol_id: string | null;
-		symbol_name: string | null;
-		dependency_type: string;
-		depth: number;
-	}>(sql, [repositoryId, sourceParam, repositoryId, depth]);
-}
 
 /**
  * Ensure repository exists in SQLite, create if not.
@@ -838,17 +866,15 @@ export async function runIndexingWorkflow(
 	filesIndexed: number;
 	symbolsExtracted: number;
 	referencesExtracted: number;
-	dependenciesExtracted: number;
 }> {
 	const { existsSync } = await import("node:fs");
 	const { resolve } = await import("node:path");
 	const { prepareRepository } = await import("@indexer/repos");
 	const { discoverSources, parseSourceFile } = await import("@indexer/parsers");
-	const { parseFile, isSupportedForAST } = await import("@indexer/ast-parser");
+	const { parseFileWithRecovery, isSupportedForAST } = await import("@indexer/ast-parser");
 	const { extractSymbols } = await import("@indexer/symbol-extractor");
 	const { extractReferences } = await import("@indexer/reference-extractor");
-	const { extractDependencies } = await import("@indexer/dependency-extractor");
-	const { detectCircularDependencies } = await import("@indexer/circular-detector");
+	const { parseTsConfig } = await import("@indexer/path-resolver");
 
 	const db = getGlobalDatabase();
 
@@ -883,6 +909,15 @@ export async function runIndexingWorkflow(
 		localPath,
 	});
 
+	// Parse tsconfig.json for path alias resolution
+	const pathMappings = parseTsConfig(localPath);
+	if (pathMappings) {
+		logger.info("Loaded path mappings from tsconfig.json", {
+			aliasCount: Object.keys(pathMappings.paths).length,
+			baseUrl: pathMappings.baseUrl,
+		});
+	}
+
 	const sources = await discoverSources(localPath);
 	const records = (
 		await Promise.all(sources.map((source) => parseSourceFile(source, localPath)))
@@ -890,33 +925,38 @@ export async function runIndexingWorkflow(
 
 	const filesIndexed = saveIndexedFiles(records, repositoryId);
 
-	const allSymbolsWithFileId: Array<{
-		id: string;
-		file_id: string;
-		name: string;
-		kind: SymbolKind;
-		lineStart: number;
-		lineEnd: number;
-		columnStart: number;
-		columnEnd: number;
-		signature: string | null;
-		documentation: string | null;
-		isExported: boolean;
-	}> = [];
-	const allReferencesWithFileId: Array<Reference & { file_id: string }> = [];
-	const filesWithId: IndexedFile[] = [];
+	// Query ALL indexed files for complete resolution (fixes order dependency bug)
+	const allIndexedFiles = db
+		.query<{ id: string; path: string }>(
+			`SELECT id, path FROM indexed_files WHERE repository_id = ?`,
+			[repositoryId]
+		)
+		.map(row => ({ id: row.id, path: row.path, repository_id: repositoryId }));
+
+	logger.debug("Queried all indexed files for path alias resolution", {
+		count: allIndexedFiles.length,
+		repositoryId,
+	});
 
 	let totalSymbols = 0;
 	let totalReferences = 0;
 
+	// First pass: Store symbols and collect references (but don't resolve imports yet)
+	interface FileWithReferences {
+		fileId: string;
+		filePath: string;
+		references: Reference[];
+	}
+	const filesWithReferences: FileWithReferences[] = [];
+
 	for (const file of records) {
 		if (!isSupportedForAST(file.path)) continue;
 
-		const ast = parseFile(file.path, file.content);
-		if (!ast) continue;
+		const parseResult = parseFileWithRecovery(file.path, file.content);
+		if (!parseResult.ast) continue;
 
-		const symbols = extractSymbols(ast, file.path);
-		const references = extractReferences(ast, file.path);
+		const symbols = extractSymbols(parseResult.ast!, file.path);
+		const references = extractReferences(parseResult.ast!, file.path);
 
 		const fileRecord = db.queryOne<{ id: string }>(
 			"SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?",
@@ -931,14 +971,47 @@ export async function runIndexingWorkflow(
 			continue;
 		}
 
-		filesWithId.push({ ...file, id: fileRecord.id, repository_id: repositoryId });
-
+		// Store symbols immediately
 		const symbolCount = storeSymbols(symbols, fileRecord.id);
-		const referenceCount = storeReferences(references, fileRecord.id);
-
 		totalSymbols += symbolCount;
-		totalReferences += referenceCount;
 
+		// Collect references for later processing
+		filesWithReferences.push({
+			fileId: fileRecord.id,
+			filePath: file.path,
+			references,
+		});
+	}
+
+	// Second pass: Store references with complete file list for proper path alias resolution
+	for (const fileWithRefs of filesWithReferences) {
+		const referenceCount = storeReferences(
+			fileWithRefs.fileId,
+			fileWithRefs.filePath,
+			fileWithRefs.references,
+			allIndexedFiles, // Use complete file list instead of incremental array
+			pathMappings
+		);
+		totalReferences += referenceCount;
+	}
+
+	// Build symbol metadata for backward compatibility
+	const allSymbolsWithFileId: Array<{
+		id: string;
+		file_id: string;
+		name: string;
+		kind: SymbolKind;
+		lineStart: number;
+		lineEnd: number;
+		columnStart: number;
+		columnEnd: number;
+		signature: string | null;
+		documentation: string | null;
+		isExported: boolean;
+	}> = [];
+	const allReferencesWithFileId: Array<Reference & { file_id: string }> = [];
+
+	for (const fileWithRefs of filesWithReferences) {
 		const storedSymbols = db.query<{
 			id: string;
 			file_id: string;
@@ -951,7 +1024,7 @@ export async function runIndexingWorkflow(
 			metadata: string;
 		}>(
 			"SELECT id, file_id, name, kind, line_start, line_end, signature, documentation, metadata FROM indexed_symbols WHERE file_id = ?",
-			[fileRecord.id]
+			[fileWithRefs.fileId]
 		);
 
 		for (const s of storedSymbols) {
@@ -971,40 +1044,9 @@ export async function runIndexingWorkflow(
 			});
 		}
 
-		for (const ref of references) {
-			allReferencesWithFileId.push({ ...ref, file_id: fileRecord.id });
+		for (const ref of fileWithRefs.references) {
+			allReferencesWithFileId.push({ ...ref, file_id: fileWithRefs.fileId });
 		}
-	}
-
-	logger.info("Extracting dependency graph", {
-		fileCount: filesWithId.length,
-		repositoryId,
-	});
-
-	const dependencies = extractDependencies(
-		filesWithId,
-		allSymbolsWithFileId,
-		allReferencesWithFileId,
-		repositoryId,
-	);
-
-	db.run("DELETE FROM dependency_graph WHERE repository_id = ?", [repositoryId]);
-	const dependencyCount = storeDependencies(dependencies);
-
-	const filePathById = new Map(filesWithId.map((f) => [f.id!, f.path]));
-	const symbolNameById = new Map(allSymbolsWithFileId.map((s) => [s.id, s.name]));
-
-	const circularChains = detectCircularDependencies(dependencies, filePathById, symbolNameById);
-
-	if (circularChains.length > 0) {
-		logger.warn("Circular dependency chains detected", {
-			chainCount: circularChains.length,
-			repositoryId,
-			chains: circularChains.map((c) => ({
-				type: c.type,
-				description: c.description,
-			})),
-		});
 	}
 
 	updateRepositoryLastIndexed(repositoryId);
@@ -1014,8 +1056,6 @@ export async function runIndexingWorkflow(
 		filesIndexed,
 		symbolsExtracted: totalSymbols,
 		referencesExtracted: totalReferences,
-		dependenciesExtracted: dependencyCount,
-		circularDependencies: circularChains.length,
 	});
 
 	return {
@@ -1023,9 +1063,182 @@ export async function runIndexingWorkflow(
 		filesIndexed,
 		symbolsExtracted: totalSymbols,
 		referencesExtracted: totalReferences,
-		dependenciesExtracted: dependencyCount,
 	};
 }
+
+// ============================================================================
+// Repository Indexing Status & File Deletion Operations
+// ============================================================================
+
+/**
+ * Check if a repository has been indexed (has files in indexed_files table).
+ * 
+ * @param repositoryId - Repository UUID or full_name
+ * @returns true if the repository has indexed files, false otherwise
+ */
+function isRepositoryIndexedInternal(
+	db: KotaDatabase,
+	repositoryId: string,
+): boolean {
+	// First try to match by ID, then by full_name
+	const result = db.queryOne<{ count: number }>(
+		`SELECT COUNT(*) as count FROM indexed_files 
+		 WHERE repository_id = ? 
+		 OR repository_id IN (SELECT id FROM repositories WHERE full_name = ?)`,
+		[repositoryId, repositoryId]
+	);
+	return (result?.count ?? 0) > 0;
+}
+
+/**
+ * Check if a repository has been indexed.
+ * 
+ * @param repositoryId - Repository UUID or full_name
+ * @returns true if the repository has indexed files, false otherwise
+ */
+export function isRepositoryIndexed(repositoryId: string): boolean {
+	return isRepositoryIndexedInternal(getGlobalDatabase(), repositoryId);
+}
+
+/**
+ * Delete a single file from the index by path.
+ * Cascading deletes will remove associated symbols and references.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePath - Relative file path to delete
+ * @returns true if file was deleted, false if not found
+ */
+function deleteFileByPathInternal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePath: string,
+): boolean {
+	const normalizedPath = normalizePath(filePath);
+	
+	// The indexed_files table has ON DELETE CASCADE for:
+	// - indexed_symbols (via file_id FK)
+	// - indexed_references (via file_id FK)
+	// FTS5 triggers handle indexed_files_fts cleanup automatically
+	
+	const result = db.queryOne<{ id: string }>(
+		`SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?`,
+		[repositoryId, normalizedPath]
+	);
+	
+	if (!result) {
+		logger.debug("File not found for deletion", { repositoryId, filePath: normalizedPath });
+		return false;
+	}
+	
+	db.run(
+		`DELETE FROM indexed_files WHERE id = ?`,
+		[result.id]
+	);
+	
+	logger.info("Deleted file from index", { repositoryId, filePath: normalizedPath, fileId: result.id });
+	return true;
+}
+
+/**
+ * Delete a single file from the index by path.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePath - Relative file path to delete
+ * @returns true if file was deleted, false if not found
+ */
+export function deleteFileByPath(
+	repositoryId: string,
+	filePath: string,
+): boolean {
+	return deleteFileByPathInternal(getGlobalDatabase(), repositoryId, filePath);
+}
+
+/**
+ * Delete multiple files from the index by paths.
+ * Uses a transaction for atomic operation.
+ * Cascading deletes will remove associated symbols and references.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePaths - Array of relative file paths to delete
+ * @returns Object with deleted count and list of deleted paths
+ */
+function deleteFilesByPathsInternal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePaths: string[],
+): { deletedCount: number; deletedPaths: string[] } {
+	if (filePaths.length === 0) {
+		return { deletedCount: 0, deletedPaths: [] };
+	}
+	
+	const normalizedPaths = filePaths.map(normalizePath);
+	const deletedPaths: string[] = [];
+	
+	db.transaction(() => {
+		for (const normalizedPath of normalizedPaths) {
+			const result = db.queryOne<{ id: string }>(
+				`SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?`,
+				[repositoryId, normalizedPath]
+			);
+			
+			if (result) {
+				db.run(`DELETE FROM indexed_files WHERE id = ?`, [result.id]);
+				deletedPaths.push(normalizedPath);
+			}
+		}
+	});
+	
+	logger.info("Deleted files from index", { 
+		repositoryId, 
+		requestedCount: filePaths.length,
+		deletedCount: deletedPaths.length 
+	});
+	
+	return { deletedCount: deletedPaths.length, deletedPaths };
+}
+
+/**
+ * Delete multiple files from the index by paths.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePaths - Array of relative file paths to delete
+ * @returns Object with deleted count and list of deleted paths
+ */
+export function deleteFilesByPaths(
+	repositoryId: string,
+	filePaths: string[],
+): { deletedCount: number; deletedPaths: string[] } {
+	return deleteFilesByPathsInternal(getGlobalDatabase(), repositoryId, filePaths);
+}
+
+/**
+ * Get repository ID from full_name.
+ * Useful for auto-indexing when you have the path but need the UUID.
+ * 
+ * @param fullName - Repository full name (e.g., "owner/repo" or "local/path")
+ * @returns Repository UUID or null if not found
+ */
+function getRepositoryIdByNameInternal(
+	db: KotaDatabase,
+	fullName: string,
+): string | null {
+	const result = db.queryOne<{ id: string }>(
+		`SELECT id FROM repositories WHERE full_name = ?`,
+		[fullName]
+	);
+	return result?.id ?? null;
+}
+
+/**
+ * Get repository ID from full_name.
+ * 
+ * @param fullName - Repository full name
+ * @returns Repository UUID or null if not found
+ */
+export function getRepositoryIdByName(fullName: string): string | null {
+	return getRepositoryIdByNameInternal(getGlobalDatabase(), fullName);
+}
+
 
 // ============================================================================
 // Backward-compatible aliases that accept db parameter
@@ -1059,10 +1272,22 @@ export function storeSymbolsLocal(
  */
 export function storeReferencesLocal(
 	db: KotaDatabase,
+	fileId: string,
+	filePath: string,
 	references: Reference[],
-	fileId: string
+	allFiles: Array<{ path: string }>,
+	pathMappings?: PathMappings | null
 ): number {
-	return storeReferencesInternal(db, references, fileId);
+	const repositoryId = db.queryOne<{ repository_id: string }>(
+		"SELECT repository_id FROM indexed_files WHERE id = ?",
+		[fileId]
+	)?.repository_id;
+	
+	if (!repositoryId) {
+		throw new Error(`File not found: ${fileId}`);
+	}
+	
+	return storeReferencesInternal(db, fileId, repositoryId, filePath, references, allFiles, pathMappings);
 }
 
 /**
@@ -1100,34 +1325,6 @@ export function resolveFilePathLocal(
 }
 
 /**
- * @deprecated Use storeDependencies() directly
- */
-export function storeDependenciesLocal(
-	db: KotaDatabase,
-	dependencies: Array<{
-		repositoryId: string;
-		fromFileId: string | null;
-		toFileId: string | null;
-		fromSymbolId: string | null;
-		toSymbolId: string | null;
-		dependencyType: "file_import" | "symbol_usage";
-		metadata: Record<string, unknown>;
-	}>
-): number {
-	return storeDependenciesInternal(db, dependencies);
-}
-
-/**
- * @deprecated Use queryDependentsRaw() directly
- */
-export const queryDependentsLocal = queryDependentsRaw;
-
-/**
- * @deprecated Use queryDependenciesRaw() directly
- */
-export const queryDependenciesLocal = queryDependenciesRaw;
-
-/**
  * @deprecated Use ensureRepository() directly
  */
 export function ensureRepositoryLocal(
@@ -1147,6 +1344,52 @@ export function updateRepositoryLastIndexedLocal(
 	repositoryId: string
 ): void {
 	return updateRepositoryLastIndexedInternal(db, repositoryId);
+}
+
+/**
+ * Check if a repository has been indexed.
+ * Version that accepts db parameter for testing.
+ */
+export function isRepositoryIndexedLocal(
+	db: KotaDatabase,
+	repositoryId: string
+): boolean {
+	return isRepositoryIndexedInternal(db, repositoryId);
+}
+
+/**
+ * Delete a single file from the index by path.
+ * Version that accepts db parameter for testing.
+ */
+export function deleteFileByPathLocal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePath: string
+): boolean {
+	return deleteFileByPathInternal(db, repositoryId, filePath);
+}
+
+/**
+ * Delete multiple files from the index by paths.
+ * Version that accepts db parameter for testing.
+ */
+export function deleteFilesByPathsLocal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePaths: string[]
+): { deletedCount: number; deletedPaths: string[] } {
+	return deleteFilesByPathsInternal(db, repositoryId, filePaths);
+}
+
+/**
+ * Get repository ID from full_name.
+ * Version that accepts db parameter for testing.
+ */
+export function getRepositoryIdByNameLocal(
+	db: KotaDatabase,
+	fullName: string
+): string | null {
+	return getRepositoryIdByNameInternal(db, fullName);
 }
 
 // Add alias for runIndexingWorkflowLocal

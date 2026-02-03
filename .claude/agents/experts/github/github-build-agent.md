@@ -8,6 +8,15 @@ tools:
   - Glob
   - Grep
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__analyze_change_impact
+  - mcp__kotadb-bunx__search_decisions
+  - mcp__kotadb-bunx__search_failures
+  - mcp__kotadb-bunx__search_patterns
+  - mcp__kotadb-bunx__record_decision
+  - mcp__kotadb-bunx__record_failure
+  - mcp__kotadb-bunx__record_insight
 model: sonnet
 color: green
 ---
@@ -132,7 +141,7 @@ bun run build
 - No new mocks introduced
 
 ## References
-- [Plan](./docs/specs/<spec>.md)
+- [Plan](./.claude/.cache/specs/<spec>.md)
 - Closes #<issue>
 ```
 
@@ -176,7 +185,61 @@ gh pr create --base develop --title "<title>" --body "<body>"
 # Check PR status
 gh pr status
 gh pr checks <number>
+
+# Release management
+gh release create v<major>.<minor>.<patch> --verify-tag
+gh release list --limit 10
 ```
+
+### Release Workflow Patterns
+
+**Bun Publishing:**
+- Bun runtime version: 1.1.29 (consistent across app-ci and npm-publish workflows)
+- Publishing command: `bun publish --access public`
+- Authentication: Uses NODE_AUTH_TOKEN secret (maps to NPM_TOKEN)
+- Validation: Full Level 3 validation (lint, typecheck, test, build) before publishing
+
+**Version Management:**
+- Git tag format: v<major>.<minor>.<patch> (semantic versioning)
+- Version verification: Tag version must match package.json version exactly
+- Failure prevention: Workflow exits with error if versions don't match
+
+**Package Metadata:**
+- Required fields: bin field in package.json must exist
+- Optional warning: files field should be present (else publishes everything)
+- Pre-publish validation: Metadata checked before npm push attempt
+
+**Release Creation:**
+- GitHub Release: Created automatically with gh release create --verify-tag
+- Release notes: Include npm registry URL for discoverability
+- Workflow summary: Auto-generated publish status reported in job summary
+
+## Memory Integration
+
+Before implementing, search for relevant past context:
+
+1. **Check Past Failures**
+   ```
+   search_failures("relevant keywords from your task")
+   ```
+   Apply learnings to avoid repeating mistakes.
+
+2. **Check Past Decisions**
+   ```
+   search_decisions("relevant architectural keywords")
+   ```
+   Follow established patterns and rationale.
+
+3. **Check Discovered Patterns**
+   ```
+   search_patterns(pattern_type: "relevant-type")
+   ```
+   Use consistent patterns across implementations.
+
+**During Implementation:**
+- Record significant architectural decisions with `record_decision`
+- Record failed approaches immediately with `record_failure`
+- Record workarounds or discoveries with `record_insight`
 
 ## Workflow
 

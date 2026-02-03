@@ -76,8 +76,8 @@ Select agents by model tier:
 - `Glob` - File pattern matching
 - `Grep` - Content search
 - `Read` - File reading
-- `mcp__kotadb__search_code` - Code search via MCP
-- `mcp__kotadb__search_dependencies` - Dependency analysis via MCP
+- `mcp__kotadb-bunx__search_code` - Code search via MCP
+- `mcp__kotadb-bunx__search_dependencies` - Dependency analysis via MCP
 
 ### Write Tools
 - `Edit` - File modification
@@ -87,7 +87,7 @@ Select agents by model tier:
 
 ### Analysis Tools
 - `WebFetch` - URL content fetching
-- `mcp__kotadb__analyze_change_impact` - Change impact analysis
+- `mcp__kotadb-bunx__analyze_change_impact` - Change impact analysis
 - `mcp__firecrawl-mcp__firecrawl_scrape` - Web scraping
 
 ## Agent Selection Guidelines

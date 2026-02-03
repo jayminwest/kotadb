@@ -15,6 +15,7 @@ import { CallToolRequestSchema, ListToolsRequestSchema } from "@modelcontextprot
 import { Sentry } from "../instrument.js";
 import {
 	ANALYZE_CHANGE_IMPACT_TOOL,
+	GENERATE_TASK_CONTEXT_TOOL,
 	INDEX_REPOSITORY_TOOL,
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_CODE_TOOL,
@@ -22,7 +23,21 @@ import {
 	SYNC_EXPORT_TOOL,
 	SYNC_IMPORT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
+	// Memory Layer tools
+	SEARCH_DECISIONS_TOOL,
+	RECORD_DECISION_TOOL,
+	SEARCH_FAILURES_TOOL,
+	RECORD_FAILURE_TOOL,
+	SEARCH_PATTERNS_TOOL,
+	RECORD_INSIGHT_TOOL,
+	// Dynamic Expertise tools
+	GET_DOMAIN_KEY_FILES_TOOL,
+	VALIDATE_EXPERTISE_TOOL,
+	SYNC_EXPERTISE_TOOL,
+	GET_RECENT_PATTERNS_TOOL,
+	// Execute functions
 	executeAnalyzeChangeImpact,
+	executeGenerateTaskContext,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearchCode,
@@ -30,6 +45,18 @@ import {
 	executeSyncExport,
 	executeSyncImport,
 	executeValidateImplementationSpec,
+	// Memory Layer execute functions
+	executeSearchDecisions,
+	executeRecordDecision,
+	executeSearchFailures,
+	executeRecordFailure,
+	executeSearchPatterns,
+	executeRecordInsight,
+	// Dynamic Expertise execute functions
+	executeGetDomainKeyFiles,
+	executeValidateExpertise,
+	executeSyncExpertise,
+	executeGetRecentPatterns,
 } from "./tools";
 
 const logger = createLogger({ module: "mcp-server" });
@@ -55,6 +82,17 @@ export interface McpServerContext {
  * - validate_implementation_spec: Validate implementation specs
  * - kota_sync_export: Export SQLite to JSONL
  * - kota_sync_import: Import JSONL to SQLite
+ * - generate_task_context: Generate context for hook-based seeding
+ * - search_decisions: Search past architectural decisions
+ * - record_decision: Record a new architectural decision
+ * - search_failures: Search failed approaches
+ * - record_failure: Record a failed approach
+ * - search_patterns: Find codebase patterns
+ * - record_insight: Store a session insight
+ * - get_domain_key_files: Get most-depended-on files for a domain
+ * - validate_expertise: Validate expertise.yaml patterns against indexed code
+ * - sync_expertise: Sync patterns from expertise.yaml to patterns table
+ * - get_recent_patterns: Get recently observed patterns
  */
 export function createMcpServer(context: McpServerContext): Server {
 	const server = new Server(
@@ -81,6 +119,19 @@ export function createMcpServer(context: McpServerContext): Server {
 				VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 				SYNC_EXPORT_TOOL,
 				SYNC_IMPORT_TOOL,
+				GENERATE_TASK_CONTEXT_TOOL,
+				// Memory Layer tools
+				SEARCH_DECISIONS_TOOL,
+				RECORD_DECISION_TOOL,
+				SEARCH_FAILURES_TOOL,
+				RECORD_FAILURE_TOOL,
+				SEARCH_PATTERNS_TOOL,
+				RECORD_INSIGHT_TOOL,
+				// Dynamic Expertise tools
+				GET_DOMAIN_KEY_FILES_TOOL,
+				VALIDATE_EXPERTISE_TOOL,
+				SYNC_EXPERTISE_TOOL,
+				GET_RECENT_PATTERNS_TOOL,
 			],
 		};
 	});
@@ -142,6 +193,85 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "kota_sync_import":
 					result = await executeSyncImport(toolArgs, "");
+					break;
+				case "generate_task_context":
+					result = await executeGenerateTaskContext(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				// Memory Layer tools
+				case "search_decisions":
+					result = await executeSearchDecisions(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_decision":
+					result = await executeRecordDecision(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "search_failures":
+					result = await executeSearchFailures(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_failure":
+					result = await executeRecordFailure(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "search_patterns":
+					result = await executeSearchPatterns(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_insight":
+					result = await executeRecordInsight(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				// Dynamic Expertise tools
+				case "get_domain_key_files":
+					result = await executeGetDomainKeyFiles(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "validate_expertise":
+					result = await executeValidateExpertise(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "sync_expertise":
+					result = await executeSyncExpertise(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "get_recent_patterns":
+					result = await executeGetRecentPatterns(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
 					break;
 				default:
 					const error = new Error(`Unknown tool: ${name}`);

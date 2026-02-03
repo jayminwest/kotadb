@@ -1,0 +1,743 @@
+# Database Expertise for KotaDB
+# Target: 400-600 lines | Domain: SQLite schema design, FTS5 search, local-only architecture
+# Adapted for KotaDB local-first v2 architecture
+
+overview:
+  description: |
+    SQLite database expertise for KotaDB—local-only code intelligence storage using
+    SQLite with FTS5 full-text search, WAL mode for concurrency, and type-safe TypeScript
+    wrappers. This expertise enables correct database schema design, query optimization,
+    and migration management within the KotaDB local-first architecture.
+  scope: |
+    Covers SQLite schema at app/src/db/sqlite-schema.sql, database client at 
+    app/src/db/sqlite/sqlite-client.ts, query layer at app/src/api/queries.ts,
+    FTS5 full-text search patterns, dependency graph recursive CTEs, WAL mode
+    configuration, connection pooling, migration strategies, and project-local
+    storage configuration (project-root.ts, gitignore.ts).
+
+    KOTADB DATABASE ARCHITECTURE (v2 - LOCAL-FIRST):
+    - Local-only SQLite storage (no Supabase, no cloud)
+    - Project-local database location: <project-root>/.kotadb/kota.db
+    - Path resolution: config > KOTADB_PATH env var > project-local default
+    - Project root detection via .git marker walking
+    - Auto-gitignore management for .kotadb/ directory
+    - WAL mode enabled for concurrent reads/writes
+    - FTS5 for code search with external content tables
+    - Connection pool pattern: 1 writer + N readers
+    - Type mappings: uuid->TEXT, timestamptz->TEXT(ISO8601), jsonb->TEXT, boolean->INTEGER
+
+    Does NOT cover cloud database patterns or Supabase (removed in v2).
+    Storage is project-local, not user-home-local (changed in v2.0.0).
+  rationale: |
+    Correct database design enables fast code search, reliable dependency tracking,
+    and safe concurrent access. Poor schema design leads to slow queries, data
+    corruption, and difficult migrations. KotaDB's local-first architecture requires
+    specialized SQLite patterns that differ from cloud database approaches.
+
+core_implementation:
+  database_location:
+    primary: <project-root>/.kotadb/kota.db
+    environment_override: KOTADB_PATH
+    resolution_order:
+      - Explicit config path (config.path parameter)
+      - KOTADB_PATH environment variable
+      - Project-local default: .kotadb/kota.db in project root (found via .git marker)
+    project_root_detection: Walks up from process.cwd() until finding .git directory
+    directory_creation: Automatic via sqlite-client.ts
+    gitignore_management: Automatic via gitignore.ts (ensures .kotadb/ is gitignored)
+    note: |
+      v2 (2026-01-28+): Project-local storage is the default for local-first architecture.
+      Database is stored relative to project root, not user home directory.
+
+  key_files:
+    - path: app/src/db/sqlite-schema.sql
+      purpose: Complete SQLite schema with FTS5, triggers, and indexes
+      tables:
+        - repositories (git repository metadata)
+        - indexed_files (source files with FTS5 search)
+        - indexed_symbols (functions, classes, types)
+        - indexed_references (import/call relationships)
+        - projects (user-defined groupings)
+        - project_repositories (many-to-many junction)
+        - dependency_graph (file and symbol dependencies)
+        - schema_migrations (migration tracking)
+    - path: app/src/db/sqlite/sqlite-client.ts
+      purpose: Type-safe KotaDatabase class and ConnectionPool
+      exports:
+        - KotaDatabase (single connection wrapper)
+        - ConnectionPool (1 writer + N readers)
+        - getGlobalDatabase() (singleton access)
+        - getGlobalPool() (pool singleton)
+    - path: app/src/api/queries.ts
+      purpose: Query layer with FTS5 search and dependency traversal
+      functions:
+        - searchFiles() (FTS5 full-text search)
+        - saveIndexedFiles() (batch insert with transactions)
+        - queryDependents() (recursive CTE for dependents)
+        - queryDependencies() (recursive CTE for dependencies)
+    - path: app/src/config/project-root.ts
+      purpose: Project root detection for determining storage location
+      exports:
+        - findProjectRoot() (walk up to .git marker)
+    - path: app/src/config/gitignore.ts
+      purpose: Auto-management of .gitignore for .kotadb/ directory
+      exports:
+        - ensureKotadbIgnored() (adds .kotadb/ to gitignore, non-fatal)
+
+  schema_design_principles:
+    type_mappings:
+      uuid: TEXT (RFC 4122 format, 36 chars)
+      timestamptz: TEXT (ISO 8601 format)
+      jsonb: TEXT (JSON string, use JSON1 extension)
+      boolean: INTEGER (0 = false, 1 = true)
+      text_array: TEXT (JSON array string)
+    constraints:
+      primary_keys: TEXT UUIDs generated via randomUUID()
+      foreign_keys: ON DELETE CASCADE for referential integrity
+      unique_indexes: Partial indexes where needed (WHERE clause)
+      check_constraints: For enum-like columns (kind, reference_type)
+
+key_operations:
+  design_fts5_search:
+    when: Implementing full-text search on file content
+    approach: |
+      1. Create external content FTS5 table linked to base table:
+         ```sql
+         CREATE VIRTUAL TABLE IF NOT EXISTS indexed_files_fts USING fts5(
+             path,
+             content,
+             content='indexed_files',
+             content_rowid='rowid'
+         );
+         ```
+      2. Create sync triggers for INSERT, UPDATE, DELETE:
+         - AFTER INSERT: Add new content to FTS
+         - AFTER DELETE: Remove using 'delete' command
+         - AFTER UPDATE: Delete old, insert new
+      3. Query using MATCH with bm25() ranking:
+         ```sql
+         SELECT f.*, snippet(indexed_files_fts, 1, '<mark>', '</mark>', '...', 32) AS snippet
+         FROM indexed_files_fts fts
+         JOIN indexed_files f ON fts.rowid = f.rowid
+         WHERE indexed_files_fts MATCH ?
+         ORDER BY bm25(indexed_files_fts)
+         LIMIT ?
+         ```
+      4. CRITICAL: Escape user input for FTS5 using escapeFts5Term()
+    pitfalls:
+      - what: "Using FTS5 without external content table"
+        instead: "Use content='' to avoid duplicate storage"
+        reason: "Doubles storage requirements and sync overhead"
+      - what: "Not escaping FTS5 queries"
+        instead: "Use escapeFts5Term() wrapper for user input"
+        reason: "Hyphens and FTS5 keywords cause syntax errors"
+    timestamp: 2026-01-28
+    evidence: Commit 5af086f (fix #595)
+
+  escape_fts5_search_terms:
+    when: Processing user input for FTS5 MATCH queries
+    approach: |
+      Always escape user input before passing to FTS5 MATCH clause:
+      
+      ```typescript
+      /**
+       * Escape a search term for use in SQLite FTS5 MATCH clause.
+       * Wraps the entire term in double quotes for exact phrase matching.
+       * Escapes internal double quotes by doubling them.
+       */
+      function escapeFts5Term(term: string): string {
+        // Escape internal double quotes by doubling them
+        const escaped = term.replace(/"/g, '""');
+        // Wrap in double quotes for exact phrase matching
+        return \`"\${escaped}"\`;
+      }
+      
+      // Usage in query
+      const escapedTerm = escapeFts5Term(userInput);
+      const results = db.query(
+        'SELECT * FROM indexed_files_fts WHERE indexed_files_fts MATCH ?',
+        [escapedTerm]
+      );
+      ```
+      
+      This prevents:
+      - Multi-word searches being interpreted as AND operators ("hello world")
+      - Hyphens triggering NOT operator parsing ("mom-and-pop")
+      - FTS5 keywords (AND, OR, NOT, NEAR) treated as operators instead of literals
+      - Syntax errors on operator-like terms
+    test_coverage: |
+      Essential test cases (from queries-sqlite.test.ts):
+      1. Hyphenated terms: "pre-commit" should not parse as "pre NOT commit"
+      2. Multi-word phrases: "planType smb" should match adjacent words
+      3. FTS keywords as literals: "search and find" treats "and" as text
+      4. Embedded quotes: 'say "hello"' properly escapes internal quotes
+      5. Operator-like terms: "OR", "AND", "NOT", "NEAR" as search text
+    timestamp: 2026-01-28
+    evidence: Commit 5af086f, app/src/api/queries.ts lines 241-262
+    related_issue: "#595 - FTS5 search fails on multi-word/hyphenated queries"
+
+  auto_initialize_schema:
+    when: Creating KotaDatabase instance for the first time
+    approach: |
+      Implement automatic schema initialization in KotaDatabase constructor:
+      
+      ```typescript
+      // In KotaDatabase constructor (after configurePragmas)
+      if (!this.config.readonly) {
+        if (!this.tableExists("indexed_files")) {
+          const schemaPath = join(__dirname, "../sqlite-schema.sql");
+          const schema = readFileSync(schemaPath, "utf-8");
+          this.exec(schema);
+          logger.info("SQLite schema initialized", {
+            path: this.config.path,
+          });
+        } else {
+          logger.debug("SQLite schema already initialized");
+        }
+      }
+      ```
+      
+      Key patterns:
+      - Check for representative table existence (indexed_files)
+      - Only run for write-mode connections (skip readonly)
+      - Read schema from sqlite-schema.sql (single source of truth)
+      - Log appropriately (info for init, debug for existing)
+      - Execute entire schema in single operation (atomic)
+    benefits:
+      - Eliminates "no such table" errors for first-time users
+      - No manual schema setup required in local mode
+      - Idempotent initialization (safe to run multiple times)
+      - Consistent schema across all environments
+    timestamp: 2026-01-28
+    evidence: Commit 2032801, app/src/db/sqlite/sqlite-client.ts
+    related_issue: "#574 - auto-initialize SQLite schema on local mode startup"
+
+  resolve_project_local_path:
+    when: Determining where to store database and exports for project-local operation
+    approach: |
+      Implement three-tier path resolution for project-local storage:
+      
+      ```typescript
+      // Priority: explicit config > env var > project-local default
+      export function resolveDbPath(configPath?: string): string {
+        if (configPath) {
+          return configPath;  // Explicit config takes precedence
+        }
+        
+        const envPath = process.env.KOTADB_PATH;
+        if (envPath) {
+          return envPath;  // Environment variable override
+        }
+        
+        return getDefaultDbPath();  // Fall back to project-local default
+      }
+      
+      export function getDefaultDbPath(): string {
+        const projectRoot = findProjectRoot();
+        if (!projectRoot) {
+          throw new Error(
+            "Unable to determine project root. Please either:\n" +
+            "  1. Run KotaDB from within a project directory (containing .git)\n" +
+            "  2. Set KOTADB_PATH environment variable\n" +
+            "  3. Provide explicit path via config.path parameter"
+          );
+        }
+        
+        ensureKotadbIgnored(projectRoot);  // Auto-add .kotadb/ to gitignore
+        return join(projectRoot, ".kotadb", "kota.db");
+      }
+      ```
+      
+      Key patterns:
+      - Three-tier resolution: config > env > project-local
+      - Project-local default: `.kotadb/kota.db` relative to project root
+      - Clear error messages guiding user to fix setup issues
+      - Auto-management of gitignore for database directory
+    benefits:
+      - Works out-of-the-box for developers (no env var needed)
+      - Supports explicit config for testing/CI
+      - Supports env var override for special deployments
+      - Database automatically gitignored (no accidental commits)
+      - Clear guidance when setup is incomplete
+    trade_offs:
+      - Requires .git directory to determine project root
+      - Non-fatal failures in gitignore update may be confusing
+    timestamp: 2026-01-28
+    evidence: Commit d669841, app/src/config/project-root.ts, app/src/db/sqlite/sqlite-client.ts
+    related_issue: "#592 - project-local .kotadb/ storage"
+
+  detect_project_root:
+    when: Need to find project root for determining storage location
+    approach: |
+      Walk up directory tree from current working directory until finding .git marker:
+      
+      ```typescript
+      /**
+       * Find the project root by walking up the directory tree.
+       * Looks for .git directory as the project root marker.
+       */
+      export function findProjectRoot(startDir: string = process.cwd()): string | null {
+        let current = startDir;
+        
+        while (true) {
+          const gitDir = join(current, ".git");
+          if (existsSync(gitDir)) {
+            logger.debug("Found project root", { path: current, marker: ".git" });
+            return current;
+          }
+          
+          // Move up one directory
+          const parent = dirname(current);
+          if (parent === current) {
+            // We've reached the filesystem root
+            break;
+          }
+          current = parent;
+        }
+        
+        logger.debug("No project root found", { startDir });
+        return null;
+      }
+      ```
+      
+      Algorithm:
+      1. Start from given directory (default: process.cwd())
+      2. Check if .git exists in current directory
+      3. If found, return as project root
+      4. Move up to parent directory
+      5. Stop when reaching filesystem root (dirname returns same path)
+      6. Return null if not found
+      
+      Design decisions:
+      - Use .git as marker (reliable, present in all Git repos)
+      - Return null instead of throwing (allows fallback to env var)
+      - Log at debug level for visibility without noise
+      - Handle filesystem root detection via dirname comparison
+    pitfalls:
+      - what: "Starting from wrong directory"
+        instead: "Always pass process.cwd() or explicit startDir"
+        reason: "Walking up from /tmp won't find project in /home/user/project"
+      - what: "Throwing error instead of returning null"
+        instead: "Return null and let caller handle fallback logic"
+        reason: "Allows graceful fallback to env var or explicit config"
+    timestamp: 2026-01-28
+    evidence: Commit d669841, app/src/config/project-root.ts lines 30-52
+
+  ensure_kotadb_in_gitignore:
+    when: Setting up project-local storage to prevent database commits
+    approach: |
+      Automatically ensure .kotadb/ directory is in project's .gitignore:
+      
+      ```typescript
+      /**
+       * Ensure .kotadb/ is added to project's .gitignore.
+       * If gitignore is malformed or inaccessible, logs warning but does not fail.
+       */
+      export function ensureKotadbIgnored(projectRoot: string): boolean {
+        const gitignorePath = join(projectRoot, ".gitignore");
+        
+        try {
+          // Check if .kotadb/ is already ignored
+          if (existsSync(gitignorePath)) {
+            const content = readFileSync(gitignorePath, "utf-8");
+            
+            // Check for multiple valid patterns
+            const patterns = [
+              /^\.kotadb\/$/m,        // .kotadb/
+              /^\.kotadb$/m,          // .kotadb
+              /^\.kotadb\*$/m,        // .kotadb*
+              /^\/\.kotadb\/$/m,      // /.kotadb/
+            ];
+            
+            if (patterns.some(pattern => pattern.test(content))) {
+              logger.debug(".kotadb/ already in .gitignore", { path: gitignorePath });
+              return true;
+            }
+          }
+          
+          // Append .kotadb/ entry with clear comment
+          const entry = "\n# KotaDB local storage\n.kotadb/\n";
+          appendFileSync(gitignorePath, entry);
+          
+          logger.info("Added .kotadb/ to .gitignore", { path: gitignorePath });
+          return true;
+          
+        } catch (error) {
+          // Non-fatal: log warning and continue
+          const errorMessage = error instanceof Error ? error.message : String(error);
+          process.stderr.write(
+            `[WARN] Could not update .gitignore (non-fatal)\n` +
+            `  path: ${gitignorePath}\n` +
+            `  error: ${errorMessage}\n`
+          );
+          logger.warn("Could not update .gitignore (non-fatal)", {
+            path: gitignorePath,
+            error: errorMessage,
+          });
+          return false;
+        }
+      }
+      ```
+      
+      Key patterns:
+      - Check multiple gitignore patterns (.kotadb/, .kotadb, .kotadb*, /.kotadb/)
+      - Non-fatal error handling (log warning, continue)
+      - Clear comment in gitignore explaining purpose
+      - Idempotent (safe to call multiple times)
+      - Handles missing .gitignore gracefully (creates entry)
+    benefits:
+      - Prevents accidental database commits
+      - Works silently without breaking database initialization
+      - Handles various .gitignore formats
+      - Clear logging for troubleshooting
+    error_handling:
+      - Missing .gitignore: Creates new entry (appendFileSync creates file)
+      - Inaccessible .gitignore: Warns but continues (non-fatal)
+      - Already ignored: Logs debug message and returns true
+    timestamp: 2026-01-28
+    evidence: Commit d669841, app/src/config/gitignore.ts lines 29-68
+    related_issue: "#592 - project-local .kotadb/ storage"
+
+
+
+  create_migration:
+    when: Adding new tables, columns, or indexes
+    approach: |
+      1. Check current schema version via PRAGMA user_version
+      2. Create migration SQL with IF NOT EXISTS guards:
+         ```sql
+         CREATE TABLE IF NOT EXISTS new_table (...);
+         CREATE INDEX IF NOT EXISTS idx_name ON table(column);
+         ```
+      3. Use transactions for multi-statement migrations:
+         ```typescript
+         db.transaction(() => {
+           db.exec(migrationSQL);
+           db.setSchemaVersion(newVersion);
+         });
+         ```
+      4. Record migration in schema_migrations table
+      5. Test rollback strategy before applying
+    kotadb_conventions:
+      - Use PRAGMA user_version for version tracking
+      - Insert into schema_migrations for audit trail
+      - Use IF NOT EXISTS for idempotent migrations
+      - Apply in sqlite-client.ts constructor if needed
+
+  optimize_query:
+    when: Query performance is slow or EXPLAIN shows full table scans
+    approach: |
+      1. Analyze query plan:
+         ```sql
+         EXPLAIN QUERY PLAN SELECT ... FROM ...
+         ```
+      2. Check for missing indexes on WHERE, JOIN, ORDER BY columns
+      3. Add composite indexes for multi-column queries:
+         ```sql
+         CREATE INDEX IF NOT EXISTS idx_composite ON table(col1, col2);
+         ```
+      4. Use covering indexes when reading only indexed columns
+      5. Consider partial indexes for frequently filtered subsets:
+         ```sql
+         CREATE INDEX IF NOT EXISTS idx_partial ON table(col) WHERE condition;
+         ```
+      6. For FTS5, ensure content sync triggers are efficient
+    common_optimizations:
+      - Add index on foreign key columns (repository_id, file_id)
+      - Use prepared statements for repeated queries
+      - Batch inserts within transactions
+      - Use IMMEDIATE transactions for write operations
+
+  implement_recursive_cte:
+    when: Traversing dependency graphs or hierarchical data
+    approach: |
+      1. Define base case (initial selection):
+         ```sql
+         WITH RECURSIVE deps AS (
+             SELECT id, target_id, 1 AS depth, '/' || id || '/' AS path
+             FROM dependency_graph
+             WHERE source_id = ?
+         ```
+      2. Define recursive case (join to CTE):
+         ```sql
+             UNION ALL
+             SELECT d.id, d.target_id, deps.depth + 1, deps.path || d.id || '/'
+             FROM dependency_graph d
+             JOIN deps ON d.source_id = deps.target_id
+             WHERE deps.depth < ? AND INSTR(deps.path, '/' || d.id || '/') = 0
+         )
+         ```
+      3. Add cycle detection via path column (INSTR check)
+      4. Limit depth to prevent infinite recursion
+      5. Select from CTE with appropriate joins:
+         ```sql
+         SELECT DISTINCT d.*, f.path AS file_path
+         FROM deps d
+         LEFT JOIN indexed_files f ON d.target_id = f.id
+         ORDER BY d.depth
+         ```
+    patterns:
+      - queryDependents(): Find files that depend ON target
+      - queryDependencies(): Find files that target DEPENDS on
+      - Cycle detection: Track visited IDs in path string
+
+  configure_wal_mode:
+    when: Setting up database for concurrent access
+    approach: |
+      1. Enable WAL mode (writer connection only):
+         ```sql
+         PRAGMA journal_mode = WAL;
+         ```
+      2. Configure busy timeout for lock contention:
+         ```sql
+         PRAGMA busy_timeout = 30000;
+         ```
+      3. Set performance pragmas:
+         ```sql
+         PRAGMA synchronous = NORMAL;
+         PRAGMA cache_size = -64000;  -- 64MB cache
+         PRAGMA temp_store = MEMORY;
+         PRAGMA mmap_size = 268435456;  -- 256MB mmap
+         ```
+      4. Enable foreign key enforcement:
+         ```sql
+         PRAGMA foreign_keys = ON;
+         ```
+      5. Checkpoint periodically:
+         ```sql
+         PRAGMA wal_checkpoint(TRUNCATE);
+         ```
+    connection_pool_pattern:
+      writer: Single connection with WAL mode, read-write
+      readers: N connections (CPU count) with read-only mode
+      usage: getWriter() for writes, getReader() for reads
+
+decision_trees:
+  fts5_vs_like:
+    question: Should I use FTS5 or LIKE for search?
+    options:
+      - if: Searching file content (code search)
+        then: Use FTS5 with indexed_files_fts table
+        reason: "FTS5 provides ranking, snippets, and O(log n) performance"
+      - if: Searching exact column values (paths, names)
+        then: Use LIKE with index on column
+        reason: "Simpler query, no sync triggers needed"
+      - if: Searching with complex patterns (regex-like)
+        then: Use LIKE '%pattern%' with full scan
+        reason: "FTS5 doesn't support arbitrary patterns"
+
+  index_type_selection:
+    question: What type of index should I create?
+    options:
+      - if: Single column equality queries (WHERE col = ?)
+        then: Standard B-tree index (CREATE INDEX)
+      - if: Multi-column queries with leading column filter
+        then: Composite index with most selective column first
+      - if: Frequent queries on subset of rows
+        then: Partial index with WHERE clause
+      - if: Full-text search on text content
+        then: FTS5 virtual table with sync triggers
+      - if: JSON field access
+        then: Expression index on json_extract()
+
+  migration_strategy:
+    question: How should I apply this schema change?
+    options:
+      - if: Adding new table
+        then: CREATE TABLE IF NOT EXISTS (idempotent)
+      - if: Adding new column
+        then: ALTER TABLE ADD COLUMN with default value
+      - if: Modifying column type
+        then: Create new column, migrate data, drop old (SQLite limitation)
+      - if: Adding index
+        then: CREATE INDEX IF NOT EXISTS (idempotent)
+      - if: Changing table structure significantly
+        then: Rename old, create new, migrate data, drop old
+
+  transaction_type:
+    question: Which transaction type should I use?
+    options:
+      - if: Read-only query
+        then: No explicit transaction (autocommit)
+      - if: Single write operation
+        then: db.run() with autocommit
+      - if: Multiple related writes
+        then: db.transaction(() => { ... })
+      - if: Write that must not fail due to other writers
+        then: db.immediateTransaction(() => { ... })
+
+patterns:
+  external_content_fts5:
+    structure: |
+      -- Base table with actual data
+      CREATE TABLE content_table (
+          id TEXT PRIMARY KEY,
+          searchable_text TEXT NOT NULL,
+          metadata TEXT
+      );
+      
+      -- External content FTS5 (no duplicate storage)
+      CREATE VIRTUAL TABLE content_fts USING fts5(
+          searchable_text,
+          content='content_table',
+          content_rowid='rowid'
+      );
+      
+      -- Sync triggers (INSERT, DELETE, UPDATE)
+      CREATE TRIGGER content_fts_ai AFTER INSERT ON content_table BEGIN
+          INSERT INTO content_fts(rowid, searchable_text) VALUES (new.rowid, new.searchable_text);
+      END;
+      
+      CREATE TRIGGER content_fts_ad AFTER DELETE ON content_table BEGIN
+          INSERT INTO content_fts(content_fts, rowid, searchable_text) 
+          VALUES ('delete', old.rowid, old.searchable_text);
+      END;
+      
+      CREATE TRIGGER content_fts_au AFTER UPDATE ON content_table BEGIN
+          INSERT INTO content_fts(content_fts, rowid, searchable_text) 
+          VALUES ('delete', old.rowid, old.searchable_text);
+          INSERT INTO content_fts(rowid, searchable_text) VALUES (new.rowid, new.searchable_text);
+      END;
+    trade_offs:
+      pros: [No duplicate storage, Automatic sync, Fast full-text search]
+      cons: [Trigger overhead on writes, FTS5 query syntax learning curve]
+
+  connection_pool:
+    structure: |
+      // 1 writer for all write operations
+      const writer = new KotaDatabase({ readonly: false, wal: true });
+      
+      // N readers for concurrent read operations
+      const readers = Array(cpus().length).fill(null).map(() =>
+        new KotaDatabase({ readonly: true, wal: true })
+      );
+      
+      // Round-robin reader selection
+      function getReader(): KotaDatabase {
+        const reader = readers[readerIndex];
+        readerIndex = (readerIndex + 1) % readers.length;
+        return reader;
+      }
+    usage: |
+      pool.write(db => db.run('INSERT ...'));
+      pool.read(db => db.query('SELECT ...'));
+    trade_offs:
+      pros: [Concurrent reads, Single writer prevents conflicts, WAL benefits]
+      cons: [Memory overhead, Connection management complexity]
+
+  batch_insert_pattern:
+    structure: |
+      function batchInsert(db: KotaDatabase, records: Record[]) {
+        db.transaction(() => {
+          const stmt = db.prepare('INSERT INTO table (col1, col2) VALUES (?, ?)');
+          for (const record of records) {
+            stmt.run([record.col1, record.col2]);
+          }
+        });
+      }
+    notes:
+      - Prepare statement once, reuse for all inserts
+      - Wrap in transaction for atomicity and performance
+      - Use IMMEDIATE transaction if concurrent writers possible
+
+  uuid_generation:
+    approach: |
+      import { randomUUID } from "node:crypto";
+      const id = randomUUID();  // Standard RFC 4122 UUID
+    storage: TEXT column (36 characters)
+    indexing: Primary key index automatically created
+
+best_practices:
+  schema_design:
+    - Use TEXT for UUIDs (36 chars, RFC 4122 format)
+    - Use TEXT with ISO 8601 for timestamps (sortable)
+    - Use TEXT for JSON (parse with JSON1 extension)
+    - Use INTEGER for booleans (0/1)
+    - Add CHECK constraints for enum-like columns
+    - Create indexes on foreign key columns
+    - Use ON DELETE CASCADE for referential integrity
+
+  query_layer:
+    - Use parameterized queries (never string interpolation)
+    - Prepare statements for repeated queries
+    - Batch inserts within transactions
+    - Use IMMEDIATE transactions for writes
+    - ALWAYS escape FTS5 queries using escapeFts5Term() before MATCH
+
+  connection_management:
+    - Use connection pool for concurrent access
+    - Single writer, multiple readers pattern
+    - Enable WAL mode for better concurrency
+    - Set appropriate busy_timeout (30s default)
+    - Close connections on shutdown
+
+  performance:
+    - Use covering indexes when possible
+    - Use partial indexes for filtered queries
+    - Batch operations within transactions
+    - Use EXPLAIN QUERY PLAN to diagnose
+    - Checkpoint WAL periodically
+
+  migrations:
+    - Use IF NOT EXISTS for idempotent migrations
+    - Track schema version via PRAGMA user_version
+    - Record migrations in schema_migrations table
+    - Test rollback strategy before applying
+    - Avoid data-destructive migrations
+
+known_issues:
+  - issue: FTS5 MATCH syntax errors with hyphens and multi-word queries
+    impact: Queries like "mom-and-pop" or "planType smb" fail with SQL syntax error
+    resolution: Wrap ALL user input in double quotes via escapeFts5Term()
+    status: Implemented in queries.ts (commit 5af086f)
+    timestamp: 2026-01-28
+    test_coverage: 5 test cases in queries-sqlite.test.ts
+
+  - issue: SQLite column type changes not supported
+    impact: Cannot ALTER COLUMN type in SQLite
+    resolution: Create new column, migrate data, drop old column
+    status: Design pattern documented
+
+  - issue: WAL mode requires file system support
+    impact: Network file systems may not support WAL
+    resolution: Use default journal mode on unsupported systems
+    status: Check file system compatibility
+
+  - issue: Large transactions can cause WAL growth
+    impact: WAL file grows until checkpoint
+    resolution: Checkpoint periodically, batch in smaller transactions
+    status: Checkpoint implemented in sqlite-client.ts
+
+potential_enhancements:
+  - Add database backup/restore functionality
+  - Implement incremental FTS5 index updates
+  - Add query plan caching for complex CTEs
+  - Implement database compaction (VACUUM) scheduling
+  - Add schema diff tool for migration generation
+  - Implement read replica support for distributed queries
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: increasing
+    contradiction_count: 0
+    new_patterns_added_this_cycle: 5
+    patterns_updated_this_cycle: 2
+    last_reviewed: 2026-01-28
+    utility_ratio: 1.0
+    notes: |
+      Cycle 2026-01-28: Added 5 new patterns, updated 2 existing (database_location, key_files).
+      
+      New patterns added:
+      1. escape_fts5_search_terms - Critical FTS5 escaping function (commit 5af086f)
+      2. auto_initialize_schema - Automatic schema initialization (commit 2032801)
+      3. resolve_project_local_path - Three-tier path resolution for project-local storage (commit d669841, issue #592)
+      4. detect_project_root - Walk up to .git marker for project root detection (commit d669841, issue #592)
+      5. ensure_kotadb_in_gitignore - Auto-management of .kotadb/ in gitignore (commit d669841, issue #592)
+      
+      Updated patterns:
+      1. database_location - Updated to reflect project-local v2 default
+      2. key_files - Added project-root.ts and gitignore.ts entries
+      
+      Evidence: Real production implementations in local-only v2 refactor (commit d669841)
+      Test coverage: Integration tested in project initialization workflow
+      Domain stability: Increasing - project-local storage patterns converging with local-first architecture

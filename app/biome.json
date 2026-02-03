@@ -22,6 +22,9 @@
 		"indentStyle": "tab",
 		"lineWidth": 100
 	},
+	"files": {
+		"ignore": ["tests/fixtures/parsing/errors/**"]
+	},
 	"overrides": [
 		{
 			"include": ["scripts/**/*.ts", "tests/**/*.ts"],

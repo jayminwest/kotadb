@@ -1,63 +1,178 @@
 # KotaDB
 
-KotaDB is a local-only code intelligence tool for CLI Agents like Claude Code and Codex. This project provides a lightweight HTTP interface for repository indexing and code search, backed by SQLite for zero-configuration local storage.
+**Ask Claude about your code. Get instant answers.**
 
-## Getting Started
+KotaDB gives Claude Code superpowers for understanding your codebase. Index your repository once, then ask questions like *"What breaks if I change this file?"* and get accurate, dependency-aware answers.
 
-### Prerequisites
+## For Users
 
-- [Bun](https://bun.sh) v1.1+
+### What KotaDB Does
 
-### Install dependencies
+KotaDB is a local code intelligence tool that helps Claude Code understand your codebase structure:
+
+- **Impact Analysis**: Know exactly what files depend on what you're changing
+- **Code Search**: Find code by meaning, not just text matching
+- **Dependency Graphs**: See how your files connect to each other
+- **Zero Cloud**: Everything runs locally - your code never leaves your machine
+
+### 5-Minute Setup
+
+**Prerequisites:** [Bun](https://bun.sh) v1.1+ (required)
+
+**Step 1: Add to Claude Code**
+
+Add this to your Claude Code MCP config (`~/.claude/mcp.json`):
+
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "command": "bunx",
+      "args": ["kotadb@next", "--stdio"]
+    }
+  }
+}
+```
+
+**Step 2: Start Asking Questions**
+
+Just ask! KotaDB auto-indexes on first use:
+> "What files depend on src/index.ts?"
+
+KotaDB automatically indexes your codebase and answers your question. No manual setup needed.
+
+Once indexed, Claude can answer questions like:
+- "What files import this module?"
+- "What would break if I refactored this function?"
+- "Find all files related to authentication"
+
+### Key Questions KotaDB Answers
+
+| Question | KotaDB Tool |
+|----------|-------------|
+| "What breaks if I change this file?" | `search_dependencies` |
+| "How risky is this refactor?" | `analyze_change_impact` |
+| "Find code that does X" | `search_code` |
+| "What files were recently indexed?" | `list_recent_files` |
+
+### Why Stdio Transport?
+
+KotaDB uses stdio (standard input/output) instead of HTTP ports:
+
+- **No port conflicts**: Works alongside other tools without configuration
+- **Simpler setup**: Just add the MCP config and go
+- **Better isolation**: Claude Code manages the process lifecycle
+- **Recommended by MCP**: Official pattern for local tools
+
+---
+
+## For Contributors
+
+### Development Setup
 
 ```bash
+# Install dependencies
 cd app && bun install
-```
 
-### Start the API server
-
-```bash
+# Start the API server
 cd app && bun run src/index.ts
+
+# Run tests
+cd app && bun test
+
+# Type-check
+cd app && bunx tsc --noEmit
 ```
 
-The server listens on port `3000` by default. Override with `PORT=4000 cd app && bun run src/index.ts`.
+The server listens on port `3000` by default. Override with `PORT=4000`.
 
 Data is stored in `~/.kotadb/kotadb.sqlite` by default.
 
-### Useful scripts
+### Useful Scripts
 
-- `cd app && bun --watch src/index.ts` – Start the server in watch mode for local development.
-- `cd app && bun test` – Run the Bun test suite.
-- `cd app && bunx tsc --noEmit` – Type-check the project.
+- `cd app && bun --watch src/index.ts` - Start server in watch mode
+- `cd app && bun test` - Run the test suite
+- `cd app && bunx tsc --noEmit` - Type-check the project
 
-### Running Tests
+For detailed development setup, see [DEVELOPMENT.md](./DEVELOPMENT.md).
 
-KotaDB uses SQLite for local testing with no external dependencies.
+### Project Layout
 
-```bash
-# Run tests
-cd app && bun test
+```
+app/                   # Application layer (TypeScript/Bun API service)
+  src/
+    api/               # HTTP routes and database access
+    db/                # SQLite client initialization and helpers
+    indexer/           # Repository crawling, parsing, and extraction
+    mcp/               # Model Context Protocol implementation
+    types/             # Shared TypeScript types
+  tests/               # Test suite
+
+automation/            # Agentic layer (AI developer workflows)
+  adws/                # ADW automation scripts
+
+.claude/commands/      # Claude Code slash commands
+.github/workflows/     # CI workflows
+docs/                  # Documentation
 ```
 
-## API Highlights
+---
+
+## API Reference
+
+### MCP Tools
+
+KotaDB provides these tools through the Model Context Protocol:
+
+| Tool | Purpose |
+|------|---------|
+| `search_code` | Search indexed code files for a term |
+| `index_repository` | Index a git repository |
+| `list_recent_files` | List recently indexed files |
+| `search_dependencies` | Find file dependencies and dependents |
+| `analyze_change_impact` | Analyze impact of proposed changes |
+| `validate_implementation_spec` | Validate implementation specs |
+| `kota_sync_export` | Export database to JSONL |
+| `kota_sync_import` | Import JSONL into database |
 
 ### REST Endpoints
 
-- `GET /health` – Simple heartbeat endpoint.
-- `POST /index` – Queue a repository for indexing (body: `{ "repository": "org/repo", "localPath": "./repo" }`).
-- `GET /search?term=foo` – Search for files containing `foo`. Optional `project` and `limit` parameters.
-- `GET /files/recent` – Recent indexing results.
+- `GET /health` - Heartbeat endpoint
+- `POST /index` - Queue repository for indexing
+- `GET /search?term=foo` - Search for files containing term
+- `GET /files/recent` - Recent indexing results
 
-The indexer clones repositories automatically when a `localPath` is not provided. Override the default GitHub clone source by exporting `KOTA_GIT_BASE_URL` (for example, your self-hosted Git service).
+### HTTP Transport (Alternative)
 
-### MCP Protocol Endpoint
+For multi-client scenarios or remote access, use HTTP transport:
 
-KotaDB supports the [Model Context Protocol (MCP)](https://modelcontextprotocol.io) for standardized agent integration. The MCP endpoint enables CLI agents like Claude Code to discover and use KotaDB's capabilities automatically.
+```json
+{
+  "mcpServers": {
+    "kotadb": {
+      "type": "http",
+      "url": "http://localhost:3000/mcp",
+      "headers": {
+        "Accept": "application/json, text/event-stream",
+        "MCP-Protocol-Version": "2025-06-18"
+      }
+    }
+  }
+}
+```
+
+Customize the port with `--port`:
+
+```bash
+kotadb --port 4000
+```
+
+### MCP Protocol Details
 
 **Endpoint:** `POST /mcp`
 
 **Required Headers:**
-- `Accept: application/json, text/event-stream` **(CRITICAL: Both types required)**
+- `Accept: application/json, text/event-stream`
 - `MCP-Protocol-Version: 2025-06-18`
 - `Content-Type: application/json`
 
@@ -80,7 +195,7 @@ curl -X POST http://localhost:3000/mcp \
   }'
 ```
 
-**Example: List Available Tools**
+**Example: Search Dependencies**
 
 ```bash
 curl -X POST http://localhost:3000/mcp \
@@ -90,59 +205,6 @@ curl -X POST http://localhost:3000/mcp \
   -d '{
     "jsonrpc": "2.0",
     "id": 2,
-    "method": "tools/list",
-    "params": {}
-  }'
-```
-
-**Example: Search Code**
-
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-06-18" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 3,
-    "method": "tools/call",
-    "params": {
-      "name": "search_code",
-      "arguments": {"term": "Router"}
-    }
-  }'
-```
-
-**Available MCP Tools:**
-- `search_code`: Search indexed code files for a specific term
-- `index_repository`: Index a git repository by cloning/updating it
-- `list_recent_files`: List recently indexed files
-- `search_dependencies`: Search the dependency graph for impact analysis
-
-**Tool: `search_dependencies`**
-
-Find files that depend on (dependents) or are depended on by (dependencies) a target file. Useful for:
-- **Impact analysis before refactoring**: See what breaks if you change a file
-- **Test scope discovery**: Find relevant test files for implementation changes
-- **Circular dependency detection**: Identify dependency cycles in your codebase
-
-**Parameters:**
-- `file_path` (required): Relative file path within repository (e.g., `"src/auth/context.ts"`)
-- `direction` (optional): Search direction - `"dependents"`, `"dependencies"`, or `"both"` (default: `"both"`)
-- `depth` (optional): Recursion depth for traversal, 1-5 (default: `1`). Higher values find indirect relationships.
-- `include_tests` (optional): Include test files in results (default: `true`)
-- `repository` (optional): Repository ID to search within (auto-detected if omitted)
-
-**Example: Find what breaks if you change a file**
-
-```bash
-curl -X POST http://localhost:3000/mcp \
-  -H "Content-Type: application/json" \
-  -H "Accept: application/json, text/event-stream" \
-  -H "MCP-Protocol-Version: 2025-06-18" \
-  -d '{
-    "jsonrpc": "2.0",
-    "id": 4,
     "method": "tools/call",
     "params": {
       "name": "search_dependencies",
@@ -155,11 +217,11 @@ curl -X POST http://localhost:3000/mcp \
   }'
 ```
 
+---
+
 ## Multi-Repository Support
 
-KotaDB v2.0.0 uses project-local storage in `.kotadb/` directories, providing automatic isolation between projects. All MCP tools support an optional `repository` parameter for filtering results when multiple repositories are indexed.
-
-**Quick Start:**
+KotaDB v2.0.0 uses project-local storage in `.kotadb/` directories, providing automatic isolation between projects. All MCP tools support an optional `repository` parameter for filtering results.
 
 ```typescript
 // List all recent files
@@ -172,48 +234,12 @@ await tools.list_recent_files({
 });
 ```
 
-See `docs/guides/multi-repo-best-practices.md` for detailed guidance on working with multiple repositories, including configuration examples and troubleshooting.
+See `docs/guides/multi-repo-best-practices.md` for detailed guidance.
 
+---
 
-**Security & Configuration:**
+## Security
 
-By default, KotaDB only accepts requests from localhost origins. Configure `KOTA_ALLOWED_ORIGINS` environment variable (comma-separated list of allowed origins) if needed.
+By default, KotaDB only accepts requests from localhost origins. Configure `KOTA_ALLOWED_ORIGINS` environment variable (comma-separated) if needed.
 
-## Docker & Compose
-
-Build and run the service in a container:
-
-```bash
-docker compose up dev
-```
-
-## Project Layout
-
-```
-app/                   # Application layer (TypeScript/Bun API service)
-  src/
-    api/               # HTTP routes and database access
-    db/                # SQLite client initialization and helpers
-    indexer/           # Repository crawling, parsing, and extraction utilities
-    mcp/               # Model Context Protocol (MCP) implementation
-    types/             # Shared TypeScript types
-  tests/               # Test suite
-  package.json         # Bun dependencies and scripts
-  tsconfig.json        # TypeScript configuration
-  Dockerfile           # Bun runtime image
-  scripts/             # Application-specific bash scripts
-
-automation/            # Agentic layer (Python AI developer workflows)
-  adws/                # ADW automation scripts and modules
-  docker/              # ADW-specific Docker images
-
-.claude/commands/      # Claude Code slash commands
-.github/workflows/     # CI workflows
-docs/                  # Documentation
-```
-
-See `app/README.md` for application-specific quickstart and `automation/adws/README.md` for automation workflows.
-
-## Project Roadmap
-
-For strategic priorities, planned features, and development timeline, see [ROADMAP.md](ROADMAP.md).
+The indexer clones repositories automatically when `localPath` is not provided. Override the GitHub clone source with `KOTA_GIT_BASE_URL`.

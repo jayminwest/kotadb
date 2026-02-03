@@ -6,6 +6,7 @@
  * 
  * NOTE: Updated for local-only v2.0.0 (Issue #591)
  * Cloud-only endpoints (subscriptions) have been removed.
+ * POST /index removed - indexing available via MCP tool only.
  */
 
 import { describe, expect, test } from 'bun:test';
@@ -71,12 +72,12 @@ describe('OpenAPI Spec Generation', () => {
 	test('includes rate limit headers in authenticated endpoints', () => {
 		const spec = buildOpenAPISpec() as any;
 		
-		// Check /index endpoint (authenticated)
-		const indexOperation = spec.paths['/index']?.post;
-		expect(indexOperation).toBeDefined();
+		// Check /search endpoint (authenticated)
+		const searchOperation = spec.paths['/search']?.get;
+		expect(searchOperation).toBeDefined();
 		
 		// Should have 200 response with rate limit headers
-		const response200 = indexOperation?.responses?.['200'];
+		const response200 = searchOperation?.responses?.['200'];
 		expect(response200).toBeDefined();
 		expect(response200?.headers).toBeDefined();
 		
@@ -112,14 +113,14 @@ describe('OpenAPI Spec Generation', () => {
 	test('applies security to authenticated endpoints', () => {
 		const spec = buildOpenAPISpec() as any;
 		
-		// Check /index endpoint (authenticated)
-		const indexOperation = spec.paths['/index']?.post;
-		expect(indexOperation).toBeDefined();
+		// Check /search endpoint (authenticated)
+		const searchOperation = spec.paths['/search']?.get;
+		expect(searchOperation).toBeDefined();
 		
 		// Should have security requirements
-		expect(indexOperation?.security).toBeDefined();
-		expect(Array.isArray(indexOperation?.security)).toBe(true);
-		expect(indexOperation?.security.length).toBeGreaterThan(0);
+		expect(searchOperation?.security).toBeDefined();
+		expect(Array.isArray(searchOperation?.security)).toBe(true);
+		expect(searchOperation?.security.length).toBeGreaterThan(0);
 	});
 
 	test('has servers defined', () => {
@@ -129,9 +130,9 @@ describe('OpenAPI Spec Generation', () => {
 		expect(Array.isArray(spec.servers)).toBe(true);
 		expect(spec.servers.length).toBeGreaterThan(0);
 		
-		// Should have production server
-		const prodServer = spec.servers.find((s: any) => s.url.includes('api.kotadb.com'));
-		expect(prodServer).toBeDefined();
+		// Local-only mode: should have localhost server
+		const localServer = spec.servers.find((s: any) => s.url.includes('localhost'));
+		expect(localServer).toBeDefined();
 	});
 
 	test('version matches package.json', () => {
@@ -160,12 +161,10 @@ describe('OpenAPI Spec Generation', () => {
 		// Check for expected tags (local-only mode)
 		const tagNames = spec.tags.map((t: any) => t.name);
 		expect(tagNames).toContain('Health');
-		expect(tagNames).toContain('Indexing');
-		expect(tagNames).toContain('Jobs');
 		expect(tagNames).toContain('Search');
-		expect(tagNames).toContain('Projects');
-		// NOTE: Subscriptions tag removed for local-only v2.0.0
-		// API Keys may or may not be present depending on local mode
+		expect(tagNames).toContain('MCP');
+		expect(tagNames).toContain('Validation');
+		// NOTE: Indexing, Jobs, Projects, API Keys tags removed for local-only mode
 	});
 
 	test('all paths have operation IDs or summaries', () => {

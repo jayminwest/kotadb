@@ -9,6 +9,14 @@ tools:
   - Grep
   - Bash
   - Task
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__search_decisions
+  - mcp__kotadb-bunx__search_failures
+  - mcp__kotadb-bunx__search_patterns
+  - mcp__kotadb-bunx__record_decision
+  - mcp__kotadb-bunx__record_failure
+  - mcp__kotadb-bunx__record_insight
 model: sonnet
 color: purple
 expertDomain: agent-authoring
@@ -94,7 +102,7 @@ When approaching limits:
 
 4. **Identify Effective Patterns**
    - New agent organization approaches
-   - MCP tool usage patterns (mcp__kotadb__)
+   - MCP tool usage patterns (mcp__kotadb-bunx__)
    - Improved prompt structure techniques
    - Registry update workflows
    - Expert domain patterns
@@ -162,6 +170,48 @@ When approaching limits:
    - High kotadb-specific ratio (>0.7)
 
    → Domain may be reaching stability.
+
+## Memory Recording
+
+After analyzing changes, record significant findings for cross-session learning:
+
+### Record Architectural Decisions
+When you identify important design choices in the changes:
+```
+record_decision(
+  title: "Decision title",
+  context: "Why this decision was needed",
+  decision: "What was decided",
+  rationale: "Why this approach was chosen",
+  scope: "architecture|pattern|convention|workaround"
+)
+```
+
+### Record Failed Approaches
+When you identify approaches that didn't work:
+```
+record_failure(
+  title: "Failure title",
+  problem: "What was being solved",
+  approach: "What was tried",
+  failure_reason: "Why it failed"
+)
+```
+
+### Record Insights and Discoveries
+When you find workarounds or unexpected learnings:
+```
+record_insight(
+  content: "The insight or discovery",
+  insight_type: "discovery|failure|workaround"
+)
+```
+
+**Recording Guidelines:**
+- Record decisions that affect multiple files or future work
+- Record failures that others might repeat
+- Record workarounds for non-obvious problems
+- Include file paths in related_files when relevant
 
 ## Report
 

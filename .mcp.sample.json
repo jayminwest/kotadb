@@ -1,10 +1,14 @@
 {
   "mcpServers": {
-    "kotadb": {
-      "type": "http",
-      "url": "http://localhost:3000/mcp",
-      "headers": {
-        "Authorization": "Bearer kota_free_test1234567890ab_0123456789abcdef0123456789abcdef"
+    "kotadb-bunx": {
+      "command": "bunx",
+      "args": ["kotadb@next", "--stdio"]
+    },
+    "kotadb-local-dev": {
+      "command": "bun",
+      "args": ["run", "/path/to/kotadb/app/src/cli.ts", "--stdio"],
+      "env": {
+        "LOG_LEVEL": "debug"
       }
     }
   }

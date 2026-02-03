@@ -17,11 +17,11 @@ Create a rigorously labeled GitHub issue capturing the upcoming work. Follow thi
    - `gh label list --limit 100`
    - Ensure you have one label from each required category: component, priority, effort, status. Add optional methodology/risk labels if useful.
 4. **Collect context**
-   - Review `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and open only the docs whose conditions match the work (e.g., `README.md`, `CLAUDE.md`, `docs/specs/**`).
+   - Review `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and open only the docs whose conditions match the work (e.g., `README.md`, `CLAUDE.md`, `.claude/.cache/specs/**`).
    - Capture reproduction steps or business justification as needed.
    - **Identify issue relationships**: Check for dependencies, related work, blockers using `.claude/commands/docs/issue-relationships.md`
      - `gh issue list --search "<keywords>"` to find related issues
-     - Review recent spec files in `docs/specs/` for relationship patterns
+     - Review recent spec files in `.claude/.cache/specs/` for relationship patterns
      - Check git history or PRs for prerequisite work
 5. **Draft issue content**
    - Include sections for Description, Acceptance Criteria, Technical Approach (if known), Validation, and References.

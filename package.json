@@ -3,9 +3,7 @@
   "version": "2.0.0",
   "private": true,
   "workspaces": [
-    "app",
-    "shared",
-    "web"
+    "app"
   ],
   "scripts": {
     "prepare": "husky || true"

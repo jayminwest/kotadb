@@ -16,8 +16,26 @@
       "Edit"
     ]
   },
-  "statusLine": {
-    "type": "command",
-    "command": "python3 $CLAUDE_PROJECT_DIR/.claude/statusline.py"
+  "hooks": {
+    "PreToolUse": [{
+      "matcher": "Edit|Write|MultiEdit",
+      "hooks": [{
+        "type": "command",
+        "command": "python3 .claude/hooks/kotadb/pre-edit-context.py"
+      }]
+    }],
+    "SubagentStart": [{
+      "matcher": "build|Explore",
+      "hooks": [{
+        "type": "command",
+        "command": "python3 .claude/hooks/kotadb/agent-context.py"
+      }]
+    }],
+    "SessionStart": [{
+      "hooks": [{
+        "type": "command",
+        "command": "python3 .claude/hooks/kotadb/session-expertise.py"
+      }]
+    }]
   }
 }

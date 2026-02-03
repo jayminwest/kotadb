@@ -8,13 +8,13 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - You are executing in an isolated git worktree directory
 - Your CWD is the worktree root (e.g., `/project/trees/feat-123-abc12345`)
 - ALL file paths in Write, Edit, Read tools MUST be relative to CWD
-- ✅ Correct: `docs/specs/feature-123-plan.md`
-- ❌ Wrong: `/project/trees/feat-123-abc12345/docs/specs/feature-123-plan.md`
+- ✅ Correct: `.claude/.cache/specs/feature-123-plan.md`
+- ❌ Wrong: `/project/trees/feat-123-abc12345/.claude/.cache/specs/feature-123-plan.md`
 - Using absolute paths will cause git staging failures and commit errors
 
 ## Instructions
 - **Verify issue labels first**: Run `gh issue view <issue-number> --json labels` to ensure the issue has labels from all four categories (component, priority, effort, status). If labels are missing, apply them before proceeding.
-- Create a new markdown plan under `docs/specs/` named `feature-<issue-number>-<slug>.md` (e.g., `docs/specs/feature-1024-event-streaming.md`).
+- Create a new markdown plan under `.claude/.cache/specs/` named `feature-<issue-number>-<slug>.md` (e.g., `.claude/.cache/specs/feature-1024-event-streaming.md`).
 - Build `<slug>` from the issue title using 3–6 lowercase, hyphenated words (alphanumeric only).
 - Reference issue metadata from `$ARGUMENTS` at the top of the plan for traceability.
 - Review `.claude/commands/docs/conditional_docs/app.md` or `.claude/commands/docs/conditional_docs/automation.md` and read any documentation whose conditions match the feature scope.
@@ -33,7 +33,7 @@ Draft a KotaDB feature implementation plan using the issue context passed in `$A
 - If executing via ADW orchestration, query workflow state via MCP instead of searching:
   ```typescript
   const state = await mcp.call("adw_get_state", { adw_id: "<adw_id>" });
-  const planFile = state.plan_file;  // e.g., "docs/specs/feature-145-plan.md"
+  const planFile = state.plan_file;  // e.g., ".claude/.cache/specs/feature-145-plan.md"
   const worktreePath = state.worktree_path;  // e.g., "trees/feat-145-abc12345"
   ```
 
@@ -113,25 +113,25 @@ Return ONLY the plan file path as plain text on a single line.
 
 **Correct output:**
 ```
-docs/specs/chore-1450-refresh-deps.md
+.claude/.cache/specs/chore-1450-refresh-deps.md
 ```
 
 **INCORRECT outputs (do NOT do this):**
 ```
-Created chore plan at docs/specs/chore-1450-refresh-deps.md
+Created chore plan at .claude/.cache/specs/chore-1450-refresh-deps.md
 ```
 ```
-Plan file: docs/specs/chore-1450-refresh-deps.md
+Plan file: .claude/.cache/specs/chore-1450-refresh-deps.md
 ```
 ```
-**docs/specs/chore-1450-refresh-deps.md**
+**.claude/.cache/specs/chore-1450-refresh-deps.md**
 ```
 
 ## Feature Plan Summary
 
 I've created a comprehensive plan for the event streaming feature!
 
-**Plan Location:** docs/specs/feature-1024-event-streaming.md
+**Plan Location:** .claude/.cache/specs/feature-1024-event-streaming.md
 
 The plan includes three major phases...
 ```

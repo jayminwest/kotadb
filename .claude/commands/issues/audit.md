@@ -127,7 +127,7 @@ Systematically audit open GitHub issues to identify candidates for closure. This
    After closing issues:
    - Update any spec files that reference closed issues
    - Update epic/tracking issues to remove closed children
-   - Update `docs/specs/` files if closures affect documented features
+   - Update `.claude/.cache/specs/` files if closures affect documented features
    - Note closure summary in commit message or PR description
 
 ## Reporting

@@ -7,6 +7,9 @@ tools:
   - Grep
   - Write
   - Bash
+  - mcp__kotadb-bunx__search_code
+  - mcp__kotadb-bunx__search_dependencies
+  - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
 ---
@@ -163,7 +166,7 @@ app/src/
    - Example requests/responses
 
 7. **Save Specification**
-   - Save spec to `docs/specs/api-<descriptive-name>-spec.md`
+   - Save spec to `.claude/.cache/specs/api-<descriptive-name>-spec.md`
    - Include code snippets for implementation
    - Document validation criteria
    - Return the spec path when complete
@@ -197,5 +200,5 @@ app/src/
 - Path: <endpoint path>
 
 **Specification Location:**
-- Path: `docs/specs/api-<name>-spec.md`
+- Path: `.claude/.cache/specs/api-<name>-spec.md`
 ```

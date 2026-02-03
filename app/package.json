@@ -1,10 +1,43 @@
 {
-  "name": "kota-db",
-  "version": "2.0.0",
-  "description": "KotaDB indexing and API service built with Bun + TypeScript.",
-  "private": true,
+  "name": "kotadb",
+  "version": "2.1.0",
+  "description": "Local-only code intelligence tool for CLI agents. SQLite-backed repository indexing and code search via MCP.",
   "type": "module",
   "module": "src/index.ts",
+  "bin": {
+    "kotadb": "./src/cli.ts"
+  },
+  "files": [
+    "src/**/*.ts",
+    "src/**/*.js",
+    "src/**/*.sql",
+    "!src/**/*.test.ts",
+    "!src/**/*.spec.ts",
+    "tsconfig.json",
+    "shared/**/*.ts"
+  ],
+  "keywords": [
+    "mcp",
+    "code-search",
+    "code-intelligence",
+    "sqlite",
+    "cli",
+    "claude-code",
+    "model-context-protocol"
+  ],
+  "author": "Jaymin West",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/jayminwest/kotadb.git"
+  },
+  "bugs": {
+    "url": "https://github.com/jayminwest/kotadb/issues"
+  },
+  "homepage": "https://github.com/jayminwest/kotadb#readme",
+  "engines": {
+    "node": ">=18.0.0"
+  },
   "scripts": {
     "dev": "bun --watch src/index.ts",
     "start": "bun run src/index.ts",
@@ -14,18 +47,20 @@
     "build": "bun run typecheck",
     "lint": "bunx biome lint",
     "test:validate-env": "! grep -rn 'process\\.env\\.\\(SUPABASE_URL\\|DATABASE_URL\\)\\s*=\\s*[\"\\x27]' tests/ || (echo 'ERROR: Found hardcoded environment variable string assignments in tests/' && exit 1)",
-    "prepare": "husky || true"
+    "prepare": "husky || true",
+    "prepublishOnly": "bun run typecheck && bun run lint"
   },
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^8.2.0",
-    "@modelcontextprotocol/sdk": "^1.20.0",
+    "@asteasolutions/zod-to-openapi": "^8.4.0",
+    "@modelcontextprotocol/sdk": "^1.25.0",
     "@sentry/node": "^10.25.0",
     "@typescript-eslint/parser": "^8.0.0",
-    "@typescript-eslint/types": "^8.0.0",
+    "@typescript-eslint/types": "^8.54.0",
     "bcryptjs": "^2.4.3",
-    "cors": "^2.8.5",
+    "chokidar": "^5.0.0",
+    "cors": "^2.8.6",
     "express": "^4.18.0",
-    "zod": "^4.1.12"
+    "zod": "^4.3.6"
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^12.1.0",
@@ -33,9 +68,9 @@
     "@types/bcryptjs": "^2.4.6",
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.21",
-    "@types/node": "^22.9.0",
+    "@types/node": "^25.2.0",
     "@types/supertest": "^6.0.3",
-    "bun-types": "^1.1.10",
+    "bun-types": "^1.3.8",
     "husky": "^9.1.7",
     "lint-staged": "^16.2.4",
     "supertest": "^7.1.4",
