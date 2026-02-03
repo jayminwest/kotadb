@@ -14,3 +14,14 @@ export {
   trackDeletions,
   type DeletionEntry
 } from "./deletion-manifest.js";
+export {
+  SourceWatcher,
+  createSourceWatcher,
+  startWatching,
+  stopWatching,
+  stopAll,
+  getWatchedPaths,
+  type ChangeType,
+  type FileChangeEvent,
+  type SourceWatcherOptions,
+} from "./source-watcher.js";
