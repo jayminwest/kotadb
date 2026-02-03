@@ -34,8 +34,14 @@ const logger = createLogger({ module: "mcp-tools" });
 /**
  * MCP Tool Definition
  */
+/**
+ * Tool tier for categorizing tools by feature set
+ */
+export type ToolTier = "core" | "sync" | "memory" | "expertise";
+
 export interface ToolDefinition {
 	name: string;
+	tier: ToolTier;
 	description: string;
 	inputSchema: {
 		type: "object";
@@ -45,11 +51,60 @@ export interface ToolDefinition {
 }
 
 /**
+ * Toolset tier for CLI selection (maps to tool tiers)
+ */
+export type ToolsetTier = "default" | "core" | "memory" | "full";
 
+/**
+ * Filter tools by the requested toolset tier
+ *
+ * Tier mapping:
+ * - core: 6 tools (core tier only)
+ * - default: 8 tools (core + sync tiers)
+ * - memory: 14 tools (core + sync + memory tiers)
+ * - full: all tools
+ *
+ * @param tier - The toolset tier to filter by
+ * @param tools - Optional array of tools (defaults to all tool definitions)
+ */
+export function filterToolsByTier(tier: ToolsetTier, tools?: ToolDefinition[]): ToolDefinition[] {
+	const allTools = tools ?? getToolDefinitions();
+	switch (tier) {
+		case "core":
+			return allTools.filter((t) => t.tier === "core");
+		case "default":
+			return allTools.filter((t) => t.tier === "core" || t.tier === "sync");
+		case "memory":
+			return allTools.filter((t) => t.tier === "core" || t.tier === "sync" || t.tier === "memory");
+		case "full":
+			return allTools;
+		default:
+			// Default to "default" tier if unknown
+			return allTools.filter((t) => t.tier === "core" || t.tier === "sync");
+	}
+}
+
+/**
+ * Alias for filterToolsByTier - get tool definitions filtered by toolset
+ *
+ * @param toolset - The toolset tier to filter by
+ */
+export function getToolsByTier(toolset: ToolsetTier): ToolDefinition[] {
+	return filterToolsByTier(toolset);
+}
+
+/**
+ * Validate if a string is a valid toolset tier
+ */
+export function isValidToolset(value: string): value is ToolsetTier {
+	return value === "default" || value === "core" || value === "memory" || value === "full";
+}
+/**
 /**
  * Tool: search_code
  */
 export const SEARCH_CODE_TOOL: ToolDefinition = {
+	tier: "core",
 	name: "search_code",
 	description:
 		"Search indexed code files for a specific term. Returns matching files with context snippets.",
@@ -77,6 +132,7 @@ export const SEARCH_CODE_TOOL: ToolDefinition = {
  * Tool: index_repository
  */
 export const INDEX_REPOSITORY_TOOL: ToolDefinition = {
+	tier: "core",
 	name: "index_repository",
 	description:
 		"Index a git repository by cloning/updating it and extracting code files. Performs synchronous indexing and returns immediately with status 'completed' and full indexing stats.",
@@ -104,6 +160,7 @@ export const INDEX_REPOSITORY_TOOL: ToolDefinition = {
  * Tool: list_recent_files
  */
 export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
+	tier: "core",
 	name: "list_recent_files",
 	description:
 		"List recently indexed files, ordered by indexing timestamp. Useful for seeing what code is available.",
@@ -126,6 +183,7 @@ export const LIST_RECENT_FILES_TOOL: ToolDefinition = {
  * Tool: search_dependencies
  */
 export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
+	tier: "core",
 	name: "search_dependencies",
 	description:
 		"Search the dependency graph to find files that depend on (dependents) or are depended on by (dependencies) a target file. Useful for impact analysis before refactoring, test scope discovery, and circular dependency detection.",
@@ -174,6 +232,7 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
  * Tool: analyze_change_impact
  */
 export const ANALYZE_CHANGE_IMPACT_TOOL: ToolDefinition = {
+	tier: "core",
 	name: "analyze_change_impact",
 	description:
 		"Analyze the impact of proposed code changes by examining dependency graphs, test scope, and potential conflicts. Returns comprehensive analysis including affected files, test recommendations, architectural warnings, and risk assessment. Useful for planning implementations and avoiding breaking changes.",
@@ -221,6 +280,7 @@ export const ANALYZE_CHANGE_IMPACT_TOOL: ToolDefinition = {
  * Tool: validate_implementation_spec
  */
 export const VALIDATE_IMPLEMENTATION_SPEC_TOOL: ToolDefinition = {
+	tier: "expertise",
 	name: "validate_implementation_spec",
 	description:
 		"Validate an implementation specification against KotaDB conventions and repository state. Checks for file conflicts, naming conventions, path alias usage, test coverage, and dependency compatibility. Returns validation errors, warnings, and approval conditions checklist.",
@@ -303,6 +363,7 @@ export const VALIDATE_IMPLEMENTATION_SPEC_TOOL: ToolDefinition = {
  * Tool: kota_sync_export
  */
 export const SYNC_EXPORT_TOOL: ToolDefinition = {
+	tier: "sync",
 	name: "kota_sync_export",
 	description:
 		"Export local SQLite database to JSONL files for git sync. Uses hash-based change detection to skip unchanged tables. Exports to .kotadb/export/ by default.",
@@ -325,6 +386,7 @@ export const SYNC_EXPORT_TOOL: ToolDefinition = {
  * Tool: kota_sync_import
  */
 export const SYNC_IMPORT_TOOL: ToolDefinition = {
+	tier: "sync",
 	name: "kota_sync_import",
 	description:
 		"Import JSONL files into local SQLite database. Applies deletion manifest first, then imports all tables transactionally. Typically run after git pull to sync remote changes.",
@@ -347,6 +409,7 @@ export const SYNC_IMPORT_TOOL: ToolDefinition = {
  * Target: <100ms response time
  */
 export const GENERATE_TASK_CONTEXT_TOOL: ToolDefinition = {
+	tier: "core",
 	name: "generate_task_context",
 	description:
 		"Generate structured context for a set of files including dependency counts, impacted files, test files, and recent changes. Designed for hook-based context injection with <100ms performance target.",
@@ -387,6 +450,7 @@ export const GENERATE_TASK_CONTEXT_TOOL: ToolDefinition = {
  * Tool: search_decisions
  */
 export const SEARCH_DECISIONS_TOOL: ToolDefinition = {
+	tier: "memory",
 	name: "search_decisions",
 	description:
 		"Search past architectural decisions using FTS5. Returns decisions with relevance scores.",
@@ -419,6 +483,7 @@ export const SEARCH_DECISIONS_TOOL: ToolDefinition = {
  * Tool: record_decision
  */
 export const RECORD_DECISION_TOOL: ToolDefinition = {
+	tier: "memory",
 	name: "record_decision",
 	description:
 		"Record a new architectural decision for future reference. Decisions are searchable via search_decisions.",
@@ -469,6 +534,7 @@ export const RECORD_DECISION_TOOL: ToolDefinition = {
  * Tool: search_failures
  */
 export const SEARCH_FAILURES_TOOL: ToolDefinition = {
+	tier: "memory",
 	name: "search_failures",
 	description:
 		"Search failed approaches to avoid repeating mistakes. Returns failures with relevance scores.",
@@ -496,6 +562,7 @@ export const SEARCH_FAILURES_TOOL: ToolDefinition = {
  * Tool: record_failure
  */
 export const RECORD_FAILURE_TOOL: ToolDefinition = {
+	tier: "memory",
 	name: "record_failure",
 	description:
 		"Record a failed approach for future reference. Helps agents avoid repeating mistakes.",
@@ -536,6 +603,7 @@ export const RECORD_FAILURE_TOOL: ToolDefinition = {
  * Tool: search_patterns
  */
 export const SEARCH_PATTERNS_TOOL: ToolDefinition = {
+	tier: "memory",
 	name: "search_patterns",
 	description:
 		"Find codebase patterns by type or file. Returns discovered patterns for consistency.",
@@ -570,6 +638,7 @@ export const SEARCH_PATTERNS_TOOL: ToolDefinition = {
  * Tool: record_insight
  */
 export const RECORD_INSIGHT_TOOL: ToolDefinition = {
+	tier: "memory",
 	name: "record_insight",
 	description:
 		"Store a session insight for future agents. Insights are discoveries, failures, or workarounds.",
@@ -611,6 +680,7 @@ export const RECORD_INSIGHT_TOOL: ToolDefinition = {
  * Tool: get_domain_key_files
  */
 export const GET_DOMAIN_KEY_FILES_TOOL: ToolDefinition = {
+	tier: "expertise",
 	name: "get_domain_key_files",
 	description:
 		"Get the most-depended-on files for a domain. Key files are core infrastructure that many other files depend on.",
@@ -638,6 +708,7 @@ export const GET_DOMAIN_KEY_FILES_TOOL: ToolDefinition = {
  * Tool: validate_expertise
  */
 export const VALIDATE_EXPERTISE_TOOL: ToolDefinition = {
+	tier: "expertise",
 	name: "validate_expertise",
 	description:
 		"Validate that key_files defined in expertise.yaml exist in the indexed codebase. Checks for stale or missing file references.",
@@ -657,6 +728,7 @@ export const VALIDATE_EXPERTISE_TOOL: ToolDefinition = {
  * Tool: sync_expertise
  */
 export const SYNC_EXPERTISE_TOOL: ToolDefinition = {
+	tier: "expertise",
 	name: "sync_expertise",
 	description:
 		"Sync patterns from expertise.yaml files to the patterns table. Extracts pattern definitions and stores them for future reference.",
@@ -679,6 +751,7 @@ export const SYNC_EXPERTISE_TOOL: ToolDefinition = {
  * Tool: get_recent_patterns
  */
 export const GET_RECENT_PATTERNS_TOOL: ToolDefinition = {
+	tier: "expertise",
 	name: "get_recent_patterns",
 	description:
 		"Get recently observed patterns from the patterns table. Useful for understanding codebase conventions.",
@@ -734,7 +807,6 @@ export function getToolDefinitions(): ToolDefinition[] {
 		GET_RECENT_PATTERNS_TOOL,
 	];
 }
-
 /**
 
 /**
