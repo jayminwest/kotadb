@@ -1,5 +1,8 @@
 /**
  * Integration tests for request logging middleware
+ * 
+ * Note: All log levels output to stderr to keep stdout clean for JSON output.
+ * This is intentional - see issue #117.
  */
 
 import { describe, it, expect, mock, beforeEach, afterEach } from "bun:test";
@@ -10,7 +13,6 @@ import type { LogEntry } from "@logging/logger";
 
 describe("Request logging middleware", () => {
 	let app: Express;
-	let stdoutSpy: ReturnType<typeof mock>;
 	let stderrSpy: ReturnType<typeof mock>;
 	let originalLogLevel: string | undefined;
 
@@ -18,10 +20,8 @@ describe("Request logging middleware", () => {
 		// Create Express app
 		app = express();
 
-		// Capture stdout and stderr
-		stdoutSpy = mock(() => {});
+		// Capture stderr (all logs go to stderr now)
 		stderrSpy = mock(() => {});
-		process.stdout.write = stdoutSpy;
 		process.stderr.write = stderrSpy;
 
 		// Save original log level
@@ -75,8 +75,8 @@ describe("Request logging middleware", () => {
 			try {
 				await fetch(`http://localhost:${port}/test`);
 
-				// Check that logs contain request_id
-				const logs = stdoutSpy.mock.calls
+				// Check that logs contain request_id (all logs go to stderr)
+				const logs = stderrSpy.mock.calls
 					.map((call) => JSON.parse(call[0] as string) as LogEntry)
 					.filter((log) => log.message.includes("Incoming request"));
 
@@ -102,7 +102,7 @@ describe("Request logging middleware", () => {
 			try {
 				await fetch(`http://localhost:${port}/api/test`);
 
-				const logs = stdoutSpy.mock.calls
+				const logs = stderrSpy.mock.calls
 					.map((call) => JSON.parse(call[0] as string) as LogEntry)
 					.filter((log) => log.message === "Incoming request");
 
@@ -126,7 +126,7 @@ describe("Request logging middleware", () => {
 			try {
 				await fetch(`http://localhost:${port}/test`);
 
-				const logs = stdoutSpy.mock.calls
+				const logs = stderrSpy.mock.calls
 					.map((call) => JSON.parse(call[0] as string) as LogEntry)
 					.filter((log) => log.message === "Request completed");
 
@@ -150,7 +150,7 @@ describe("Request logging middleware", () => {
 			try {
 				await fetch(`http://localhost:${port}/test`);
 
-				const logs = stdoutSpy.mock.calls
+				const logs = stderrSpy.mock.calls
 					.map((call) => JSON.parse(call[0] as string) as LogEntry)
 					.filter((log) => log.level === "warn" && log.message.includes("Request completed"));
 
@@ -173,7 +173,7 @@ describe("Request logging middleware", () => {
 			try {
 				await fetch(`http://localhost:${port}/test`);
 
-				const logs = stdoutSpy.mock.calls
+				const logs = stderrSpy.mock.calls
 					.map((call) => JSON.parse(call[0] as string) as LogEntry)
 					.filter((log) => log.level === "warn" && log.message.includes("Request completed"));
 
@@ -219,7 +219,7 @@ describe("Request logging middleware", () => {
 			try {
 				await fetch(`http://localhost:${port}/test`);
 
-				const logs = stdoutSpy.mock.calls
+				const logs = stderrSpy.mock.calls
 					.map((call) => JSON.parse(call[0] as string) as LogEntry)
 					.filter((log) => log.message === "Custom handler log");
 
