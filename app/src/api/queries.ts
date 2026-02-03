@@ -1067,6 +1067,180 @@ export async function runIndexingWorkflow(
 }
 
 // ============================================================================
+// Repository Indexing Status & File Deletion Operations
+// ============================================================================
+
+/**
+ * Check if a repository has been indexed (has files in indexed_files table).
+ * 
+ * @param repositoryId - Repository UUID or full_name
+ * @returns true if the repository has indexed files, false otherwise
+ */
+function isRepositoryIndexedInternal(
+	db: KotaDatabase,
+	repositoryId: string,
+): boolean {
+	// First try to match by ID, then by full_name
+	const result = db.queryOne<{ count: number }>(
+		`SELECT COUNT(*) as count FROM indexed_files 
+		 WHERE repository_id = ? 
+		 OR repository_id IN (SELECT id FROM repositories WHERE full_name = ?)`,
+		[repositoryId, repositoryId]
+	);
+	return (result?.count ?? 0) > 0;
+}
+
+/**
+ * Check if a repository has been indexed.
+ * 
+ * @param repositoryId - Repository UUID or full_name
+ * @returns true if the repository has indexed files, false otherwise
+ */
+export function isRepositoryIndexed(repositoryId: string): boolean {
+	return isRepositoryIndexedInternal(getGlobalDatabase(), repositoryId);
+}
+
+/**
+ * Delete a single file from the index by path.
+ * Cascading deletes will remove associated symbols and references.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePath - Relative file path to delete
+ * @returns true if file was deleted, false if not found
+ */
+function deleteFileByPathInternal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePath: string,
+): boolean {
+	const normalizedPath = normalizePath(filePath);
+	
+	// The indexed_files table has ON DELETE CASCADE for:
+	// - indexed_symbols (via file_id FK)
+	// - indexed_references (via file_id FK)
+	// FTS5 triggers handle indexed_files_fts cleanup automatically
+	
+	const result = db.queryOne<{ id: string }>(
+		`SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?`,
+		[repositoryId, normalizedPath]
+	);
+	
+	if (!result) {
+		logger.debug("File not found for deletion", { repositoryId, filePath: normalizedPath });
+		return false;
+	}
+	
+	db.run(
+		`DELETE FROM indexed_files WHERE id = ?`,
+		[result.id]
+	);
+	
+	logger.info("Deleted file from index", { repositoryId, filePath: normalizedPath, fileId: result.id });
+	return true;
+}
+
+/**
+ * Delete a single file from the index by path.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePath - Relative file path to delete
+ * @returns true if file was deleted, false if not found
+ */
+export function deleteFileByPath(
+	repositoryId: string,
+	filePath: string,
+): boolean {
+	return deleteFileByPathInternal(getGlobalDatabase(), repositoryId, filePath);
+}
+
+/**
+ * Delete multiple files from the index by paths.
+ * Uses a transaction for atomic operation.
+ * Cascading deletes will remove associated symbols and references.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePaths - Array of relative file paths to delete
+ * @returns Object with deleted count and list of deleted paths
+ */
+function deleteFilesByPathsInternal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePaths: string[],
+): { deletedCount: number; deletedPaths: string[] } {
+	if (filePaths.length === 0) {
+		return { deletedCount: 0, deletedPaths: [] };
+	}
+	
+	const normalizedPaths = filePaths.map(normalizePath);
+	const deletedPaths: string[] = [];
+	
+	db.transaction(() => {
+		for (const normalizedPath of normalizedPaths) {
+			const result = db.queryOne<{ id: string }>(
+				`SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?`,
+				[repositoryId, normalizedPath]
+			);
+			
+			if (result) {
+				db.run(`DELETE FROM indexed_files WHERE id = ?`, [result.id]);
+				deletedPaths.push(normalizedPath);
+			}
+		}
+	});
+	
+	logger.info("Deleted files from index", { 
+		repositoryId, 
+		requestedCount: filePaths.length,
+		deletedCount: deletedPaths.length 
+	});
+	
+	return { deletedCount: deletedPaths.length, deletedPaths };
+}
+
+/**
+ * Delete multiple files from the index by paths.
+ * 
+ * @param repositoryId - Repository UUID
+ * @param filePaths - Array of relative file paths to delete
+ * @returns Object with deleted count and list of deleted paths
+ */
+export function deleteFilesByPaths(
+	repositoryId: string,
+	filePaths: string[],
+): { deletedCount: number; deletedPaths: string[] } {
+	return deleteFilesByPathsInternal(getGlobalDatabase(), repositoryId, filePaths);
+}
+
+/**
+ * Get repository ID from full_name.
+ * Useful for auto-indexing when you have the path but need the UUID.
+ * 
+ * @param fullName - Repository full name (e.g., "owner/repo" or "local/path")
+ * @returns Repository UUID or null if not found
+ */
+function getRepositoryIdByNameInternal(
+	db: KotaDatabase,
+	fullName: string,
+): string | null {
+	const result = db.queryOne<{ id: string }>(
+		`SELECT id FROM repositories WHERE full_name = ?`,
+		[fullName]
+	);
+	return result?.id ?? null;
+}
+
+/**
+ * Get repository ID from full_name.
+ * 
+ * @param fullName - Repository full name
+ * @returns Repository UUID or null if not found
+ */
+export function getRepositoryIdByName(fullName: string): string | null {
+	return getRepositoryIdByNameInternal(getGlobalDatabase(), fullName);
+}
+
+
+// ============================================================================
 // Backward-compatible aliases that accept db parameter
 // These use the passed database (for tests) rather than the global one
 // ============================================================================
@@ -1170,6 +1344,52 @@ export function updateRepositoryLastIndexedLocal(
 	repositoryId: string
 ): void {
 	return updateRepositoryLastIndexedInternal(db, repositoryId);
+}
+
+/**
+ * Check if a repository has been indexed.
+ * Version that accepts db parameter for testing.
+ */
+export function isRepositoryIndexedLocal(
+	db: KotaDatabase,
+	repositoryId: string
+): boolean {
+	return isRepositoryIndexedInternal(db, repositoryId);
+}
+
+/**
+ * Delete a single file from the index by path.
+ * Version that accepts db parameter for testing.
+ */
+export function deleteFileByPathLocal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePath: string
+): boolean {
+	return deleteFileByPathInternal(db, repositoryId, filePath);
+}
+
+/**
+ * Delete multiple files from the index by paths.
+ * Version that accepts db parameter for testing.
+ */
+export function deleteFilesByPathsLocal(
+	db: KotaDatabase,
+	repositoryId: string,
+	filePaths: string[]
+): { deletedCount: number; deletedPaths: string[] } {
+	return deleteFilesByPathsInternal(db, repositoryId, filePaths);
+}
+
+/**
+ * Get repository ID from full_name.
+ * Version that accepts db parameter for testing.
+ */
+export function getRepositoryIdByNameLocal(
+	db: KotaDatabase,
+	fullName: string
+): string | null {
+	return getRepositoryIdByNameInternal(db, fullName);
 }
 
 // Add alias for runIndexingWorkflowLocal

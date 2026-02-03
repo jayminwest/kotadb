@@ -24,6 +24,8 @@ import { analyzeChangeImpact } from "./impact-analysis";
 import { invalidParams } from "./jsonrpc";
 import { validateImplementationSpec } from "./spec-validation";
 import { resolveRepositoryIdentifierWithError } from "./repository-resolver";
+import { ensureRepositoryIndexed, type AutoIndexResult } from "./auto-index";
+import { startWatching } from "@sync/source-watcher.js";
 import { readFileSync, existsSync } from "node:fs";
 import { parse as parseYaml } from "yaml";
 
@@ -41,6 +43,8 @@ export interface ToolDefinition {
 		required?: string[];
 	};
 }
+
+/**
 
 /**
  * Tool: search_code
@@ -732,6 +736,8 @@ export function getToolDefinitions(): ToolDefinition[] {
 }
 
 /**
+
+/**
  * Type guard for list_recent_files params
  */
 function isListRecentParams(params: unknown): params is { limit?: number; repository?: string } | undefined {
@@ -744,7 +750,10 @@ function isListRecentParams(params: unknown): params is { limit?: number; reposi
 }
 
 /**
+/**
  * Execute search_code tool
+ *
+ * AUTO-INDEX: If no repository is indexed, automatically indexes the cwd.
  */
 export async function executeSearchCode(
 	params: unknown,
@@ -780,13 +789,34 @@ export async function executeSearchCode(
 		limit?: number;
 	};
 
+	// AUTO-INDEX: Ensure repository is indexed before searching
+	let autoIndexResult: AutoIndexResult | null = null;
+	let repositoryId = validatedParams.repository;
+
+	try {
+		autoIndexResult = await ensureRepositoryIndexed(validatedParams.repository);
+		repositoryId = autoIndexResult.repositoryId;
+		
+		if (autoIndexResult.wasIndexed) {
+			logger.info("Auto-indexed repository before search", {
+				repositoryId,
+				filesIndexed: autoIndexResult.stats?.filesIndexed,
+			});
+		}
+	} catch (error) {
+		// Log but don't fail - allow search to proceed (may return empty results)
+		logger.warn("Auto-index check failed, proceeding with search", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
+
 	// Use SQLite via searchFiles
 	const results = searchFiles(validatedParams.term, {
-		repositoryId: validatedParams.repository,
+		repositoryId: repositoryId,
 		limit: validatedParams.limit,
 	});
 
-	return {
+	const response: Record<string, unknown> = {
 		results: results.map((row) => ({
 			projectRoot: row.projectRoot,
 			path: row.path,
@@ -795,6 +825,16 @@ export async function executeSearchCode(
 			indexedAt: row.indexedAt.toISOString(),
 		})),
 	};
+
+	// Include auto-index info if indexing was performed
+	if (autoIndexResult?.wasIndexed) {
+		response.auto_indexed = {
+			message: autoIndexResult.message,
+			stats: autoIndexResult.stats,
+		};
+	}
+
+	return response;
 }
 
 /**
@@ -849,6 +889,19 @@ export async function executeIndexRepository(
 	try {
 		const result = await runIndexingWorkflow(indexRequest);
 
+		// Start watching for file changes after successful indexing
+		const watchPath = indexRequest.localPath || process.cwd();
+		try {
+			startWatching(watchPath, result.repositoryId);
+			logger.info("Started source watcher for indexed repository", { path: watchPath });
+		} catch (watchError) {
+			// Do not fail indexing if watcher fails to start
+			logger.warn("Failed to start source watcher", {
+				error: watchError instanceof Error ? watchError.message : String(watchError),
+				path: watchPath,
+			});
+		}
+
 		return {
 			runId: result.repositoryId, // Add runId for API compatibility
 			repositoryId: result.repositoryId,
@@ -867,6 +920,8 @@ export async function executeIndexRepository(
 		throw error;
 	}
 }
+
+/**
 
 /**
  * Execute list_recent_files tool
@@ -900,6 +955,8 @@ export async function executeListRecentFiles(
 		})),
 	};
 }
+
+/**
 
 /**
  * Execute search_dependencies tool
@@ -972,6 +1029,26 @@ export async function executeSearchDependencies(
 		repository: p.repository as string | undefined,
 	};
 
+
+
+	// AUTO-INDEX: Ensure repository is indexed before dependency search
+	let autoIndexResult: AutoIndexResult | null = null;
+	try {
+		autoIndexResult = await ensureRepositoryIndexed(validatedParams.repository);
+		// Use auto-indexed repository ID if available
+		if (autoIndexResult.wasIndexed) {
+			logger.info("Auto-indexed repository before dependency search", {
+				repositoryId: autoIndexResult.repositoryId,
+				filesIndexed: autoIndexResult.stats?.filesIndexed,
+			});
+		}
+		// Override repository param with resolved ID
+		validatedParams.repository = autoIndexResult.repositoryId;
+	} catch (error) {
+		logger.warn("Auto-index check failed, proceeding with search", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
 
 	// Resolve repository ID (supports UUID or full_name)
 	const repoResult = resolveRepositoryIdentifierWithError(validatedParams.repository);
@@ -1061,6 +1138,8 @@ export async function executeSearchDependencies(
 }
 
 /**
+
+/**
  * Execute analyze_change_impact tool
  */
 export async function executeAnalyzeChangeImpact(
@@ -1120,10 +1199,30 @@ export async function executeAnalyzeChangeImpact(
 		repository: p.repository as string | undefined,
 	};
 
+
+	// AUTO-INDEX: Ensure repository is indexed before change impact analysis
+	try {
+		const autoIndexResult = await ensureRepositoryIndexed(validatedParams.repository);
+		if (autoIndexResult.wasIndexed) {
+			logger.info("Auto-indexed repository before change impact analysis", {
+				repositoryId: autoIndexResult.repositoryId,
+				filesIndexed: autoIndexResult.stats?.filesIndexed,
+			});
+		}
+		// Override repository param with resolved ID
+		validatedParams.repository = autoIndexResult.repositoryId;
+	} catch (error) {
+		logger.warn("Auto-index check failed, proceeding with analysis", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
+
 	const result = await analyzeChangeImpact(validatedParams, userId);
 
 	return result;
 }
+
+/**
 
 /**
  * Execute validate_implementation_spec tool
@@ -1184,6 +1283,8 @@ export async function executeValidateImplementationSpec(
 }
 
 /**
+
+/**
  * Execute kota_sync_export tool
  */
 export async function executeSyncExport(
@@ -1217,6 +1318,8 @@ export async function executeSyncExport(
 		export_dir: exportDir || ".kotadb/export (project-local)",
 	};
 }
+
+/**
 
 /**
  * Execute kota_sync_import tool
@@ -1260,6 +1363,8 @@ export async function executeSyncImport(
 		import_dir: dir,
 	};
 }
+
+/**
 
 
 /**
@@ -1449,6 +1554,8 @@ export async function executeGenerateTaskContext(
 }
 
 /**
+
+/**
  * Generate potential test file patterns for a source file
  */
 function generateTestFilePatterns(sourcePath: string): string[] {
@@ -1473,6 +1580,8 @@ function generateTestFilePatterns(sourcePath: string): string[] {
 	return patterns;
 }
 
+/**
+
 
 
 // ============================================================================
@@ -1486,6 +1595,8 @@ function escapeFts5Term(term: string): string {
 	const escaped = term.replace(/"/g, '""');
 	return `"${escaped}"`;
 }
+
+/**
 
 /**
  * Execute search_decisions tool
@@ -1593,6 +1704,8 @@ export async function executeSearchDecisions(
 }
 
 /**
+
+/**
  * Execute record_decision tool
  */
 export async function executeRecordDecision(
@@ -1673,6 +1786,8 @@ export async function executeRecordDecision(
 		message: "Decision recorded successfully",
 	};
 }
+
+/**
 
 /**
  * Execute search_failures tool
@@ -1763,6 +1878,8 @@ export async function executeSearchFailures(
 }
 
 /**
+
+/**
  * Execute record_failure tool
  */
 export async function executeRecordFailure(
@@ -1833,6 +1950,8 @@ export async function executeRecordFailure(
 		message: "Failure recorded successfully",
 	};
 }
+
+/**
 
 /**
  * Execute search_patterns tool
@@ -1927,6 +2046,8 @@ export async function executeSearchPatterns(
 }
 
 /**
+
+/**
  * Execute record_insight tool
  */
 export async function executeRecordInsight(
@@ -1986,6 +2107,8 @@ export async function executeRecordInsight(
 		message: "Insight recorded successfully",
 	};
 }
+
+/**
 
 
 // ============================================================================
@@ -2056,6 +2179,8 @@ export async function executeGetDomainKeyFiles(
 		key_files: results,
 	};
 }
+
+/**
 
 /**
  * Execute validate_expertise tool
@@ -2209,6 +2334,8 @@ export async function executeValidateExpertise(
 }
 
 /**
+
+/**
  * Execute sync_expertise tool
  * Extracts patterns from expertise.yaml and stores in patterns table
  */
@@ -2331,6 +2458,8 @@ export async function executeSyncExpertise(
 }
 
 /**
+
+/**
  * Execute get_recent_patterns tool
  * Returns recently observed patterns from the patterns table
  */
@@ -2416,6 +2545,8 @@ export async function executeGetRecentPatterns(
 		},
 	};
 }
+
+/**
 
 /**
  * Main tool call dispatcher
