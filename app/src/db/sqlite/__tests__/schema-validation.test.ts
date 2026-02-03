@@ -663,8 +663,8 @@ describe("SQLite Schema Validation", () => {
 		});
 
 		it("should auto-increment id", () => {
-			db.run("INSERT INTO schema_migrations (name) VALUES (?)", ["002_test_migration"]);
-			db.run("INSERT INTO schema_migrations (name) VALUES (?)", ["003_another_migration"]);
+			db.run("INSERT INTO schema_migrations (name) VALUES (?)", ["003_test_migration"]);
+			db.run("INSERT INTO schema_migrations (name) VALUES (?)", ["004_another_migration"]);
 
 			const migrations = db
 				.query<{ id: number; name: string }, []>(
@@ -672,10 +672,11 @@ describe("SQLite Schema Validation", () => {
 				)
 				.all();
 
-			expect(migrations.length).toBe(3); // Including initial migration
-			expect(migrations[0]?.id).toBe(1);
-			expect(migrations[1]?.id).toBe(2);
-			expect(migrations[2]?.id).toBe(3);
+			expect(migrations.length).toBe(4); // 001_initial + 002_memory_layer + test migrations
+			expect(migrations[0]?.id).toBe(1); // 001_initial_sqlite_schema
+			expect(migrations[1]?.id).toBe(2); // 002_memory_layer_tables
+			expect(migrations[2]?.id).toBe(3); // 003_test_migration
+			expect(migrations[3]?.id).toBe(4); // 004_another_migration
 		});
 	});
 

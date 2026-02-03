@@ -258,6 +258,213 @@ CREATE TABLE IF NOT EXISTS schema_migrations (
 
 CREATE INDEX IF NOT EXISTS idx_schema_migrations_applied ON schema_migrations(applied_at DESC);
 
+
+-- ============================================================================
+-- 10. Memory Layer Tables (Agent Learning & Knowledge Persistence)
+-- ============================================================================
+-- These tables support the memory layer for cross-session knowledge persistence.
+-- They enable agents to record decisions, track failures, and share insights.
+--
+-- Issue: Memory Layer Implementation
+-- Author: Claude Code
+-- Date: 2026-02-03
+
+-- ============================================================================
+-- 10.1 Decisions Table - Architectural and design decisions
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS decisions (
+    id TEXT PRIMARY KEY,                         -- uuid → TEXT
+    repository_id TEXT,                          -- Foreign key to repositories (nullable)
+    title TEXT NOT NULL,                         -- Decision title/summary
+    context TEXT NOT NULL,                       -- Context/background for the decision
+    decision TEXT NOT NULL,                      -- The actual decision made
+    scope TEXT NOT NULL,                         -- Decision scope
+    rationale TEXT,                              -- Why this decision was made
+    alternatives TEXT DEFAULT '[]',              -- JSON array of considered alternatives
+    related_files TEXT DEFAULT '[]',             -- JSON array of related file paths
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    metadata TEXT DEFAULT '{}',                  -- Additional metadata as JSON
+    
+    FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
+    CHECK (scope IN ('architecture', 'pattern', 'convention', 'workaround'))
+);
+
+-- Indexes for decisions
+CREATE INDEX IF NOT EXISTS idx_decisions_repository_id ON decisions(repository_id);
+CREATE INDEX IF NOT EXISTS idx_decisions_scope ON decisions(scope);
+CREATE INDEX IF NOT EXISTS idx_decisions_created_at ON decisions(created_at DESC);
+
+-- FTS5 virtual table for decision search
+CREATE VIRTUAL TABLE IF NOT EXISTS decisions_fts USING fts5(
+    title,
+    context,
+    decision,
+    rationale,
+    content='decisions',
+    content_rowid='rowid'
+);
+
+-- FTS5 sync triggers for decisions
+CREATE TRIGGER IF NOT EXISTS decisions_fts_ai 
+AFTER INSERT ON decisions 
+BEGIN
+    INSERT INTO decisions_fts(rowid, title, context, decision, rationale) 
+    VALUES (new.rowid, new.title, new.context, new.decision, new.rationale);
+END;
+
+CREATE TRIGGER IF NOT EXISTS decisions_fts_ad 
+AFTER DELETE ON decisions 
+BEGIN
+    INSERT INTO decisions_fts(decisions_fts, rowid, title, context, decision, rationale) 
+    VALUES ('delete', old.rowid, old.title, old.context, old.decision, old.rationale);
+END;
+
+CREATE TRIGGER IF NOT EXISTS decisions_fts_au 
+AFTER UPDATE ON decisions 
+BEGIN
+    INSERT INTO decisions_fts(decisions_fts, rowid, title, context, decision, rationale) 
+    VALUES ('delete', old.rowid, old.title, old.context, old.decision, old.rationale);
+    INSERT INTO decisions_fts(rowid, title, context, decision, rationale) 
+    VALUES (new.rowid, new.title, new.context, new.decision, new.rationale);
+END;
+
+-- ============================================================================
+-- 10.2 Failures Table - Failed approaches to avoid repeating mistakes
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS failures (
+    id TEXT PRIMARY KEY,                         -- uuid → TEXT
+    repository_id TEXT,                          -- Foreign key to repositories (nullable)
+    title TEXT NOT NULL,                         -- Failure title/summary
+    problem TEXT NOT NULL,                       -- The problem being solved
+    approach TEXT NOT NULL,                      -- The approach that was tried
+    failure_reason TEXT NOT NULL,                -- Why it failed
+    related_files TEXT DEFAULT '[]',             -- JSON array of related file paths
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    metadata TEXT DEFAULT '{}',                  -- Additional metadata as JSON
+    
+    FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE
+);
+
+-- Indexes for failures
+CREATE INDEX IF NOT EXISTS idx_failures_repository_id ON failures(repository_id);
+CREATE INDEX IF NOT EXISTS idx_failures_created_at ON failures(created_at DESC);
+
+-- FTS5 virtual table for failure search
+CREATE VIRTUAL TABLE IF NOT EXISTS failures_fts USING fts5(
+    title,
+    problem,
+    approach,
+    failure_reason,
+    content='failures',
+    content_rowid='rowid'
+);
+
+-- FTS5 sync triggers for failures
+CREATE TRIGGER IF NOT EXISTS failures_fts_ai 
+AFTER INSERT ON failures 
+BEGIN
+    INSERT INTO failures_fts(rowid, title, problem, approach, failure_reason) 
+    VALUES (new.rowid, new.title, new.problem, new.approach, new.failure_reason);
+END;
+
+CREATE TRIGGER IF NOT EXISTS failures_fts_ad 
+AFTER DELETE ON failures 
+BEGIN
+    INSERT INTO failures_fts(failures_fts, rowid, title, problem, approach, failure_reason) 
+    VALUES ('delete', old.rowid, old.title, old.problem, old.approach, old.failure_reason);
+END;
+
+CREATE TRIGGER IF NOT EXISTS failures_fts_au 
+AFTER UPDATE ON failures 
+BEGIN
+    INSERT INTO failures_fts(failures_fts, rowid, title, problem, approach, failure_reason) 
+    VALUES ('delete', old.rowid, old.title, old.problem, old.approach, old.failure_reason);
+    INSERT INTO failures_fts(rowid, title, problem, approach, failure_reason) 
+    VALUES (new.rowid, new.title, new.problem, new.approach, new.failure_reason);
+END;
+
+-- ============================================================================
+-- 10.3 Patterns Table - Discovered codebase patterns
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS patterns (
+    id TEXT PRIMARY KEY,                         -- uuid → TEXT
+    repository_id TEXT,                          -- Foreign key to repositories (nullable)
+    pattern_type TEXT NOT NULL,                  -- Type of pattern (e.g., 'error-handling', 'api-call')
+    file_path TEXT,                              -- File where pattern was observed
+    description TEXT NOT NULL,                   -- Description of the pattern
+    example TEXT,                                -- Code example of the pattern
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    metadata TEXT DEFAULT '{}',                  -- Additional metadata as JSON
+    
+    FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE
+);
+
+-- Indexes for patterns
+CREATE INDEX IF NOT EXISTS idx_patterns_repository_id ON patterns(repository_id);
+CREATE INDEX IF NOT EXISTS idx_patterns_pattern_type ON patterns(pattern_type);
+CREATE INDEX IF NOT EXISTS idx_patterns_file_path ON patterns(file_path);
+CREATE INDEX IF NOT EXISTS idx_patterns_created_at ON patterns(created_at DESC);
+
+-- ============================================================================
+-- 10.4 Insights Table - Session insights for future agents
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS insights (
+    id TEXT PRIMARY KEY,                         -- uuid → TEXT
+    session_id TEXT,                             -- Session identifier (optional)
+    content TEXT NOT NULL,                       -- The insight content
+    insight_type TEXT NOT NULL,                  -- Type of insight
+    related_file TEXT,                           -- Related file path (optional)
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    metadata TEXT DEFAULT '{}',                  -- Additional metadata as JSON
+    
+    CHECK (insight_type IN ('discovery', 'failure', 'workaround'))
+);
+
+-- Indexes for insights
+CREATE INDEX IF NOT EXISTS idx_insights_session_id ON insights(session_id);
+CREATE INDEX IF NOT EXISTS idx_insights_insight_type ON insights(insight_type);
+CREATE INDEX IF NOT EXISTS idx_insights_related_file ON insights(related_file);
+CREATE INDEX IF NOT EXISTS idx_insights_created_at ON insights(created_at DESC);
+
+-- FTS5 virtual table for insight search
+CREATE VIRTUAL TABLE IF NOT EXISTS insights_fts USING fts5(
+    content,
+    content='insights',
+    content_rowid='rowid'
+);
+
+-- FTS5 sync triggers for insights
+CREATE TRIGGER IF NOT EXISTS insights_fts_ai 
+AFTER INSERT ON insights 
+BEGIN
+    INSERT INTO insights_fts(rowid, content) 
+    VALUES (new.rowid, new.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS insights_fts_ad 
+AFTER DELETE ON insights 
+BEGIN
+    INSERT INTO insights_fts(insights_fts, rowid, content) 
+    VALUES ('delete', old.rowid, old.content);
+END;
+
+CREATE TRIGGER IF NOT EXISTS insights_fts_au 
+AFTER UPDATE ON insights 
+BEGIN
+    INSERT INTO insights_fts(insights_fts, rowid, content) 
+    VALUES ('delete', old.rowid, old.content);
+    INSERT INTO insights_fts(rowid, content) 
+    VALUES (new.rowid, new.content);
+END;
+
+-- Record memory layer migration
+INSERT OR IGNORE INTO schema_migrations (name) VALUES ('002_memory_layer_tables');
+
 -- Record this migration
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('001_initial_sqlite_schema');
 
