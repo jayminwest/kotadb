@@ -943,8 +943,18 @@ export async function executeListRecentFiles(
 			? (params.repository as string | undefined) 
 			: undefined;
 
+	// Resolve repository ID (supports UUID or full_name)
+	let repositoryId = repository;
+	if (repositoryId) {
+		const repoResult = resolveRepositoryIdentifierWithError(repositoryId);
+		if ("error" in repoResult) {
+			return { results: [], message: repoResult.error };
+		}
+		repositoryId = repoResult.id;
+	}
+
 	// Use SQLite via listRecentFiles with optional repository filter
-	const files = listRecentFiles(limit, repository);
+	const files = listRecentFiles(limit, repositoryId);
 
 	return {
 		results: files.map((file) => ({
@@ -955,8 +965,6 @@ export async function executeListRecentFiles(
 		})),
 	};
 }
-
-/**
 
 /**
  * Execute search_dependencies tool
