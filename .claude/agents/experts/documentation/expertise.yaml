@@ -291,6 +291,82 @@ key_operations:
       - No reviewer attribution
       - Incorrect navigation order
 
+
+  create_quickstart_documentation:
+    when: Providing rapid onboarding for new users (< 5 minutes)
+    approach: |
+      1. Create separate QUICKSTART.md focused on user journey (not technical details)
+      2. Start with value proposition and immediate benefit
+      3. Use conversational "Ask Claude" examples instead of tool names
+      4. Emphasize auto-indexing and zero-config setup
+      5. Keep installation steps minimal (2-3 steps max)
+      6. Show concrete examples of natural language queries
+      7. Include troubleshooting for first-use friction points
+    timestamp: 2026-02-03
+    evidence: Commit 22f036d - QUICKSTART.md separated from README
+    patterns:
+      - Separate quickstart from technical README
+      - User-focused language (Ask Claude) vs developer-focused (tool parameters)
+      - "What you can do" examples before "how it works" explanations
+      - Troubleshooting section for common first-use issues
+    code_example: |
+      # KotaDB Quickstart
+      
+      **Ask Claude about your code, get instant answers.**
+      
+      ## Install (2 minutes)
+      
+      ### 1. Add to Claude Code
+      [minimal config]
+      
+      ### 2. Restart Claude Code
+      That's it. No indexing commands, no configuration files.
+      
+      ## Your First Query
+      
+      Open any project and ask Claude:
+      > "What files depend on src/api/routes.ts?"
+    pitfalls:
+      - Mixing technical implementation details into quickstart
+      - Showing tool names instead of natural language examples
+      - Requiring manual indexing steps (highlights auto-indexing)
+      - Overwhelming users with all features upfront
+
+  document_tool_tiers:
+    when: Exposing configurable feature sets via CLI flags
+    approach: |
+      1. Create comparison table with tier names, tool counts, descriptions
+      2. Show concrete CLI examples for each tier
+      3. Document tier in both README and CLI help text
+      4. Provide MCP configuration examples with toolset selection
+      5. Include tool count in tier description for transparency
+      6. Use progressive disclosure (minimal to full feature sets)
+    timestamp: 2026-02-03
+    evidence: Current uncommitted changes - README.md and app/src/cli.ts
+    patterns:
+      - Tabular format for tier comparison
+      - Tool count transparency in descriptions
+      - Multiple configuration examples showing different tiers
+      - CLI help text mirrors README documentation
+    code_example: |
+      ### Tool Tiers
+      
+      | Tier | Tools | Description |
+      |------|-------|-----------|
+      | `core` | 6 | Essential code intelligence |
+      | `default` | 8 | Core + sync tools |
+      | `memory` | 14 | Default + memory layer |
+      | `full` | 20 | All tools |
+      
+      Example configurations:
+      - `bunx kotadb@next --stdio --toolset core` (minimal: 6 tools)
+      - `bunx kotadb@next --stdio` (default: 8 tools)
+    pitfalls:
+      - Inconsistent tool counts between README and implementation
+      - Missing CLI examples for each tier
+      - Unclear tier progression (why choose one over another)
+      - No MCP configuration examples showing tier selection
+
 decision_trees:
   documentation_validation_strategy:
     question: How should I validate this documentation section?
@@ -432,6 +508,37 @@ patterns:
       - README.md: project overview, installation quick start
       - commands/README.md: directory structure, command categories
 
+  user_focused_documentation_pattern:
+    structure: Natural language examples using "Ask Claude" phrasing
+    usage: Tool capability documentation for end users
+    trade_offs: Approachability vs technical precision
+    timestamp: 2026-02-03
+    evidence: QUICKSTART.md (Commit 22f036d)
+    example: |
+      ### search_dependencies
+      **Understand what depends on what.**
+      
+      Ask Claude:
+      - "What files import this module?"
+      - "What would break if I delete this file?"
+      - "Show me the dependency tree for the auth system"
+    rationale: |
+      Users think in terms of questions they want answered, not tool parameters.
+      Showing natural language examples demonstrates capability more effectively
+      than technical parameter documentation.
+
+  separate_quickstart_pattern:
+    structure: QUICKSTART.md for new users, README.md for technical details
+    usage: Projects with both user and developer audiences
+    trade_offs: Maintenance overhead vs improved onboarding experience
+    timestamp: 2026-02-03
+    evidence: Commit 22f036d - Added QUICKSTART.md alongside README
+    rationale: |
+      README serves multiple audiences (contributors, integrators, users).
+      Separate quickstart allows optimizing for 5-minute user onboarding
+      without cluttering technical reference material.
+
+
 best_practices:
   api_documentation:
     - Cross-reference all MCP tools with app/src/mcp/tools.ts
@@ -515,6 +622,12 @@ known_issues:
     status: Resolved (2026-02-02)
     evidence: Commit cbf171b (Issue #77)
 
+  - issue: README mixed user onboarding with technical reference
+    impact: New users overwhelmed by installation complexity
+    resolution: Created separate QUICKSTART.md for 5-minute onboarding
+    status: Resolved (2026-02-03)
+    evidence: Commit 22f036d
+
 potential_enhancements:
   - Automated documentation validation against implementation
   - CLI command testing in CI/CD pipeline
@@ -526,13 +639,14 @@ potential_enhancements:
 
 stability:
   convergence_indicators:
-    insight_rate_trend: active (3 new patterns this cycle)
+    insight_rate_trend: active (4 new patterns this cycle)
     contradiction_count: 0
-    last_reviewed: 2026-02-02
+    last_reviewed: 2026-02-03
     notes: |
-      Second review cycle. Extracted patterns from Issues #77 (phantom commands)
-      and #84 (MCP tool naming). Added key_operations for slash command validation,
-      cross-file sync, and tool selection guidance. Added patterns for phantom
-      command prevention, tool selection guidance, and cross-file sync. Three new
-      known_issues resolved. Domain showing healthy pattern accumulation without
-      contradictions. Next review should assess if patterns are stabilizing.
+      Third review cycle. Extracted patterns from quickstart separation (#123),
+      comprehensive docs update (#124), and tool tier documentation (uncommitted).
+      Added key_operations for quickstart creation and tool tier documentation.
+      Added patterns for user-focused documentation and separate quickstart files.
+      One new known_issue resolved. Domain continues healthy pattern accumulation
+      with focus on user experience improvements. Patterns show evolution from
+      technical accuracy (cycles 1-2) to user-focused approachability (cycle 3).
