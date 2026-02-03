@@ -3,21 +3,23 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="KotaDB Blog - Updates, tutorials, and insights about local-first code intelligence.">
-  <meta name="keywords" content="KotaDB, blog, code intelligence, SQLite, developer tools">
-  <meta name="author" content="KotaDB">
-  <meta property="og:title" content="KotaDB Blog">
+  <meta name="description" content="kotadb Blog - Updates, tutorials, and insights about local-first code intelligence.">
+  <meta name="keywords" content="kotadb, blog, code intelligence, SQLite, developer tools">
+  <meta name="author" content="kotadb">
+  <meta property="og:title" content="kotadb Blog">
   <meta property="og:description" content="Updates, tutorials, and insights about local-first code intelligence.">
   <meta property="og:type" content="website">
   <meta name="twitter:card" content="summary">
-  <meta name="twitter:title" content="KotaDB Blog">
+  <meta name="twitter:title" content="kotadb Blog">
   <meta name="twitter:description" content="Updates, tutorials, and insights about local-first code intelligence.">
-  <title>Blog - KotaDB</title>
+  <meta name="theme-color" content="#0a0a0f">
+  <title>Blog - kotadb</title>
+  <link rel="icon" type="image/svg+xml" href="/assets/favicon.svg">
   <link rel="stylesheet" href="../css/main.css">
   <style>
     .blog-header {
       padding: var(--space-3xl) 0 var(--space-xl);
-      border-bottom: 1px solid var(--color-border);
+      border-bottom: 1px solid var(--glass-border);
     }
     
     .blog-header h1 {
@@ -41,14 +43,17 @@
     
     .blog-post-card {
       padding: var(--space-lg);
-      background-color: var(--color-bg-alt);
-      border: 1px solid var(--color-border);
-      border-radius: var(--border-radius);
-      transition: border-color 0.15s ease;
+      background: var(--glass-bg);
+      backdrop-filter: blur(8px);
+      border: 1px solid var(--glass-border);
+      border-radius: var(--border-radius-lg);
+      transition: all var(--transition-base);
     }
     
     .blog-post-card:hover {
+      background: rgba(255, 255, 255, 0.05);
       border-color: var(--color-primary);
+      transform: translateY(-2px);
     }
     
     .blog-post-card a {
@@ -93,7 +98,21 @@
 <body>
   <header class="site-header">
     <div class="container">
-      <a href="/" class="logo">KotaDB</a>
+      <a href="/" class="logo">
+        <svg viewBox="0 0 80 80" fill="none" xmlns="http://www.w3.org/2000/svg">
+          <defs>
+            <linearGradient id="logoGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stop-color="#22d3ee"/>
+              <stop offset="100%" stop-color="#0891b2"/>
+            </linearGradient>
+          </defs>
+          <rect x="8" y="8" width="12" height="64" rx="3" fill="url(#logoGrad)"/>
+          <polygon points="20,40 20,30 50,8 60,8 60,18 32,40" fill="#22d3ee" opacity="0.9"/>
+          <polygon points="20,40 20,50 50,72 60,72 60,62 32,40" fill="#0891b2" opacity="0.85"/>
+          <polygon points="25,40 48,20 55,20 55,27 35,40 55,53 55,60 48,60 25,40" fill="#22d3ee"/>
+        </svg>
+        <span class="logo-text">kota<span class="accent">db</span></span>
+      </a>
       <nav class="main-nav">
         <a href="/docs/">Docs</a>
         <a href="/blog/">Blog</a>
@@ -106,7 +125,7 @@
     <section class="blog-header">
       <div class="container">
         <h1>Blog</h1>
-        <p>Updates, tutorials, and insights about KotaDB and local-first development.</p>
+        <p>Updates, tutorials, and insights about kotadb and local-first development.</p>
       </div>
     </section>
 
@@ -122,7 +141,7 @@
   <footer class="site-footer">
     <div class="container">
       <div class="footer-content">
-        <p>&copy; 2026 KotaDB. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
+        <p>2026 kotadb. Released under the <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE">MIT License</a>.</p>
         <nav class="footer-nav">
           <a href="https://github.com/jayminwest/kotadb" target="_blank" rel="noopener noreferrer">GitHub</a>
           <a href="https://github.com/jayminwest/kotadb/blob/main/LICENSE" target="_blank" rel="noopener noreferrer">License</a>

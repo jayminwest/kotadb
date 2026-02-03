@@ -1,0 +1,39 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!--
+  KotaDB Icon Mark v1 (Favicon/App Icon)
+  Square format for favicon and app icons
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100">
+  <defs>
+    <linearGradient id="grad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#22d3ee"/>
+      <stop offset="100%" stop-color="#0891b2"/>
+    </linearGradient>
+    
+    <filter id="glow" x="-20%" y="-20%" width="140%" height="140%">
+      <feGaussianBlur stdDeviation="2" result="blur"/>
+      <feMerge>
+        <feMergeNode in="blur"/>
+        <feMergeNode in="SourceGraphic"/>
+      </feMerge>
+    </filter>
+  </defs>
+  
+  <!-- Background (optional - remove for transparent) -->
+  <!-- <rect width="100" height="100" rx="20" fill="#0a0a0f"/> -->
+  
+  <!-- K Mark centered -->
+  <g transform="translate(18, 10)">
+    <!-- Vertical stem -->
+    <rect x="0" y="0" width="14" height="80" rx="3" fill="url(#grad)" filter="url(#glow)"/>
+    
+    <!-- Upper diagonal -->
+    <polygon points="14,40 14,28 52,0 64,0 64,12 26,40" fill="#22d3ee" opacity="0.9"/>
+    
+    <!-- Lower diagonal -->
+    <polygon points="14,40 14,52 52,80 64,80 64,68 26,40" fill="#0891b2" opacity="0.85"/>
+    
+    <!-- Inner accent -->
+    <polygon points="20,40 48,16 56,16 56,24 32,40 56,56 56,64 48,64 20,40" fill="#22d3ee" filter="url(#glow)"/>
+  </g>
+</svg>
