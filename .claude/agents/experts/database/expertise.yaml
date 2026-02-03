@@ -165,6 +165,122 @@ key_operations:
       - "Defense-in-depth: whitelist + table existence check"
     evidence: "app/src/sync/deletion-manifest.ts, 2026-02-02"
 
+  repository_resolution:
+    when: MCP tools accepting repository parameters
+    pattern: |
+      // Support both UUID and full_name formats
+      import { resolveRepositoryIdentifierWithError } from "@mcp/repository-resolver";
+      
+      const repoResult = resolveRepositoryIdentifierWithError(params.repository);
+      if ("error" in repoResult) {
+        return { error: repoResult.error };
+      }
+      const repositoryId = repoResult.id;
+    fallback: "If no repository provided, fall back to most recently created repo"
+    validation: "UUID regex: /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i"
+    error_messages:
+      - "No repositories found. Please index a repository first using index_repository tool."
+      - "Repository not found: {identifier}. Use a valid repository UUID or full_name."
+    evidence: "Commits 60b4997, 9adc86f (issue #137), app/src/mcp/repository-resolver.ts, 2026-02-03"
+
+  cascade_deletion_with_fts5:
+    when: Deleting indexed files and their dependent data
+    pattern: |
+      // Schema with CASCADE
+      CREATE TABLE indexed_files (...);
+      CREATE TABLE indexed_symbols (
+        file_id TEXT NOT NULL,
+        FOREIGN KEY (file_id) REFERENCES indexed_files(id) ON DELETE CASCADE
+      );
+      
+      // FTS5 triggers auto-cleanup on base table DELETE
+      CREATE TRIGGER indexed_files_fts_ad AFTER DELETE ON indexed_files BEGIN
+        INSERT INTO indexed_files_fts(indexed_files_fts, rowid, ...) 
+        VALUES ('delete', old.rowid, ...);
+      END;
+      
+      // TypeScript deletion
+      db.run(`DELETE FROM indexed_files WHERE id = ?`, [fileId]);
+      // Automatically deletes: symbols, references, FTS5 entries
+    benefits:
+      - "Single DELETE statement cleans up entire dependency tree"
+      - "FTS5 triggers maintain search index consistency"
+      - "No manual cleanup needed for child tables"
+    evidence: "app/src/api/queries.ts deleteFileByPath(), commit aa4fcf4, 2026-02-03"
+
+  batch_deletion_transactional:
+    when: Deleting multiple files atomically
+    pattern: |
+      function deleteFilesByPaths(repoId: string, paths: string[]): DeleteResult {
+        const deleted: string[] = [];
+        db.transaction(() => {
+          for (const path of paths) {
+            const file = db.queryOne<{ id }>(
+              `SELECT id FROM indexed_files WHERE repository_id = ? AND path = ?`,
+              [repoId, normalizePath(path)]
+            );
+            if (file) {
+              db.run(`DELETE FROM indexed_files WHERE id = ?`, [file.id]);
+              deleted.push(path);
+            }
+          }
+        });
+        return { deletedCount: deleted.length, deletedPaths: deleted };
+      }
+    benefits:
+      - "All-or-nothing: either all files deleted or none"
+      - "Consistent state even if error mid-batch"
+      - "Single WAL checkpoint instead of N checkpoints"
+    evidence: "app/src/api/queries.ts deleteFilesByPathsInternal(), commit aa4fcf4, 2026-02-03"
+
+  internal_external_function_pattern:
+    when: Writing database functions that need testability
+    pattern: |
+      // Internal version accepts db for testing
+      function operationInternal(db: KotaDatabase, params...): Result {
+        return db.query(...);
+      }
+      
+      // Public version uses global database
+      export function operation(params...): Result {
+        return operationInternal(getGlobalDatabase(), params);
+      }
+      
+      // Test version explicitly accepts db
+      export function operationLocal(db: KotaDatabase, params...): Result {
+        return operationInternal(db, params);
+      }
+    benefits:
+      - "Tests can inject in-memory database"
+      - "Production code uses singleton global db"
+      - "Single implementation, multiple interfaces"
+    naming: "*Internal() for impl, *() for production, *Local() for tests"
+    evidence: "app/src/api/queries.ts pattern throughout, 2026-02-03"
+
+  memory_layer_schema:
+    when: Implementing cross-session agent learning
+    tables:
+      decisions:
+        purpose: "Record architectural and design decisions"
+        fts5_columns: "title, context, decision, rationale"
+        scope_enum: "architecture | pattern | convention | workaround"
+      failures:
+        purpose: "Track failed approaches to avoid repeating mistakes"
+        fts5_columns: "title, problem, approach, failure_reason"
+      patterns:
+        purpose: "Store detected codebase patterns with examples"
+        indexed_on: "pattern_type, file_path"
+      insights:
+        purpose: "Session discoveries and workarounds"
+        fts5_columns: "content"
+        type_enum: "discovery | failure | workaround"
+    common_patterns:
+      - "All tables have optional repository_id FK with CASCADE"
+      - "JSON arrays in TEXT for alternatives/related_files"
+      - "FTS5 virtual tables for searchability"
+      - "Automatic FTS5 sync via ai/ad/au triggers"
+    evidence: "Commit 25ecbc2 (issue #99), app/src/db/sqlite-schema.sql section 10, 2026-02-03"
+
   wal_configuration:
     pragmas: |
       PRAGMA journal_mode = WAL;
@@ -269,6 +385,12 @@ best_practices:
     - schema_migrations table
     - test rollback
 
+  testability:
+    - Internal/External function pattern
+    - Test functions accept db parameter
+    - Production functions use getGlobalDatabase()
+    - Name test variants with *Local suffix
+
 known_issues:
   - issue: FTS5 syntax errors with hyphens/multi-word
     resolution: "escapeFts5Term() (commit 5af086f)"
@@ -283,16 +405,23 @@ known_issues:
     resolution: "Checkpoint periodically, smaller batches"
 
 stability:
-  last_reviewed: 2026-02-02
+  last_reviewed: 2026-02-03
   insight_rate_trend: accelerating
   contradiction_count: 0
   notes: |
-    Major update (2026-02-02) - added sync and security patterns:
+    Major update (2026-02-03) - added patterns from auto-indexing and memory layer:
+    - Repository resolution: UUID vs full_name flexibility with helpful errors
+    - CASCADE deletion with FTS5: Single DELETE cleans up all dependencies
+    - Batch deletion transactional: All-or-nothing multi-file deletion
+    - Internal/External function pattern: Testability via db parameter injection
+    - Memory layer schema: decisions, failures, patterns, insights tables with FTS5
+    
+    Previous update (2026-02-02) - sync and security patterns:
     - Deletion manifest security controls (whitelist, validation, DoS protection)
     - JSONL sync architecture with explicit deletion tracking
     - Single source of truth lessons learned from dependency_graph removal
-
-    Previous consolidation (2026-01-30) preserved:
+    
+    Consolidated (2026-01-30):
     - FTS5 + escapeFts5Term (issue #595)
     - Auto-init schema (issue #574)
     - Project-local storage (issue #592)

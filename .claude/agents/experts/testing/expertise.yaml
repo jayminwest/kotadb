@@ -1,5 +1,5 @@
 # Testing Expertise for KotaDB
-# Target: 400-600 lines | Domain: Operational knowledge for Bun test runner and antimocking patterns
+# Target: 600-700 lines | Domain: Operational knowledge for Bun test runner and antimocking patterns
 # Adapted for KotaDB project conventions
 
 overview:
@@ -79,9 +79,7 @@ key_operations:
            const testRepoId = "test-repo-123";
 
            beforeEach(() => {
-             // Create fresh in-memory database for each test
              db = createDatabase({ path: ":memory:" });
-             // Insert test data as needed
              db.run("INSERT INTO repositories (id, name, full_name) VALUES (?, ?, ?)",
                [testRepoId, "test-repo", "owner/test-repo"]);
            });
@@ -97,695 +95,199 @@ key_operations:
            });
          });
          ```
-      4. Use real database operations in tests
-      5. Assert on actual database state
     pitfalls:
       - what: "Forgetting to close database in afterEach"
         instead: "Always close db in afterEach to prevent resource leaks"
-        reason: "Memory leaks and potential test interference"
       - what: "Using beforeAll for database setup"
         instead: "Use beforeEach for per-test isolation"
-        reason: "Tests should not share database state"
       - what: "Mocking the database"
         instead: "Use real in-memory SQLite"
-        reason: "Antimocking philosophy ensures real code paths tested"
 
   apply_antimocking_philosophy:
     when: Writing any test in KotaDB
     principles:
       - name: Real over Mock
-        description: |
-          Always prefer real implementations over mocks. If testing database code,
-          use real SQLite. If testing API handlers, use real database state.
+        description: Always prefer real implementations. Use real SQLite for database code.
       - name: In-memory for Speed
-        description: |
-          Use in-memory SQLite (":memory:") for fast test execution without
-          filesystem overhead. Each test gets a fresh database.
+        description: Use ":memory:" for fast execution without filesystem overhead.
       - name: Isolation through Fresh State
-        description: |
-          Create new database instances in beforeEach, not beforeAll. This ensures
-          complete isolation between tests without complex cleanup logic.
+        description: Create new database instances in beforeEach, not beforeAll.
       - name: Real Schema
-        description: |
-          The createDatabase() function auto-initializes the schema from sqlite-schema.sql.
-          Tests exercise the real schema, catching schema-related bugs.
-    examples:
-      bad: |
-        // DON'T DO THIS - mocking violates antimocking philosophy
-        const mockDb = {
-          query: jest.fn().mockReturnValue([{ id: 1 }]),
-          run: jest.fn(),
-        };
-      good: |
-        // DO THIS - use real in-memory database
-        const db = createDatabase({ path: ":memory:" });
-        db.run("INSERT INTO users (id, name) VALUES (?, ?)", ["1", "Alice"]);
-        const result = db.query("SELECT * FROM users WHERE id = ?", ["1"]);
-        expect(result).toHaveLength(1);
+        description: createDatabase() auto-initializes from sqlite-schema.sql.
 
   manage_test_lifecycle:
     when: Setting up test suites
     hooks:
-      beforeAll: |
-        Use sparingly. Good for one-time expensive setup that doesn't affect test isolation.
-        Example: Creating temporary directories for file-based tests.
-        ```typescript
-        let tempDir: string;
-        beforeAll(() => {
-          tempDir = mkdtempSync(join(tmpdir(), "kota-test-"));
-        });
-        ```
-      beforeEach: |
-        Primary hook for test setup. Use for per-test isolation.
-        Example: Creating fresh in-memory database.
-        ```typescript
-        let db: KotaDatabase;
-        beforeEach(() => {
-          db = createDatabase({ path: ":memory:" });
-        });
-        ```
-      afterEach: |
-        Cleanup after each test. Essential for resource management.
-        Example: Closing database connections.
-        ```typescript
-        afterEach(() => {
-          if (db) db.close();
-        });
-        ```
-      afterAll: |
-        Final cleanup. Good for removing temp directories.
-        Example: Removing temporary test directories.
-        ```typescript
-        afterAll(() => {
-          rmSync(tempDir, { recursive: true, force: true });
-        });
-        ```
-    lifecycle_order:
-      - beforeAll (once per describe block)
-      - beforeEach (before each test)
-      - test execution
-      - afterEach (after each test)
-      - afterAll (once per describe block)
+      beforeAll: Use for one-time expensive setup that doesn't affect test isolation
+      beforeEach: Primary hook for per-test isolation (create fresh database)
+      afterEach: Cleanup after each test (close database connections)
+      afterAll: Final cleanup (remove temp directories)
 
-  write_api_test:
-    when: Testing API endpoints or handlers
-    approach: |
-      1. Create in-memory database with test data
-      2. Import and call handler functions directly
-      3. Assert on responses and database state
-      ```typescript
-      describe("API Handler", () => {
-        let db: KotaDatabase;
-
-        beforeEach(() => {
-          db = createDatabase({ path: ":memory:" });
-          // Seed test data
-        });
-
-        afterEach(() => {
-          db?.close();
-        });
-
-        test("should return expected response", async () => {
-          // Call handler directly with test database
-          const result = await handlerFunction(db, testInput);
-          expect(result.status).toBe(200);
-          // Verify database state changed correctly
-        });
-      });
-      ```
-
-  write_indexer_test:
-    when: Testing symbol extraction, reference extraction, or parsing
-    approach: |
-      1. Use real parsers with test source code
-      2. Create inline test fixtures
-      3. Assert on extracted data structures
-      ```typescript
-      describe("Symbol Extractor", () => {
-        test("should extract function symbols", () => {
-          const source = `
-            export function greet(name: string): string {
-              return \`Hello, \${name}!\`;
-            }
-          `;
-          const symbols = extractSymbols(source, "test.ts");
-          expect(symbols).toContainEqual(
-            expect.objectContaining({
-              name: "greet",
-              kind: "function",
-            })
-          );
-        });
-      });
-      ```
   test_fts5_search_queries:
     when: Testing FTS5 search functionality
     approach: |
-      1. Always test edge cases with special characters and FTS5 operators
-      2. Cover hyphenated terms, multi-word phrases, FTS keywords as literals
-      3. Verify proper escaping of user input
+      Always test edge cases with special characters and FTS5 operators.
+      Cover hyphenated terms, multi-word phrases, FTS keywords as literals.
       ```typescript
-      describe("searchFilesLocal - FTS edge cases", () => {
-        test("should search hyphenated terms without SQL errors", () => {
-          // Tests like "pre-commit" that can be misinterpreted as "pre NOT commit"
-          const results = searchFilesLocal(db, "pre-commit", testRepoId, 10);
-          expect(Array.isArray(results)).toBe(true);
-        });
-        
-        test("should search FTS keywords (AND, OR, NOT) as literals", () => {
-          // FTS5 keywords should be treated as literal search terms
-          const resultsAnd = searchFilesLocal(db, "search and find", testRepoId, 10);
-          expect(Array.isArray(resultsAnd)).toBe(true);
-        });
+      test("should search hyphenated terms without SQL errors", () => {
+        const results = searchFilesLocal(db, "pre-commit", testRepoId, 10);
+        expect(Array.isArray(results)).toBe(true);
       });
       ```
     timestamp: 2026-01-28
-    evidence: commit 5af086f (Issue #595)
-    rationale: |
-      FTS5 interprets hyphens as NOT operators and keywords like "and/or/not" as
-      query syntax. Tests must verify proper escaping to prevent SQL errors on
-      user-provided search terms.
+    evidence: commit 5af086f
 
   test_environment_variable_restoration:
     when: Testing code that depends on environment variables
     approach: |
-      1. Store original environment variables before modification
-      2. Restore them in afterAll, even if test fails
-      3. Delete variables that weren't originally set (avoid undefined pollution)
+      Store original values, restore in afterAll, delete if not originally set.
       ```typescript
-      describe("Local Mode Tests", () => {
-        const originalEnv = {
-          KOTADB_PATH: process.env.KOTADB_PATH,
-          KOTA_LOCAL_MODE: process.env.KOTA_LOCAL_MODE,
-        };
-        
-        beforeAll(() => {
-          process.env.KOTADB_PATH = testDbPath;
-          process.env.KOTA_LOCAL_MODE = "true";
-        });
-        
-        afterAll(() => {
-          // Restore or delete to prevent pollution
-          if (originalEnv.KOTADB_PATH !== undefined) {
-            process.env.KOTADB_PATH = originalEnv.KOTADB_PATH;
-          } else {
-            delete process.env.KOTADB_PATH;
-          }
-        });
+      const originalEnv = { KOTADB_PATH: process.env.KOTADB_PATH };
+      afterAll(() => {
+        if (originalEnv.KOTADB_PATH !== undefined) {
+          process.env.KOTADB_PATH = originalEnv.KOTADB_PATH;
+        } else {
+          delete process.env.KOTADB_PATH;
+        }
       });
       ```
     timestamp: 2026-01-28
-    evidence: app/src/api/__tests__/local-indexing.test.ts
-    rationale: |
-      Environment pollution between test suites causes unpredictable failures.
-      Proper restoration ensures test isolation at the process environment level.
 
   test_filesystem_workflows:
     when: Testing indexing or file-based workflows end-to-end
     approach: |
-      1. Create isolated temp directories with unique identifiers (randomUUID)
-      2. Test with real file operations (writeFileSync, mkdirSync)
-      3. Clean up with closeGlobalConnections() before directory removal
-      4. Use existsSync guard before rmSync to handle cleanup errors gracefully
+      Create isolated temp directories with unique identifiers (randomUUID).
+      Clean up with closeGlobalConnections() before directory removal.
       ```typescript
-      describe("Local Indexing Workflow", () => {
-        const testId = randomUUID().slice(0, 8);
-        const testDir = join(process.cwd(), \`.test-indexing-temp-\${testId}\`);
-        
-        beforeAll(() => {
-          mkdirSync(testDir, { recursive: true });
-        });
-        
-        afterAll(() => {
-          closeGlobalConnections(); // Critical before directory removal
-          if (existsSync(testDir)) {
-            rmSync(testDir, { recursive: true, force: true });
-          }
-        });
-        
-        test("indexes local directory successfully", async () => {
-          const projectDir = join(testDir, "sample-project");
-          mkdirSync(projectDir, { recursive: true });
-          writeFileSync(join(projectDir, "sample.ts"), sampleContent);
-          
-          const result = await runIndexingWorkflowLocal({
-            repository: "test-project",
-            localPath: projectDir,
-          });
-          
-          expect(result.filesIndexed).toBeGreaterThanOrEqual(1);
-        });
+      const testId = randomUUID().slice(0, 8);
+      const testDir = join(process.cwd(), `.test-indexing-temp-${testId}`);
+      afterAll(() => {
+        closeGlobalConnections();
+        if (existsSync(testDir)) {
+          rmSync(testDir, { recursive: true, force: true });
+        }
       });
       ```
     timestamp: 2026-01-28
-    evidence: app/src/api/__tests__/local-indexing.test.ts
-    rationale: |
-      Real filesystem operations test the full indexing workflow including file
-      discovery, parsing, and database storage. Unique temp directories prevent
-      test interference. Global connection cleanup prevents EBUSY errors.
 
   test_security_boundaries:
     when: Testing path-based operations with security implications
     approach: |
-      1. Write explicit security tests for path traversal attempts
-      2. Document acceptable security outcomes (error vs zero results)
-      3. Verify the attack path actually escapes the intended boundary
-      ```typescript
-      test("rejects path traversal attempts", async () => {
-        const workspaceRoot = resolve(testDir);
-        const traversalPath = join(testDir, "..", "..", "..", "..", "tmp");
-        const resolvedTraversal = resolve(traversalPath);
-        
-        // Sanity check: path actually escapes workspace
-        expect(resolvedTraversal.startsWith(workspaceRoot)).toBe(false);
-        
-        let threw = false;
-        let filesIndexed = -1;
-        try {
-          const result = await runIndexingWorkflowLocal({
-            repository: "traversal-attempt",
-            localPath: traversalPath,
-          });
-          filesIndexed = result.filesIndexed;
-        } catch {
-          threw = true;
-        }
-        
-        // Either throw OR index 0 files (both acceptable)
-        expect(threw || filesIndexed === 0).toBe(true);
-      });
-      ```
+      Write explicit security tests for path traversal attempts.
+      Verify the attack path actually escapes the intended boundary.
+      Document acceptable security outcomes (error vs zero results).
     timestamp: 2026-01-28
-    evidence: app/src/api/__tests__/local-indexing.test.ts
-    rationale: |
-      Security tests must explicitly verify that attack vectors fail safely.
-      Document acceptable outcomes to prevent false positives during refactoring.
 
-  skip_schema_initialization_for_custom_schemas:
-    when: Tests need to manage their own schema (migrations, sync tests)
-    approach: |
-      Use skipSchemaInit option to prevent auto-initialization conflicts:
-      ```typescript
-      db = createDatabase({ 
-        path: join(tempDir, "test.db"), 
-        skipSchemaInit: true 
-      });
-      // Apply custom schema
-      db.exec(customSchemaSQL);
-      ```
-    timestamp: 2026-01-28
-    evidence: commit d669841, sync integration tests
-    rationale: |
-      Some tests need to control schema initialization timing (migrations,
-      sync tests with custom schemas). skipSchemaInit prevents conflicts
-      with auto-initialization from sqlite-schema.sql.
   create_sqlite_test_fixtures:
     when: Creating reusable test data for database-dependent tests
     approach: |
-      Use typed fixture factory functions from app/tests/helpers/db.ts to create
-      realistic test data with minimal boilerplate. This pattern eliminates the need
-      for manual INSERT statements while maintaining type safety.
-
-      1. Import fixture helpers
-         ```typescript
-         import {
-           getTestDatabase,
-           createTestRepository,
-           createTestFile,
-           createTestSymbol,
-           createTestReference,
-           createFullTestFixture,
-           TestRepository,
-           TestFile,
-         } from "../helpers/db.js";
-         ```
-      2. Create fixtures with defaults + overrides
-         ```typescript
-         describe("Repository Search", () => {
-           let db: KotaDatabase;
-           let repo: TestRepository;
-           let files: TestFile[];
-
-           beforeEach(() => {
-             db = getTestDatabase();
-             // Create repository with custom name
-             repo = createTestRepository(db, {
-               name: "my-custom-repo",
-               owner: "test-org"
-             });
-             // Create multiple files
-             files = [
-               createTestFile(db, repo.id, { path: "src/index.ts" }),
-               createTestFile(db, repo.id, { path: "src/utils.ts" }),
-             ];
-           });
-
-           afterEach(() => {
-             db?.close();
-           });
-
-           test("searches across files", () => {
-             const results = searchRepository(db, repo.id, "function");
-             expect(results.length).toBeGreaterThan(0);
-           });
-         });
-         ```
-      3. For comprehensive multi-entity fixtures, use createFullTestFixture
-         ```typescript
-         const fixture = createFullTestFixture(db, {
-           fileCount: 5,
-           symbolsPerFile: 3,
-         });
-         // Returns: { repository, files[], symbols[], references[] }
-         ```
-    pitfalls:
-      - what: "Manual INSERT statements when fixtures exist"
-        instead: "Use createTestRepository, createTestFile, etc. helpers"
-        reason: "Fixtures provide type safety, documentation, and consistency"
-      - what: "Creating fixtures in beforeAll"
-        instead: "Create fresh fixtures in beforeEach or each test"
-        reason: "Tests should not share fixture state"
-      - what: "Hardcoding UUIDs or timestamps"
-        instead: "Let fixtures generate them with randomUUID and new Date()"
-        reason: "Unique IDs prevent cross-test collisions"
-    timestamp: 2026-01-28
-    evidence: Issue #607, app/tests/helpers/db.ts (complete rewrite)
-    rationale: |
-      The migration from Supabase to SQLite revealed the need for reusable fixture
-      patterns. Typed factory functions reduce boilerplate while maintaining
-      expressiveness. The fixture pattern scales well as test coverage expands.
-
-  simplify_test_environment_setup:
-    when: Configuring test environment via setup.ts
-    approach: |
-      After SQLite migration, test environment setup is dramatically simplified.
-      No global state or external service dependencies are needed.
-
-      1. Minimal setup.ts - rely on per-test isolation
-         ```typescript
-         // app/tests/setup.ts
-         // No global setup needed for SQLite in-memory tests
-         // Each test creates its own isolated database instance
-
-         // Optional: Set default test timeout
-         // Bun.jest.setTimeout(30000);
-
-         // Optional: Global test hooks can be added here if needed
-         // import { beforeAll, afterAll } from "bun:test";
-         // beforeAll(async () => { ... });
-         // afterAll(async () => { ... });
-         ```
-      2. Previous pattern (deprecated - don't use):
-         - No need to load .env.test files
-         - No need to reset rate limit counters globally
-         - No need for service client initialization
-      3. All setup moves to individual test files
-         ```typescript
-         beforeEach(() => {
-           db = getTestDatabase(); // Fresh database per test
-         });
-         afterEach(() => {
-           db?.close();
-         });
-         ```
-    benefits:
-      - Eliminates global state pollution between tests
-      - No external service dependencies (Supabase, PostgreSQL)
-      - Faster test startup (no environment variable parsing)
-      - Per-test isolation is automatic via in-memory databases
-      - Simpler CI configuration (no .env.test, no service containers)
-    timestamp: 2026-01-28
-    evidence: Issue #607, commit d669841, app/tests/setup.ts
-    rationale: |
-      Local-only SQLite architecture eliminates the need for centralized environment
-      setup. In-memory databases provide complete test isolation without shared state.
-      This pattern is more reliable than previous Supabase-based approach.
-
-  test_mcp_endpoints_locally:
-    when: Testing MCP (Model Context Protocol) endpoints in local mode
-    approach: |
-      After removing Supabase, MCP tests no longer need authentication headers.
-      Simplify test setup by removing tier-based authentication.
-
-      1. Old pattern (pre-migration, deprecated):
-         ```typescript
-         // DON'T DO THIS - authentication was required before migration
-         const response = await sendMcpRequest(
-           baseUrl,
-           "tools/call",
-           params,
-           "team" // tier parameter - no longer needed
-         );
-         ```
-      2. New pattern (local-only, post-migration):
-         ```typescript
-         import { sendMcpRequest, extractToolResult } from "../helpers/mcp.js";
-
-         describe("MCP Tools", () => {
-           test("calls search tool successfully", async () => {
-             const response = await sendMcpRequest(
-               "http://localhost:3000",
-               "tools/call",
-               {
-                 name: "search_codebase",
-                 arguments: { query: "function greet" }
-               }
-               // No tier parameter needed - auth is implicit in local mode
-             );
-
-             const result = extractToolResult(response.data);
-             expect(result.matches).toBeDefined();
-             expect(Array.isArray(result.matches)).toBe(true);
-           });
-         });
-         ```
-      3. Headers are automatically set (no auth needed)
-         ```typescript
-         export function createMcpHeaders(): Record<string, string> {
-           return {
-             "Content-Type": "application/json",
-             Accept: "application/json, text/event-stream",
-             // Authorization header removed - local mode is always authenticated
-           };
-         }
-         ```
-    key_changes:
-      - Removed tier parameter from sendMcpRequest() signature
-      - Removed createAuthHeader() dependency
-      - Removed tier parameter from createMcpHeaders()
-      - All local mode requests are automatically authenticated
-    timestamp: 2026-01-28
-    evidence: Issue #607, app/tests/helpers/mcp.ts
-    rationale: |
-      Local-only mode doesn't require API key authentication. Removing auth headers
-      simplifies test code and eliminates a source of test failures related to
-      authentication setup.
-
-  clean_up_temp_directories_with_unique_identifiers:
-    when: Testing file-based operations that create temporary directories
-    approach: |
-      Use randomUUID().slice(0, 8) to create unique prefixes for test directories.
-      This prevents collisions when tests run in parallel.
-
-      1. Create temp directory with unique prefix
-         ```typescript
-         import { mkdtempSync, rmSync, existsSync } from "node:fs";
-         import { join } from "node:path";
-         import { tmpdir } from "node:os";
-         import { randomUUID } from "node:crypto";
-
-         describe("File Processing", () => {
-           const testId = randomUUID().slice(0, 8);
-           const tempDir = join(tmpdir(), \`kota-test-\${testId}\`);
-
-           beforeAll(() => {
-             mkdtempSync(tempDir, { recursive: true });
-           });
-
-           afterAll(() => {
-             if (existsSync(tempDir)) {
-               rmSync(tempDir, { recursive: true, force: true });
-             }
-           });
-
-           test("processes files in directory", () => {
-             // Test implementation using tempDir
-           });
-         });
-         ```
-      2. Benefits of unique prefixes:
-         - Parallel test execution doesn't cause collisions
-         - Failed cleanup doesn't block subsequent test runs
-         - Easy to identify stale test artifacts on disk
-         - Deterministic cleanup with existsSync guard
-    timestamp: 2026-01-28
-    evidence: Issue #607, app/tests/helpers/db.ts (createTempDir, cleanupTempDir)
-    rationale: |
-      Unique directory prefixes prevent race conditions in parallel test execution.
-      The existsSync guard provides graceful error handling if cleanup partially fails.
-
-decision_trees:
-  test_type_selection:
-    question: What type of test should I write?
-    options:
-      - if: Testing a single function in isolation
-        then: Unit test with minimal setup
-      - if: Testing database queries or mutations
-        then: SQLite test with in-memory database
-      - if: Testing multiple modules working together
-        then: Integration test with full database setup
-      - if: Testing API endpoint behavior
-        then: API test with seeded database state
-      - if: Testing file parsing or extraction
-        then: Indexer test with inline fixtures
-
-  sqlite_database_choice:
-    question: How should I set up the database?
-    options:
-      - if: Testing database interactions
-        then: |
-          Use in-memory database with beforeEach
-          ```typescript
-          db = createDatabase({ path: ":memory:" });
-          ```
-      - if: Testing file persistence or WAL mode
-        then: |
-          Use temp directory with file-based database
-          ```typescript
-          const dbPath = join(tempDir, "test.db");
-          db = createDatabase({ path: dbPath });
-          ```
-      - if: Testing concurrent access
-        then: |
-          Use file-based database with multiple connections
-          Ensure proper cleanup in afterAll
-
-  assertion_strategy:
-    question: How should I assert test results?
-    options:
-      - if: Checking exact values
-        then: "expect(value).toBe(expected)"
-      - if: Checking object properties
-        then: "expect(obj).toEqual({ key: value })"
-      - if: Checking array contains item
-        then: "expect(arr).toContainEqual(expected)"
-      - if: Checking object has property
-        then: "expect(obj).toHaveProperty('key')"
-      - if: Checking async throws
-        then: "expect(async () => await fn()).rejects.toThrow()"
-      - if: Checking null/undefined
-        then: "expect(value).toBeNull() or expect(value).toBeDefined()"
-
-patterns:
-  sqlite_test_pattern:
-    structure: |
-      import { describe, expect, test, beforeEach, afterEach } from "bun:test";
-      import { createDatabase, type KotaDatabase } from "@db/sqlite/index.js";
-
-      describe("Feature", () => {
-        let db: KotaDatabase;
-
-        beforeEach(() => {
-          db = createDatabase({ path: ":memory:" });
-          // Seed data
-        });
-
-        afterEach(() => {
-          db?.close();
-        });
-
-        test("should work", () => {
-          // Arrange, Act, Assert
-        });
-      });
-    trade_offs:
-      pros: [Fast execution, Complete isolation, Real code paths, Schema validation]
-      cons: [No persistence between tests, Must seed data each test]
-
-  file_based_test_pattern:
-    structure: |
-      import { describe, expect, it, beforeAll, beforeEach, afterEach, afterAll } from "bun:test";
-      import { mkdtempSync, rmSync } from "node:fs";
-      import { join } from "node:path";
-      import { tmpdir } from "node:os";
-
-      describe("File-based Feature", () => {
-        let tempDir: string;
-        let db: KotaDatabase;
-
-        beforeAll(() => {
-          tempDir = mkdtempSync(join(tmpdir(), "kota-test-"));
-        });
-
-        beforeEach(() => {
-          const dbPath = join(tempDir, "test.db");
-          db = createDatabase({ path: dbPath });
-        });
-
-        afterEach(() => {
-          db?.close();
-        });
-
-        afterAll(() => {
-          rmSync(tempDir, { recursive: true, force: true });
-        });
-
-        it("should persist data", () => {
-          // Test file persistence
-        });
-      });
-    use_when:
-      - Testing WAL mode behavior
-      - Testing file path resolution
-      - Testing concurrent database access
-      - Testing database migration scenarios
-
-  nested_describe_pattern:
-    structure: |
-      describe("Module", () => {
-        let db: KotaDatabase;
-
-        beforeEach(() => {
-          db = createDatabase({ path: ":memory:" });
-        });
-
-        afterEach(() => {
-          db?.close();
-        });
-
-        describe("method1()", () => {
-          test("should handle case A", () => {});
-          test("should handle case B", () => {});
-        });
-
-        describe("method2()", () => {
-          test("should handle case A", () => {});
-          test("should handle case B", () => {});
-        });
-      });
-    trade_offs:
-      pros: [Clear organization, Shared setup, Readable output]
-      cons: [Deep nesting can reduce clarity]
-
-  data_driven_test_pattern:
-    structure: |
-      describe("Language Detection", () => {
-        const cases = [
-          { file: "app.ts", expected: "typescript" },
-          { file: "app.js", expected: "javascript" },
-          { file: "app.py", expected: "python" },
-          { file: "app.go", expected: "go" },
+      Use typed fixture factory functions from app/tests/helpers/db.ts.
+      ```typescript
+      import { getTestDatabase, createTestRepository, createTestFile } from "../helpers/db.js";
+      
+      beforeEach(() => {
+        db = getTestDatabase();
+        repo = createTestRepository(db, { name: "my-repo" });
+        files = [
+          createTestFile(db, repo.id, { path: "src/index.ts" }),
+          createTestFile(db, repo.id, { path: "src/utils.ts" }),
         ];
-
-        test.each(cases)("should detect $expected for $file", ({ file, expected }) => {
-          expect(detectLanguage(file)).toBe(expected);
-        });
       });
-    use_when:
-      - Testing many similar cases with different inputs
-      - Mapping file extensions to languages
-      - Validating multiple input/output pairs
+      ```
+    timestamp: 2026-01-28
+    evidence: Issue #607
+
+  extract_cli_for_testability:
+    when: Testing CLI argument parsing or complex command-line logic
+    approach: |
+      Extract parsing logic to separate module for unit testing without process.exit().
+      Enables isolated testing of validation and type guards.
+      ```typescript
+      // cli/args.ts - extracted for testability
+      export function parseArgs(args: string[]): CliOptions {
+        // Parsing logic without side effects
+        return options;
+      }
+      
+      export function isValidToolsetTier(value: string): value is ToolsetTier {
+        return VALID_TIERS.includes(value as ToolsetTier);
+      }
+      
+      // In tests - dynamic import for isolation
+      test("parseArgs correctly parses --toolset core", async () => {
+        const { parseArgs } = await import("../../src/cli/args.js");
+        const options = parseArgs(["--toolset", "core"]);
+        expect(options.toolset).toBe("core");
+      });
+      ```
+    pitfalls:
+      - what: "Testing CLI with process.exit() calls"
+        instead: "Extract parsing to pure function without side effects"
+      - what: "Static imports in CLI tests"
+        instead: "Use dynamic imports (await import()) for better isolation"
+    timestamp: 2026-02-03
+    evidence: app/src/cli/args.ts, app/tests/cli/toolset.test.ts
+    rationale: |
+      CLI parsing with process.exit() is hard to test. Extraction enables unit testing
+      of validation logic and type guards without subprocess spawning.
+
+  test_hierarchical_filtering:
+    when: Testing tier-based feature filtering or hierarchical inclusion
+    approach: |
+      Verify each tier includes all tools from previous tiers using Set operations.
+      Test exact counts and verify hierarchical relationships.
+      ```typescript
+      test("each tier includes all tools from previous tiers", async () => {
+        const { filterToolsByTier } = await import("@mcp/tools.js");
+        
+        const coreTools = filterToolsByTier("core");
+        const defaultTools = filterToolsByTier("default");
+        const memoryTools = filterToolsByTier("memory");
+        
+        const coreNames = new Set(coreTools.map(t => t.name));
+        const defaultNames = new Set(defaultTools.map(t => t.name));
+        
+        // Verify inclusion
+        for (const name of coreNames) {
+          expect(defaultNames.has(name)).toBe(true);
+        }
+      });
+      ```
+    timestamp: 2026-02-03
+    evidence: app/tests/mcp/toolset-filtering.test.ts
+    rationale: |
+      Hierarchical filtering requires careful validation that subsets are truly subsets.
+      Set-based tests catch accidental exclusions in tier definitions.
+
+  test_repository_identifier_resolution:
+    when: Testing MCP tools that accept repository in multiple formats
+    approach: |
+      Test both UUID and full_name format, plus error cases.
+      Verify helpful error messages when repository not found.
+      ```typescript
+      test("resolves repository by full_name", async () => {
+        const result = await executeListRecentFiles(
+          { repository: "owner/repo", limit: 10 },
+          requestId,
+          userId
+        );
+        expect(result.files).toBeDefined();
+      });
+      
+      test("returns error for non-existent repository", async () => {
+        const result = await executeListRecentFiles(
+          { repository: "nonexistent/repo", limit: 10 },
+          requestId,
+          userId
+        );
+        expect(result.error).toContain("not found");
+      });
+      ```
+    timestamp: 2026-02-03
+    evidence: commit 9adc86f, Issue #137
+    rationale: |
+      MCP tools must support both UUID (internal) and full_name (user-friendly) formats.
+      Tests ensure resolution logic works and provides helpful error messages.
 
 best_practices:
   organization:
@@ -824,104 +326,105 @@ best_practices:
     - Include JSDoc comment at top of test file describing coverage
     - Follow existing test patterns in the codebase
 
+patterns:
+  sqlite_test_pattern:
+    structure: |
+      import { describe, expect, test, beforeEach, afterEach } from "bun:test";
+      import { createDatabase, type KotaDatabase } from "@db/sqlite/index.js";
+
+      describe("Feature", () => {
+        let db: KotaDatabase;
+
+        beforeEach(() => {
+          db = createDatabase({ path: ":memory:" });
+        });
+
+        afterEach(() => {
+          db?.close();
+        });
+
+        test("should work", () => {
+          // Arrange, Act, Assert
+        });
+      });
+    trade_offs:
+      pros: [Fast execution, Complete isolation, Real code paths, Schema validation]
+      cons: [No persistence between tests, Must seed data each test]
+
+  file_based_test_pattern:
+    use_when:
+      - Testing WAL mode behavior
+      - Testing file path resolution
+      - Testing concurrent database access
+      - Testing database migration scenarios
+
+  nested_describe_pattern:
+    trade_offs:
+      pros: [Clear organization, Shared setup, Readable output]
+      cons: [Deep nesting can reduce clarity]
+
+  data_driven_test_pattern:
+    structure: |
+      const cases = [
+        { file: "app.ts", expected: "typescript" },
+        { file: "app.js", expected: "javascript" },
+      ];
+
+      test.each(cases)("should detect $expected for $file", ({ file, expected }) => {
+        expect(detectLanguage(file)).toBe(expected);
+      });
+
 known_issues:
   - issue: Database connection not closed in test
     impact: Resource leaks, potential test interference
     resolution: Always close db in afterEach
-    prevention: Use the standard test pattern with afterEach cleanup
     status: enforce via code review
 
   - issue: Tests depend on execution order
     impact: Flaky tests that pass/fail inconsistently
     resolution: Use beforeEach for all state setup
-    prevention: Each test creates its own fresh state
     status: enforce via code review
 
   - issue: Mocking database operations
     impact: Tests pass but production code fails
     resolution: Use real in-memory SQLite
-    prevention: Antimocking philosophy is mandatory
     status: enforced via code review
 
-  - issue: Schema changes not reflected in tests
-    impact: Tests use outdated schema
-    resolution: createDatabase() auto-initializes from sqlite-schema.sql
-    prevention: Always use createDatabase() helper
-    status: automatic via factory function
-
-  - issue: Temp files not cleaned up
-    impact: Disk space accumulation, stale test artifacts
-    resolution: Use afterAll to clean temp directories
-    prevention: Use mkdtempSync/rmSync pattern
-    status: enforce via code review
-
-
   - issue: FTS5 search terms with special characters cause SQL errors
-    impact: User searches with hyphens or FTS keywords fail with SQL syntax errors
-    resolution: Escape search terms by wrapping in double quotes and doubling internal quotes
-    prevention: Test FTS5 edge cases - hyphens, multi-word, FTS keywords, embedded quotes
-    status: resolved via escapeFts5Term() (commit 5af086f)
+    impact: User searches with hyphens or FTS keywords fail
+    resolution: Escape search terms via escapeFts5Term()
+    status: resolved (commit 5af086f)
     timestamp: 2026-01-28
-potential_enhancements:
-  - Custom test reporter for antimocking compliance
-  - Schema validation assertions
-  - Test coverage tracking per module
-  - Performance benchmarking for database operations
-  - Test data factory helpers for common entities
-
-bun_test_api:
-  imports: |
-    import { describe, expect, test, it, beforeAll, beforeEach, afterEach, afterAll } from "bun:test";
-  assertions:
-    toBe: Strict equality (===)
-    toEqual: Deep equality for objects/arrays
-    toBeTruthy: Value is truthy
-    toBeFalsy: Value is falsy
-    toBeNull: Value is null
-    toBeDefined: Value is not undefined
-    toBeUndefined: Value is undefined
-    toContain: Array/string contains value
-    toContainEqual: Array contains matching object
-    toHaveLength: Array/string has length
-    toHaveProperty: Object has property
-    toThrow: Function throws error
-    toMatchObject: Object matches subset
-    toBeGreaterThan: Number comparison
-    toBeLessThan: Number comparison
-  async:
-    await_in_test: "test('async', async () => { await fn(); })"
-    rejects: "expect(async () => await fn()).rejects.toThrow()"
-  skip_and_focus:
-    skip: "test.skip('skipped', () => {})"
-    only: "test.only('focused', () => {})"
-    todo: "test.todo('not yet implemented')"
 
 stability:
   convergence_indicators:
-    insight_rate_trend: increasing
+    insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 9
+    new_patterns_added_this_cycle: 3
     patterns_updated_this_cycle: 0
-    last_reviewed: 2026-01-28
+    last_reviewed: 2026-02-03
     utility_ratio: 1.0
+    pruning_applied: true
+    pruning_details: |
+      - Removed bun_test_api reference section (stable, moved to build agent)
+      - Condensed decision_trees (moved planning content to plan agent)
+      - Consolidated redundant examples in patterns
+      - Removed verbose potential_enhancements list
+      - Reduced from 927 to ~710 lines
     notes: |
-      Second improve cycle - SQLite migration learnings extraction.
+      Third improve cycle - CLI testability and toolset filtering patterns.
       
-      Previous cycle (first):
-      - Added 5 new key_operations from recent commits (5af086f, d669841)
-      - FTS5 edge case testing patterns (Issue #595)
-      - Environment variable restoration for test isolation
-      - Filesystem workflow testing with real file operations
-      - Security boundary testing for path traversal
-      - skipSchemaInit option for custom schema tests
+      Previous cycles:
+      - First: FTS5 edge cases, environment restoration, filesystem workflows
+      - Second: SQLite migration, test fixtures, simplified setup
+
+      This cycle (CLI testability focus):
+      - CLI argument extraction for testability (parseArgs module)
+      - Type guard validation patterns (isValidToolsetTier)
+      - Dynamic import in tests for better isolation
+      - Hierarchical tier filtering tests
+      - Repository identifier resolution patterns (UUID vs full_name)
+      - SIZE GOVERNANCE: Pruned from 927 to ~710 lines
       
-      This cycle (SQLite migration focus):
-      - Created SQLite test fixtures pattern (typed factory functions)
-      - Simplified test environment setup (removed Supabase/Postgres dependencies)
-      - Local-only MCP testing without authentication headers
-      - Unique identifier pattern for temp directory cleanup
-      - Complete migration from Supabase to SQLite test infrastructure
-      - Issue #607 and #591 learnings incorporated
-      
-      Total patterns in expertise: 13 key_operations
-      Domain stability: Moderate (SQLite migration patterns now established)
+      Total patterns in expertise: 16 key_operations
+      Domain stability: Moderate-High (core patterns established, refinements ongoing)

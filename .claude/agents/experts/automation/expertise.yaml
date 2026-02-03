@@ -1,5 +1,5 @@
 # Automation Expert Domain Expertise
-# Last reviewed: 2026-01-31
+# Last reviewed: 2026-02-03
 # Domain: automation layer development with Claude Agent SDK
 
 overview:
@@ -7,7 +7,8 @@ overview:
     Automation expert domain provides specialized knowledge for kotadb's automation layer,
     which uses the Claude Agent SDK (@anthropic-ai/claude-code) to execute automated workflows.
     This domain covers SDK integration patterns, workflow orchestration, metrics tracking with
-    SQLite, GitHub commenting via gh CLI, console output transparency, and cost tracking for AI operations.
+    SQLite, GitHub commenting via gh CLI, console output transparency, MCP toolset configuration,
+    and cost tracking for AI operations.
     
   scope:
     primary_codebase:
@@ -22,10 +23,15 @@ overview:
       - automation/package.json (SDK dependency)
       - automation/tsconfig.json (TypeScript config)
       - automation/README.md (documentation)
+      - app/src/cli/args.ts (CLI argument parsing with toolset tier support)
+      - app/src/mcp/tools.ts (MCP tool definitions with tier metadata)
+      - app/src/mcp/server.ts (MCP server with tool filtering)
     
     broader_scope:
       - Claude Agent SDK patterns (query(), message streaming, hooks, stderr callback)
-      - MCP server configuration for kotadb access
+      - MCP server configuration for kotadb access with toolset tiers
+      - MCP tool organization (core, sync, memory, expertise tiers)
+      - Tool filtering patterns for dynamic tool selection
       - Bun.spawn patterns for gh CLI integration
       - SQLite metrics storage (automation/.data/metrics.db)
       - ANSI escape code formatting for console output
@@ -59,6 +65,35 @@ core_implementation:
         - Display metrics table or run workflow
         - Handle exit codes
         - Record metrics and post GitHub comments
+        
+    cli_args_ts:
+      path: app/src/cli/args.ts
+      purpose: CLI argument parsing with toolset tier validation
+      responsibilities:
+        - Define ToolsetTier type ("default" | "core" | "memory" | "full")
+        - Parse --toolset flag with = and space syntax
+        - Validate tier values with type guard isValidToolsetTier
+        - Return parsed CliOptions with toolset field
+        - Provide helpful error messages for invalid tiers
+        
+    mcp_tools_ts:
+      path: app/src/mcp/tools.ts
+      purpose: MCP tool definitions with tier-based filtering
+      responsibilities:
+        - Define ToolDefinition interface with tier field
+        - Categorize tools into tiers (core, sync, memory, expertise)
+        - Implement filterToolsByTier for dynamic tool selection
+        - Map toolset tiers to tool tiers (core→core, default→core+sync, etc)
+        - Export tool filtering utilities for MCP server
+        
+    mcp_server_ts:
+      path: app/src/mcp/server.ts
+      purpose: MCP server with toolset-aware tool registration
+      responsibilities:
+        - Accept toolset in McpServerContext
+        - Filter tools by tier in ListToolsRequestSchema handler
+        - Log filtered tool count for debugging
+        - Thread toolset through server lifecycle
         
     orchestrator_ts:
       path: automation/src/orchestrator.ts
@@ -420,7 +455,7 @@ key_operations:
         kotadb: {
           type: "stdio",
           command: "bunx",
-          args: ["--bun", "kotadb"],
+          args: ["--bun", "kotadb", "--toolset", "memory"],
           env: { KOTADB_CWD: projectRoot }
         }
       }
@@ -466,6 +501,104 @@ key_operations:
       - Network failures are transient
       - Wrong repo format breaks comment posting
       - Not handling empty PR URL shows undefined
+      
+  configure_mcp_toolset:
+    when: Selecting MCP tool tier for workflow requirements
+    approach: |
+      Configure mcpServers with --toolset flag to control which tools are available.
+      Use tier-based filtering to balance capability with token overhead. Thread toolset
+      from CLI args through server context to tool filtering logic.
+    patterns:
+      - Toolset tiers: core (6), default (8), memory (14), full (19 tools)
+      - Tool tiers: core, sync, memory, expertise
+      - Tier mapping: core→core, default→core+sync, memory→core+sync+memory, full→all
+      - CLI parsing with --toolset flag (space and = syntax)
+      - Type guard validation: isValidToolsetTier(value)
+      - Context threading: CLI → McpServerContext → filterToolsByTier()
+      - Hierarchical tool inclusion: each tier includes previous tiers
+    code_example: |
+      // CLI parsing (app/src/cli/args.ts)
+      export type ToolsetTier = "default" | "core" | "memory" | "full";
+      
+      export function isValidToolsetTier(value: string): value is ToolsetTier {
+        return ["default", "core", "memory", "full"].includes(value as ToolsetTier);
+      }
+      
+      // MCP server configuration with toolset
+      mcpServers: {
+        kotadb: {
+          type: "stdio",
+          command: "bunx",
+          args: ["--bun", "kotadb", "--toolset", "memory"],
+          env: { KOTADB_CWD: projectRoot }
+        }
+      }
+      
+      // Tool filtering (app/src/mcp/tools.ts)
+      export function filterToolsByTier(tier: ToolsetTier): ToolDefinition[] {
+        const allTools = getToolDefinitions();
+        switch (tier) {
+          case "core":
+            return allTools.filter((t) => t.tier === "core");
+          case "default":
+            return allTools.filter((t) => t.tier === "core" || t.tier === "sync");
+          case "memory":
+            return allTools.filter((t) => 
+              t.tier === "core" || t.tier === "sync" || t.tier === "memory"
+            );
+          case "full":
+            return allTools;
+        }
+      }
+      
+      // MCP server tool registration
+      server.setRequestHandler(ListToolsRequestSchema, async () => {
+        const tier = context.toolset || "default";
+        const filteredTools = filterToolsByTier(tier);
+        return { tools: filteredTools };
+      });
+    pitfalls:
+      - Not validating toolset tier causes runtime errors
+      - Forgetting to thread toolset through context breaks filtering
+      - Tool tier metadata must be added to all ToolDefinitions
+      - Hierarchical inclusion requirement: higher tiers must include lower tiers
+      - Case-sensitive tier names ("core" not "CORE")
+      
+  implement_tool_tier_metadata:
+    when: Adding new MCP tool or refactoring tool definitions
+    approach: |
+      Add tier field to ToolDefinition for every tool. Categorize by purpose:
+      core for essential ops, sync for data export/import, memory for cross-session
+      intelligence, expertise for domain validation tools.
+    patterns:
+      - ToolDefinition interface includes tier: ToolTier field
+      - ToolTier type: "core" | "sync" | "memory" | "expertise"
+      - Core tier: search_code, index_repository, list_recent_files, search_dependencies,
+        analyze_change_impact, generate_task_context
+      - Sync tier: kota_sync_export, kota_sync_import
+      - Memory tier: search_decisions, record_decision, search_failures, record_failure,
+        search_patterns, record_insight
+      - Expertise tier: get_domain_key_files, validate_expertise, sync_expertise,
+        get_recent_patterns, validate_implementation_spec
+    code_example: |
+      export const SEARCH_CODE_TOOL: ToolDefinition = {
+        tier: "core",
+        name: "search_code",
+        description: "Search indexed code files...",
+        inputSchema: { /* ... */ }
+      };
+      
+      export const RECORD_DECISION_TOOL: ToolDefinition = {
+        tier: "memory",
+        name: "record_decision",
+        description: "Record a new architectural decision...",
+        inputSchema: { /* ... */ }
+      };
+    pitfalls:
+      - Missing tier field breaks filterToolsByTier
+      - Incorrect tier categorization confuses users
+      - Not updating tests when adding tier metadata
+
 
 decision_trees:
   console_output_strategy:
@@ -562,6 +695,25 @@ decision_trees:
       - condition: Errors
         action: Log to console AND store in metrics if workflow-level
         rationale: Both immediate feedback and historical tracking
+  mcp_toolset_selection:
+    question: Which toolset tier should I use for this workflow?
+    branches:
+      - condition: Minimal token overhead, basic code intelligence only
+        action: Use --toolset core (6 tools)
+        rationale: Smallest footprint for simple search/indexing tasks
+        
+      - condition: Standard workflows with occasional data sync
+        action: Use --toolset default (8 tools) or omit flag
+        rationale: Balanced capability, includes sync tools
+        
+      - condition: Need cross-session memory (decisions, failures, patterns)
+        action: Use --toolset memory (14 tools)
+        rationale: Enables persistent intelligence layer
+        
+      - condition: Advanced workflows requiring expertise validation
+        action: Use --toolset full (19 tools)
+        rationale: All capabilities including domain validation
+
 
 patterns:
   console_reporter_pattern:
@@ -646,6 +798,18 @@ best_practices:
     - Gate stack traces and detailed logs on verbosity
     - Always show errors and key actions regardless
     
+  mcp_toolset:    
+  mcp_toolset:
+    - Use --toolset flag to control tool availability
+    - Default tier (8 tools) for standard workflows
+    - Core tier (6 tools) for minimal token footprint
+    - Memory tier (14 tools) when cross-session intelligence needed
+    - Full tier (19 tools) for advanced validation workflows
+    - Add tier metadata to all new ToolDefinitions
+    - Validate toolset values with type guards
+    - Thread toolset through McpServerContext
+    - Test hierarchical inclusion (higher tiers include lower)
+  
   sdk_integration:
     - Always validate ANTHROPIC_API_KEY before query()
     - Use type guards for message handling
@@ -701,19 +865,17 @@ potential_enhancements:
   - Tool execution timeline visualization
 
 stability:
-  convergence_indicators:
-    insight_rate_trend: converging
+    insight_rate_trend: stable
     contradiction_count: 0
-    last_reviewed: 2026-02-01
+    last_reviewed: 2026-02-03
     notes: |
-      Issue #65 implementation (console output transparency) adds comprehensive
-      SDK hook integration, ANSI formatting patterns, and verbosity control.
-      ConsoleReporter successfully separates user-facing output from structured
-      logging. SDK stderr callback pattern established for suppressing default
-      output. All key automation operations now documented with code examples.
-      Domain approaching stability with most patterns established and tested.
-
-      Issue #64 implementation (git worktree isolation) adds worktree.ts module
-      with graceful fallback patterns, filesystem-safe timestamps, and preservation
-      strategies for debugging. Enables parallel workflow execution without conflicts.
-      See worktree-learnings.md for detailed patterns and best practices.
+      MCP toolset tier implementation adds flexible tool filtering with --toolset flag.
+      Four tiers (core, default, memory, full) enable token-conscious tool selection.
+      Tool tier metadata (core, sync, memory, expertise) allows hierarchical filtering.
+      Context threading pattern established: CLI → McpServerContext → filterToolsByTier().
+      Type guards and validation ensure runtime safety. Comprehensive test coverage
+      confirms hierarchical inclusion and tier boundaries. Pattern successfully balances
+      capability vs token overhead.
+      
+      Prior: Issue #65 (console transparency), #64 (worktree isolation). Domain stable
+      with established SDK integration, hook patterns, and reporting infrastructure.

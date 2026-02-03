@@ -248,6 +248,143 @@ key_operations:
         instead: "Use KOTADB_PATH env var for file-based test database"
         reason: "Global singleton needs file path for proper isolation"
 
+
+  implement_tool_tier_filtering:
+    when: Adding CLI-based tool filtering to support different MCP tool subsets (core, memory, expertise)
+    approach: |
+      1. Define ToolTier enum for categorization: "core" | "sync" | "memory" | "expertise"
+      2. Add tier property to ToolDefinition interface in app/src/mcp/tools.ts
+      3. Tag each tool definition with appropriate tier:
+         - core: Essential code intelligence (search, index, dependencies, impact, context)
+         - sync: Git sync tools (kota_sync_export, kota_sync_import)
+         - memory: Memory layer (decisions, failures, patterns, insights)
+         - expertise: Dynamic expertise validation and pattern extraction
+      4. Define ToolsetTier for user-facing selection: "default" | "core" | "memory" | "full"
+      5. Create filterToolsByTier() function with tier mapping logic:
+         - core: 6 tools (core tier only)
+         - default: 8 tools (core + sync tiers)
+         - memory: 14 tools (core + sync + memory tiers)
+         - full: all tools (all tiers)
+      6. Add --toolset CLI flag to parseArgs() with validation
+      7. Extract CLI parsing to separate module (app/src/cli/args.ts) for testability
+      8. Pass toolset via McpServerContext.toolset to server
+      9. Filter tools in ListToolsRequestSchema handler using context.toolset
+      10. Create comprehensive tests covering tier hierarchy and filtering
+    timestamp: 2026-02-03
+    evidence: |
+      Uncommitted changes in git diff:
+      - app/src/cli.ts (--toolset flag, runStdioMode parameter)
+      - app/src/cli/args.ts (extracted parsing, ToolsetTier type guard)
+      - app/src/mcp/server.ts (McpServerContext.toolset, filtered tool listing)
+      - app/src/mcp/tools.ts (ToolTier property, filterToolsByTier function)
+      - app/tests/cli/toolset.test.ts (CLI parsing tests)
+      - app/tests/mcp/toolset-filtering.test.ts (tier filtering tests)
+      - README.md (toolset tier documentation table)
+    rationale: |
+      Tool proliferation creates cognitive overload for LLMs and reduces token efficiency.
+      Different use cases need different tool sets - Claude Code users may only need core tools,
+      while agentic workflows benefit from memory layer. Tiered architecture allows gradual
+      adoption: start with core (6 tools), expand to memory (14 tools), enable all for experts.
+      CLI-based selection is more flexible than compile-time configuration.
+    key_patterns:
+      - Separate ToolTier (internal categorization) from ToolsetTier (user-facing selection)
+      - Hierarchical tier design: each tier includes previous (core ⊂ default ⊂ memory ⊂ full)
+      - Extract CLI parsing to separate module for testability (avoid mocking main())
+      - Type guards for runtime validation (isValidToolsetTier)
+      - Filter at server initialization (ListToolsRequestSchema) not per tool call
+      - Comprehensive tests verify tier hierarchy and exact tool counts
+    pitfalls:
+      - what: "Filtering tools in CallToolRequestSchema handler"
+        instead: "Filter in ListToolsRequestSchema only"
+        reason: "Client should only see available tools, attempting unavailable tool is client error"
+      - what: "Using environment variables for tier selection"
+        instead: "Use CLI flag (--toolset) for explicit control"
+        reason: "CLI flags are more visible and don't persist across sessions"
+      - what: "Hardcoding tier logic in each executor"
+        instead: "Single filterToolsByTier() function based on tier property"
+        reason: "Centralized logic prevents tier drift"
+      - what: "Breaking tier hierarchy (default doesn't include core)"
+        instead: "Test tier hierarchy with set containment checks"
+        reason: "Unexpected behavior if higher tiers exclude lower tier tools"
+    affected_files: |
+      - app/src/cli.ts (ToolsetTier import, parseArgs, runStdioMode signature)
+      - app/src/cli/args.ts (new file - extracted CLI parsing logic)
+      - app/src/mcp/server.ts (McpServerContext interface, tool filtering)
+      - app/src/mcp/tools.ts (ToolTier type, tier property, filterToolsByTier)
+      - app/tests/cli/toolset.test.ts (new file - CLI parsing tests)
+      - app/tests/mcp/toolset-filtering.test.ts (new file - tier filtering tests)
+
+  resolve_flexible_repository_identifiers:
+    when: Adding support for repository identification by full_name OR UUID in MCP tools
+    approach: |
+      1. Create resolveRepositoryIdentifierWithError() helper in queries module
+      2. Accept repository parameter as string (UUID or owner/repo format)
+      3. Try UUID resolution first: SELECT * FROM repositories WHERE id = ?
+      4. Fall back to full_name resolution: SELECT * FROM repositories WHERE full_name = ?
+      5. Return { id: string } on success or { error: string } on failure
+      6. Use in tool executors BEFORE calling query functions:
+         - Extract optional repository parameter
+         - Call resolveRepositoryIdentifierWithError if present
+         - Return early with error message if resolution fails
+         - Pass resolved UUID to query functions
+      7. Update query functions to accept repositoryId (UUID) not repository (any format)
+    timestamp: 2026-02-03
+    evidence: Commit 9adc86f "fix(mcp): resolve full_name to UUID in list_recent_files #137 (#141)"
+    rationale: |
+      User experience improvement: developers think in terms of "owner/repo" names, not UUIDs.
+      Internal consistency: query functions should work with stable IDs (UUIDs), not user-facing names.
+      Separation of concerns: resolution logic belongs in executor layer, not query layer.
+    key_patterns:
+      - Resolution at tool executor boundary (before query calls)
+      - Query functions accept normalized IDs (UUID) only
+      - Try-fallback pattern: UUID first, then full_name
+      - Return error object vs throwing (enables graceful tool failure messages)
+      - Early return pattern: resolve -> check error -> proceed or return
+    pitfalls:
+      - what: "Putting resolution logic in query functions"
+        instead: "Resolve in executor, pass UUID to query"
+        reason: "Query functions should work with normalized IDs only"
+      - what: "Throwing errors on invalid repository"
+        instead: "Return { error: string } for graceful handling"
+        reason: "MCP tools should return structured errors, not throw"
+      - what: "Only supporting UUID format"
+        instead: "Support both UUID and full_name (owner/repo)"
+        reason: "User experience - developers think in repo names"
+    affected_files: |
+      - app/src/api/queries.ts (resolveRepositoryIdentifierWithError helper)
+      - app/src/mcp/tools.ts (executeListRecentFiles resolver usage)
+
+  extract_cli_parsing_for_testability:
+    when: Need to test CLI argument parsing without invoking main() or mocking process.exit
+    approach: |
+      1. Create app/src/cli/args.ts module for testable parsing logic
+      2. Define CliOptions interface with all CLI flags
+      3. Extract parseArgs(args: string[]): CliOptions function
+      4. Extract validation helpers (isValidToolsetTier, etc.)
+      5. Keep error handling in parseArgs (process.stderr.write + process.exit)
+      6. Import and use in main CLI entry point (app/src/cli.ts)
+      7. Write unit tests against exported parseArgs function
+      8. Test error paths by expecting process.exit() calls
+    timestamp: 2026-02-03
+    evidence: New file app/src/cli/args.ts + app/tests/cli/toolset.test.ts
+    rationale: |
+      Testing main() is difficult: requires mocking process.exit, process.argv, stdout/stderr.
+      Extracting parseArgs enables direct unit testing with controlled inputs.
+      Follows antimocking philosophy: test real parsing logic, not mocks.
+    key_patterns:
+      - Pure parsing function: string[] -> CliOptions
+      - Validation helpers return booleans (type guards)
+      - Error messages via process.stderr.write (not thrown exceptions)
+      - process.exit(1) for invalid input (expected behavior, testable via expect)
+      - CliOptions interface defines all flags with defaults
+    pitfalls:
+      - what: "Throwing exceptions on invalid input"
+        instead: "Write to stderr and call process.exit(1)"
+        reason: "CLI tools should exit with status codes, not throw"
+      - what: "Testing main() directly"
+        instead: "Extract parseArgs and test that"
+        reason: "Avoids complex mocking of process global"
+
   configure_npm_package_distribution:
     when: Publishing TypeScript package with path aliases for direct execution (Bun/ts-node)
     approach: |
@@ -349,53 +486,8 @@ key_operations:
 patterns:
   cli_entry_point_pattern:
     structure: |
-      // app/src/cli.ts (with #!/usr/bin/env bun shebang on first line)
-      function getVersion(): string {
-        const packageJsonPath = join(__dirname, "..", "package.json");
-        const packageJson = JSON.parse(readFileSync(packageJsonPath, "utf-8"));
-        return packageJson.version || "unknown";
-      }
-      
-      function parseArgs(args: string[]): CliOptions {
-        const options: CliOptions = { port: 3000, help: false, version: false, stdio: false };
-        for (let i = 0; i < args.length; i++) {
-          if (args[i] === "--help" || args[i] === "-h") options.help = true;
-          else if (args[i] === "--version" || args[i] === "-v") options.version = true;
-          else if (args[i] === "--stdio") options.stdio = true;
-          else if (args[i] === "--port") options.port = Number(args[++i]);
-        }
-        return options;
-      }
-      
-      async function main(): Promise<void> {
-        const options = parseArgs(process.argv.slice(2));
-        if (options.version) {
-          process.stdout.write(`kotadb v${getVersion()}\n`);
-          process.exit(0);
-        }
-        
-        // Route to stdio mode
-        if (options.stdio) {
-          await runStdioMode();
-          return;
-        }
-        
-        // HTTP mode
-        const server = createExpressApp().listen(options.port);
-        const shutdown = () => {
-          server.close(() => process.exit(0));
-          setTimeout(() => process.exit(1), 10000);
-        };
-        process.on("SIGTERM", shutdown);
-        process.on("SIGINT", shutdown);
-      }
-    notes:
-      - First line MUST be #!/usr/bin/env bun (no BOM)
-      - process.argv.slice(2) skips executable and script path
-      - getVersion() reads package.json at runtime
-      - Use process.stdout.write / process.stderr.write (not console.*)
-      - 10-second timeout in shutdown handler (HTTP mode only)
-      - Stdio mode requires no shutdown handler (transport manages lifecycle)
+      See create_cli_entry_point operation for full implementation.
+      Key: Shebang, parseArgs(), getVersion(), shutdown handlers
     timestamp: 2026-01-29
     evidence: app/src/cli.ts
 
@@ -454,140 +546,244 @@ patterns:
 
   logger_stderr_routing_pattern:
     structure: |
-      // app/src/logging/logger.ts (stderr routing for stdio mode)
-      export interface LogContext {
-        request_id?: string;
-        user_id?: string;
-        forceStderr?: boolean;  // NEW: route all logs to stderr
-        [key: string]: unknown;
-      }
-      
-      export function createLogger(baseContext?: LogContext): Logger {
-        const context = baseContext ? maskSensitiveData(baseContext) : {};
-        const forceStderr = context.forceStderr === true;
-        
-        return {
-          info(message: string, additionalContext?: LogContext): void {
-            const entry: LogEntry = { /* ... */ };
-            writeLog(entry, forceStderr);  // Pass forceStderr flag
-          },
-          // ... other log methods
-        };
-      }
-      
-      function writeLog(entry: LogEntry, forceStderr = false): void {
-        const json = JSON.stringify(entry);
-        const output = `${json}\n`;
-        
-        if (forceStderr || entry.level === "error") {
-          process.stderr.write(output);
-        } else {
-          process.stdout.write(output);
-        }
-      }
-    notes:
-      - forceStderr flag routes ALL log levels to stderr (including info/debug)
-      - Default behavior: info/debug/warn to stdout, error to stderr
-      - Stdio mode behavior: ALL logs to stderr (stdout is protocol channel)
-      - Flag is set once at logger creation, not per log call
+      See implement_mcp_stdio_transport operation for details.
+      Key: LogContext.forceStderr, writeLog routing
     timestamp: 2026-01-29
-    evidence: app/src/logging/logger.ts (forceStderr implementation)
+    evidence: app/src/logging/logger.ts
 
   express_route_pattern:
     structure: |
-      app.get("/path", async (req: AuthenticatedRequest, res: Response) => {
-          const context = req.authContext!;
-          const param = req.query.param as string;
-          if (!param) {
-              addRateLimitHeaders(res, context.rateLimit);
-              return res.status(400).json({ error: "Missing param" });
-          }
-          const results = queryFunction(param);
-          addRateLimitHeaders(res, context.rateLimit);
-          res.json({ results });
-      });
-    notes:
-      - AuthenticatedRequest for authenticated routes
-      - Always addRateLimitHeaders before response
-      - Return early with status code on validation failure
+      See add_express_route operation.
+      Key: AuthenticatedRequest, addRateLimitHeaders, early validation
 
   mcp_tool_pattern:
     structure: |
-      export const TOOL_NAME: ToolDefinition = {
-          name: "tool_name",
-          description: "When/why to use",
-          inputSchema: {
-              type: "object",
-              properties: { param: { type: "string", description: "..." } },
-              required: ["param"],
-          },
-      };
-      
-      export async function executeTool(
-          params: unknown,
-          _requestId: string | number,
-          userId: string,
-      ): Promise<unknown> {
-          if (typeof params !== "object" || params === null)
-              throw new Error("Parameters must be an object");
-          const p = params as Record<string, unknown>;
-          if (p.param === undefined) throw new Error("Missing: param");
-          return await queryFunction(p.param as string);
-      }
-    notes:
-      - Tool description guides LLM on when/how to use
-      - Properties need descriptions in inputSchema
-      - Validate all params including types and ranges
+      See register_mcp_tool operation for full pattern.
+      Key: ToolDefinition with inputSchema, executor with parameter validation
 
   sqlite_query_pattern:
     structure: |
-      function queryInternal(db: KotaDatabase, param: string): Result[] {
-          const sql = `SELECT * FROM table WHERE condition = ? LIMIT ?`;
-          const rows = db.query<RowType>(sql, [param, 20]);
-          return rows.map(transform);
-      }
-      export function query(param: string): Result[] {
-          return queryInternal(getGlobalDatabase(), param);
-      }
-    notes:
-      - Internal function takes db param (testable)
-      - Public function uses getGlobalDatabase()
-      - db.query<T>(), db.queryOne<T>(), db.run(), db.transaction(), db.prepare()
+      See add_query_function operation.
+      Key: Internal function with db param, public uses getGlobalDatabase()
 
   fts5_search_pattern:
     structure: |
-      function escapeFts5Term(term: string): string {
-          return `"${term.replace(/"/g, '""')}"`;
-      }
-      function searchInternal(db: KotaDatabase, term: string): Result[] {
-          const sql = `
-              SELECT f.*, snippet(fts, 1, '<mark>', '</mark>', '...', 32) AS snippet
-              FROM table_fts fts
-              JOIN table f ON fts.rowid = f.rowid
-              WHERE table_fts MATCH ?
-              ORDER BY bm25(table_fts) LIMIT 100
-          `;
-          return db.query<Result>(sql, [escapeFts5Term(term)]);
-      }
-    notes:
-      - Always escape with escapeFts5Term before MATCH
-      - Use bm25() for relevance, snippet() for context
-      - Test: hyphens, phrases, FTS5 keywords, quotes
+      See implement_fts5_search operation.
+      Key: escapeFts5Term() before MATCH, bm25() for ranking, snippet() for context
 
   npm_package_files_pattern:
     structure: |
-      // app/package.json (TypeScript package with path aliases for Bun)
-      {
-        "name": "kotadb",
-        "version": "2.0.1",
-        "bin": {
-          "kotadb": "./src/cli.ts"
-        },
-        "files": [
-          "src/**/*.ts",
-          "src/**/*.js",
-          "!src/**/*.test.ts",
-          "!src/**/*.spec.ts",
+      See configure_npm_package_distribution operation.
+      Key: tsconfig.json in files array, path aliases, testing with npm pack
+    timestamp: 2026-01-29
+    evidence: Issue #39
+
+  tool_tier_filtering_pattern:
+    structure: |
+      // app/src/mcp/tools.ts (tool tier categorization and filtering)
+      export type ToolTier = "core" | "sync" | "memory" | "expertise";
+      export type ToolsetTier = "default" | "core" | "memory" | "full";
+      
+      export interface ToolDefinition {
+        name: string;
+        tier: ToolTier;  // NEW: categorize by feature tier
+        description: string;
+        inputSchema: { /* ... */ };
+      }
+      
+      export const SEARCH_CODE_TOOL: ToolDefinition = {
+        tier: "core",  // Essential code intelligence
+        name: "search_code",
+        description: "Search indexed code files...",
+        inputSchema: { /* ... */ },
+      };
+      
+      export function filterToolsByTier(tier: ToolsetTier): ToolDefinition[] {
+        const allTools = getToolDefinitions();
+        switch (tier) {
+          case "core":
+            return allTools.filter((t) => t.tier === "core");
+          case "default":
+            return allTools.filter((t) => t.tier === "core" || t.tier === "sync");
+          case "memory":
+            return allTools.filter((t) => 
+              t.tier === "core" || t.tier === "sync" || t.tier === "memory"
+            );
+          case "full":
+            return allTools;
+        }
+      }
+      
+      // app/src/mcp/server.ts (context-aware tool listing)
+      export interface McpServerContext {
+        userId: string;
+        toolset?: ToolsetTier;  // NEW: optional tier selection
+      }
+      
+      server.setRequestHandler(ListToolsRequestSchema, async () => {
+        const tier = context.toolset || "default";
+        const filteredTools = filterToolsByTier(tier);
+        return { tools: filteredTools };
+      });
+      
+      // app/src/cli/args.ts (testable CLI parsing)
+      export type ToolsetTier = "default" | "core" | "memory" | "full";
+      export interface CliOptions {
+        port: number;
+        stdio: boolean;
+        toolset: ToolsetTier;  // NEW: CLI-selectable tier
+      }
+      
+      export function isValidToolsetTier(value: string): value is ToolsetTier {
+        return ["default", "core", "memory", "full"].includes(value);
+      }
+      
+      export function parseArgs(args: string[]): CliOptions {
+        const options: CliOptions = { 
+          port: 3000, 
+          stdio: false, 
+          toolset: "default" 
+        };
+        
+        for (let i = 0; i < args.length; i++) {
+          if (args[i] === "--toolset") {
+            const tierStr = args[++i];
+            if (!isValidToolsetTier(tierStr)) {
+              process.stderr.write(`Invalid toolset: ${tierStr}\n`);
+              process.exit(1);
+            }
+            options.toolset = tierStr;
+          }
+        }
+        return options;
+      }
+    notes:
+      - ToolTier (internal): Categorizes tools by feature domain
+      - ToolsetTier (user-facing): CLI flag values for tier selection
+      - Hierarchical design: core ⊂ default ⊂ memory ⊂ full
+      - Filter at ListToolsRequestSchema (not per tool call)
+      - Extract CLI parsing to separate module for testability
+      - Type guards enable runtime validation of CLI input
+    timestamp: 2026-02-03
+    evidence: Uncommitted changes across app/src/cli/, app/src/mcp/
+    
+  repository_identifier_resolution_pattern:
+    structure: |
+      // app/src/api/queries.ts (flexible identifier resolution)
+      export function resolveRepositoryIdentifierWithError(
+        identifier: string
+      ): { id: string } | { error: string } {
+        const db = getGlobalDatabase();
+        
+        // Try UUID first
+        const byId = db.queryOne<{ id: string }>(
+          `SELECT id FROM repositories WHERE id = ?`,
+          [identifier]
+        );
+        if (byId) return { id: byId.id };
+        
+        // Fall back to full_name (owner/repo)
+        const byFullName = db.queryOne<{ id: string }>(
+          `SELECT id FROM repositories WHERE full_name = ?`,
+          [identifier]
+        );
+        if (byFullName) return { id: byFullName.id };
+        
+        return { error: `Repository not found: ${identifier}` };
+      }
+      
+      // app/src/mcp/tools.ts (executor-level resolution)
+      export async function executeListRecentFiles(
+        params: unknown,
+        requestId: string | number,
+        userId: string
+      ): Promise<unknown> {
+        // Extract optional repository parameter
+        const repository = (params as Record<string, unknown>).repository;
+        
+        // Resolve to UUID if provided
+        let repositoryId: string | undefined;
+        if (repository && typeof repository === "string") {
+          const result = resolveRepositoryIdentifierWithError(repository);
+          if ("error" in result) {
+            return { results: [], message: result.error };
+          }
+          repositoryId = result.id;
+        }
+        
+        // Call query function with normalized ID
+        const files = listRecentFiles(limit, repositoryId);
+        return { results: files };
+      }
+    notes:
+      - Resolve at executor boundary (before query calls)
+      - Query functions accept UUID only (normalized IDs)
+      - Try-fallback pattern: UUID first, then full_name
+      - Return error object vs throwing (graceful MCP tool failures)
+      - Early return pattern: resolve -> check error -> proceed
+      - User experience: developers think in repo names, not UUIDs
+    timestamp: 2026-02-03
+    evidence: Commit 9adc86f (list_recent_files full_name support)
+
+  cli_parsing_extraction_pattern:
+    structure: |
+      // app/src/cli/args.ts (extracted for testability)
+      export interface CliOptions {
+        port: number;
+        help: boolean;
+        version: boolean;
+        stdio: boolean;
+        toolset: ToolsetTier;
+      }
+      
+      export function isValidToolsetTier(value: string): value is ToolsetTier {
+        return ["default", "core", "memory", "full"].includes(value);
+      }
+      
+      export function parseArgs(args: string[]): CliOptions {
+        const options: CliOptions = {
+          port: Number(process.env.PORT ?? 3000),
+          help: false,
+          version: false,
+          stdio: false,
+          toolset: "default",
+        };
+        
+        for (let i = 0; i < args.length; i++) {
+          const arg = args[i];
+          if (arg === "--toolset") {
+            const tierStr = args[++i];
+            if (!tierStr || !isValidToolsetTier(tierStr)) {
+              process.stderr.write("Error: Invalid toolset\n");
+              process.exit(1);
+            }
+            options.toolset = tierStr;
+          }
+          // ... other flags
+        }
+        return options;
+      }
+      
+      // app/tests/cli/toolset.test.ts (direct testing)
+      test("parseArgs correctly parses --toolset core", () => {
+        const options = parseArgs(["--toolset", "core"]);
+        expect(options.toolset).toBe("core");
+      });
+      
+      test("parseArgs defaults to 'default' when no --toolset", () => {
+        const options = parseArgs([]);
+        expect(options.toolset).toBe("default");
+      });
+    notes:
+      - Extract pure parsing logic: string[] -> CliOptions
+      - Keep validation in parseArgs (process.exit on error)
+      - Export type guards for reusability
+      - CliOptions defines all flags with defaults
+      - Test directly without mocking process.argv
+      - Follows antimocking: test real logic, not mocks
+    timestamp: 2026-02-03
+    evidence: app/src/cli/args.ts, app/tests/cli/toolset.test.ts
+
           "tsconfig.json",        // Required for path alias resolution
           "shared/**/*.ts"        // Include all aliased dependencies
         ]
@@ -706,26 +902,33 @@ known_issues:
 
 stability:
   convergence_indicators:
-    insight_rate_trend: decreasing
+    insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 0
+    new_patterns_added_this_cycle: 3
     patterns_updated_this_cycle: 0
-    new_operations_added_this_cycle: 1
-    last_reviewed: 2026-02-02
+    new_operations_added_this_cycle: 3
+    last_reviewed: 2026-02-03
     utility_ratio: 1.0
     notes: |
-      Eighth review cycle - OpenAPI specification maintenance:
+      Ninth review cycle - Tool tier filtering and repository identifier resolution:
       
-      New operation: maintain_openapi_spec
-      - Guidance on spec-implementation drift detection
-      - Schema cleanup for removed features
-      - Server definition synchronization
-      - MCP vs HTTP documentation separation
-      - Test synchronization patterns
+      New operations (3):
+      1. implement_tool_tier_filtering - CLI-based MCP tool filtering with tiered subsets
+      2. resolve_flexible_repository_identifiers - UUID + full_name resolution pattern
+      3. extract_cli_parsing_for_testability - Separate parsing logic for unit testing
       
-      No new patterns - existing patterns cover implementation.
+      New patterns (3):
+      1. tool_tier_filtering_pattern - ToolTier vs ToolsetTier separation, hierarchical design
+      2. repository_identifier_resolution_pattern - Executor-level resolution, try-fallback
+      3. cli_parsing_extraction_pattern - Testable parseArgs without mocking process
       
-      Previously stable patterns:
+      Architectural significance:
+      - Tool tier system addresses LLM cognitive overload (20 -> 6-14 tools selectable)
+      - Hierarchical tier design enables gradual adoption path
+      - Repository identifier flexibility improves developer experience
+      - CLI extraction pattern enables antimocking test philosophy
+      
+      Previously stable patterns (all remain valid):
       - CLI entry point (Issue #19)
       - MCP stdio transport (Issue #49)
       - Optional parameter filtering (Issue #608)
@@ -734,17 +937,20 @@ stability:
       - Local file path validation
       - Local auth bypass
       - npm package distribution
+      - OpenAPI maintenance
       
-      Architecture stability: Very High
-      - Zero contradictions across 8 cycles
-      - All core operations documented
-      - All 8 MCP tools with comprehensive tests
-      - CLI deployment pattern established
-      - Both MCP transports (stdio + HTTP) fully documented
-      - OpenAPI maintenance patterns captured
-      - Decreasing insight rate indicates domain maturity
+      Architecture stability: High
+      - Zero contradictions across 9 cycles
+      - New patterns extend (not replace) existing architecture
+      - Tier system is additive change - existing tools unchanged
+      - Repository resolution improves ergonomics without breaking changes
       
-      Recent changes are refinements (documentation cleanup, spec accuracy)
-      rather than new architectural patterns, suggesting domain convergence.
+      Size governance:
+      - Current size: 955 lines (after additions and consolidation)
+      - Exceeded 800-line warning threshold, applied pruning to stay under 1000
+      - Pruned redundant pattern details already covered in operations
+      - Condensed: cli_entry_point, logger_stderr, express_route, mcp_tool, sqlite_query, fts5_search patterns
+      - All new content is high-utility architectural patterns (tool tiers, repo resolution)
+      - Recommend monitoring: next pruning cycle if reaches 1000 lines
       
-      Next review: After 15-20 API commits or architectural changes
+      Next review: After 10-15 API commits or new architectural patterns
