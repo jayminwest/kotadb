@@ -50,6 +50,7 @@ kotadb v${version} - Local code intelligence for CLI agents
 USAGE:
   kotadb [OPTIONS]
   kotadb deps [OPTIONS]
+  kotadb expertise [OPTIONS]
 
 COMMANDS:
   deps              Query dependency information for a file
@@ -59,6 +60,12 @@ COMMANDS:
                       --depth, -d <n>       Dependency traversal depth 1-5 (default: 1)
                       --include-tests       Include test files in output
                       --repository, -r <id> Repository ID or full_name
+
+  expertise         Manage expert domain knowledge
+                    Subcommands:
+                      sync --domain <d>     Sync patterns to database
+                      validate --domain <d> Check for stale patterns
+                      key-files --domain <d> List key files with dependents
 
 OPTIONS:
   --stdio           Use stdio transport (for Claude Code integration)
@@ -201,6 +208,13 @@ async function main(): Promise<void> {
     // Handle deps subcommand
     const { runDepsCommand } = await import("./cli/deps.js");
     runDepsCommand(args.slice(1));
+    return;
+  }
+
+  if (firstArg === "expertise") {
+    // Handle expertise subcommand
+    const { runExpertiseCommand } = await import("./cli/expertise.js");
+    runExpertiseCommand(args.slice(1));
     return;
   }
 
