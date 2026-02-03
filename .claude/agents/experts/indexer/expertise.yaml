@@ -59,7 +59,7 @@ core_implementation:
       purpose: Symbol extraction from AST
       exports: extractSymbols, Symbol, SymbolKind
     - path: app/src/indexer/reference-extractor.ts
-      purpose: Reference extraction from AST
+      purpose: Reference extraction from AST with re-export and dynamic import support
       exports: extractReferences, Reference, ReferenceType
     - path: app/src/indexer/import-resolver.ts
       purpose: Import path resolution
@@ -74,8 +74,17 @@ core_implementation:
       purpose: SQLite storage with atomic transactions
       exports: storeIndexedData, StorageResult
     - path: app/src/api/queries.ts
-      purpose: FTS5 search with proper term escaping
-      exports: searchFilesLocal, escapeFts5Term
+      purpose: FTS5 search with proper term escaping, auto-indexing workflow integration
+      exports: searchFilesLocal, escapeFts5Term, runIndexingWorkflow, isRepositoryIndexed
+    - path: app/src/mcp/auto-index.ts
+      purpose: Auto-indexing utilities for "just works" behavior
+      exports: ensureRepositoryIndexed, detectRepositoryFromCwd, isPathIndexed
+    - path: app/src/sync/source-watcher.ts
+      purpose: File system watcher for automatic incremental re-indexing
+      exports: SourceWatcher, createSourceWatcher, startWatching, stopWatching
+    - path: app/src/indexer/incremental.ts
+      purpose: Incremental indexing API for changed file processing
+      exports: indexChangedFiles, deleteIndexedFiles, detectChangedFiles
 
 key_operations:
   parse_ast:
@@ -205,6 +214,240 @@ key_operations:
     timestamp: 2026-02-02
     evidence: "commit 38d4e96, PR #76/#92, app/src/indexer/ast-parser.ts, app/src/indexer/regex-fallback.ts"
 
+  auto_index_workflow:
+    when: Tools need to ensure repository is indexed before execution
+    approach: |
+      1. Call ensureRepositoryIndexed(repositoryParam?, localPath?) -> AutoIndexResult
+      2. Repository detection
+         - If repositoryParam provided -> check if it's a local path (has .git) or identifier
+         - If no param -> auto-detect from process.cwd() using detectRepositoryFromCwd()
+         - Generate identifier: "local/<directory-name>" for local repositories
+      3. Check if already indexed
+         - Query repositories table by full_name (identifier)
+         - Verify using isRepositoryIndexed(repositoryId) to check files exist
+         - Return existing repositoryId if properly indexed
+      4. Perform indexing if needed
+         - Create IndexRequest with repository, ref: "main", localPath
+         - Call runIndexingWorkflow(indexRequest) for full indexing
+         - Return wasIndexed: true with stats (filesIndexed, symbolsExtracted, etc.)
+
+      Integration pattern:
+      ```typescript
+      // In MCP tools before performing operations
+      const autoResult = await ensureRepositoryIndexed(repository, localPath);
+      const repositoryId = autoResult.repositoryId;
+
+      if (autoResult.wasIndexed) {
+        // First-time indexing occurred
+        logger.info("Auto-indexed repository", {
+          message: autoResult.message,
+          stats: autoResult.stats
+        });
+      }
+
+      // Proceed with tool operation using repositoryId
+      const results = await searchCode(repositoryId, query);
+      ```
+
+      Repository detection heuristics:
+      - Check for .git directory existence
+      - Use basename of directory for repository name
+      - Create "local/<name>" identifier for local repos
+      - Store absolute path as git_url for local repositories
+    examples:
+      - ensureRepositoryIndexed() from /path/to/myrepo -> auto-detects "local/myrepo"
+      - ensureRepositoryIndexed("/path/to/repo") -> detects path, creates "local/repo"
+      - ensureRepositoryIndexed("local/existing") -> finds existing, returns repositoryId
+    pitfalls:
+      - what: Not checking .git directory for path-based detection
+        instead: Always verify .git exists before treating as local repository
+        reason: Prevents indexing non-git directories accidentally
+      - what: Using synchronous file system operations in MCP tools
+        instead: Use async ensureRepositoryIndexed for better performance
+        reason: MCP tools should be non-blocking
+      - what: Ignoring AutoIndexResult.wasIndexed flag
+        instead: Use flag to provide user feedback about indexing activity
+        reason: Users should know when first-time indexing occurs
+    timestamp: 2026-02-03
+    evidence: "commit aa4fcf4, PR #35/#125, app/src/mcp/auto-index.ts, app/src/mcp/tools.ts"
+
+  incremental_indexing:
+    when: Re-indexing changed files without full repository scan
+    approach: |
+      1. Call indexChangedFiles(repositoryId, repositoryPath, changedFiles[]) -> IncrementalIndexResult
+      2. Separate deleted files from added/modified
+         - Deleted files: call deleteIndexedFiles() to remove from database
+         - Added/Modified files: parse, extract, and store new data
+      3. For each file to index:
+         - Parse using parseSourceFile(absolutePath, repositoryRoot)
+         - Delete existing data if file was previously indexed
+         - Store file record with new metadata
+         - Extract symbols and references if AST-supported
+         - Resolve imports using path mappings from tsconfig.json
+      4. Return comprehensive results
+         - filesUpdated, filesDeleted, symbolsExtracted, referencesExtracted
+         - errors[] with { path, error } for failed files
+
+      ChangedFile format:
+      ```typescript
+      interface ChangedFile {
+        path: string;           // Relative path from repository root
+        status: "added" | "modified" | "deleted";
+      }
+      ```
+
+      Deletion handling:
+      - Uses CASCADE deletes: file -> symbols -> references
+      - Atomic transactions ensure consistency
+      - Batch deletions for performance
+
+      Error handling:
+      - Individual file failures don't halt entire operation
+      - Errors collected in result.errors array
+      - Failed files logged with Sentry integration
+
+      Path normalization:
+      - Convert absolute paths to relative for database consistency
+      - Handle Windows/Unix path separators
+      - Remove leading ./ prefixes
+    examples:
+      - Change detection: git diff --name-status -> ChangedFile[]
+      - File watcher: debounced filesystem events -> incremental indexing
+      - Manual re-index: specific file paths -> targeted updates
+    pitfalls:
+      - what: Not normalizing file paths for database lookup
+        instead: Use normalizePath() consistently for relative path format
+        reason: Database stores relative paths, absolute paths won't match
+      - what: Failing entire operation on single file error
+        instead: Collect errors, continue processing other files
+        reason: Partial updates are better than complete failure
+      - what: Not checking file extensions before indexing
+        instead: Filter unsupported files early with isSupportedSource()
+        reason: Avoids unnecessary processing and storage
+    timestamp: 2026-02-03
+    evidence: "commit aa4fcf4, PR #35/#125, app/src/indexer/incremental.ts"
+
+  file_watching:
+    when: Automatically detecting source file changes for continuous indexing
+    approach: |
+      1. Create SourceWatcher with repositoryPath and repositoryId
+      2. Start recursive filesystem watching with node:fs watch()
+      3. Filter events:
+         - Ignore directories: node_modules, .git, .kotadb, dist, build, .cache
+         - Watch extensions: .ts, .tsx, .js, .jsx, .mjs, .cjs, .py, .rs, .go, etc.
+         - Determine change type: add (new file), change (modified), delete (removed)
+      4. Debounce changes (default 500ms) to batch rapid modifications
+      5. Process batched changes:
+         - Group by change type: added[], modified[], deleted[]
+         - Convert to ChangedFile[] format
+         - Call defaultChangeHandler -> indexChangedFiles()
+      6. Handle errors gracefully with logging
+
+      Debouncing pattern:
+      ```typescript
+      private scheduleProcess(): void {
+        if (this.debounceTimer) {
+          clearTimeout(this.debounceTimer);
+        }
+        this.debounceTimer = setTimeout(() => {
+          this.processChanges().catch(error => {
+            logger.error("Failed to process changes", error);
+          });
+        }, this.debounceMs);
+      }
+      ```
+
+      Singleton management:
+      - startWatching(repositoryPath, repositoryId) - creates and starts watcher
+      - stopWatching(repositoryPath) - stops and removes watcher
+      - stopAll() - cleanup all watchers (e.g., on shutdown)
+      - getWatchedPaths() - list active watchers
+
+      Change detection logic:
+      - rename + new file -> "add"
+      - modify existing -> "change"
+      - file no longer exists -> "delete"
+      - Uses existsSync() for delete detection
+    examples:
+      - Save file in editor -> debounced change event -> incremental re-index
+      - Git checkout -> multiple file events -> batched processing
+      - File creation -> add event -> new file indexed
+    pitfalls:
+      - what: Not debouncing rapid file changes
+        instead: Use configurable debounce delay (500ms default)
+        reason: Rapid saves/builds create excessive re-indexing
+      - what: Watching ignored directories (node_modules)
+        instead: Filter path parts against IGNORED_DIRECTORIES set
+        reason: Avoids processing irrelevant file changes
+      - what: Not handling watcher errors gracefully
+        instead: Catch and log errors, don't crash watcher
+        reason: File system errors shouldn't break continuous indexing
+    timestamp: 2026-02-03
+    evidence: "commit aa4fcf4, PR #35/#125, app/src/sync/source-watcher.ts"
+
+  extract_reexports_dynamic_imports:
+    when: Tracking re-exports and dynamic imports for accurate dependency graphs
+    approach: |
+      1. Re-export extraction (export { x } from './module')
+         - Visit ExportNamedDeclaration nodes with source
+         - Extract specifiers: local name and exported name
+         - Create "re_export" reference with importSource metadata
+      2. Star re-export extraction (export * from './module')
+         - Visit ExportAllDeclaration nodes
+         - Handle export * as alias patterns
+         - Create "export_all" reference with exportedAs metadata
+      3. Dynamic import extraction (import('./module'))
+         - Visit ImportExpression nodes
+         - Handle static string sources: import('./utils')
+         - Handle template literals: import(`./pages/${name}`)
+         - Create "dynamic_import" reference with isDynamic flag
+
+      New reference types:
+      - re_export: Named re-exports with local/exported name mapping
+      - export_all: Star exports with optional namespace alias
+      - dynamic_import: Runtime imports with static/template patterns
+
+      Metadata extensions:
+      ```typescript
+      interface ReferenceMetadata {
+        // Re-export metadata
+        localName?: string;         // Original symbol name
+        exportedName?: string;      // Re-exported name
+        exportedAs?: string | null; // Namespace alias
+
+        // Dynamic import metadata
+        isDynamic?: boolean;        // Runtime resolution
+        isTemplatePattern?: boolean; // Template literal source
+      }
+      ```
+
+      Template literal handling:
+      - Extract static parts: `./pages/${name}` -> "./pages/*"
+      - Mark as template pattern for tooling awareness
+      - Still track as dependency for analysis
+
+      Database schema updates:
+      - Added reference types to CHECK constraint
+      - Supports filtering by reference_types in search queries
+      - unresolved_imports field in dependency search responses
+    examples:
+      - export { utils } from './shared' -> re_export reference
+      - export * as helpers from './utils' -> export_all reference
+      - import('./components/Button') -> dynamic_import reference
+      - import(`./pages/${route}`) -> dynamic_import with template pattern
+    pitfalls:
+      - what: Not handling template literal patterns
+        instead: Extract static parts, mark as template pattern
+        reason: Provides partial dependency info for dynamic sources
+      - what: Missing database schema updates for new reference types
+        instead: Update CHECK constraints when adding reference types
+        reason: Database will reject new reference types without schema update
+      - what: Not visiting children after extracting export references
+        instead: Call visitChildren() for ExportNamedDeclaration
+        reason: Export declarations may contain nested references
+    timestamp: 2026-02-02
+    evidence: "commit 41a3387, PR #89/#95, app/src/indexer/reference-extractor.ts, app/src/db/schema.sql"
+
   extract_symbols:
     when: Extracting functions, classes, interfaces, types from AST
     approach: |
@@ -262,6 +505,9 @@ key_operations:
       - call: Function calls, method calls
       - property_access: Member expressions (non-call)
       - type_reference: TypeScript type references
+      - re_export: Named re-exports (export { x } from './module')
+      - export_all: Star re-exports (export * from './module')
+      - dynamic_import: Runtime imports (import('./module'))
 
       Import handling:
       - Named: import { foo } from './module'
@@ -556,6 +802,12 @@ key_operations:
         then: Extract property access reference
       - if: TSTypeReference
         then: Extract type reference
+      - if: ExportNamedDeclaration with source
+        then: Extract re-export references for each specifier
+      - if: ExportAllDeclaration
+        then: Extract star re-export reference
+      - if: ImportExpression
+        then: Extract dynamic import reference
       - if: Other node type
         then: Visit children recursively
 
@@ -703,7 +955,138 @@ patterns:
     timestamp: 2026-01-29
     evidence: app/src/api/queries.ts runIndexingWorkflow()
 
+  auto_index_integration_pattern:
+    structure: |
+      // MCP tool pattern
+      export async function myMcpTool(params: ToolParams): Promise<ToolResult> {
+        // 1. Ensure repository is indexed before any operations
+        const autoResult = await ensureRepositoryIndexed(
+          params.repository,
+          params.localPath
+        );
 
+        // 2. Extract repository ID for queries
+        const repositoryId = autoResult.repositoryId;
+
+        // 3. Provide user feedback on auto-indexing
+        const messages: string[] = [];
+        if (autoResult.wasIndexed) {
+          messages.push(autoResult.message);
+          if (autoResult.stats) {
+            messages.push(`Indexed ${autoResult.stats.filesIndexed} files`);
+          }
+        }
+
+        // 4. Perform tool operation with guaranteed indexed repository
+        const results = await performToolOperation(repositoryId, params);
+
+        return {
+          messages,
+          data: results
+        };
+      }
+    trade_offs:
+      pros: [Just works UX, No manual indexing required, Transparent to user, Handles both new and existing repos]
+      cons: [First-time delay for indexing, Potential for large repository surprises, Auto-detection heuristics may fail]
+    timestamp: 2026-02-03
+    evidence: app/src/mcp/tools.ts integration
+
+  incremental_indexing_pattern:
+    structure: |
+      // File watcher integration
+      export class SourceWatcher {
+        private async processChanges(): Promise<void> {
+          // 1. Collect debounced changes by type
+          const changes = this.groupChangesByType();
+
+          // 2. Convert to standard ChangedFile format
+          const changedFiles = this.toChangedFileFormat(changes);
+
+          // 3. Use incremental indexing API
+          const result = await indexChangedFiles(
+            this.repositoryId,
+            this.repositoryPath,
+            changedFiles
+          );
+
+          // 4. Log comprehensive results
+          logger.info("Incremental re-indexing completed", {
+            filesUpdated: result.filesUpdated,
+            filesDeleted: result.filesDeleted,
+            symbolsExtracted: result.symbolsExtracted,
+            errors: result.errors.length
+          });
+
+          // 5. Handle partial failures gracefully
+          if (result.errors.length > 0) {
+            logger.warn("Some files failed to re-index", {
+              errors: result.errors.slice(0, 5) // Limit error logging
+            });
+          }
+        }
+      }
+    trade_offs:
+      pros: [Efficient updates, Atomic transactions, Comprehensive error handling, Maintains index freshness]
+      cons: [Complexity of change detection, Potential for missed events, Debouncing may delay updates]
+    timestamp: 2026-02-03
+    evidence: app/src/sync/source-watcher.ts, app/src/indexer/incremental.ts
+
+  reference_type_expansion_pattern:
+    structure: |
+      // Reference extraction with expanded types
+      function visitNode(node: TSESTree.Node, references: Reference[]): void {
+        switch (node.type) {
+          case "ExportNamedDeclaration":
+            if (node.source) {  // Re-export
+              for (const spec of node.specifiers) {
+                references.push({
+                  targetName: spec.exported.name,
+                  referenceType: "re_export",
+                  metadata: {
+                    importSource: node.source.value,
+                    localName: spec.local.name,
+                    exportedName: spec.exported.name
+                  }
+                });
+              }
+            }
+            break;
+
+          case "ExportAllDeclaration":
+            references.push({
+              targetName: node.exported?.name || "*",
+              referenceType: "export_all",
+              metadata: {
+                importSource: node.source.value,
+                exportedAs: node.exported?.name
+              }
+            });
+            break;
+
+          case "ImportExpression":
+            const source = node.source.type === "Literal"
+              ? node.source.value
+              : "<dynamic>";
+            references.push({
+              targetName: "__dynamic_import__",
+              referenceType: "dynamic_import",
+              metadata: {
+                importSource: source,
+                isDynamic: true,
+                isTemplatePattern: node.source.type === "TemplateLiteral"
+              }
+            });
+            break;
+        }
+
+        // Always visit children for nested references
+        visitChildren(node, references, context);
+      }
+    trade_offs:
+      pros: [Complete dependency tracking, Modern ES6+ support, Better analysis accuracy, Template literal awareness]
+      cons: [Increased reference volume, Complex metadata handling, Dynamic import ambiguity]
+    timestamp: 2026-02-02
+    evidence: app/src/indexer/reference-extractor.ts
 
   constant_extraction:
     when: Shared constants need synchronization across modules
@@ -752,6 +1135,57 @@ patterns:
       - Preserve relative path structure for database matching
     timestamp: 2026-01-29
     evidence: "app/src/indexer/import-resolver.ts, app/src/indexer/path-resolver.ts"
+
+  automatic_indexing:
+    items:
+      - Integrate ensureRepositoryIndexed() into all MCP tools for "just works" UX
+      - Use repository detection heuristics (.git directory, basename for name)
+      - Generate "local/<name>" identifiers for local repositories
+      - Check if repository is already indexed before triggering workflow
+      - Return wasIndexed flag and stats for user feedback
+      - Store absolute path as git_url for local repositories
+      - Handle both explicit repository params and auto-detection from cwd
+      - Graceful error handling with clear error messages
+    timestamp: 2026-02-03
+    evidence: "app/src/mcp/auto-index.ts, app/src/mcp/tools.ts integration"
+
+  incremental_indexing:
+    items:
+      - Use indexChangedFiles() for efficient targeted re-indexing
+      - Support ChangedFile format with path and status (added/modified/deleted)
+      - Separate deletion handling with CASCADE database operations
+      - Atomic transactions per file group for consistency
+      - Comprehensive error collection without halting operation
+      - Path normalization for database compatibility
+      - Individual file failure resilience
+      - Sentry integration for error tracking
+    timestamp: 2026-02-03
+    evidence: "app/src/indexer/incremental.ts"
+
+  file_watching:
+    items:
+      - Use SourceWatcher class for recursive filesystem monitoring
+      - Debounce changes (500ms default) to batch rapid modifications
+      - Filter ignored directories (node_modules, .git, build output)
+      - Watch relevant extensions (.ts, .tsx, .js, .jsx, .py, .rs, .go, etc.)
+      - Determine change types (add/modify/delete) from filesystem events
+      - Singleton pattern for watcher management (start/stop/cleanup)
+      - Graceful error handling to prevent watcher crashes
+      - Integration with incremental indexing API
+    timestamp: 2026-02-03
+    evidence: "app/src/sync/source-watcher.ts"
+
+  reference_extraction_expanded:
+    items:
+      - Extract 7 reference types: import, call, property_access, type_reference, re_export, export_all, dynamic_import
+      - Handle re-exports with local/exported name mapping
+      - Support star re-exports with optional namespace aliases
+      - Track dynamic imports with template literal pattern detection
+      - Update database schema CHECK constraints for new reference types
+      - Visit children nodes after extracting references (nested structures)
+      - Store comprehensive metadata for analysis tools
+    timestamp: 2026-02-02
+    evidence: "app/src/indexer/reference-extractor.ts, app/src/db/schema.sql"
 
   storage:
     - Use single transaction for atomicity
@@ -818,25 +1252,34 @@ known_issues:
 
 stability:
   convergence_indicators:
-    insight_rate_trend: stable
+    insight_rate_trend: expanding
     contradiction_count: 0
-    new_patterns_added_this_cycle: 2
-    patterns_updated_this_cycle: 2
-    last_reviewed: 2026-02-02
+    new_patterns_added_this_cycle: 6
+    patterns_updated_this_cycle: 3
+    last_reviewed: 2026-02-03
     utility_ratio: 1.0
     notes: |
-      Cycle 6 update - AST parser error recovery (focus_area: error recovery):
-      - Added: parse_ast_with_error_recovery operation (3-stage recovery: normal -> partial AST -> regex)
-      - Added: error_recovery_cascade_pattern (graceful degradation pattern)
+      Cycle 7 update - Automatic indexing and incremental features:
+      - Added: auto_index_workflow operation (just works UX, repository detection)
+      - Added: incremental_indexing operation (changed file processing, atomic updates)
+      - Added: file_watching operation (filesystem monitoring, debounced updates)
+      - Added: extract_reexports_dynamic_imports operation (expanded reference types)
+      - Added: auto_index_integration_pattern (MCP tool integration)
+      - Added: incremental_indexing_pattern (file watcher integration)
+      - Added: reference_type_expansion_pattern (7 reference types)
+      - Updated: core_implementation/key_files with auto-index.ts, source-watcher.ts, incremental.ts
+      - Updated: reference_extraction_approach with new reference types
+      - Updated: best practices with automatic_indexing, incremental_indexing, file_watching, reference_extraction_expanded
+      - Learning: Auto-indexing enables "just works" UX; incremental indexing maintains freshness; re-exports critical for modern JS/TS
+      - Evidence: commits aa4fcf4 (#35/#125), 41a3387 (#89/#95), 2000+ lines added across 8 files
+      - File size: 844 -> 1200+ lines (significant expansion due to major feature additions)
+
+      Cycle 6 (2026-02-02) - AST parser error recovery:
+      - Added: parse_ast_with_error_recovery operation (3-stage recovery)
       - Added: error_recovery_strategy decision tree
-      - Updated: core_implementation/key_files to include regex-fallback.ts
       - Learning: allowInvalidAST enables partial recovery; regex fallback prevents complete symbol loss
-      - Evidence: commit 38d4e96, PR #76/#92, 1538 lines changed across 11 files
-      - File size managed: 980 -> 1167 (pre-prune) -> 844 (post-prune, target range)
-      - Pruned: storage_abstraction, batch_transaction, test_fixture patterns (lower value/redundant)
-      
+
       Cycle 5 (2026-01-31) - path resolver bug fix:
       - Updated: resolve_path_aliases with critical path normalization
-      - Added: known_issues entry for absolute-to-relative conversion bug (#62)
-      - File size: ~950 -> ~975 lines
+      - Added: known_issues entry for absolute-to-relative conversion bug
 
