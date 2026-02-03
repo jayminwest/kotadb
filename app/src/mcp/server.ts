@@ -30,6 +30,11 @@ import {
 	RECORD_FAILURE_TOOL,
 	SEARCH_PATTERNS_TOOL,
 	RECORD_INSIGHT_TOOL,
+	// Dynamic Expertise tools
+	GET_DOMAIN_KEY_FILES_TOOL,
+	VALIDATE_EXPERTISE_TOOL,
+	SYNC_EXPERTISE_TOOL,
+	GET_RECENT_PATTERNS_TOOL,
 	// Execute functions
 	executeAnalyzeChangeImpact,
 	executeGenerateTaskContext,
@@ -47,6 +52,11 @@ import {
 	executeRecordFailure,
 	executeSearchPatterns,
 	executeRecordInsight,
+	// Dynamic Expertise execute functions
+	executeGetDomainKeyFiles,
+	executeValidateExpertise,
+	executeSyncExpertise,
+	executeGetRecentPatterns,
 } from "./tools";
 
 const logger = createLogger({ module: "mcp-server" });
@@ -79,6 +89,10 @@ export interface McpServerContext {
  * - record_failure: Record a failed approach
  * - search_patterns: Find codebase patterns
  * - record_insight: Store a session insight
+ * - get_domain_key_files: Get most-depended-on files for a domain
+ * - validate_expertise: Validate expertise.yaml patterns against indexed code
+ * - sync_expertise: Sync patterns from expertise.yaml to patterns table
+ * - get_recent_patterns: Get recently observed patterns
  */
 export function createMcpServer(context: McpServerContext): Server {
 	const server = new Server(
@@ -113,6 +127,11 @@ export function createMcpServer(context: McpServerContext): Server {
 				RECORD_FAILURE_TOOL,
 				SEARCH_PATTERNS_TOOL,
 				RECORD_INSIGHT_TOOL,
+				// Dynamic Expertise tools
+				GET_DOMAIN_KEY_FILES_TOOL,
+				VALIDATE_EXPERTISE_TOOL,
+				SYNC_EXPERTISE_TOOL,
+				GET_RECENT_PATTERNS_TOOL,
 			],
 		};
 	});
@@ -220,6 +239,35 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "record_insight":
 					result = await executeRecordInsight(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				// Dynamic Expertise tools
+				case "get_domain_key_files":
+					result = await executeGetDomainKeyFiles(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "validate_expertise":
+					result = await executeValidateExpertise(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "sync_expertise":
+					result = await executeSyncExpertise(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "get_recent_patterns":
+					result = await executeGetRecentPatterns(
 						toolArgs,
 						"", // requestId not used
 						context.userId,
