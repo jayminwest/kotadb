@@ -276,7 +276,7 @@ export async function loadMarkdownInto(url, target, options = {}) {
       element.innerHTML = `
         <div class="error-message">
           <h2>Failed to Load Content</h2>
-          <p>Unable to load the requested content. Please try again later.</p>
+          <p>Unable to load the requested content. The page may work without JavaScript - please try refreshing.</p>
           <details>
             <summary>Technical Details</summary>
             <pre>${error.message}</pre>
