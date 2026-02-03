@@ -275,3 +275,204 @@ def output_context(context: str) -> None:
     if context:
         print(context)
     sys.exit(0)
+
+
+# ============================================================================
+# Memory Layer Helper Functions
+# ============================================================================
+
+def call_mcp_tool(tool_name: str, params: dict[str, Any], timeout: int = 5) -> dict[str, Any]:
+    """
+    Call a KotaDB MCP tool via HTTP.
+    
+    Args:
+        tool_name: Name of the MCP tool (e.g., 'search_failures')
+        params: Tool parameters as a dict
+        timeout: Request timeout in seconds
+    
+    Returns:
+        Dict with tool result or error
+    """
+    import urllib.request
+    import urllib.error
+    
+    # MCP endpoint
+    mcp_url = os.environ.get("KOTADB_MCP_URL", "http://localhost:3000/mcp")
+    
+    # Build JSON-RPC request for tools/call
+    request_data = {
+        "jsonrpc": "2.0",
+        "method": "tools/call",
+        "params": {
+            "name": tool_name,
+            "arguments": params,
+        },
+        "id": 1,
+    }
+    
+    try:
+        req = urllib.request.Request(
+            mcp_url,
+            data=json.dumps(request_data).encode("utf-8"),
+            headers={
+                "Content-Type": "application/json",
+                "Accept": "application/json",
+            },
+            method="POST",
+        )
+        
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            result = json.loads(response.read().decode("utf-8"))
+            
+            if "error" in result:
+                return {"error": result["error"].get("message", "Unknown error")}
+            
+            # MCP result is in result.result.content[0].text (JSON string)
+            content = result.get("result", {}).get("content", [])
+            if content and isinstance(content, list) and len(content) > 0:
+                text = content[0].get("text", "{}")
+                return json.loads(text)
+            
+            return {"error": "No content in MCP response"}
+    
+    except urllib.error.URLError as e:
+        return {"error": f"MCP server not available: {e}"}
+    except urllib.error.HTTPError as e:
+        return {"error": f"MCP request failed: {e.code}"}
+    except json.JSONDecodeError as e:
+        return {"error": f"Failed to parse MCP response: {e}"}
+    except Exception as e:
+        return {"error": str(e)}
+
+
+def run_kotadb_search_failures(query: str, limit: int = 5) -> dict[str, Any]:
+    """
+    Search for past failures using KotaDB MCP tool.
+    
+    Args:
+        query: Search query for failures
+        limit: Maximum number of results
+    
+    Returns:
+        Dict with results array or error
+    """
+    return call_mcp_tool("search_failures", {"query": query, "limit": limit})
+
+
+def run_kotadb_search_decisions(query: str, limit: int = 5) -> dict[str, Any]:
+    """
+    Search for past decisions using KotaDB MCP tool.
+    
+    Args:
+        query: Search query for decisions
+        limit: Maximum number of results
+    
+    Returns:
+        Dict with results array or error
+    """
+    return call_mcp_tool("search_decisions", {"query": query, "limit": limit})
+
+
+def extract_search_terms_from_path(file_path: str) -> list[str]:
+    """
+    Extract relevant search terms from a file path.
+    
+    Args:
+        file_path: Path to extract terms from
+    
+    Returns:
+        List of search terms (keywords)
+    """
+    import re
+    
+    terms = []
+    
+    # Get the filename without extension
+    filename = os.path.basename(file_path)
+    name_without_ext = os.path.splitext(filename)[0]
+    
+    # Remove common suffixes like .test, .spec
+    name_without_ext = re.sub(r'\.(test|spec)$', '', name_without_ext)
+    
+    # Split camelCase and kebab-case
+    words = re.split(r'[-_]|(?<=[a-z])(?=[A-Z])', name_without_ext)
+    words = [w.lower() for w in words if w and len(w) > 2]
+    
+    # Add meaningful words as terms
+    for word in words:
+        if word not in ['index', 'main', 'app', 'src', 'lib', 'utils', 'helpers']:
+            terms.append(word)
+    
+    # Extract directory context
+    dir_path = os.path.dirname(file_path)
+    if dir_path:
+        # Get immediate parent directory
+        parent_dir = os.path.basename(dir_path)
+        if parent_dir and parent_dir not in ['src', 'lib', 'app', 'tests', '__tests__']:
+            terms.append(parent_dir.lower())
+    
+    # Deduplicate while preserving order
+    seen = set()
+    unique_terms = []
+    for term in terms:
+        if term not in seen:
+            seen.add(term)
+            unique_terms.append(term)
+    
+    return unique_terms[:3]  # Max 3 terms
+
+
+def format_memory_context(
+    failures: list[dict[str, Any]],
+    decisions: list[dict[str, Any]],
+    max_failures: int = 5,
+    max_decisions: int = 5,
+) -> str:
+    """
+    Format memory search results as context for the agent.
+    
+    Args:
+        failures: List of failure results
+        decisions: List of decision results
+        max_failures: Maximum failures to show
+        max_decisions: Maximum decisions to show
+    
+    Returns:
+        Formatted markdown context string
+    """
+    lines = []
+    
+    has_failures = failures and len(failures) > 0
+    has_decisions = decisions and len(decisions) > 0
+    
+    if not has_failures and not has_decisions:
+        return ""
+    
+    lines.append("## Memory Context")
+    lines.append("")
+    
+    if has_failures:
+        lines.append("**Relevant Past Failures:**")
+        for f in failures[:max_failures]:
+            title = f.get("title", "Unknown")
+            reason = f.get("failure_reason", "")
+            # Truncate reason to keep output concise
+            if len(reason) > 80:
+                reason = reason[:77] + "..."
+            lines.append(f"- {title}: {reason}")
+        lines.append("")
+    
+    if has_decisions:
+        lines.append("**Relevant Decisions:**")
+        for d in decisions[:max_decisions]:
+            title = d.get("title", "Unknown")
+            rationale = d.get("rationale") or d.get("decision", "")
+            # Truncate rationale to keep output concise
+            if len(rationale) > 80:
+                rationale = rationale[:77] + "..."
+            lines.append(f"- {title}: {rationale}")
+        lines.append("")
+    
+    lines.append("Consider these learnings before proceeding.")
+    
+    return "\n".join(lines)
