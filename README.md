@@ -66,6 +66,20 @@ KotaDB uses stdio (standard input/output) instead of HTTP ports:
 
 ---
 
+## Learn to Build AI Dev Tools
+
+KotaDB is part of my journey building AI-powered developer tools. I share everything I learn:
+
+🎥 **YouTube** - Tutorials on Claude Code, MCP, and building tools like this  
+→ [youtube.com/@jaymin-west](https://youtube.com/@jaymin-west)
+
+👥 **Prompt to Prod Community** - Learn to ship AI apps, not just prompt  
+→ [skool.com/prompt-to-prod](https://skool.com/prompt-to-prod)
+
+Built by [Jaymin West](https://jayminwest.com)
+
+---
+
 ## For Contributors
 
 ### Development Setup
