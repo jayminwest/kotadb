@@ -26,9 +26,6 @@ if (process.env.NODE_ENV !== "test") {
 			// Privacy compliance: don't send IP addresses or user agents automatically
 			sendDefaultPii: false,
 
-			// Enable debug mode in development
-			debug: isDevelopment,
-
 			// Scrub sensitive headers before sending to Sentry
 			beforeSend(event, hint) {
 				// Remove sensitive headers
@@ -61,7 +58,7 @@ if (process.env.NODE_ENV !== "test") {
 		});
 
 		if (isDevelopment && process.env.SENTRY_DSN) {
-			process.stdout.write(
+			process.stderr.write(
 				JSON.stringify({
 					timestamp: new Date().toISOString(),
 					level: "info",

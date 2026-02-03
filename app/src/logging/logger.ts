@@ -100,19 +100,12 @@ function maskSensitiveData(context: LogContext): LogContext {
 }
 
 /**
- * Format and write log entry to stdout (info/debug/warn) or stderr (error)
+ * Format and write log entry to stderr (all logs go to stderr to keep stdout clean for JSON output)
  */
-function writeLog(entry: LogEntry, forceStderr = false): void {
+function writeLog(entry: LogEntry, _forceStderr = false): void {
 	const json = JSON.stringify(entry);
-	const output = `${json}\n`;
-
-	if (forceStderr || entry.level === "error") {
-		process.stderr.write(output);
-	} else {
-		process.stdout.write(output);
-	}
+	process.stderr.write(`${json}\n`);
 }
-
 /**
  * Create a logger instance with optional correlation context
  */

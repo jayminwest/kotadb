@@ -184,7 +184,7 @@ Repository indexing and advanced code intelligence operations are available via 
 	const duration = Date.now() - startTime;
 	const pathCount = Object.keys(spec.paths || {}).length;
 
-	process.stdout.write(JSON.stringify({
+	process.stderr.write(JSON.stringify({
 		level: 'info',
 		module: 'openapi-builder',
 		message: 'OpenAPI spec generated',
