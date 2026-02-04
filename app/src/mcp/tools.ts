@@ -204,34 +204,6 @@ export const SEARCH_TOOL: ToolDefinition = {
 	},
 };
 
-/**
-/**
- * Tool: search_code
- */
-export const SEARCH_CODE_TOOL: ToolDefinition = {
-	tier: "core",
-	name: "search_code",
-	description:
-		"Search indexed code files for a specific term. Returns matching files with context snippets.",
-	inputSchema: {
-		type: "object",
-		properties: {
-			term: {
-				type: "string",
-				description: "The search term to find in code files",
-			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter results to a specific repository ID",
-			},
-			limit: {
-				type: "number",
-				description: "Optional: Maximum number of results (default: 20, max: 100)",
-			},
-		},
-		required: ["term"],
-	},
-};
 
 /**
  * Tool: index_repository
@@ -552,39 +524,6 @@ export const GENERATE_TASK_CONTEXT_TOOL: ToolDefinition = {
 // ============================================================================
 
 /**
- * Tool: search_decisions
- */
-export const SEARCH_DECISIONS_TOOL: ToolDefinition = {
-	tier: "memory",
-	name: "search_decisions",
-	description:
-		"Search past architectural decisions using FTS5. Returns decisions with relevance scores.",
-	inputSchema: {
-		type: "object",
-		properties: {
-			query: {
-				type: "string",
-				description: "Search query for decisions",
-			},
-			scope: {
-				type: "string",
-				enum: ["architecture", "pattern", "convention", "workaround"],
-				description: "Optional: Filter by decision scope",
-			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter to a specific repository ID or full_name",
-			},
-			limit: {
-				type: "number",
-				description: "Optional: Max results (default: 20)",
-			},
-		},
-		required: ["query"],
-	},
-};
-
-/**
  * Tool: record_decision
  */
 export const RECORD_DECISION_TOOL: ToolDefinition = {
@@ -636,34 +575,6 @@ export const RECORD_DECISION_TOOL: ToolDefinition = {
 };
 
 /**
- * Tool: search_failures
- */
-export const SEARCH_FAILURES_TOOL: ToolDefinition = {
-	tier: "memory",
-	name: "search_failures",
-	description:
-		"Search failed approaches to avoid repeating mistakes. Returns failures with relevance scores.",
-	inputSchema: {
-		type: "object",
-		properties: {
-			query: {
-				type: "string",
-				description: "Search query for failures",
-			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter to a specific repository ID or full_name",
-			},
-			limit: {
-				type: "number",
-				description: "Optional: Max results (default: 20)",
-			},
-		},
-		required: ["query"],
-	},
-};
-
-/**
  * Tool: record_failure
  */
 export const RECORD_FAILURE_TOOL: ToolDefinition = {
@@ -701,41 +612,6 @@ export const RECORD_FAILURE_TOOL: ToolDefinition = {
 			},
 		},
 		required: ["title", "problem", "approach", "failure_reason"],
-	},
-};
-
-/**
- * Tool: search_patterns
- */
-export const SEARCH_PATTERNS_TOOL: ToolDefinition = {
-	tier: "memory",
-	name: "search_patterns",
-	description:
-		"Find codebase patterns by type or file. Returns discovered patterns for consistency.",
-	inputSchema: {
-		type: "object",
-		properties: {
-			query: {
-				type: "string",
-				description: "Optional: Search query for pattern name/description",
-			},
-			pattern_type: {
-				type: "string",
-				description: "Optional: Filter by pattern type (e.g., error-handling, api-call)",
-			},
-			file: {
-				type: "string",
-				description: "Optional: Filter by file path",
-			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter to a specific repository ID or full_name",
-			},
-			limit: {
-				type: "number",
-				description: "Optional: Max results (default: 20)",
-			},
-		},
 	},
 };
 
@@ -1237,6 +1113,7 @@ export async function executeSearch(
 			(async () => {
 				// Reuse existing executeSearchPatterns logic
 				const patternParams = {
+					query: p.query,
 					pattern_type: filters.pattern_type,
 					repository: filters.repositoryId,
 					limit,
@@ -1277,7 +1154,6 @@ export async function executeSearch(
 	return response;
 }
 
-/**
 /**
  * Execute search_code tool
  *
