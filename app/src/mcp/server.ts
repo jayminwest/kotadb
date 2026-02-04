@@ -138,7 +138,7 @@ export function createMcpServer(context: McpServerContext): Server {
 		try {
 			switch (name) {
 				case "search":
-				result = await executeSearch(
+					result = await executeSearch(
 						toolArgs,
 						"", // requestId not used
 						context.userId,
@@ -192,7 +192,57 @@ export function createMcpServer(context: McpServerContext): Server {
 						context.userId,
 					);
 					break;
-			// Memory Layer tools
+				// Memory Layer tools
+				case "record_decision":
+					result = await executeRecordDecision(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_failure":
+					result = await executeRecordFailure(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "record_insight":
+					result = await executeRecordInsight(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				// Dynamic Expertise tools
+				case "get_domain_key_files":
+					result = await executeGetDomainKeyFiles(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "validate_expertise":
+					result = await executeValidateExpertise(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "sync_expertise":
+					result = await executeSyncExpertise(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "get_recent_patterns":
+					result = await executeGetRecentPatterns(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
 				default:
 					const error = new Error(`Unknown tool: ${name}`);
 					logger.error("Unknown MCP tool requested", error, {
