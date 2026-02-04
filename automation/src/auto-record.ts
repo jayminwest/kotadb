@@ -62,7 +62,7 @@ Use record_decision tool with:
 `;
 
   const sdkOptions = {
-    model: "claude-haiku-3-5-20241022",
+    model: "claude-haiku-4-5-20251001",
     maxTurns: 5,
     cwd: projectRoot,
     permissionMode: "bypassPermissions" as const,
@@ -119,7 +119,7 @@ Use record_failure tool with:
 `;
 
   const sdkOptions = {
-    model: "claude-haiku-3-5-20241022",
+    model: "claude-haiku-4-5-20251001",
     maxTurns: 5,
     cwd: projectRoot,
     permissionMode: "bypassPermissions" as const,

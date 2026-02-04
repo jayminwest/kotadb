@@ -497,6 +497,53 @@ key_operations:
       - Incorrect package name breaks MCP server startup
       - Not using bunx --bun flag may use Node.js
       
+
+  validate_anthropic_model_names:
+    when: Configuring SDK queries with specific model versions
+    approach: |
+      Validate Anthropic model names follow the format claude-{variant}-{major}-{minor}-{date}.
+      Use authoritative model list from Claude API documentation. Invalid model names cause
+      HTTP 404 errors during query() execution.
+    patterns:
+      - Format: claude-{variant}-{major}-{minor}-{date}
+      - Valid variants: opus, sonnet, haiku
+      - Major/minor versions: integer values (e.g., 4.5, 3.5)
+      - Date: 8-digit YYYYMMDD format (e.g., 20251001)
+      - Examples: claude-opus-4-1-20250514, claude-haiku-4-5-20251001, claude-sonnet-4-20250514
+    code_example: |
+      // Valid model names (use these)
+      const VALID_MODELS = {
+        haiku: "claude-haiku-4-5-20251001",      // Haiku 4.5 (current)
+        sonnet: "claude-sonnet-4-20250514",      // Sonnet 4 (current)
+        opus: "claude-opus-4-1-20250514"         // Opus 4.1 (current)
+      };
+      
+      // Invalid model names (these cause 404 errors)
+      const INVALID_MODELS = {
+        haiku_old: "claude-haiku-3-5-20241022",  // Non-existent version
+        generic: "claude-haiku",                 // Missing version numbers
+        bad_format: "claude-haiku-4-5"           // Missing date
+      };
+      
+      // Validation function
+      function isValidModelName(modelName: string): boolean {
+        const pattern = /^claude-(opus|sonnet|haiku)-\d+\.\d+-\d{8}$/;
+        return pattern.test(modelName);
+      }
+      
+      // Usage in SDK options
+      const sdkOptions = {
+        model: "claude-haiku-4-5-20251001",  // Validated model name
+        maxTurns: 20,
+        // ...
+      };
+    pitfalls:
+      - Typo in model name causes confusing 404 error instead of validation error
+      - Using outdated model names stops working when Anthropic deprecates old versions
+      - Copy-paste errors from documentation with different date formats
+      - Mixing variant names (opus vs opuses, etc.)
+      - Assuming hyphenated version numbers instead of dots
+
   record_workflow_metrics:
     when: Tracking workflow execution for analysis and cost monitoring
     approach: |
@@ -982,6 +1029,11 @@ best_practices:
     - Use upsert semantics for idempotent context storage
 
 known_issues:
+  - issue: Invalid Anthropic model name causes HTTP 404 errors
+    impact: SDK query() fails with confusing 404 error during curation/recording
+    resolution: Use correct model format (claude-{variant}-{major}-{minor}-{date}), e.g., claude-haiku-4-5-20251001
+    status: Fixed in #163, validate model names before using
+    
   - issue: SDK query() timeout on long workflows
     impact: Workflow fails mid-execution
     resolution: Increase maxTurns, optimize workflow
@@ -1023,6 +1075,12 @@ stability:
     Implementation establishes foundation for future context-aware orchestration where
     downstream phases can access curated data from upstream phases. CLI flag 
     --accumulate-context enables feature for backward compatibility.
+    
+    
+    Model Naming Fix (#163): Corrected haiku model name from invalid claude-haiku-3-5-20241022
+    to valid claude-haiku-4-5-20251001. Anthropic model naming follows strict format:
+    claude-{variant}-{major}-{minor}-{date}. Invalid names cause API 404 errors. Added validation
+    guidance to prevent future occurrences. This bug was blocking context curation in #148.
     
     Prior: Issue #95 (toolset tiers), #65 (console transparency), #64 (worktree isolation).
     Domain converging with comprehensive automation patterns established.
@@ -1185,7 +1243,7 @@ stability:
     Issue #148 implements deep KotaDB integration with haiku-powered context curation
     and automated workflow outcome recording. Key architectural decisions:
     
-    1. Curator Strategy: Lightweight haiku model (claude-haiku-3-5-20241022) runs between
+    1. Curator Strategy: Lightweight haiku model (claude-haiku-4-5-20251001) runs between
        phases to query memory tools and produce ~500 token curated summaries. Separate
        SDK calls maintain clear separation from main workflow execution.
     
@@ -1209,6 +1267,12 @@ stability:
     architectural decisions. Combined with #144 context accumulation infrastructure,
     creates robust inter-phase handoff mechanism.
     
+    
+    Model Naming Fix (#163): Corrected haiku model name from invalid claude-haiku-3-5-20241022
+    to valid claude-haiku-4-5-20251001. Anthropic model naming follows strict format:
+    claude-{variant}-{major}-{minor}-{date}. Invalid names cause API 404 errors. Added validation
+    guidance to prevent future occurrences. This bug was blocking context curation in #148.
+    
     Prior: #144 (context accumulation), #143 (unified search), #95 (toolset tiers).
     Domain converging with comprehensive memory integration patterns established.
 
@@ -1221,7 +1285,7 @@ stability:
         - Extract structured output (summary, failures, patterns, decisions)
         - Store curated context via storeWorkflowContext()
         - Run between workflow phases (post-analysis, post-plan, post-build)
-        - Use haiku model (claude-haiku-3-5-20241022) for speed and cost
+        - Use haiku model (claude-haiku-4-5-20251001) for speed and cost
         - Configure memory toolset for search access
         
     auto_record_ts:

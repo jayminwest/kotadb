@@ -81,7 +81,7 @@ export async function curateContext(options: CurationOptions): Promise<CuratedCo
   
   // Configure SDK for haiku curator call
   const sdkOptions = {
-    model: "claude-haiku-3-5-20241022", // Haiku for speed and cost
+    model: "claude-haiku-4-5-20251001", // Haiku for speed and cost
     maxTurns: 20, // Lightweight - just query and summarize
     cwd: projectRoot,
     permissionMode: "bypassPermissions" as const,
