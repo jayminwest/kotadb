@@ -1,5 +1,5 @@
 # Documentation Expert Domain Expertise
-# Last reviewed: 2026-02-02
+# Last reviewed: 2026-02-04
 # Domain: technical documentation improvement and maintenance
 
 overview:
@@ -16,6 +16,9 @@ overview:
       - .claude/commands/**/*.md (slash command templates)
       - .claude/agents/**/*.md (agent documentation)
       - web/docs/content/ (user-facing documentation)
+      - web/blog/content/ (marketing and announcement content)
+      - docs/ (technical guides and specifications)
+      - docs/specs/ (detailed technical specifications)
       - .claude/.cache/specs/ (technical specifications)
       - automation/README.md (automation layer docs)
       - .claude/agents/experts/ (expert domain knowledge)
@@ -27,6 +30,10 @@ overview:
       - Installation guide testing and verification
       - Versioning metadata and freshness tracking
       - Cross-file documentation consistency
+      - Cross-directory content synchronization (docs/ ↔ web/docs/content/)
+      - Version consistency enforcement across documentation sets
+      - Memory layer and advanced feature documentation
+      - Web expert domain and marketing content integration
 
     not_covered:
       - Code implementation (see respective expert domains)
@@ -367,6 +374,155 @@ key_operations:
       - Unclear tier progression (why choose one over another)
       - No MCP configuration examples showing tier selection
 
+  comprehensive_documentation_standardization:
+    when: Large-scale documentation updates requiring systematic validation
+    approach: |
+      1. Create detailed technical specification with implementation phases
+      2. Define validation criteria for each documentation type
+      3. Map all affected files and their interdependencies
+      4. Establish systematic validation approach (cross-reference with implementation)
+      5. Include risk assessment and timeline estimation
+      6. Document success metrics and completion criteria
+    timestamp: 2026-02-04
+    evidence: docs/specs/documentation/comprehensive-documentation-standardization-spec.md
+    patterns:
+      - Specification-driven approach with detailed implementation phases
+      - Systematic validation against source code implementations
+      - Cross-file dependency mapping and conflict resolution
+      - Risk assessment categorization (low/medium/high)
+      - Success metrics with measurable completion criteria
+    code_example: |
+      ## Phase 1: Version and Reference Standardization
+      **Actions:**
+      1. Update all version references from `2.0.1` to `2.2.0`
+      2. Standardize database location references to `.kotadb/kota.db`
+      3. Replace all `@next` package references with `kotadb`
+      4. Update `last_updated` dates to `2026-02-04`
+    pitfalls:
+      - Attempting large-scale updates without systematic approach
+      - Missing cross-file dependencies and creating inconsistencies
+      - Lack of validation criteria leading to incomplete updates
+      - No risk assessment causing unexpected breaking changes
+
+  sync_directory_documentation:
+    when: Maintaining consistency between docs/ and web/docs/content/ directories
+    approach: |
+      1. Compare file modification times between directories
+      2. Identify content conflicts and determine canonical source
+      3. Merge unique content from both versions with preference for most recent
+      4. Standardize frontmatter format across both directories
+      5. Ensure consistent cross-references between directories
+      6. Validate links work in both documentation contexts
+    timestamp: 2026-02-04
+    evidence: docs/ and web/docs/content/ synchronization in issue #157
+    patterns:
+      - Bi-directional synchronization with conflict resolution
+      - Canonical source determination by modification time
+      - Frontmatter standardization across directory boundaries
+      - Cross-reference validation for both contexts
+    code_example: |
+      # Directory Sync Strategy:
+      1. Compare file modification times
+      2. Merge unique content from both versions
+      3. Standardize frontmatter format
+      4. Ensure consistent cross-references
+    pitfalls:
+      - Overwriting newer content with older versions
+      - Inconsistent frontmatter causing navigation issues
+      - Broken cross-references when paths differ between directories
+      - Missing unique content from either directory
+
+  document_memory_layer_features:
+    when: Documenting persistent intelligence and cross-session learning capabilities
+    approach: |
+      1. Create architectural overview with visual diagrams
+      2. Document core tables and their search tools mapping
+      3. Provide comprehensive JSON examples for all memory tools
+      4. Include integration patterns with agent workflows
+      5. Document configuration options and privacy controls
+      6. Add performance characteristics and best practices
+    timestamp: 2026-02-04
+    evidence: docs/memory-layer-guide.md creation
+    patterns:
+      - Architectural diagrams showing cross-session persistence
+      - Table-to-tool mapping for clear understanding
+      - Comprehensive JSON examples for each memory operation
+      - Integration patterns with existing workflows
+      - Privacy controls and local-first emphasis
+    code_example: |
+      ### Core Concept
+      ```
+      ┌─────────────┐    ┌─────────────┐    ┌─────────────┐
+      │  Session A  │───▶│   Memory    │◀───│  Session B  │
+      │   Agent     │    │   Layer     │    │   Agent     │
+      └─────────────┘    └─────────────┘    └─────────────┘
+                                │
+                         ┌─────────────┐
+                         │   SQLite    │
+                         │  + FTS5     │
+                         └─────────────┘
+      ```
+    pitfalls:
+      - Abstract explanations without concrete examples
+      - Missing integration patterns with existing workflows
+      - Overlooking privacy and local-first principles
+      - Incomplete tool examples or parameter documentation
+
+  document_unified_search_capabilities:
+    when: Documenting AI-powered tool consolidation and intelligent routing
+    approach: |
+      1. Explain automatic intent detection and routing logic
+      2. Document search type categorization with examples
+      3. Provide response format specification with real examples
+      4. Include performance characteristics and optimization tips
+      5. Document migration paths from individual tools
+      6. Add troubleshooting section for common issues
+    timestamp: 2026-02-04
+    evidence: docs/unified-search-guide.md creation
+    patterns:
+      - Intent detection examples for different query types
+      - Comprehensive response format documentation
+      - Migration guidance from legacy tool patterns
+      - Performance optimization and troubleshooting
+      - Integration examples with MCP clients
+    code_example: |
+      ### Automatic Detection
+      - **Code queries**: "async function", "React component", "database query"
+      - **Pattern queries**: "error handling", "logging pattern", "API design"
+      - **Decision queries**: "why did we choose", "architecture decision"
+      - **Failure queries**: "what went wrong", "failed approach", "doesn't work"
+    pitfalls:
+      - Unclear intent detection criteria
+      - Missing migration guidance for existing tool users
+      - Inadequate response format documentation
+      - No troubleshooting for edge cases
+
+  update_expert_domain_documentation:
+    when: Adding new expert domains to the KotaDB ecosystem
+    approach: |
+      1. Update CLAUDE.md expert domain table with new domain
+      2. Update expert domain count in descriptions
+      3. Add domain-specific usage examples to /do command guidance
+      4. Create dedicated documentation for domain capabilities
+      5. Ensure all expert domain references are consistent
+    timestamp: 2026-02-04
+    evidence: Web expert domain addition to CLAUDE.md
+    patterns:
+      - Consistent table format for expert domain listing
+      - Count updates across all documentation files
+      - Domain-specific usage examples in command guidance
+      - Dedicated capability documentation for each domain
+    code_example: |
+      | `web` | Web content, design system, marketing site | `.claude/agents/experts/web/` |
+
+      **Usage via /do:**
+      - Web: `/do "Update marketing site content"` (web expert)
+    pitfalls:
+      - Forgetting to update expert domain counts
+      - Missing usage examples for new domains
+      - Inconsistent domain descriptions across files
+      - No dedicated capability documentation
+
 decision_trees:
   documentation_validation_strategy:
     question: How should I validate this documentation section?
@@ -527,6 +683,55 @@ patterns:
       Showing natural language examples demonstrates capability more effectively
       than technical parameter documentation.
 
+  comprehensive_specification_pattern:
+    structure: Detailed multi-phase specification with systematic validation
+    usage: Large-scale documentation updates requiring coordination across files
+    trade_offs: Thorough planning vs implementation speed
+    timestamp: 2026-02-04
+    evidence: docs/specs/documentation/comprehensive-documentation-standardization-spec.md
+    example: |
+      ## Problem Statement
+      1. **Version Mismatches**: Documentation references outdated version 2.0.1 instead of current 2.2.0
+      2. **Database Location Inconsistencies**: Mixed references to database locations
+
+      ## Solution Overview
+      ### Phase 1: Version and Reference Standardization
+      - Update all version references from `2.0.1` to `2.2.0`
+      - Standardize database location references to `.kotadb/kota.db`
+
+  memory_layer_documentation_pattern:
+    structure: Architectural overview with visual diagrams, comprehensive examples, integration patterns
+    usage: Documenting complex persistent intelligence features with cross-session capabilities
+    trade_offs: Comprehensive explanation vs documentation length
+    timestamp: 2026-02-04
+    evidence: docs/memory-layer-guide.md
+    rationale: |
+      Memory layer features are conceptually complex and require understanding
+      of cross-session persistence, SQLite integration, and agent workflow patterns.
+      Visual diagrams and comprehensive examples make abstract concepts concrete.
+
+  unified_search_documentation_pattern:
+    structure: Intent detection examples, response format specification, migration guidance
+    usage: Documenting AI-powered tool consolidation with intelligent routing
+    trade_offs: Complete feature coverage vs approachability
+    timestamp: 2026-02-04
+    evidence: docs/unified-search-guide.md
+    rationale: |
+      Unified search consolidates multiple tools into one intelligent interface.
+      Documentation must explain both the new unified approach and how to migrate
+      from individual tools, requiring comprehensive examples and clear intent detection.
+
+  directory_synchronization_pattern:
+    structure: Bi-directional sync with conflict resolution and canonical source determination
+    usage: Maintaining consistency between docs/ and web/docs/content/ directories
+    trade_offs: Content synchronization vs directory independence
+    timestamp: 2026-02-04
+    evidence: Issue #157 documentation sync requirements
+    rationale: |
+      Multiple documentation directories serve different audiences but contain
+      overlapping content. Synchronization prevents content drift while allowing
+      directory-specific formatting and cross-references.
+
   separate_quickstart_pattern:
     structure: QUICKSTART.md for new users, README.md for technical details
     usage: Projects with both user and developer audiences
@@ -588,6 +793,42 @@ best_practices:
       - Technology stack claims must be consistent
     timestamp: 2026-02-02
 
+  comprehensive_documentation_updates:
+    items:
+      - Create detailed specification before large-scale changes
+      - Map all affected files and their interdependencies
+      - Define systematic validation approach against implementation
+      - Include risk assessment and timeline estimation
+      - Document success metrics and completion criteria
+    timestamp: 2026-02-04
+
+  directory_synchronization:
+    items:
+      - Compare modification times to determine canonical source
+      - Merge unique content from both directories
+      - Standardize frontmatter format across directories
+      - Validate cross-references work in both contexts
+      - Preserve directory-specific formatting when needed
+    timestamp: 2026-02-04
+
+  memory_layer_documentation:
+    items:
+      - Include architectural diagrams for complex features
+      - Map database tables to corresponding search tools
+      - Provide comprehensive JSON examples for all operations
+      - Document integration patterns with existing workflows
+      - Include privacy controls and local-first principles
+    timestamp: 2026-02-04
+
+  unified_search_documentation:
+    items:
+      - Explain intent detection with concrete examples
+      - Document response format with real data structures
+      - Include migration guidance from individual tools
+      - Add troubleshooting for common edge cases
+      - Show integration patterns with MCP clients
+    timestamp: 2026-02-04
+
 known_issues:
   - issue: MCP tool documentation incomplete (5 of 8 tools documented)
     impact: Missing tools prevent full API utilization
@@ -628,6 +869,36 @@ known_issues:
     status: Resolved (2026-02-03)
     evidence: Commit 22f036d
 
+  - issue: Version references inconsistent across documentation (2.0.1 vs 2.2.0)
+    impact: Users installing wrong version, documentation appears outdated
+    resolution: Systematic version update across all documentation files
+    status: In Progress (2026-02-04)
+    evidence: Issue #157 comprehensive documentation update
+
+  - issue: docs/ and web/docs/content/ directories out of sync
+    impact: Content divergence causing inconsistent information
+    resolution: Directory synchronization with conflict resolution
+    status: In Progress (2026-02-04)
+    evidence: Issue #157 directory sync requirements
+
+  - issue: Memory layer features undocumented
+    impact: Users unaware of persistent intelligence capabilities
+    resolution: Created comprehensive memory layer guide
+    status: Resolved (2026-02-04)
+    evidence: docs/memory-layer-guide.md
+
+  - issue: Unified search tool undocumented
+    impact: Users continuing to use individual tools instead of unified interface
+    resolution: Created unified search guide with migration examples
+    status: Resolved (2026-02-04)
+    evidence: docs/unified-search-guide.md
+
+  - issue: Web expert domain not documented in CLAUDE.md
+    impact: Users unaware of web/marketing site capabilities
+    resolution: Updated expert domain table and usage examples
+    status: In Progress (2026-02-04)
+    evidence: CLAUDE.md expert domain count mismatch (9 vs 10)
+
 potential_enhancements:
   - Automated documentation validation against implementation
   - CLI command testing in CI/CD pipeline
@@ -636,17 +907,24 @@ potential_enhancements:
   - Example testing framework for code snippets
   - Phantom command detection in pre-commit hooks
   - Cross-file sync validation automation
+  - Directory synchronization automation with conflict resolution
+  - Version consistency enforcement in CI/CD
+  - Memory layer documentation auto-generation from schema
+  - Unified search documentation updates from tool changes
+  - Expert domain documentation template generation
 
 stability:
   convergence_indicators:
-    insight_rate_trend: active (4 new patterns this cycle)
+    insight_rate_trend: high_activity (9 new patterns this cycle)
     contradiction_count: 0
-    last_reviewed: 2026-02-03
+    last_reviewed: 2026-02-04
     notes: |
-      Third review cycle. Extracted patterns from quickstart separation (#123),
-      comprehensive docs update (#124), and tool tier documentation (uncommitted).
-      Added key_operations for quickstart creation and tool tier documentation.
-      Added patterns for user-focused documentation and separate quickstart files.
-      One new known_issue resolved. Domain continues healthy pattern accumulation
-      with focus on user experience improvements. Patterns show evolution from
-      technical accuracy (cycles 1-2) to user-focused approachability (cycle 3).
+      Fourth review cycle. Major pattern expansion from comprehensive documentation
+      standardization (#157), memory layer documentation, unified search documentation,
+      and web expert domain integration. Added 5 new key_operations and 4 new patterns.
+      Resolved 2 documentation gaps (memory layer, unified search), identified 4 new
+      known_issues from systematic analysis. Domain shows strong evolution from
+      individual file fixes (cycles 1-2) to user experience (cycle 3) to systematic
+      large-scale coordination (cycle 4). Comprehensive specification pattern represents
+      mature approach to complex documentation challenges. High activity indicates
+      domain responding well to v2.2.0 feature expansion and documentation modernization.

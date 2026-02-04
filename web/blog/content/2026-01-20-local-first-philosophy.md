@@ -67,7 +67,7 @@ All data is stored in `~/.kotadb/` on your machine:
 
 ```
 ~/.kotadb/
-  ├── kotadb.db      # Main database with code index
+  ├── kota.db        # Main database with code index
   └── config.json    # Optional configuration
 ```
 
@@ -82,6 +82,17 @@ Being local-first means accepting some trade-offs:
 - **Storage on your hardware**: Large codebases require disk space
 
 We believe these trade-offs are worth it for the privacy, speed, and reliability benefits.
+
+## Memory Layer: Local Learning
+
+KotaDB v2.2.0 introduces the Memory Layer, which exemplifies local-first intelligence:
+
+- **Decisions persist locally**: Architectural decisions stored in your SQLite database
+- **Learning stays private**: Failed approaches and patterns never leave your machine
+- **Cross-session intelligence**: Your local agent gets smarter with every session
+- **No cloud dependency**: All learning happens in your local `.kotadb/kota.db`
+
+The Memory Layer proves that intelligent software doesn't need cloud connectivity - it can learn and evolve entirely on your local machine.
 
 ## Conclusion
 

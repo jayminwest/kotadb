@@ -2,8 +2,8 @@
 title: Configuration
 description: Configure KotaDB for your environment
 order: 2
-last_updated: 2026-02-03
-version: 2.0.1
+last_updated: 2026-02-04
+version: 2.2.0
 reviewed_by: documentation-build-agent
 ---
 
@@ -19,7 +19,7 @@ KotaDB can be configured using environment variables:
 |----------|---------|-------------|
 | `KOTADB_PORT` | `3000` | HTTP server port |
 | `KOTADB_HOST` | `127.0.0.1` | HTTP server host |
-| `KOTADB_DB_PATH` | `~/.kotadb/kotadb.db` | SQLite database location |
+| `KOTADB_DB_PATH` | `~/.kotadb/kota.db` | SQLite database location |
 | `KOTADB_LOG_LEVEL` | `info` | Logging verbosity (debug, info, warn, error) |
 
 Example:
@@ -30,7 +30,7 @@ KOTADB_PORT=8080 KOTADB_DB_PATH=/custom/path/db.sqlite kotadb serve
 
 ## Database Location
 
-By default, KotaDB stores its SQLite database at `~/.kotadb/kotadb.db`. You can change this location using the `KOTADB_DB_PATH` environment variable.
+By default, KotaDB stores its SQLite database at `~/.kotadb/kota.db`. You can change this location using the `KOTADB_DB_PATH` environment variable.
 
 The database contains:
 - Indexed file metadata
@@ -137,7 +137,7 @@ Add to your project's `.mcp.json`:
   "mcpServers": {
     "kotadb": {
       "command": "bunx",
-      "args": ["kotadb@next", "--stdio"]
+      "args": ["kotadb", "--stdio"]
     }
   }
 }
@@ -152,7 +152,7 @@ Add to your `claude_desktop_config.json`:
   "mcpServers": {
     "kotadb": {
       "command": "bunx",
-      "args": ["kotadb@next", "--stdio"]
+      "args": ["kotadb", "--stdio"]
     }
   }
 }
@@ -163,7 +163,7 @@ Add to your `claude_desktop_config.json`:
 For HTTP-based integration, start the server without `--stdio`:
 
 ```bash
-bunx kotadb@next --port 3000
+bunx kotadb --port 3000
 ```
 
 ## Indexing Configuration

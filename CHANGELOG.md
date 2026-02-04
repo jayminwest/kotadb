@@ -62,7 +62,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Various indexer and automation fixes
 
 ## [2.0.0] - 2025-01-28
-## [2.0.0] - 2025-01-28
 
 ### Breaking Changes
 

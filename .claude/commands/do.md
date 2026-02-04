@@ -858,7 +858,7 @@ Use TypeScript path aliases for all imports:
 
 ### Storage
 - Local SQLite only (no cloud dependencies)
-- Database at `app/data/kotadb.db`
+- Database at `.kotadb/kota.db`
 
 ### Commit Format
 ```
