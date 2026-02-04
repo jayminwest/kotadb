@@ -1,6 +1,6 @@
 {
   "name": "kotadb",
-  "version": "2.1.0",
+  "version": "2.2.0",
   "description": "Local-only code intelligence tool for CLI agents. SQLite-backed repository indexing and code search via MCP.",
   "type": "module",
   "module": "src/index.ts",
