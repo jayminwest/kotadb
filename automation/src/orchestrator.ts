@@ -25,6 +25,8 @@ import {
 } from "./parser.ts";
 import { handlePRCreation, commitExpertiseChanges, type IssueType } from "./pr.ts";
 import { clearWorkflowContext } from "./context.ts";
+import { curateContext, type CuratedContext } from "./curator.ts";
+import { autoRecordSuccess, autoRecordFailure } from "./auto-record.ts";
 
 /**
  * GitHub issue data fetched via gh CLI
@@ -204,6 +206,30 @@ export async function orchestrateWorkflow(
   logger.logEvent("PHASE_COMPLETE", { phase: "analysis", domain });
   reporter.completePhase("analysis", { domain });
 
+  // CURATION: Post-Analysis
+  if (workflowId) {
+    try {
+      const curatedContext = await curateContext({
+        workflowId,
+        phase: 'post-analysis',
+        domain,
+        currentPhaseOutput: analysisResult,
+        projectRoot,
+        logger,
+        reporter
+      });
+      logger.logEvent("CONTEXT_CURATED", { 
+        workflow_id: workflowId, 
+        phase: 'post-analysis',
+        token_count: curatedContext.tokenCount
+      });
+    } catch (error) {
+      // Non-fatal: log warning and continue
+      logger.logError("curation_post_analysis", error instanceof Error ? error : new Error(String(error)));
+      reporter.logWarning("Context curation failed (non-fatal)");
+    }
+  }
+
   // Phase 2: Plan
   reporter.startPhase("plan");
   logger.logEvent("PHASE_START", { phase: "plan", domain });
@@ -211,12 +237,60 @@ export async function orchestrateWorkflow(
   logger.logEvent("PHASE_COMPLETE", { phase: "plan", spec_path: specPath });
   reporter.completePhase("plan", { spec_path: specPath });
 
+  // CURATION: Post-Plan
+  if (workflowId) {
+    try {
+      const planOutput = `Spec created at: ${specPath}\nDomain: ${domain}\nRequirements: ${requirements}`;
+      const curatedContext = await curateContext({
+        workflowId,
+        phase: 'post-plan',
+        domain,
+        currentPhaseOutput: planOutput,
+        projectRoot,
+        logger,
+        reporter
+      });
+      logger.logEvent("CONTEXT_CURATED", { 
+        workflow_id: workflowId, 
+        phase: 'post-plan',
+        token_count: curatedContext.tokenCount
+      });
+    } catch (error) {
+      logger.logError("curation_post_plan", error instanceof Error ? error : new Error(String(error)));
+      reporter.logWarning("Context curation failed (non-fatal)");
+    }
+  }
+
   // Phase 3: Build
   reporter.startPhase("build");
   logger.logEvent("PHASE_START", { phase: "build", domain });
   const filesModified = await executeBuild(domain, specPath, sdkOptions, logger, dryRun);
   logger.logEvent("PHASE_COMPLETE", { phase: "build", files_count: filesModified.length });
   reporter.completePhase("build", { files_count: filesModified.length });
+
+  // CURATION: Post-Build
+  if (workflowId) {
+    try {
+      const buildOutput = `Files modified: ${filesModified.join(', ')}\nDomain: ${domain}`;
+      const curatedContext = await curateContext({
+        workflowId,
+        phase: 'post-build',
+        domain,
+        currentPhaseOutput: buildOutput,
+        projectRoot,
+        logger,
+        reporter
+      });
+      logger.logEvent("CONTEXT_CURATED", { 
+        workflow_id: workflowId, 
+        phase: 'post-build',
+        token_count: curatedContext.tokenCount
+      });
+    } catch (error) {
+      logger.logError("curation_post_build", error instanceof Error ? error : new Error(String(error)));
+      reporter.logWarning("Context curation failed (non-fatal)");
+    }
+  }
 
   // Phase 4: Improve (optional)
   reporter.startPhase("improve");
@@ -235,6 +309,37 @@ export async function orchestrateWorkflow(
   }
   logger.logEvent("PHASE_COMPLETE", { phase: "improve", status: improveStatus });
   reporter.completePhase("improve", { status: improveStatus });
+
+  // Auto-record workflow outcome
+  if (!dryRun && workflowId) {
+    try {
+      if (improveStatus === "success") {
+        await autoRecordSuccess({
+          workflowId,
+          issueNumber,
+          domain,
+          filesModified,
+          projectRoot,
+          logger,
+          reporter
+        });
+      } else if (improveStatus === "failed") {
+        await autoRecordFailure({
+          workflowId,
+          issueNumber,
+          domain,
+          error: "Improve phase failed",
+          projectRoot,
+          logger,
+          reporter
+        });
+      }
+    } catch (error) {
+      // Non-fatal: log warning and continue
+      logger.logError("auto_recording", error instanceof Error ? error : new Error(String(error)));
+      reporter.logWarning("Auto-recording failed (non-fatal)");
+    }
+  }
 
   // Commit expertise changes from improve phase (before PR)
   if (!dryRun && improveStatus === "success") {

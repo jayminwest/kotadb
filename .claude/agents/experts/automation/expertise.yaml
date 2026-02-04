@@ -1026,3 +1026,212 @@ stability:
     
     Prior: Issue #95 (toolset tiers), #65 (console transparency), #64 (worktree isolation).
     Domain converging with comprehensive automation patterns established.
+
+  curate_context_between_phases:
+    when: Need to inject relevant memory context between workflow phases
+    approach: |
+      Use lightweight haiku curator to query KotaDB memory tools (failures, patterns, 
+      decisions) and produce ~500 token curated summary for next phase. Curator runs
+      as separate SDK query() call between phases.
+    patterns:
+      - Separate haiku SDK call with memory toolset
+      - Query search tool with scope=["failures", "patterns", "decisions"]
+      - Extract structured output (summary + items)
+      - Store via storeWorkflowContext() for next phase access
+      - Non-fatal failures (log warning, continue workflow)
+      - Token budget: ~500 tokens per curation
+      - Timing: <2s per curator call (haiku is fast)
+    code_example: |
+      const curatedContext = await curateContext({
+        workflowId,
+        phase: 'post-analysis',
+        domain: 'database',
+        currentPhaseOutput: analysisResult,
+        projectRoot,
+        logger,
+        reporter
+      });
+      
+      // Context automatically stored and available to next phase
+    pitfalls:
+      - Not handling curator failures gracefully breaks workflow
+      - Overly verbose summaries exceed token budget
+      - Missing workflowId prevents context storage
+      - Curator must use memory toolset for search access
+  
+  auto_record_workflow_outcomes:
+    when: Workflow completes (success or failure)
+    approach: |
+      Automatically record workflow outcomes to KotaDB memory tools using haiku.
+      Success -> record_decision, Failure -> record_failure. Runs once per workflow
+      (not per-phase) after improve phase completes.
+    patterns:
+      - Separate haiku SDK call with memory toolset
+      - Retrieve all workflow contexts for summary
+      - Success: record_decision with pattern scope
+      - Failure: record_failure with error details
+      - Include related_files array
+      - Non-fatal failures (log warning, continue)
+      - Dry-run mode skips recording
+    code_example: |
+      // Success recording
+      await autoRecordSuccess({
+        workflowId,
+        issueNumber: 123,
+        domain: 'automation',
+        filesModified: ['src/orchestrator.ts', 'src/curator.ts'],
+        projectRoot,
+        logger,
+        reporter
+      });
+      
+      // Failure recording
+      await autoRecordFailure({
+        workflowId,
+        issueNumber: 123,
+        domain: 'automation',
+        error: 'Build phase failed: type error in curator.ts',
+        projectRoot,
+        logger,
+        reporter
+      });
+    pitfalls:
+      - Recording before workflow truly completes
+      - Missing context retrieval loses valuable data
+      - Recording in dry-run mode pollutes memory
+      - Exceptions in recording shouldn't fail workflow
+
+  context_curation_timing:
+    question: When should context curation run?
+    branches:
+      - condition: After analysis phase
+        action: Curate context for plan phase
+        rationale: Plan needs failure/pattern/decision context
+        
+      - condition: After plan phase
+        action: Curate context for build phase
+        rationale: Build needs refined context from planning
+        
+      - condition: After build phase
+        action: Curate context for improve phase
+        rationale: Improve needs build outcomes for learning
+        
+      - condition: After improve phase
+        action: Auto-record outcome (no curation)
+        rationale: Workflow complete, record for future runs
+        
+      - condition: Curator fails
+        action: Log warning, continue workflow
+        rationale: Curation is enhancement, not blocker
+
+  memory_tool_usage:
+    question: Which memory tool should I use?
+    branches:
+      - condition: Need to find past failures for domain
+        action: search({scope: ["failures"], query: domain})
+        rationale: Avoid repeating mistakes
+        
+      - condition: Need established patterns for domain
+        action: search({scope: ["patterns"], query: domain})
+        rationale: Follow conventions
+        
+      - condition: Need architectural decisions
+        action: search({scope: ["decisions"], query: domain})
+        rationale: Understand past choices
+        
+      - condition: Workflow succeeded
+        action: record_decision with pattern scope
+        rationale: Share success for future workflows
+        
+      - condition: Workflow failed
+        action: record_failure with error details
+        rationale: Learn from failures
+        
+      - condition: Discovered insight during workflow
+        action: record_insight with discovery/workaround type
+        rationale: Share discoveries
+
+  haiku_curator_pattern:
+    structure: Separate SDK query() call with haiku model between phases
+    usage: Query memory tools, synthesize curated summary, store context
+    trade_offs: Extra SDK call overhead vs intelligent context injection
+    
+  auto_recording_pattern:
+    structure: Post-workflow haiku call to record outcome
+    usage: Success -> decision, Failure -> failure, learning flywheel
+    trade_offs: Extra SDK call vs systematic learning accumulation
+
+  context_curation:
+    - Run curator between phases for context continuity
+    - Use haiku model for speed and cost efficiency
+    - Target ~500 token summaries (concise, actionable)
+    - Query all three memory scopes (failures, patterns, decisions)
+    - Store curated context via storeWorkflowContext()
+    - Make curation failures non-fatal (log, continue)
+    - Monitor curator timing (<2s per call)
+    - Use memory toolset for curator SDK calls
+  
+  auto_recording:
+    - Record once per workflow (not per phase)
+    - Run after improve phase completes
+    - Include all workflow contexts in recording
+    - Success: record_decision with pattern scope
+    - Failure: record_failure with full error context
+    - Include related_files array for traceability
+    - Skip recording in dry-run mode
+    - Make recording failures non-fatal
+
+  notes: |
+    Issue #148 implements deep KotaDB integration with haiku-powered context curation
+    and automated workflow outcome recording. Key architectural decisions:
+    
+    1. Curator Strategy: Lightweight haiku model (claude-haiku-3-5-20241022) runs between
+       phases to query memory tools and produce ~500 token curated summaries. Separate
+       SDK calls maintain clear separation from main workflow execution.
+    
+    2. Auto-Recording: Successful workflows recorded as decisions (pattern scope), failed
+       workflows recorded as failures with full error context. Enables learning flywheel
+       where every ADW run benefits from past experience.
+    
+    3. Memory Toolset: Curator and auto-recording use --toolset memory to access unified
+       search tool with scope parameter (failures/patterns/decisions) and recording tools.
+    
+    4. Non-Fatal Failures: All curation and recording failures are non-fatal. Workflow
+       continues with warning logs. This prevents memory system issues from blocking
+       primary automation functionality.
+    
+    5. Agent Registry: All 40+ agents now have access to memory tools (search, record_decision,
+       record_failure, record_insight) enabling systematic knowledge accumulation across
+       all expert domains.
+    
+    Implementation establishes foundation for intelligent multi-phase workflows where each
+    phase benefits from curated context about past failures, established patterns, and
+    architectural decisions. Combined with #144 context accumulation infrastructure,
+    creates robust inter-phase handoff mechanism.
+    
+    Prior: #144 (context accumulation), #143 (unified search), #95 (toolset tiers).
+    Domain converging with comprehensive memory integration patterns established.
+
+    curator_ts:
+      path: automation/src/curator.ts
+      purpose: Haiku-powered context curator for inter-phase handoffs
+      responsibilities:
+        - Query KotaDB memory tools (search with scope parameter)
+        - Produce ~500 token curated summaries
+        - Extract structured output (summary, failures, patterns, decisions)
+        - Store curated context via storeWorkflowContext()
+        - Run between workflow phases (post-analysis, post-plan, post-build)
+        - Use haiku model (claude-haiku-3-5-20241022) for speed and cost
+        - Configure memory toolset for search access
+        
+    auto_record_ts:
+      path: automation/src/auto-record.ts
+      purpose: Automated workflow outcome recording
+      responsibilities:
+        - Record successful workflows as decisions (record_decision tool)
+        - Record failed workflows as failures (record_failure tool)
+        - Retrieve all workflow contexts for comprehensive summary
+        - Use haiku model for recording calls
+        - Include related_files array for traceability
+        - Skip recording in dry-run mode
+        - Non-fatal failures (log warning, continue)
