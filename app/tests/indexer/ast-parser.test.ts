@@ -38,6 +38,12 @@ describe("isSupportedForAST", () => {
 		expect(isSupportedForAST("tsconfig.json")).toBe(false);
 	});
 
+	test("rejects SQL files", () => {
+		expect(isSupportedForAST("schema.sql")).toBe(false);
+		expect(isSupportedForAST("db/migrations/001.sql")).toBe(false);
+		expect(isSupportedForAST("functions/increment.sql")).toBe(false);
+	});
+
 	test("rejects other extensions", () => {
 		expect(isSupportedForAST("README.md")).toBe(false);
 		expect(isSupportedForAST("styles.css")).toBe(false);
