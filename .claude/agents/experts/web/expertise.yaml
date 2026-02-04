@@ -6,7 +6,7 @@ overview:
     design system maintenance, and deployment configuration.
   scope: |
     Covers web/ directory structure, HTML template patterns, CSS custom properties (Liquid Glass),
-    JavaScript utilities (theme toggle, markdown rendering), content management patterns,
+    JavaScript utilities (theme toggle, markdown rendering, terminal animation), content management patterns,
     Vercel configuration, and SEO files (sitemap, robots.txt).
     Does NOT cover app/ codebase or server-side logic.
   rationale: |
@@ -18,11 +18,11 @@ core_implementation:
   database_location: null
   key_files:
     - path: web/index.html
-      purpose: Marketing homepage with hero, features, stats
+      purpose: Marketing homepage with hero terminal, features, Quick Start, stats
     - path: web/css/main.css
       purpose: Liquid Glass design system with CSS custom properties
     - path: web/js/main.js
-      purpose: Theme toggle, terminal demo, GitHub stats
+      purpose: Theme toggle, copy-to-clipboard utility (CopyCode module)
     - path: web/js/render.js
       purpose: Markdown rendering utilities with frontmatter parsing
     - path: web/docs/index.html
@@ -85,13 +85,44 @@ key_operations:
     when: Modifying marketing homepage
     approach: |
       1. Edit web/index.html sections (hero, features, stats, etc.)
-      2. Verify terminal demo animation timing in web/js/main.js
+      2. Verify terminal demo animation timing (inline script in index.html)
       3. Test GitHub stats fetching (rate limit aware)
       4. Check responsive layout on mobile/tablet/desktop
       5. Validate SEO meta tags in <head>
     pitfalls:
       - Breaking terminal animation with invalid command strings
       - GitHub API rate limits for stats
+  
+  update_terminal_animation:
+    when: Modifying hero terminal demo content or timing
+    approach: |
+      1. Edit commands array in inline script at bottom of web/index.html
+      2. Structure: { type: 'command'|'output'|'success', text: 'content' }
+      3. Adjust timing delays: command typing (50ms/char), output instant (0ms), line delays (300-800ms)
+      4. For conversational UI: use instant outputs (delay: 0) to simulate AI responses
+      5. Test animation flow and readability
+    patterns:
+      - Conversational format: use '> Question' for user input, instant output for responses
+      - Remove terminal prompt ($) for conversational lines (set line.innerHTML to just command span)
+      - Typing effect only for user input, instant for AI responses
+    example: |
+      { type: 'command', text: '> Find all files that depend on auth/context.ts' },
+      { type: 'output', text: '' },  // Blank line for spacing
+      { type: 'output', text: '🔍 Searching dependencies...' },
+      { type: 'output', text: 'Found 8 files that import auth/context.ts:' }
+  
+  enable_copy_button:
+    when: Adding copy functionality to code blocks
+    approach: |
+      1. Add class="code-block" to <pre> element
+      2. CopyCode module in web/js/main.js auto-detects and adds button
+      3. No additional code needed - fully automatic
+    patterns:
+      - CopyCode.init() runs on DOMContentLoaded and markdown-loaded events
+      - Clipboard API with fallback for older browsers (execCommand)
+      - Visual feedback: clipboard emoji → checkmark (2s) → clipboard
+    example: |
+      <pre class="code-block"><code>{ "mcpServers": { ... } }</code></pre>
   
   test_local_deployment:
     when: Testing web changes locally before deploy
@@ -102,10 +133,13 @@ key_operations:
       4. Test hash-based routing for docs and blog
       5. Test theme toggle functionality
       6. Verify markdown rendering for docs and blog
-      7. Check 404 page behavior
+      7. Check terminal animation timing and content
+      8. Test copy buttons on code blocks
+      9. Check 404 page behavior
     pitfalls:
       - Forgetting to test hash routing (client-side only)
       - Not testing in both light and dark themes
+      - Not verifying terminal animation timing on different devices
   
   verify_deployment_config:
     when: Checking Vercel deployment settings
@@ -133,6 +167,8 @@ decision_trees:
         action: Edit web/index.html directly
       - condition: Design system change (colors, spacing, typography)
         action: Update CSS custom properties in web/css/main.css
+      - condition: Terminal demo content
+        action: Edit commands array in inline script (web/index.html)
   
   design_change_scope:
     entry_point: What design element am I changing?
@@ -147,6 +183,8 @@ decision_trees:
         action: Update component styles and test hover/focus states
       - condition: Responsive breakpoints
         action: Update media queries at 768px, 1024px
+      - condition: Terminal animation timing
+        action: Edit delay values in typeCharacter() function
 
 patterns:
   no_build_process_pattern:
@@ -190,6 +228,28 @@ patterns:
     trade_offs:
       - advantage: No build tooling or SSG required
       - cost: Manual updates across multiple files for nav changes
+  
+  inline_script_animation_pattern:
+    structure: Terminal animation via inline <script> in index.html
+    usage: Hero terminal typing effect with mixed timing
+    trade_offs:
+      - advantage: No external JS file, immediate execution, self-contained
+      - cost: Not reusable, harder to test, inline code increases HTML size
+    implementation: |
+      - Commands array with type (command/output/success) and text
+      - typeCharacter() recursion with setTimeout for animation
+      - Variable timing: typing (50ms), instant (0ms), line delays (300-800ms)
+      - Conversational UI: remove prompt for command lines, instant output
+  
+  copy_button_class_pattern:
+    structure: Add 'code-block' class to enable copy functionality
+    usage: Any <pre> element that should have copy-to-clipboard
+    trade_offs:
+      - advantage: Zero JavaScript needed, fully automatic via CopyCode module
+      - cost: Must remember to add class (easy to forget)
+    implementation: |
+      <pre class="code-block"><code>content</code></pre>
+      CopyCode.init() detects and adds button automatically
 
 best_practices:
   content:
@@ -197,6 +257,7 @@ best_practices:
     - Update both content file AND page arrays when adding content
     - Test hash routing after adding new pages
     - Maintain consistent date format (YYYY-MM-DD) in blog posts
+    - Add 'code-block' class to <pre> elements for copy buttons
   
   design_system:
     - Update CSS custom properties, not hardcoded values
@@ -207,8 +268,16 @@ best_practices:
   javascript:
     - Keep JS minimal and vanilla (no framework dependencies)
     - Gracefully handle GitHub API rate limits for stats
-    - Test terminal demo animation timing
+    - Use inline scripts for page-specific animations (terminal demo)
     - Ensure theme toggle persists to localStorage
+    - CopyCode module handles all copy-to-clipboard needs
+  
+  terminal_animation:
+    - Use instant outputs (delay: 0) for conversational/AI responses
+    - Keep typing effect for user input only (50ms per character)
+    - Add blank lines (empty text) for visual spacing
+    - Use emojis sparingly for visual interest (🔍, ✓, •)
+    - Test timing on slower devices (mobile)
   
   deployment:
     - Test locally before pushing to main
@@ -230,13 +299,20 @@ potential_enhancements:
   - Server-side rendering for improved SEO
   - Templating system for header/footer consistency
   - Automated testing for hash routing and markdown rendering
+  - Extract terminal animation to reusable module
 
 stability:
   convergence_indicators:
-    insight_rate_trend: new_domain
+    insight_rate_trend: stable
     contradiction_count: 0
     last_reviewed: 2026-02-03
     notes: |
-      Initial domain creation. Patterns established from existing web/ directory structure.
+      Issue #149 implementation learnings captured (2026-02-03):
+      - Terminal animation patterns: conversational UI with mixed timing
+      - Copy button enablement: simple class-based pattern
+      - MCP configuration display: JSON code blocks with copy functionality
+      - Animation timing adjustments: instant (0ms) for AI responses
+      
       Static site architecture is stable. Content management patterns are proven.
       Design system (Liquid Glass) is defined and consistent.
+      Terminal animation pattern now documented for future updates.
