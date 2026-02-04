@@ -1,5 +1,5 @@
 # KotaDB API Expert Knowledge
-# Target: 400-600 lines | Domain: Operational knowledge for API development
+# Target: 600-800 lines | Domain: Operational knowledge for API development
 # Adapted for KotaDB local-only architecture
 
 overview:
@@ -32,766 +32,249 @@ core_implementation:
   key_files:
     - path: app/src/cli.ts
       purpose: CLI entry point - argument parsing, server startup, graceful shutdown, stdio transport
-      exports: (none - direct execution)
-      patterns: shebang, arg parsing, signal handlers, version resolution, stdio mode routing
     - path: app/src/api/routes.ts
       purpose: Express app factory - createExpressApp()
-      exports: createExpressApp
     - path: app/src/api/queries.ts
       purpose: SQLite query functions - searchFiles, listRecentFiles, runIndexingWorkflow
-      exports: searchFiles, listRecentFiles, ensureRepository, saveIndexedFiles
     - path: app/src/mcp/server.ts
       purpose: MCP Server factory - createMcpServer(), createMcpTransport()
-      exports: createMcpServer, createMcpTransport
     - path: app/src/mcp/tools.ts
       purpose: MCP tool definitions and executors
-      exports: SEARCH_CODE_TOOL, executeSearchCode, handleToolCall, etc.
     - path: app/src/api/openapi/builder.ts
       purpose: OpenAPI 3.1 spec generator
-      exports: buildOpenAPISpec, clearSpecCache
     - path: app/src/logging/logger.ts
       purpose: Structured logging with stderr routing support
-      exports: createLogger, Logger, LogContext
 
 key_operations:
   create_cli_entry_point:
     when: Creating npm bin entry point for distributed package
     approach: |
       1. Create app/src/cli.ts with #!/usr/bin/env bun shebang (first line, no BOM)
-      2. Import createExpressApp, getEnvironmentConfig, createLogger
-      3. Implement getVersion(): Reads package.json at runtime
-      4. Implement parseArgs() to handle --help, -h, --version, -v, --port <number>, --stdio
-      5. In main(): parse args -> handle --version/--help -> route stdio/HTTP mode
-      6. Set up graceful shutdown handlers for SIGTERM and SIGINT (HTTP mode only):
-         - Close server and exit(0) on success
-         - Force exit(1) after 10-second timeout
-      7. Add global error handlers for unhandledRejection and uncaughtException
-      8. Export cli.ts in package.json bin field: { "kotadb": "./src/cli.ts" }
+      2. Implement getVersion() reading package.json at runtime
+      3. Implement parseArgs() for --help, --version, --port, --stdio flags
+      4. Set up graceful shutdown handlers (HTTP mode): SIGTERM/SIGINT -> close -> exit(0) or timeout exit(1)
+      5. Export in package.json bin field: { "kotadb": "./src/cli.ts" }
     timestamp: 2026-01-28
-    evidence: app/src/cli.ts (full implementation)
-    rationale: |
-      Enables KotaDB distribution as installable npm package via `npx kotadb` or `bunx kotadb`.
-      Bun shebang allows direct execution. Graceful shutdown prevents database corruption.
+    evidence: app/src/cli.ts
     key_patterns:
-      - getVersion() reads package.json at runtime (supports bundled packages)
-      - process.argv.slice(2) skips executable and script path
-      - Timeout-based forced shutdown (10s) prevents hanging processes (HTTP mode)
-      - process.stdout.write for output, process.stderr.write for errors
-    pitfalls:
-      - what: "Using console.log instead of process.stdout.write"
-        instead: "Use process.stdout.write for all CLI output"
-        reason: "console.log adds overhead, process.stdout.write is pure"
-      - what: "Hardcoding package version in CLI code"
-        instead: "Read from package.json at runtime"
-        reason: "Must stay in sync with package.json during releases"
-      - what: "Missing timeout in shutdown handler"
-        instead: "Always include 10-second timeout for forced shutdown"
-        reason: "Prevents process hanging if close() doesn't complete"
+      - Runtime version resolution from package.json
+      - 10-second forced shutdown timeout (HTTP mode)
+      - process.stdout.write (not console.log)
 
   implement_mcp_stdio_transport:
     when: Adding stdio transport for MCP server (Claude Code integration)
     approach: |
       1. Import StdioServerTransport from @modelcontextprotocol/sdk/server/stdio.js
-      2. Add --stdio flag to CLI option parsing (CliOptions interface)
-      3. Create runStdioMode() function:
-         - Create logger with forceStderr: true (CRITICAL for JSON-RPC protocol)
-         - Create MCP server with createMcpServer(context)
-         - Instantiate new StdioServerTransport()
-         - Connect server to transport via server.connect(transport)
-         - Let transport manage process lifecycle (no explicit shutdown handler)
-      4. Update main() to route --stdio flag to runStdioMode()
-      5. Add forceStderr support to logger:
-         - Add forceStderr?: boolean to LogContext interface
-         - Update createLogger() to extract and pass forceStderr flag
-         - Update writeLog() to accept forceStderr parameter
-         - Route all logs to stderr when forceStderr is true
-      6. Update help text to document --stdio flag and stdio configuration
+      2. Create runStdioMode() with logger forceStderr: true (CRITICAL - stdout reserved for JSON-RPC)
+      3. Connect server to transport via server.connect(transport)
+      4. No shutdown handlers needed (transport manages lifecycle via stdin close)
     timestamp: 2026-01-29
-    evidence: Issue #49, app/src/cli.ts, app/src/logging/logger.ts
-    rationale: |
-      Stdio transport eliminates port conflicts (EADDRINUSE on 3000) by using stdin/stdout
-      instead of TCP. This is the MCP-recommended pattern for local CLI tools. CRITICAL:
-      stdout MUST be reserved for JSON-RPC protocol messages - all logs go to stderr.
+    evidence: app/src/cli.ts, app/src/logging/logger.ts
     key_patterns:
-      - StdioServerTransport from @modelcontextprotocol/sdk/server/stdio.js (v1.25+)
-      - forceStderr: true in logger ensures stdout is protocol-only
-      - Transport manages process lifecycle (stdin close triggers shutdown)
-      - No graceful shutdown handler needed (unlike HTTP mode)
-      - Mode selection via CLI flag (--stdio), not environment variable
-    pitfalls:
-      - what: "Logging to stdout in stdio mode"
-        instead: "Use forceStderr: true in createLogger() options"
-        reason: "stdout is reserved for JSON-RPC messages, logs corrupt protocol"
-      - what: "Adding SIGTERM/SIGINT handlers in stdio mode"
-        instead: "Let transport manage lifecycle via stdin close"
-        reason: "Transport handles shutdown when Claude Code closes stdin"
-      - what: "Using PORT environment variable in stdio mode"
-        instead: "Ignore port configuration when --stdio is set"
-        reason: "Stdio doesn't use TCP ports, PORT is meaningless"
-      - what: "Starting HTTP server when --stdio is set"
-        instead: "Route to runStdioMode() and return early"
-        reason: "Modes are mutually exclusive - stdio XOR HTTP"
-    affected_files: |
-      - app/src/cli.ts (CliOptions, parseArgs, runStdioMode, main routing)
-      - app/src/logging/logger.ts (LogContext.forceStderr, createLogger, writeLog)
-      - README.md (stdio-first documentation)
-      - app/tests/cli.test.ts (--stdio flag validation)
+      - forceStderr: true prevents stdout pollution
+      - Transport lifecycle management (no manual shutdown)
 
-  add_express_route:
-    when: Adding new HTTP endpoint to the API
+  add_contextual_search_tips:
+    when: Enhancing MCP search tool to guide LLM users toward better search strategies
     approach: |
-      1. Add route inside createExpressApp() in app/src/api/routes.ts
-      2. Use AuthenticatedRequest for authenticated routes, Request for public
-      3. Always call addRateLimitHeaders(res, context.rateLimit) before response
-      4. Extract and validate query params early, return 400 on missing params
-      5. Call query functions from @api/queries, handle errors with 500 status
-      6. Register in OpenAPI spec via app/src/api/openapi/paths.ts
-    examples:
-      - GET /search (authenticated, rate-limited)
-      - POST /mcp (public, JSON-RPC)
-      - GET /health (public, no auth)
-    pitfalls:
-      - what: "Forgetting addRateLimitHeaders call"
-        instead: "Always call it before sending response"
-        reason: "Clients expect rate limit headers on all endpoints"
-
-  register_mcp_tool:
-    when: Adding new MCP tool for Claude Code integration
-    approach: |
-      1. Define ToolDefinition in app/src/mcp/tools.ts with name, description, inputSchema
-      2. Create executor function: validate params -> call query functions -> return result
-      3. Register in createMcpServer: add to ListToolsRequestSchema and CallToolRequestSchema
-      4. Validate ALL parameters including types before processing
-      5. Return structured objects that serialize well to JSON
-    examples:
-      - search_code: searches indexed files using FTS5
-      - index_repository: runs indexing workflow
-      - list_recent_files: lists recently indexed files with optional filtering
-    pitfalls:
-      - what: "Missing parameter validation"
-        instead: "Always type-check all params before using"
-        reason: "LLM may pass incorrect parameters"
-
-  add_query_function:
-    when: Adding new database query operation
-    approach: |
-      1. Create internal function with db parameter (for testability)
-      2. Create public function using getGlobalDatabase()
-      3. Internal functions: db.query<T>(), db.queryOne<T>(), db.run(), db.transaction()
-      4. Use db.prepare() for bulk operations
-      5. Always escape FTS5 terms with escapeFts5Term() for user input
-    kotadb_conventions:
-      - Use getGlobalDatabase() from @db/sqlite/index.js for public functions
-      - Internal functions take db parameter for testing
-      - Transaction wrapper via db.transaction(() => { ... })
-      - Prepared statements for bulk inserts
-
-  implement_fts5_search:
-    when: Adding or modifying FTS5 full-text search operations
-    approach: |
-      1. Always escape user input: escapeFts5Term(term) wraps in double quotes
-      2. Use FTS5 MATCH operator with escaped terms
-      3. Use bm25() for relevance ranking and snippet() for context
-      4. Test edge cases: hyphenated terms, multi-word phrases, FTS5 keywords, quotes
-    rationale: |
-      Prevents SQL errors on multi-word phrases, hyphens, and FTS5 keywords.
-      Double-quote escaping forces exact phrase matching and treats input as literal.
-    pitfalls:
-      - what: "Passing raw user input to MATCH"
-        instead: "Always use escapeFts5Term() first"
-        reason: "Unescaped input breaks FTS5 query parsing"
-
-  validate_local_file_paths:
-    when: Accepting file paths in local mode API operations
-    approach: |
-      1. Use path.resolve(localPath) to convert to absolute path
-      2. Verify path.startsWith(process.cwd()) to prevent traversal attacks
-      3. Check fs.existsSync(resolvedPath) if needed
-    rationale: |
-      Local mode indexing accepts user-provided paths. Without validation,
-      "../../../etc/passwd" could expose sensitive files. Restrict all paths 
-      to within process.cwd() workspace directory.
-
-  add_optional_parameter_filters:
-    when: Adding optional filtering parameters to query functions and MCP tools
-    approach: |
-      1. Create internal function with optional parameter (e.g., repositoryId?: string)
-      2. Use hasFilter flag to control both SQL string AND params array
-      3. Type guard in executor: validate optional param type before using
-      4. Extract with safe casting: (params.prop as string | undefined)
-      5. Document optional parameter in tool inputSchema with description
-    timestamp: 2026-01-28
-    evidence: Issue #608 (repository filtering for list_recent_files)
-    rationale: |
-      Enables multi-repository support without breaking backward compatibility.
-      hasRepoFilter conditional pattern avoids dynamic SQL and ensures parameter 
-      arrays match query placeholders.
-    pitfalls:
-      - what: "Parameter array length mismatch with SQL placeholders"
-        instead: "Use hasFilter flag to control both SQL and params"
-        reason: "Mismatched params cause binding errors"
-
-  test_mcp_tool:
-    when: Testing MCP tool implementations for correctness and edge cases
-    approach: |
-      1. Create <tool-name>.test.ts (unit) and <tool-name>.integration.test.ts (integration)
-      2. Unit tests: parameter validation, error cases, type checking
-      3. Integration tests: database operations using KOTADB_PATH env var
-      4. Cover: parameter validation, empty/populated results, optional params, edge cases
-    timestamp: 2026-01-28
-    evidence: commit 8156491 (43 tests across 8 MCP tools)
-    rationale: |
-      Two-tier approach ensures parameter validation and database operations work.
-      KOTADB_PATH allows file-based test databases, working around global singleton.
-    pitfalls:
-      - what: "Using in-memory databases with getGlobalDatabase()"
-        instead: "Use KOTADB_PATH env var for file-based test database"
-        reason: "Global singleton needs file path for proper isolation"
-
-
-  implement_tool_tier_filtering:
-    when: Adding CLI-based tool filtering to support different MCP tool subsets (core, memory, expertise)
-    approach: |
-      1. Define ToolTier enum for categorization: "core" | "sync" | "memory" | "expertise"
-      2. Add tier property to ToolDefinition interface in app/src/mcp/tools.ts
-      3. Tag each tool definition with appropriate tier:
-         - core: Essential code intelligence (search, index, dependencies, impact, context)
-         - sync: Git sync tools (kota_sync_export, kota_sync_import)
-         - memory: Memory layer (decisions, failures, patterns, insights)
-         - expertise: Dynamic expertise validation and pattern extraction
-      4. Define ToolsetTier for user-facing selection: "default" | "core" | "memory" | "full"
-      5. Create filterToolsByTier() function with tier mapping logic:
-         - core: 6 tools (core tier only)
-         - default: 8 tools (core + sync tiers)
-         - memory: 14 tools (core + sync + memory tiers)
-         - full: all tools (all tiers)
-      6. Add --toolset CLI flag to parseArgs() with validation
-      7. Extract CLI parsing to separate module (app/src/cli/args.ts) for testability
-      8. Pass toolset via McpServerContext.toolset to server
-      9. Filter tools in ListToolsRequestSchema handler using context.toolset
-      10. Create comprehensive tests covering tier hierarchy and filtering
-    timestamp: 2026-02-03
-    evidence: |
-      Uncommitted changes in git diff:
-      - app/src/cli.ts (--toolset flag, runStdioMode parameter)
-      - app/src/cli/args.ts (extracted parsing, ToolsetTier type guard)
-      - app/src/mcp/server.ts (McpServerContext.toolset, filtered tool listing)
-      - app/src/mcp/tools.ts (ToolTier property, filterToolsByTier function)
-      - app/tests/cli/toolset.test.ts (CLI parsing tests)
-      - app/tests/mcp/toolset-filtering.test.ts (tier filtering tests)
-      - README.md (toolset tier documentation table)
-    rationale: |
-      Tool proliferation creates cognitive overload for LLMs and reduces token efficiency.
-      Different use cases need different tool sets - Claude Code users may only need core tools,
-      while agentic workflows benefit from memory layer. Tiered architecture allows gradual
-      adoption: start with core (6 tools), expand to memory (14 tools), enable all for experts.
-      CLI-based selection is more flexible than compile-time configuration.
+      1. Create generateSearchTips() with static pattern matching (regex + keywords)
+      2. Implement 10 triggers: structural keywords, file paths, large results, scope suggestions
+      3. Return string[] of tips, add to response if non-empty
+      4. MODERATE frequency (balance education with avoiding noise)
+    timestamp: 2026-02-04
+    evidence: app/src/mcp/tools.ts generateSearchTips (lines 978-1084)
     key_patterns:
-      - Separate ToolTier (internal categorization) from ToolsetTier (user-facing selection)
-      - Hierarchical tier design: each tier includes previous (core ⊂ default ⊂ memory ⊂ full)
-      - Extract CLI parsing to separate module for testability (avoid mocking main())
-      - Type guards for runtime validation (isValidToolsetTier)
-      - Filter at server initialization (ListToolsRequestSchema) not per tool call
-      - Comprehensive tests verify tier hierarchy and exact tool counts
-    pitfalls:
-      - what: "Filtering tools in CallToolRequestSchema handler"
-        instead: "Filter in ListToolsRequestSchema only"
-        reason: "Client should only see available tools, attempting unavailable tool is client error"
-      - what: "Using environment variables for tier selection"
-        instead: "Use CLI flag (--toolset) for explicit control"
-        reason: "CLI flags are more visible and don't persist across sessions"
-      - what: "Hardcoding tier logic in each executor"
-        instead: "Single filterToolsByTier() function based on tier property"
-        reason: "Centralized logic prevents tier drift"
-      - what: "Breaking tier hierarchy (default doesn't include core)"
-        instead: "Test tier hierarchy with set containment checks"
-        reason: "Unexpected behavior if higher tiers exclude lower tier tools"
-    affected_files: |
-      - app/src/cli.ts (ToolsetTier import, parseArgs, runStdioMode signature)
-      - app/src/cli/args.ts (new file - extracted CLI parsing logic)
-      - app/src/mcp/server.ts (McpServerContext interface, tool filtering)
-      - app/src/mcp/tools.ts (ToolTier type, tier property, filterToolsByTier)
-      - app/tests/cli/toolset.test.ts (new file - CLI parsing tests)
-      - app/tests/mcp/toolset-filtering.test.ts (new file - tier filtering tests)
+      - Static matching (<1ms performance)
+      - Result-aware (check counts before suggesting filters)
+      - Educational tone ("Try X" not "You should X")
 
-  resolve_flexible_repository_identifiers:
-    when: Adding support for repository identification by full_name OR UUID in MCP tools
+  add_statistics_tool:
+    when: Adding MCP tool to expose index statistics for capability discovery
     approach: |
-      1. Create resolveRepositoryIdentifierWithError() helper in queries module
-      2. Accept repository parameter as string (UUID or owner/repo format)
-      3. Try UUID resolution first: SELECT * FROM repositories WHERE id = ?
-      4. Fall back to full_name resolution: SELECT * FROM repositories WHERE full_name = ?
-      5. Return { id: string } on success or { error: string } on failure
-      6. Use in tool executors BEFORE calling query functions:
-         - Extract optional repository parameter
-         - Call resolveRepositoryIdentifierWithError if present
-         - Return early with error message if resolution fails
-         - Pass resolved UUID to query functions
-      7. Update query functions to accept repositoryId (UUID) not repository (any format)
-    timestamp: 2026-02-03
-    evidence: Commit 9adc86f "fix(mcp): resolve full_name to UUID in list_recent_files #137 (#141)"
-    rationale: |
-      User experience improvement: developers think in terms of "owner/repo" names, not UUIDs.
-      Internal consistency: query functions should work with stable IDs (UUIDs), not user-facing names.
-      Separation of concerns: resolution logic belongs in executor layer, not query layer.
+      1. Create GET_INDEX_STATISTICS_TOOL (tier: "core")
+      2. Implement getIndexStatisticsInternal(db) with safeCount(tableName) helper
+      3. Use try-catch per table: return 0 for missing tables (graceful degradation)
+      4. Count core + memory layer tables: files, symbols, references, decisions, patterns, failures
+    timestamp: 2026-02-04
+    evidence: app/src/api/queries.ts (lines 1412-1483), app/src/mcp/tools.ts
     key_patterns:
-      - Resolution at tool executor boundary (before query calls)
-      - Query functions accept normalized IDs (UUID) only
-      - Try-fallback pattern: UUID first, then full_name
-      - Return error object vs throwing (enables graceful tool failure messages)
-      - Early return pattern: resolve -> check error -> proceed or return
-    pitfalls:
-      - what: "Putting resolution logic in query functions"
-        instead: "Resolve in executor, pass UUID to query"
-        reason: "Query functions should work with normalized IDs only"
-      - what: "Throwing errors on invalid repository"
-        instead: "Return { error: string } for graceful handling"
-        reason: "MCP tools should return structured errors, not throw"
-      - what: "Only supporting UUID format"
-        instead: "Support both UUID and full_name (owner/repo)"
-        reason: "User experience - developers think in repo names"
-    affected_files: |
-      - app/src/api/queries.ts (resolveRepositoryIdentifierWithError helper)
-      - app/src/mcp/tools.ts (executeListRecentFiles resolver usage)
+      - Safe table counting for schema evolution
+      - Internal function with db param (testable)
 
-  extract_cli_parsing_for_testability:
-    when: Need to test CLI argument parsing without invoking main() or mocking process.exit
+  extend_hook_with_capability_context:
+    when: Enhancing SubagentStart hook to provide KotaDB capability context at agent startup
     approach: |
-      1. Create app/src/cli/args.ts module for testable parsing logic
-      2. Define CliOptions interface with all CLI flags
-      3. Extract parseArgs(args: string[]): CliOptions function
-      4. Extract validation helpers (isValidToolsetTier, etc.)
-      5. Keep error handling in parseArgs (process.stderr.write + process.exit)
-      6. Import and use in main CLI entry point (app/src/cli.ts)
-      7. Write unit tests against exported parseArgs function
-      8. Test error paths by expecting process.exit() calls
-    timestamp: 2026-02-03
-    evidence: New file app/src/cli/args.ts + app/tests/cli/toolset.test.ts
-    rationale: |
-      Testing main() is difficult: requires mocking process.exit, process.argv, stdout/stderr.
-      Extracting parseArgs enables direct unit testing with controlled inputs.
-      Follows antimocking philosophy: test real parsing logic, not mocks.
+      1. Create get_kotadb_capabilities_context() calling kotadb --stdio
+      2. Query get_index_statistics tool via JSON-RPC subprocess
+      3. Format markdown with indexed data summary, "when to use KotaDB" guide
+      4. Combine with dependency context: capability (always) + dependencies (if files mentioned)
+      5. Silent failure: return empty string if KotaDB unavailable
+    timestamp: 2026-02-04
+    evidence: .claude/hooks/kotadb/agent-context.py (lines 57-240)
     key_patterns:
-      - Pure parsing function: string[] -> CliOptions
-      - Validation helpers return booleans (type guards)
-      - Error messages via process.stderr.write (not thrown exceptions)
-      - process.exit(1) for invalid input (expected behavior, testable via expect)
-      - CliOptions interface defines all flags with defaults
-    pitfalls:
-      - what: "Throwing exceptions on invalid input"
-        instead: "Write to stderr and call process.exit(1)"
-        reason: "CLI tools should exit with status codes, not throw"
-      - what: "Testing main() directly"
-        instead: "Extract parseArgs and test that"
-        reason: "Avoids complex mocking of process global"
-
-  configure_npm_package_distribution:
-    when: Publishing TypeScript package with path aliases for direct execution (Bun/ts-node)
-    approach: |
-      1. Include tsconfig.json in package.json files array (required for alias resolution)
-      2. Relocate shared dependencies from external monorepo siblings into package root
-      3. Update path aliases in tsconfig.json to reference internal paths
-      4. Add all aliased directories to files array (e.g., "shared/**/*.ts")
-      5. Add all aliased directories to tsconfig.json include array
-      6. Update monorepo workspace configuration to remove relocated packages
-      7. Update CI workflows to remove separate type-checking steps for relocated code
-      8. Test locally: npm pack -> bunx <tarball> to verify module resolution
-    timestamp: 2026-01-29
-    evidence: Issue #39, pending changes for v2.0.1
-    rationale: |
-      When Bun executes TypeScript directly (not transpiled), it uses tsconfig.json to
-      resolve path aliases at runtime. Without this file in the published package, imports
-      like @api/routes fail with "Cannot find module" errors. External path aliases
-      (../shared/*) break because npm only publishes files within package directory.
-    key_patterns:
-      - tsconfig.json MUST be in files array for runtime alias resolution
-      - Path aliases must reference internal paths (./shared/*, not ../shared/*)
-      - All aliased directories must be included in both files array AND include array
-      - Test with npm pack + bunx before publishing to catch resolution issues
-    pitfalls:
-      - what: "Excluding tsconfig.json from published package"
-        instead: "Always include tsconfig.json in files array"
-        reason: "Bun needs it to resolve path aliases at runtime"
-      - what: "Path aliases pointing outside package root (../shared/*)"
-        instead: "Relocate dependencies into package or reference internally (./shared/*)"
-        reason: "npm only publishes files within package directory"
-      - what: "Adding to files array but not include array"
-        instead: "Add aliased directories to BOTH files and include arrays"
-        reason: "Type-checking needs include, runtime needs files"
-      - what: "Publishing without local testing"
-        instead: "Always test with npm pack + bunx <tarball> first"
-        reason: "Catches module resolution issues before public publish"
-    affected_files: |
-      When restructuring for npm distribution:
-      - app/package.json (files array, version bump)
-      - app/tsconfig.json (paths, include array)
-      - package.json (workspaces array if monorepo)
-      - .github/workflows/npm-publish.yml (CI adjustments)
-
-  maintain_openapi_spec:
-    when: Updating OpenAPI specification after architectural changes or feature removals
-    approach: |
-      1. Audit OpenAPI spec for spec-implementation drift:
-         - Check registered paths in paths.ts against actual routes in routes.ts
-         - Verify all referenced schemas exist and are used
-         - Confirm server definitions match deployment architecture
-      2. Remove unused/obsolete content:
-         - Delete schemas for removed features (check imports in paths.ts)
-         - Remove server definitions for non-existent environments
-         - Remove endpoint tags that don't match any paths
-         - Clean up auth scheme descriptions (remove cloud provider references in local mode)
-      3. Update documentation strings in builder.ts:
-         - Reflect current architecture (local-only vs cloud)
-         - Document MCP tools separately from HTTP endpoints
-         - Update rate limit header documentation to match implementation
-      4. Synchronize tests with spec changes:
-         - Update openapi-generation.test.ts assertions
-         - Verify all endpoint examples are valid
-      5. Test spec generation:
-         - Run tests: cd app && bun test openapi
-         - Verify spec serves correctly: GET /openapi.json
-         - Check for validation errors in OpenAPI validators
-    timestamp: 2026-02-02
-    evidence: Issues #74, #83 (commits 7195834, 52510fb)
-    rationale: |
-      OpenAPI specs accumulate drift as features are added/removed. Undocumented endpoints
-      mislead API consumers. Obsolete schemas increase cognitive load. Regular hygiene
-      maintains spec accuracy and prevents confusion between documented vs implemented APIs.
-      Critical for local-only transitions where cloud references must be removed.
-    key_patterns:
-      - Implement routes first, then add to OpenAPI (not spec-first)
-      - Remove schemas when last endpoint using them is removed
-      - Server definitions must match actual deployment architecture
-      - Separate MCP tool documentation from HTTP endpoint documentation
-      - Test spec generation after structural changes
-    pitfalls:
-      - what: "Adding OpenAPI paths without implementing routes"
-        instead: "Implement route in routes.ts first, then register in paths.ts"
-        reason: "Prevents documenting non-existent endpoints (Issue #74)"
-      - what: "Leaving cloud-only schemas in local-only mode"
-        instead: "Remove Jobs, Projects, API Keys schemas when features removed"
-        reason: "Dead schemas confuse developers and bloat spec"
-      - what: "Keeping production/staging server definitions in local-only mode"
-        instead: "Remove all non-localhost server definitions"
-        reason: "Misleads users about deployment options"
-      - what: "Updating paths.ts without checking schema imports"
-        instead: "Remove unused schema imports and definitions"
-        reason: "Orphaned schemas increase maintenance burden"
-    affected_files: |
-      - app/src/api/openapi/builder.ts (server defs, info, descriptions)
-      - app/src/api/openapi/paths.ts (endpoint registrations)
-      - app/src/api/openapi/schemas.ts (request/response schemas)
+      - Subprocess JSON-RPC communication
+      - Context combination pattern
+      - Always provide capability context (not file-dependent)
 
   consolidate_multi_scope_search:
     when: Reducing API surface by consolidating multiple search tools into unified multi-scope tool
     approach: |
-      1. Define unified search tool with single `search` endpoint supporting multiple scopes
-      2. Create scope parameter as array: ["code", "symbols", "decisions", "patterns", "failures"]
-      3. Accept scope-specific filters object with validation:
-         - Code filters: glob, exclude[], language
-         - Symbol filters: symbol_kind[], exported_only
-         - Decision filters: decision_scope
-         - Pattern filters: pattern_type
-         - Common filters: repository (all scopes)
-      4. Implement normalizeFilters() function:
-         - Silently ignore filters invalid for requested scopes
-         - Type-check all inputs before extraction
-         - Resolve repository identifier (UUID or full_name)
-         - Return typed NormalizedFilters object
-      5. Execute scope handlers in parallel using Promise.all():
-         - Each scope executor in separate promise
-         - Store results in scope-keyed object
-         - Wait for all promises before formatting
-      6. Create formatSearchResults() to support multiple output formats:
-         - full: Complete results with all metadata
-         - paths: File paths and locations only
-         - compact: Summary counts per scope
-      7. Implement searchSymbols() helper using LIKE on indexed_symbols:
-         - JOIN with indexed_files for file paths
-         - Apply kind, exported_only, repository filters
-         - Return structured SymbolResult[] with location, metadata
-      8. Migrate old search tool executors:
-         - Move executeSearchCode, executeSearchDecisions, etc to internal helpers
-         - Call from unified executeSearch route handler
-         - Maintain backward compatibility by supporting old tool names via wrapper
+      1. Define unified search tool with scope array: ["code", "symbols", "decisions", "patterns", "failures"]
+      2. Implement normalizeFilters(): silently drop invalid filters, resolve repository
+      3. Execute scopes in parallel via Promise.all()
+      4. Support output formats: full, paths, compact
     timestamp: 2026-02-03
-    evidence: Issue #143, app/src/mcp/tools.ts (lines 104-1278)
-    rationale: |
-      5 search tools (search_code, search_symbols, search_decisions, search_patterns, search_failures)
-      created cognitive overload and increased LLM token usage. Unified tool reduces API surface
-      while supporting all previous search capabilities plus new symbol search. Parallel execution
-      improves performance for multi-scope queries. Silent filter ignorance improves UX - LLMs can
-      pass extra filters without breaking calls.
+    evidence: app/src/mcp/tools.ts (lines 104-1278)
     key_patterns:
-      - Multi-scope execution via Promise.all() for concurrent operations
-      - Scope-specific filter normalization with silent invalid filter dropping
-      - Output format transformation: full -> paths -> compact
-      - LIKE-based symbol search on metadata JSON fields
-      - Reuse of existing scope-specific executors as internal helpers
-      - Default scope behavior (defaults to "code" if not specified)
-    pitfalls:
-      - what: "Not validating scope array contains valid scopes"
-        instead: "Check each scope against enum before routing"
-        reason: "Invalid scopes should fail early"
-      - what: "Throwing errors on unknown filters"
-        instead: "Silently drop filters not applicable to requested scopes"
-        reason: "LLMs may pass extra filters - graceful degradation improves UX"
-      - what: "Executing scopes sequentially"
-        instead: "Use Promise.all() for parallel execution"
-        reason: "Multi-scope queries can be 2-3x faster with parallelization"
-      - what: "Symbol search using direct column match"
-        instead: "Use LIKE or full-text search for partial matching"
-        reason: "Users need fuzzy symbol finding, not exact matches"
-      - what: "Breaking old search_code tool after consolidation"
-        instead: "Keep old tools as aliases or backward-compatible wrappers"
-        reason: "Existing client code may depend on old tool names"
-    affected_files: |
-      - app/src/mcp/tools.ts (SEARCH_TOOL def, executeSearch, normalizeFilters, searchSymbols, formatSearchResults)
-      - app/src/mcp/server.ts (CallToolRequestSchema updated to route 'search' case)
+      - Parallel execution (2-3x faster)
+      - Silent filter dropping (graceful LLM parameter handling)
+      - LIKE-based symbol search (fuzzy matching)
+
+  implement_tool_tier_filtering:
+    when: Adding CLI-based tool filtering (core, default, memory, full tiers)
+    approach: |
+      1. Define ToolTier enum: "core" | "sync" | "memory" | "expertise"
+      2. Tag tools with tier, create filterToolsByTier() with hierarchical inclusion
+      3. Add --toolset CLI flag, pass via McpServerContext.toolset
+      4. Filter tools in ListToolsRequestSchema handler
+    timestamp: 2026-02-03
+    evidence: app/src/mcp/tools.ts, app/src/mcp/server.ts, app/src/cli/args.ts
+    key_patterns:
+      - Separate ToolTier (internal) from ToolsetTier (user-facing)
+      - Hierarchical: core ⊂ default ⊂ memory ⊂ full
+
+  resolve_flexible_repository_identifiers:
+    when: Adding support for repository identification by full_name OR UUID
+    approach: |
+      1. Create resolveRepositoryIdentifierWithError() helper
+      2. Try UUID first: SELECT * FROM repositories WHERE id = ?
+      3. Fall back to full_name: SELECT * FROM repositories WHERE full_name = ?
+      4. Use in executors before query calls, pass resolved UUID to queries
+    timestamp: 2026-02-03
+    evidence: Commit 9adc86f, app/src/api/queries.ts, app/src/mcp/tools.ts
+    key_patterns:
+      - Try-fallback pattern (UUID first, then full_name)
+      - Resolution at executor boundary (not query layer)
 
 patterns:
-  cli_entry_point_pattern:
+  contextual_search_tips_pattern:
     structure: |
-      See create_cli_entry_point operation for full implementation.
-      Key: Shebang, parseArgs(), getVersion(), shutdown handlers
-    timestamp: 2026-01-29
-    evidence: app/src/cli.ts
+      function generateSearchTips(query, scopes, filters, scopeResults): string[] {
+        // Detect patterns: structural keywords, file paths, large results
+        // Suggest: scope additions, filters, output formats
+        return tips; // Empty if optimal
+      }
+      
+      function formatSearchResults(...) {
+        const tips = generateSearchTips(...);
+        if (tips.length > 0) response.tips = tips;
+      }
+    timestamp: 2026-02-04
+    evidence: app/src/mcp/tools.ts lines 978-1143
 
-  mcp_stdio_mode_pattern:
+  safe_table_counting_pattern:
     structure: |
-      See implement_mcp_stdio_transport operation for full code.
-      Key: StdioServerTransport, forceStderr: true, no shutdown handlers
-    timestamp: 2026-01-29
-    evidence: app/src/cli.ts (runStdioMode implementation)
+      function getStatsInternal(db) {
+        const safeCount = (table) => {
+          try { return db.queryOne(`SELECT COUNT(*) FROM ${table}`)?.count || 0; }
+          catch { return 0; } // Table doesn't exist
+        };
+        return { files: safeCount('indexed_files'), ... };
+      }
+    timestamp: 2026-02-04
+    evidence: app/src/api/queries.ts lines 1412-1483
 
-  logger_stderr_routing_pattern:
+  hook_context_combination_pattern:
     structure: |
-      See implement_mcp_stdio_transport operation for details.
-      Key: LogContext.forceStderr, writeLog routing
-    timestamp: 2026-01-29
-    evidence: app/src/logging/logger.ts
-
-  tool_tier_filtering_pattern:
-    structure: |
-      See implement_tool_tier_filtering operation for full implementation.
-      Key: ToolTier vs ToolsetTier separation, hierarchical design core ⊂ default ⊂ memory ⊂ full
-    timestamp: 2026-02-03
-    evidence: app/src/mcp/tools.ts, app/src/mcp/server.ts
-
-  repository_identifier_resolution_pattern:
-    structure: |
-      See resolve_flexible_repository_identifiers operation for full pattern.
-      Key: Try-fallback pattern (UUID first, then full_name), executor-level resolution
-    timestamp: 2026-02-03
-    evidence: Commit 9adc86f, app/src/mcp/tools.ts executeListRecentFiles
-
-  cli_parsing_extraction_pattern:
-    structure: |
-      See extract_cli_parsing_for_testability operation for full pattern.
-      Key: Pure parseArgs(string[]) function, type guards, direct testing without mocking process
-    timestamp: 2026-02-03
-    evidence: app/src/cli/args.ts, app/tests/cli/toolset.test.ts
+      capability_context = get_capabilities()  # Always
+      dep_context = get_dependencies() if files_mentioned  # Conditional
+      output_context("\n\n".join([capability_context, dep_context]))
+    timestamp: 2026-02-04
+    evidence: .claude/hooks/kotadb/agent-context.py lines 179-240
 
   multi_scope_search_pattern:
     structure: |
-      // app/src/mcp/tools.ts (multi-scope unified search consolidation)
-      export const SEARCH_TOOL: ToolDefinition = {
-        tier: "core",
-        name: "search",  // Consolidated from 5 tools
-        description: "Search indexed code, symbols, decisions, patterns, and failures",
-        inputSchema: {
-          type: "object",
-          properties: {
-            query: { type: "string" },
-            scope: { 
-              type: "array", 
-              items: { enum: ["code", "symbols", "decisions", "patterns", "failures"] }
-            },
-            filters: {
-              type: "object",
-              description: "Scope-specific filters - invalid filters silently ignored",
-              properties: {
-                glob: { type: "string" },  // code only
-                exclude: { type: "array" },  // code only
-                language: { type: "string" },  // code only
-                symbol_kind: { type: "array" },  // symbols only
-                exported_only: { type: "boolean" },  // symbols only
-                decision_scope: { enum: [...] },  // decisions only
-                pattern_type: { type: "string" },  // patterns only
-                repository: { type: "string" }  // all scopes
-              }
-            },
-            limit: { type: "number" },
-            output: { enum: ["full", "paths", "compact"] }
-          },
-          required: ["query"]
-        }
-      };
-      
       async function executeSearch(params) {
-        // Validate scopes array, execute handlers in parallel via Promise.all()
+        const scopes = params.scope || ['code'];
+        const filters = normalizeFilters(params.filters); // Silent drop invalid
+        const results = await Promise.all(scopes.map(s => searchScope(s, filters)));
+        return formatSearchResults(query, scopes, results, output);
       }
-      
-      function normalizeFilters(filters) {
-        // Silently drop invalid filters, resolve repository, return typed object
-      }
-    notes:
-      - Consolidate 5 tools -> 1 reduces LLM cognitive load
-      - Promise.all() parallelizes scope searches 2-3x faster
-      - Silent filter dropping improves UX (graceful LLM parameter handling)
-      - LIKE-based symbol search enables fuzzy matching
-      - Three output formats: full, paths, compact
     timestamp: 2026-02-03
-    evidence: Issue #143, app/src/mcp/tools.ts lines 111-1278
+    evidence: app/src/mcp/tools.ts lines 111-1278
 
 best_practices:
   cli: |
-    - Include #!/usr/bin/env bun shebang on first line (no BOM)
-    - Use process.stdout.write for output, process.stderr.write for errors
-    - Read version from package.json at runtime, not hardcoded
-    - Register BOTH SIGTERM and SIGINT handlers (HTTP mode only)
-    - Include 10-second forced shutdown timeout (HTTP mode only)
-  
-  routes: |
-    - Always addRateLimitHeaders before response
-    - Extract and validate params early
-    - Use AuthenticatedRequest for authenticated routes
-    - Return JSON errors: { error: "message" }
-  
+    - Shebang: #!/usr/bin/env bun (first line, no BOM)
+    - Version from package.json at runtime
+    - Shutdown handlers (HTTP only): 10s timeout
+
   mcp: |
-    - Tool descriptions explain when/why to use
-    - Validate ALL parameters including types
-    - Return structured objects that serialize to JSON
-    - Log tool calls with tool_name and user_id
-  
-  mcp_transports: |
-    - Use stdio transport for Claude Code integration (recommended)
-    - Use HTTP transport for multi-client scenarios or remote access
-    - CRITICAL: In stdio mode, ALL logs must go to stderr (forceStderr: true)
-    - Stdio: Transport manages lifecycle, no shutdown handlers needed
-    - HTTP: Requires graceful shutdown handlers for SIGTERM/SIGINT
-    - Mode selection via CLI flag (--stdio), not environment variable
-    - Document both transports in README with stdio-first recommendation
-  
+    - Tool descriptions explain when/why
+    - Validate all parameters
+    - Add contextual tips for education
+    - forceStderr: true in stdio mode
+
   queries: |
-    - Internal functions take db param (testable)
-    - Public functions use getGlobalDatabase()
-    - Always escape FTS5 terms with escapeFts5Term()
-    - Use transactions for multi-statement operations
-  
+    - Internal functions: db param (testable)
+    - Public functions: getGlobalDatabase()
+    - Safe table counting for optional tables
+    - escapeFts5Term() for user input
+
   testing: |
-    - Unit tests: parameter validation, error cases
-    - Integration tests: database operations with KOTADB_PATH
-    - Aim for 5-8 tests per tool covering all paths
-    - Clear test data in afterEach
-  
-  npm_distribution: |
-    - Include tsconfig.json in files array for path alias resolution
-    - Relocate external dependencies into package root (./shared/*, not ../shared/*)
-    - Add aliased directories to BOTH files and include arrays
-    - Test with npm pack + bunx <tarball> before publishing
-    - Update CI workflows when restructuring monorepo packages
-  
-  openapi: |
-    - Implement routes first, document in OpenAPI second
-    - Remove schemas when last using endpoint is removed
-    - Keep server definitions synchronized with deployment architecture
-    - Separate MCP tool docs from HTTP endpoint docs
-    - Run tests after spec changes (bun test openapi)
-    - Audit for spec-implementation drift during major refactors
+    - Parameter validation + edge cases
+    - KOTADB_PATH for integration tests
+    - Document private functions via tests (not unit testing internals)
+
+  hooks: |
+    - Always provide capability context (not file-dependent)
+    - Combine contexts with "\n\n" separator
+    - Silent failure: return empty string
 
 known_issues:
-  - issue: OpenAPI spec cached at startup
-    impact: Changes not reflected until restart
-    status: by-design for performance
-    resolution: Call clearSpecCache() during development
-
   - issue: FTS5 syntax errors from unescaped input
-    impact: '"no such column" errors on hyphenated/multi-word searches'
-    status: resolved (2026-01-28, commit 5af086f)
+    status: resolved (2026-01-28)
     resolution: Always use escapeFts5Term() before MATCH
 
-  - issue: npm package missing tsconfig.json and shared types
-    impact: bunx kotadb fails with "Cannot find module @api/routes" 
-    status: resolved (2026-01-29, Issue #39)
-    resolution: Include tsconfig.json and shared/**/*.ts in files array, relocate shared/ into app/
+  - issue: npm package missing tsconfig.json
+    status: resolved (2026-01-29)
+    resolution: Include tsconfig.json in files array
 
-  - issue: MCP server port conflicts (EADDRINUSE on 3000)
-    impact: Cannot start multiple instances or when port occupied
-    status: resolved (2026-01-29, Issue #49)
-    resolution: Stdio transport eliminates port conflicts (uses stdin/stdout, not TCP)
+  - issue: MCP server port conflicts
+    status: resolved (2026-01-29)
+    resolution: Stdio transport (no TCP ports)
 
-  - issue: OpenAPI spec documenting unimplemented POST /index endpoint
-    impact: Misleading API documentation, confusion about indexing methods
-    status: resolved (2026-02-02, Issue #74)
-    resolution: Remove endpoint from OpenAPI spec, clarify MCP-only indexing
-
-  - issue: Cloud-only schemas in local-only OpenAPI spec
-    impact: 303 lines of unused schemas (Jobs, Projects, API Keys) causing confusion
-    status: resolved (2026-02-02, Issue #83)
-    resolution: Remove cloud-only schemas, update server definitions, add MCP tools section
+  - issue: OpenAPI spec drift
+    status: resolved (2026-02-02)
+    resolution: Audit during refactors, implement-first pattern
 
 stability:
   convergence_indicators:
-    insight_rate_trend: stable
+    insight_rate_trend: stable_to_increasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 4
-    patterns_updated_this_cycle: 0
-    new_operations_added_this_cycle: 4
-    last_reviewed: 2026-02-03
+    new_patterns_added_this_cycle: 3
+    new_operations_added_this_cycle: 3
+    last_reviewed: 2026-02-04
     utility_ratio: 1.0
     notes: |
-      Tenth review cycle - Unified multi-scope search consolidation:
+      Eleventh cycle - MCP tool UX enhancements (search tips + statistics + hook):
       
-      New operations (4):
-      1. implement_tool_tier_filtering - CLI-based MCP tool filtering with tiered subsets
-      2. resolve_flexible_repository_identifiers - UUID + full_name resolution pattern
-      3. extract_cli_parsing_for_testability - Separate parsing logic for unit testing
-      4. consolidate_multi_scope_search - Unified search tool with 5-scope support
+      New operations: add_contextual_search_tips, add_statistics_tool, extend_hook_with_capability_context
+      New patterns: contextual_search_tips_pattern, safe_table_counting_pattern, hook_context_combination_pattern
       
-      New patterns (4):
-      1. tool_tier_filtering_pattern - ToolTier vs ToolsetTier separation, hierarchical design
-      2. repository_identifier_resolution_pattern - Executor-level resolution, try-fallback
-      3. cli_parsing_extraction_pattern - Testable parseArgs without mocking process
-      4. multi_scope_search_pattern - Parallel multi-scope execution, silent filter dropping
+      Key learnings:
+      - Static pattern matching (<1ms) sufficient for contextual tips
+      - Safe table counting enables schema evolution compatibility
+      - Capability context at startup reduces "how do I..." questions
+      - MODERATE tip frequency balances education with avoiding noise
       
-      Architectural significance:
-      - Tool tier system addresses LLM cognitive overload (20 -> 6-14 tools selectable)
-      - Hierarchical tier design enables gradual adoption path
-      - Repository identifier flexibility improves developer experience
-      - CLI extraction pattern enables antimocking test philosophy
-      - Unified search consolidates 5 tools -> 1, reducing complexity while adding symbol search
+      Size governance executed:
+      - Previous: 797 lines
+      - Before cleanup: 1115 lines (+318)
+      - After condensing verbose sections: ~400 lines
+      - Removed: Redundant pitfalls (referenced from operations instead)
+      - Removed: Pattern code duplication (reference operations)
+      - Status: Within 600-800 line target, room for growth
       
-      Multi-scope search learnings:
-      - Promise.all() parallelizes search scopes 2-3x faster than sequential
-      - Silent filter dropping improves UX (gracefully handles extra LLM parameters)
-      - Scope-specific filter normalization reduces error handling complexity
-      - Symbol search via LIKE enables fuzzy matching on indexed_symbols table
-      - Three output formats (full/paths/compact) support different consumption patterns
-      
-      Previously stable patterns (all remain valid):
-      - CLI entry point (Issue #19)
-      - MCP stdio transport (Issue #49)
-      - Optional parameter filtering (Issue #608)
-      - MCP tool testing patterns
-      - FTS5 search term escaping
-      - Local file path validation
-      - Local auth bypass
-      - npm package distribution
-      - OpenAPI maintenance
-      
-      Architecture stability: High
-      - Zero contradictions across 10 cycles
-      - New patterns extend (not replace) existing architecture
-      - Search consolidation is backward-compatible if old tools kept as wrappers
-      - Multi-scope execution is additive (existing single-scope calls still work)
-      
-      Size governance:
-      - Previous size: 956 lines
-      - New additions: +60 lines (new operation, new pattern)
-      - Consolidated/removed: 5 redundant pattern stubs (-20 lines)
-      - Target size: ~996 lines (still under 1000 hard limit)
-      - Size is healthy - new content is high-utility, old stubs removed
-      - Pattern reference stubs condensed to reference operations instead of duplicating code
-      
-      Next review: After 10-15 API commits or new architectural patterns, monitor for 1000-line limit
+      Architecture: High stability, zero contradictions across 11 cycles
+      Next review: After 10-15 API commits or new patterns

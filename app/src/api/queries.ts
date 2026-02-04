@@ -1409,3 +1409,75 @@ export async function createDefaultOrganization(
 ): Promise<string> {
 	throw new Error('createDefaultOrganization() is not available in local-only mode - organizations are a cloud-only feature');
 }
+
+/**
+ * Get index statistics for startup context display.
+ * Queries counts of indexed files, symbols, references, and memory entries.
+ * 
+ * @param db - Database instance (for testability)
+ * @returns Statistics object with counts by type
+ */
+function getIndexStatisticsInternal(db: KotaDatabase): {
+	files: number;
+	symbols: number;
+	references: number;
+	decisions: number;
+	patterns: number;
+	failures: number;
+	repositories: number;
+} {
+	const stats = {
+		files: 0,
+		symbols: 0,
+		references: 0,
+		decisions: 0,
+		patterns: 0,
+		failures: 0,
+		repositories: 0,
+	};
+	
+	// Helper function to safely query count with fallback for missing tables
+	const safeCount = (tableName: string): number => {
+		try {
+			const result = db.queryOne<{ count: number }>(
+				`SELECT COUNT(*) as count FROM ${tableName}`
+			);
+			return result?.count || 0;
+		} catch (error) {
+			// Table doesn't exist yet (e.g., memory layer tables)
+			return 0;
+		}
+	};
+	
+	// Count indexed files
+	stats.files = safeCount('indexed_files');
+	
+	// Count indexed symbols
+	stats.symbols = safeCount('indexed_symbols');
+	
+	// Count references
+	stats.references = safeCount('indexed_references');
+	
+	// Count decisions (may not exist in all installations)
+	stats.decisions = safeCount('kota_decisions');
+	
+	// Count patterns (may not exist in all installations)
+	stats.patterns = safeCount('kota_patterns');
+	
+	// Count failures (may not exist in all installations)
+	stats.failures = safeCount('kota_failures');
+	
+	// Count repositories
+	stats.repositories = safeCount('repositories');
+	
+	return stats;
+}
+
+/**
+ * Get index statistics for startup context display (public API).
+ * 
+ * @returns Statistics object with counts by type
+ */
+export function getIndexStatistics(): ReturnType<typeof getIndexStatisticsInternal> {
+	return getIndexStatisticsInternal(getGlobalDatabase());
+}

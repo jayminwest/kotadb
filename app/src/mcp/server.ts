@@ -16,6 +16,7 @@ import { Sentry } from "../instrument.js";
 import {
 	ANALYZE_CHANGE_IMPACT_TOOL,
 	GENERATE_TASK_CONTEXT_TOOL,
+	GET_INDEX_STATISTICS_TOOL,
 	INDEX_REPOSITORY_TOOL,
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_TOOL,
@@ -35,6 +36,7 @@ import {
 	// Execute functions
 	executeAnalyzeChangeImpact,
 	executeGenerateTaskContext,
+	executeGetIndexStatistics,
 	executeIndexRepository,
 	executeListRecentFiles,
 	executeSearch,
