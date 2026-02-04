@@ -2,8 +2,8 @@
 title: Installation
 description: Get KotaDB running locally
 order: 1
-last_updated: 2026-02-03
-version: 2.0.1
+last_updated: 2026-02-04
+version: 2.2.0
 reviewed_by: documentation-build-agent
 ---
 
