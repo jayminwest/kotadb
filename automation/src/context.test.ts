@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach, afterEach } from "bun:test";
-import { Database } from "bun:sqlite";
+import { Database, type SQLQueryBindings } from "bun:sqlite";
 import { 
   storeWorkflowContext, 
   getWorkflowContext, 
@@ -17,11 +17,11 @@ function createTestDatabase(rawDb: Database) {
     raw: rawDb,
     queryOne<T>(sql: string, params?: unknown[]): T | null {
       const stmt = rawDb.prepare(sql);
-      return (params ? stmt.get(...params) : stmt.get()) as T | null;
+      return (params ? stmt.get(...(params as SQLQueryBindings[])) : stmt.get()) as T | null;
     },
     query<T>(sql: string, params?: unknown[]): T[] {
       const stmt = rawDb.prepare(sql);
-      return (params ? stmt.all(...params) : stmt.all()) as T[];
+      return (params ? stmt.all(...(params as SQLQueryBindings[])) : stmt.all()) as T[];
     }
   };
 }
