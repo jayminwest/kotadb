@@ -6,7 +6,18 @@
  * 
  * Issue: #144 - ADW context accumulation
  */
-import { getGlobalDatabase } from "../../app/src/db/sqlite/sqlite-client.ts";
+import { getGlobalDatabase } from "@db/sqlite/sqlite-client.ts";
+import type { Database as BunDatabase } from "bun:sqlite";
+
+/**
+ * Database interface for dependency injection
+ * Supports both wrapped database client and raw Bun:SQLite for tests
+ */
+interface DatabaseLike {
+  raw: BunDatabase;
+  queryOne<T>(sql: string, params?: unknown[]): T | null;
+  query<T>(sql: string, params?: unknown[]): T[];
+}
 
 export interface WorkflowContextData {
   phase: 'analysis' | 'plan' | 'build' | 'improve';
@@ -24,6 +35,7 @@ interface StoredContext {
   phase: string;
   context_data: string;  // JSON
   created_at: string;
+  updated_at: string;
 }
 
 /**
@@ -32,14 +44,16 @@ interface StoredContext {
  * @param workflowId - Workflow identifier (e.g., 'adw-123-20260204T120000')
  * @param phase - Workflow phase
  * @param data - Context data to store
+ * @param db - Optional database instance for testing (defaults to global database)
  * @throws Error if database operation fails (caller should catch)
  */
 export function storeWorkflowContext(
   workflowId: string,
   phase: WorkflowContextData['phase'],
-  data: WorkflowContextData
+  data: WorkflowContextData,
+  db?: DatabaseLike
 ): void {
-  const db = getGlobalDatabase();
+  const database = db ?? getGlobalDatabase();
   
   // Validate phase matches data
   if (data.phase !== phase) {
@@ -49,48 +63,59 @@ export function storeWorkflowContext(
   const contextJson = JSON.stringify(data);
   
   // Use raw db.prepare for INSERT OR REPLACE with upsert semantics
-  const stmt = db.raw.prepare(`
+  const stmt = database.raw.prepare(`
     INSERT INTO workflow_contexts (workflow_id, phase, context_data)
     VALUES (?, ?, ?)
     ON CONFLICT(workflow_id, phase) 
-    DO UPDATE SET context_data = excluded.context_data, created_at = datetime('now')
+    DO UPDATE SET context_data = excluded.context_data, updated_at = datetime('now')
   `);
   
   stmt.run(workflowId, phase, contextJson);
 }
 
 /**
- * Retrieve workflow context
+ * Retrieve workflow context for a specific phase
  * 
  * @param workflowId - Workflow identifier
- * @param phase - Optional specific phase (if omitted, returns all phases)
+ * @param phase - Specific phase to retrieve
+ * @param db - Optional database instance for testing (defaults to global database)
  * @returns Context data or null if not found
  */
 export function getWorkflowContext(
   workflowId: string,
-  phase?: WorkflowContextData['phase']
-): WorkflowContextData | WorkflowContextData[] | null {
-  const db = getGlobalDatabase();
+  phase: WorkflowContextData['phase'],
+  db?: DatabaseLike
+): WorkflowContextData | null {
+  const database = db ?? getGlobalDatabase();
   
-  if (phase) {
-    // Get specific phase
-    const result = db.queryOne<StoredContext>(
-      `SELECT * FROM workflow_contexts WHERE workflow_id = ? AND phase = ?`,
-      [workflowId, phase]
-    );
-    
-    if (!result) return null;
-    return JSON.parse(result.context_data) as WorkflowContextData;
-  } else {
-    // Get all phases for workflow
-    const results = db.query<StoredContext>(
-      `SELECT * FROM workflow_contexts WHERE workflow_id = ? ORDER BY created_at ASC`,
-      [workflowId]
-    );
-    
-    if (results.length === 0) return null;
-    return results.map(r => JSON.parse(r.context_data) as WorkflowContextData);
-  }
+  const result = database.queryOne<StoredContext>(
+    `SELECT * FROM workflow_contexts WHERE workflow_id = ? AND phase = ?`,
+    [workflowId, phase]
+  );
+  
+  if (!result) return null;
+  return JSON.parse(result.context_data) as WorkflowContextData;
+}
+
+/**
+ * Retrieve all workflow contexts for a workflow
+ * 
+ * @param workflowId - Workflow identifier
+ * @param db - Optional database instance for testing (defaults to global database)
+ * @returns Array of context data (empty array if none found)
+ */
+export function getAllWorkflowContexts(
+  workflowId: string,
+  db?: DatabaseLike
+): WorkflowContextData[] {
+  const database = db ?? getGlobalDatabase();
+  
+  const results = database.query<StoredContext>(
+    `SELECT * FROM workflow_contexts WHERE workflow_id = ? ORDER BY created_at ASC`,
+    [workflowId]
+  );
+  
+  return results.map(r => JSON.parse(r.context_data) as WorkflowContextData);
 }
 
 /**
@@ -98,13 +123,17 @@ export function getWorkflowContext(
  * Used for cleanup after successful workflow completion
  * 
  * @param workflowId - Workflow identifier
+ * @param db - Optional database instance for testing (defaults to global database)
  * @returns Number of rows deleted
  */
-export function clearWorkflowContext(workflowId: string): number {
-  const db = getGlobalDatabase();
+export function clearWorkflowContext(
+  workflowId: string,
+  db?: DatabaseLike
+): number {
+  const database = db ?? getGlobalDatabase();
   
   // Use raw db.prepare to get changes count
-  const stmt = db.raw.prepare(`DELETE FROM workflow_contexts WHERE workflow_id = ?`);
+  const stmt = database.raw.prepare(`DELETE FROM workflow_contexts WHERE workflow_id = ?`);
   const result = stmt.run(workflowId);
   
   return result.changes;

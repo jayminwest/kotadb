@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS workflow_contexts (
     phase TEXT NOT NULL,                 -- 'analysis' | 'plan' | 'build' | 'improve'
     context_data TEXT NOT NULL,          -- JSON blob
     created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
     
     UNIQUE(workflow_id, phase),
     CHECK (phase IN ('analysis', 'plan', 'build', 'improve'))
