@@ -19,6 +19,7 @@ import { cpus } from "node:os";
 import { createLogger } from "@logging/logger.js";
 import { findProjectRoot } from "@config/project-root.js";
 import { ensureKotadbIgnored } from "@config/gitignore.js";
+import { runMigrations, updateExistingChecksums } from "./migration-runner.js";
 
 const logger = createLogger({ module: "sqlite-client" });
 
@@ -137,8 +138,11 @@ export class KotaDatabase {
 		this.configurePragmas();
 
 		// Auto-initialize schema if not already present (writer only)
+		// - New database: Apply full base schema
+		// - Existing database: Run pending migrations
 		if (!this.config.readonly && !this.config.skipSchemaInit) {
 			if (!this.tableExists("indexed_files")) {
+				// NEW DATABASE: Apply base schema
 				const schemaPath = join(__dirname, "../sqlite-schema.sql");
 				const schema = readFileSync(schemaPath, "utf-8");
 				this.exec(schema);
@@ -146,7 +150,28 @@ export class KotaDatabase {
 					path: this.config.path,
 				});
 			} else {
-				logger.debug("SQLite schema already initialized");
+				// EXISTING DATABASE: Run migrations
+				const migrationsDir = join(__dirname, "../migrations");
+				try {
+					const result = runMigrations(this, migrationsDir);
+					if (result.appliedCount > 0) {
+						logger.info("Applied pending migrations", {
+							count: result.appliedCount,
+							migrations: result.appliedMigrations,
+						});
+					}
+					// Update checksums for existing migrations (after checksum column added)
+					updateExistingChecksums(this, migrationsDir);
+					if (result.errors.length > 0) {
+						logger.error("Migration errors", { errors: result.errors });
+					}
+				} catch (error) {
+					logger.error("Migration runner failed", {
+						error: error instanceof Error ? error.message : String(error),
+					});
+					// Do not throw - allow database to continue operating with current schema
+					// This prevents startup failures due to migration issues
+				}
 			}
 		}
 
