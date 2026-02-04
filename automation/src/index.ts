@@ -63,16 +63,18 @@ Arguments:
   <issue>          GitHub issue number (#123 or 123)
 
 Options:
-  --dry-run        Preview workflow without executing changes
-  --metrics        Display recent workflow metrics
-  --no-comment     Skip posting GitHub comment
-  --verbose, -v    Enable detailed action-level logging
-  --help           Show this help message
+  --dry-run              Preview workflow without executing changes
+  --metrics              Display recent workflow metrics
+  --no-comment           Skip posting GitHub comment
+  --verbose, -v          Enable detailed action-level logging
+  --accumulate-context   Enable context accumulation for inter-phase handoffs
+  --help                 Show this help message
 
 Examples:
   bun run src/index.ts #123
   bun run src/index.ts 123 --dry-run
   bun run src/index.ts 123 --verbose
+  bun run src/index.ts 123 --accumulate-context
   bun run src/index.ts --metrics
 `);
 }
@@ -134,6 +136,7 @@ async function main(): Promise<number> {
   const dryRun = args.includes("--dry-run");
   const skipComment = args.includes("--no-comment");
   const verbose = args.includes("--verbose") || args.includes("-v");
+  const accumulateContext = args.includes("--accumulate-context");
 
   // Create worktree info (but don't create actual worktree in dry-run)
   const timestamp = formatWorktreeTimestamp(new Date());
@@ -156,7 +159,7 @@ async function main(): Promise<number> {
   }
 
   process.stdout.write(
-    `Starting workflow for issue #${issueNumber}${dryRun ? " (dry run)" : ""}${verbose ? " (verbose)" : ""}\n`
+    `Starting workflow for issue #${issueNumber}${dryRun ? " (dry run)" : ""}${verbose ? " (verbose)" : ""}${accumulateContext ? " (context accumulation)" : ""}\n`
   );
 
   if (worktreeInfo) {
@@ -173,6 +176,7 @@ async function main(): Promise<number> {
       issueNumber,
       dryRun,
       verbose,
+      accumulateContext,
       workingDirectory: worktreeInfo?.path ?? projectRoot,
       mainProjectRoot: projectRoot,  // Always use main repo for logs
       branchName: worktreeInfo?.branch
