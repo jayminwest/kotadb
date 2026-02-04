@@ -6,7 +6,7 @@
     },
     "kotadb-local-dev": {
       "command": "bun",
-      "args": ["run", "/path/to/kotadb/app/src/cli.ts", "--stdio"],
+      "args": ["run", "/path/to/kotadb/app/src/cli.ts", "--stdio", "--toolset", "full"],
       "env": {
         "LOG_LEVEL": "debug"
       }

@@ -18,17 +18,14 @@ import {
 	GENERATE_TASK_CONTEXT_TOOL,
 	INDEX_REPOSITORY_TOOL,
 	LIST_RECENT_FILES_TOOL,
-	SEARCH_CODE_TOOL,
+	SEARCH_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
 	SYNC_EXPORT_TOOL,
 	SYNC_IMPORT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 	// Memory Layer tools
-	SEARCH_DECISIONS_TOOL,
 	RECORD_DECISION_TOOL,
-	SEARCH_FAILURES_TOOL,
 	RECORD_FAILURE_TOOL,
-	SEARCH_PATTERNS_TOOL,
 	RECORD_INSIGHT_TOOL,
 	// Dynamic Expertise tools
 	GET_DOMAIN_KEY_FILES_TOOL,
@@ -40,26 +37,34 @@ import {
 	executeGenerateTaskContext,
 	executeIndexRepository,
 	executeListRecentFiles,
-	executeSearchCode,
+	executeSearch,
 	executeSearchDependencies,
 	executeSyncExport,
 	executeSyncImport,
 	executeValidateImplementationSpec,
 	// Memory Layer execute functions
-	executeSearchDecisions,
 	executeRecordDecision,
-	executeSearchFailures,
 	executeRecordFailure,
-	executeSearchPatterns,
 	executeRecordInsight,
 	// Dynamic Expertise execute functions
 	executeGetDomainKeyFiles,
 	executeValidateExpertise,
 	executeSyncExpertise,
 	executeGetRecentPatterns,
+	// Tool filtering
+	filterToolsByTier,
 } from "./tools";
 
 const logger = createLogger({ module: "mcp-server" });
+
+/**
+ * Valid toolset tiers for MCP tool selection
+ * - default: 8 tools (core + sync)
+ * - core: 6 tools
+ * - memory: 14 tools (core + sync + memory)
+ * - full: 20 tools (all)
+ */
+export type ToolsetTier = "default" | "core" | "memory" | "full";
 
 /**
  * MCP Server context passed to tool handlers via closure
@@ -68,6 +73,7 @@ const logger = createLogger({ module: "mcp-server" });
  */
 export interface McpServerContext {
 	userId: string;
+	toolset?: ToolsetTier;
 }
 
 /**
@@ -107,35 +113,20 @@ export function createMcpServer(context: McpServerContext): Server {
 		},
 	);
 
-	// Register tools/list handler - local-only tools
+	// Register tools/list handler - filter by toolset tier
 	server.setRequestHandler(ListToolsRequestSchema, async () => {
+		const tier = context.toolset || "default";
+		const filteredTools = filterToolsByTier(tier);
+		
+		logger.debug("Listing MCP tools", { 
+			tier, 
+			tool_count: filteredTools.length 
+		});
+		
 		return {
-			tools: [
-				SEARCH_CODE_TOOL,
-				INDEX_REPOSITORY_TOOL,
-				LIST_RECENT_FILES_TOOL,
-				SEARCH_DEPENDENCIES_TOOL,
-				ANALYZE_CHANGE_IMPACT_TOOL,
-				VALIDATE_IMPLEMENTATION_SPEC_TOOL,
-				SYNC_EXPORT_TOOL,
-				SYNC_IMPORT_TOOL,
-				GENERATE_TASK_CONTEXT_TOOL,
-				// Memory Layer tools
-				SEARCH_DECISIONS_TOOL,
-				RECORD_DECISION_TOOL,
-				SEARCH_FAILURES_TOOL,
-				RECORD_FAILURE_TOOL,
-				SEARCH_PATTERNS_TOOL,
-				RECORD_INSIGHT_TOOL,
-				// Dynamic Expertise tools
-				GET_DOMAIN_KEY_FILES_TOOL,
-				VALIDATE_EXPERTISE_TOOL,
-				SYNC_EXPERTISE_TOOL,
-				GET_RECENT_PATTERNS_TOOL,
-			],
+			tools: filteredTools,
 		};
 	});
-
 	// Register tools/call handler
 	server.setRequestHandler(CallToolRequestSchema, async (request) => {
 		const { name, arguments: toolArgs } = request.params;
@@ -146,8 +137,8 @@ export function createMcpServer(context: McpServerContext): Server {
 
 		try {
 			switch (name) {
-				case "search_code":
-					result = await executeSearchCode(
+				case "search":
+					result = await executeSearch(
 						toolArgs,
 						"", // requestId not used
 						context.userId,
@@ -202,13 +193,6 @@ export function createMcpServer(context: McpServerContext): Server {
 					);
 					break;
 				// Memory Layer tools
-				case "search_decisions":
-					result = await executeSearchDecisions(
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
 				case "record_decision":
 					result = await executeRecordDecision(
 						toolArgs,
@@ -216,22 +200,8 @@ export function createMcpServer(context: McpServerContext): Server {
 						context.userId,
 					);
 					break;
-				case "search_failures":
-					result = await executeSearchFailures(
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
 				case "record_failure":
 					result = await executeRecordFailure(
-						toolArgs,
-						"", // requestId not used
-						context.userId,
-					);
-					break;
-				case "search_patterns":
-					result = await executeSearchPatterns(
 						toolArgs,
 						"", // requestId not used
 						context.userId,

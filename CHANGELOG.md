@@ -5,6 +5,63 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.2.0] - 2026-02-04
+
+### Added
+
+- **Unified MCP search tool**: Consolidates all search operations into a single powerful tool (#143)
+- **CLI `--toolset` flag**: Filter MCP tools by category for focused workflows (#142)
+- **Web expert domain**: New expert domain for web/marketing site development
+- **Documentation expert domain**: Complete documentation domain with plan/build/improve/question agents (#150)
+- **Automatic indexing with file watching**: Repositories auto-update when files change (#35)
+- **Memory layer**: Persistent cross-session intelligence for improved agent context (#99)
+- **Context seeding via hooks**: Dynamic expertise injection at session start (#98)
+- **Dynamic expertise tools**: Runtime expertise validation and updates (#100)
+- **TypeScript path alias resolution**: Full support for `@alias/*` imports (#56)
+- **Re-export and dynamic import support**: Enhanced dependency tracking (#95)
+- **Repository full_name support**: Use `owner/repo` in addition to UUIDs (#96)
+- **Stdio MCP transport**: Reliable Claude Code integration
+- **Isolated worktrees**: Agent runs in isolated git worktrees for automation
+
+### Fixed
+
+- Resolve `full_name` to UUID in `list_recent_files` (#137)
+- Docs/blog rendering issues on website (#132)
+- Indexer error recovery for malformed AST (#76)
+- CLI logging redirected to stderr for clean JSON output (#118)
+- Dependency cycle detection in queries
+- SQL files included in npm package for bunx compatibility
+
+### Changed
+
+- Website redesigned with Liquid Glass design system
+- Homepage updated to showcase MCP configuration (#149)
+- QUICKSTART.md added for 5-minute onboarding (#123)
+- AI architecture diagrams added (Excalidraw + SVG)
+
+### Dependencies
+
+- Updated cors ^2.8.5 → ^2.8.6
+- Updated zod ^4.1.12 → ^4.3.6
+- Updated bun-types
+- Updated @types/node 22.19.7 → 25.2.0
+- CI: Node 24, setup-bun v2, OIDC publishing
+
+## [2.1.0] - 2026-01-30
+
+### Added
+
+- Initial expert domain agents (claude-config, agent-authoring, database, api, testing, indexer, github)
+- Plan-build-improve workflow pattern for all expert domains
+- `/do` universal entry point command
+- Automation layer with Claude Agent SDK (#60)
+- Comprehensive documentation updates
+
+### Fixed
+
+- Various indexer and automation fixes
+
+## [2.0.0] - 2025-01-28
 ## [2.0.0] - 2025-01-28
 
 ### Breaking Changes

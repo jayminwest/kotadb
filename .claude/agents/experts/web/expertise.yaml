@@ -1,0 +1,318 @@
+overview:
+  description: |
+    Web expert domain for kotadb's marketing site (kotadb.io) covering static HTML/CSS/JS,
+    Liquid Glass design system, client-side markdown rendering with marked.js, content management
+    for docs and blog, and Vercel deployment. This expertise enables correct content updates,
+    design system maintenance, and deployment configuration.
+  scope: |
+    Covers web/ directory structure, HTML template patterns, CSS custom properties (Liquid Glass),
+    JavaScript utilities (theme toggle, markdown rendering, terminal animation), content management patterns,
+    Vercel configuration, and SEO files (sitemap, robots.txt).
+    Does NOT cover app/ codebase or server-side logic.
+  rationale: |
+    Marketing site is critical for project adoption and user onboarding. Poor content management
+    leads to stale docs, broken links, and design inconsistencies. Specialized expertise ensures
+    quality and consistency.
+
+core_implementation:
+  database_location: null
+  key_files:
+    - path: web/index.html
+      purpose: Marketing homepage with hero terminal, features, Quick Start, stats
+    - path: web/css/main.css
+      purpose: Liquid Glass design system with CSS custom properties
+    - path: web/js/main.js
+      purpose: Theme toggle, copy-to-clipboard utility (CopyCode module)
+    - path: web/js/render.js
+      purpose: Markdown rendering utilities with frontmatter parsing
+    - path: web/docs/index.html
+      purpose: Documentation shell with hash-based routing
+    - path: web/docs/content/
+      purpose: Markdown documentation files (4 files)
+    - path: web/blog/index.html
+      purpose: Blog listing page
+    - path: web/blog/post.html
+      purpose: Individual blog post template
+    - path: web/blog/content/
+      purpose: Markdown blog posts (2 posts)
+    - path: web/README.md
+      purpose: Web directory documentation
+    - path: web/sitemap.xml
+      purpose: SEO sitemap
+    - path: web/robots.txt
+      purpose: Search engine directives
+
+key_operations:
+  add_documentation_page:
+    when: Creating new documentation page
+    approach: |
+      1. Create .md file in web/docs/content/ with YAML frontmatter
+      2. Add filename to DOCS_PAGES array in web/docs/index.html
+      3. Add navigation link to sidebar in web/docs/index.html
+      4. Test hash routing (e.g., /docs/#installation)
+      5. Update sitemap.xml if needed
+    pitfalls:
+      - Missing step 2 or 3 causes page to be inaccessible
+      - Frontmatter format must match marked.js expectations
+  
+  add_blog_post:
+    when: Creating new blog post
+    approach: |
+      1. Create .md file in web/blog/content/ with naming convention YYYY-MM-DD-slug.md
+      2. Add YAML frontmatter (title, description, date, slug)
+      3. Add file path to blogPosts array in web/blog/index.html
+      4. Add slug mapping to postMap object in web/blog/post.html
+      5. Test post listing and individual post rendering
+      6. Update sitemap.xml
+    pitfalls:
+      - Missing step 3 or 4 prevents post discovery/rendering
+      - Date format inconsistency breaks sorting
+  
+  update_design_system:
+    when: Modifying Liquid Glass design system
+    approach: |
+      1. Update CSS custom properties in :root selector (web/css/main.css)
+      2. Test in both light and dark themes
+      3. Verify responsive behavior across breakpoints
+      4. Check header/footer consistency across all pages
+      5. Test interactive elements (buttons, links, terminal demo)
+    patterns:
+      - CSS custom properties for theming (--color-primary, --color-bg, etc.)
+      - Dark theme via [data-theme="dark"] selector
+      - Responsive breakpoints at 768px, 1024px
+  
+  update_homepage_content:
+    when: Modifying marketing homepage
+    approach: |
+      1. Edit web/index.html sections (hero, features, stats, etc.)
+      2. Verify terminal demo animation timing (inline script in index.html)
+      3. Test GitHub stats fetching (rate limit aware)
+      4. Check responsive layout on mobile/tablet/desktop
+      5. Validate SEO meta tags in <head>
+    pitfalls:
+      - Breaking terminal animation with invalid command strings
+      - GitHub API rate limits for stats
+  
+  update_terminal_animation:
+    when: Modifying hero terminal demo content or timing
+    approach: |
+      1. Edit commands array in inline script at bottom of web/index.html
+      2. Structure: { type: 'command'|'output'|'success', text: 'content' }
+      3. Adjust timing delays: command typing (50ms/char), output instant (0ms), line delays (300-800ms)
+      4. For conversational UI: use instant outputs (delay: 0) to simulate AI responses
+      5. Test animation flow and readability
+    patterns:
+      - Conversational format: use '> Question' for user input, instant output for responses
+      - Remove terminal prompt ($) for conversational lines (set line.innerHTML to just command span)
+      - Typing effect only for user input, instant for AI responses
+    example: |
+      { type: 'command', text: '> Find all files that depend on auth/context.ts' },
+      { type: 'output', text: '' },  // Blank line for spacing
+      { type: 'output', text: '🔍 Searching dependencies...' },
+      { type: 'output', text: 'Found 8 files that import auth/context.ts:' }
+  
+  enable_copy_button:
+    when: Adding copy functionality to code blocks
+    approach: |
+      1. Add class="code-block" to <pre> element
+      2. CopyCode module in web/js/main.js auto-detects and adds button
+      3. No additional code needed - fully automatic
+    patterns:
+      - CopyCode.init() runs on DOMContentLoaded and markdown-loaded events
+      - Clipboard API with fallback for older browsers (execCommand)
+      - Visual feedback: clipboard emoji → checkmark (2s) → clipboard
+    example: |
+      <pre class="code-block"><code>{ "mcpServers": { ... } }</code></pre>
+  
+  test_local_deployment:
+    when: Testing web changes locally before deploy
+    approach: |
+      1. cd web && python3 -m http.server 8000
+      2. Open http://localhost:8000 in browser
+      3. Test all navigation links (docs, blog, GitHub)
+      4. Test hash-based routing for docs and blog
+      5. Test theme toggle functionality
+      6. Verify markdown rendering for docs and blog
+      7. Check terminal animation timing and content
+      8. Test copy buttons on code blocks
+      9. Check 404 page behavior
+    pitfalls:
+      - Forgetting to test hash routing (client-side only)
+      - Not testing in both light and dark themes
+      - Not verifying terminal animation timing on different devices
+  
+  verify_deployment_config:
+    when: Checking Vercel deployment settings
+    approach: |
+      1. Verify deployment configuration (Vercel dashboard or git settings)
+      2. Check for clean URLs configuration (if vercel.json exists)
+      3. Verify security headers settings (if configured)
+      4. Test asset caching rules (if configured)
+      5. Confirm auto-deploy from main branch is configured
+      6. Test actual deployment after push to main
+    patterns:
+      - Clean URLs remove .html extensions
+      - Long-term caching for /assets/
+      - Security headers (X-Content-Type-Options, X-Frame-Options)
+
+decision_trees:
+  content_type_selection:
+    entry_point: What type of content am I adding?
+    branches:
+      - condition: Technical documentation (API, installation, config)
+        action: Add to web/docs/content/ following add_documentation_page operation
+      - condition: Blog post (announcements, tutorials, philosophy)
+        action: Add to web/blog/content/ following add_blog_post operation
+      - condition: Homepage copy (hero, features, CTA)
+        action: Edit web/index.html directly
+      - condition: Design system change (colors, spacing, typography)
+        action: Update CSS custom properties in web/css/main.css
+      - condition: Terminal demo content
+        action: Edit commands array in inline script (web/index.html)
+  
+  design_change_scope:
+    entry_point: What design element am I changing?
+    branches:
+      - condition: Color scheme or theming
+        action: Update CSS custom properties in :root and [data-theme="dark"]
+      - condition: Layout or spacing
+        action: Update utility classes and component styles in main.css
+      - condition: Typography (fonts, sizes, weights)
+        action: Update font variables and heading styles in main.css
+      - condition: Interactive elements (buttons, links, forms)
+        action: Update component styles and test hover/focus states
+      - condition: Responsive breakpoints
+        action: Update media queries at 768px, 1024px
+      - condition: Terminal animation timing
+        action: Edit delay values in typeCharacter() function
+
+patterns:
+  no_build_process_pattern:
+    structure: Static HTML/CSS/JS with no bundler or build step
+    usage: Changes are immediately deployable
+    trade_offs: 
+      - advantage: Simple, fast iteration
+      - cost: No minification, tree-shaking, or module bundling
+  
+  client_side_markdown_pattern:
+    structure: marked.js renders markdown in browser
+    usage: Content in .md files with YAML frontmatter
+    trade_offs:
+      - advantage: Easy content updates without rebuilding
+      - cost: SEO challenges, slower initial render
+  
+  css_custom_properties_pattern:
+    structure: Design system via CSS variables in :root
+    usage: Theming, consistent spacing/colors
+    trade_offs:
+      - advantage: Easy theme switching, maintainable design system
+      - cost: Limited browser support (IE11)
+  
+  hash_routing_pattern:
+    structure: Client-side routing via URL hash (#page)
+    usage: Docs and blog post navigation
+    trade_offs:
+      - advantage: No server-side routing needed
+      - cost: SEO limitations, no browser back/forward without JS
+  
+  page_array_management_pattern:
+    structure: Content discovery via hardcoded arrays in HTML
+    usage: DOCS_PAGES in docs/index.html, blogPosts in blog/index.html
+    trade_offs:
+      - advantage: Simple, no build tooling required
+      - cost: Manual array updates when adding content (easy to forget)
+  
+  header_footer_duplication_pattern:
+    structure: Header/footer HTML duplicated across pages
+    usage: No templating system, copy-paste updates
+    trade_offs:
+      - advantage: No build tooling or SSG required
+      - cost: Manual updates across multiple files for nav changes
+  
+  inline_script_animation_pattern:
+    structure: Terminal animation via inline <script> in index.html
+    usage: Hero terminal typing effect with mixed timing
+    trade_offs:
+      - advantage: No external JS file, immediate execution, self-contained
+      - cost: Not reusable, harder to test, inline code increases HTML size
+    implementation: |
+      - Commands array with type (command/output/success) and text
+      - typeCharacter() recursion with setTimeout for animation
+      - Variable timing: typing (50ms), instant (0ms), line delays (300-800ms)
+      - Conversational UI: remove prompt for command lines, instant output
+  
+  copy_button_class_pattern:
+    structure: Add 'code-block' class to enable copy functionality
+    usage: Any <pre> element that should have copy-to-clipboard
+    trade_offs:
+      - advantage: Zero JavaScript needed, fully automatic via CopyCode module
+      - cost: Must remember to add class (easy to forget)
+    implementation: |
+      <pre class="code-block"><code>content</code></pre>
+      CopyCode.init() detects and adds button automatically
+
+best_practices:
+  content:
+    - Use YAML frontmatter for all markdown files (title, description, date, slug)
+    - Update both content file AND page arrays when adding content
+    - Test hash routing after adding new pages
+    - Maintain consistent date format (YYYY-MM-DD) in blog posts
+    - Add 'code-block' class to <pre> elements for copy buttons
+  
+  design_system:
+    - Update CSS custom properties, not hardcoded values
+    - Test all changes in both light and dark themes
+    - Verify responsive behavior at 768px and 1024px breakpoints
+    - Maintain header/footer consistency across all pages
+  
+  javascript:
+    - Keep JS minimal and vanilla (no framework dependencies)
+    - Gracefully handle GitHub API rate limits for stats
+    - Use inline scripts for page-specific animations (terminal demo)
+    - Ensure theme toggle persists to localStorage
+    - CopyCode module handles all copy-to-clipboard needs
+  
+  terminal_animation:
+    - Use instant outputs (delay: 0) for conversational/AI responses
+    - Keep typing effect for user input only (50ms per character)
+    - Add blank lines (empty text) for visual spacing
+    - Use emojis sparingly for visual interest (🔍, ✓, •)
+    - Test timing on slower devices (mobile)
+  
+  deployment:
+    - Test locally before pushing to main
+    - Update sitemap.xml when adding new pages
+    - Check 404 page behavior for broken links
+    - Verify auto-deploy triggers after push
+  
+  seo:
+    - Maintain accurate meta descriptions in <head>
+    - Update sitemap.xml when adding/removing pages
+    - Use semantic HTML (header, nav, main, section, article)
+    - Ensure proper heading hierarchy (h1 > h2 > h3)
+
+known_issues: []
+
+potential_enhancements:
+  - Automated sitemap generation from page arrays
+  - Build process for CSS/JS minification
+  - Server-side rendering for improved SEO
+  - Templating system for header/footer consistency
+  - Automated testing for hash routing and markdown rendering
+  - Extract terminal animation to reusable module
+
+stability:
+  convergence_indicators:
+    insight_rate_trend: stable
+    contradiction_count: 0
+    last_reviewed: 2026-02-03
+    notes: |
+      Issue #149 implementation learnings captured (2026-02-03):
+      - Terminal animation patterns: conversational UI with mixed timing
+      - Copy button enablement: simple class-based pattern
+      - MCP configuration display: JSON code blocks with copy functionality
+      - Animation timing adjustments: instant (0ms) for AI responses
+      
+      Static site architecture is stable. Content management patterns are proven.
+      Design system (Liquid Glass) is defined and consistent.
+      Terminal animation pattern now documented for future updates.

@@ -9,6 +9,7 @@
  *   kotadb              Start the MCP server (default port 3000)
  *   kotadb --stdio      Start in stdio mode (for Claude Code integration)
  *   kotadb --port 4000  Start on custom port
+ *   kotadb --toolset full  Select tool tier (default, core, memory, full)
  *   kotadb --version    Show version
  *   kotadb --help       Show help
  *   kotadb deps         Query dependency information for a file
@@ -25,11 +26,23 @@ import { fileURLToPath } from "node:url";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
+/**
+ * Valid toolset tiers for MCP tool selection
+ * - default: 8 tools (core + sync)
+ * - core: 6 tools
+ * - memory: 14 tools (core + sync + memory)
+ * - full: 20 tools (all)
+ */
+export type ToolsetTier = "default" | "core" | "memory" | "full";
+
+const VALID_TOOLSET_TIERS: ToolsetTier[] = ["default", "core", "memory", "full"];
+
 interface CliOptions {
   port: number;
   help: boolean;
   version: boolean;
   stdio: boolean;
+  toolset: ToolsetTier;
 }
 
 function getVersion(): string {
@@ -70,6 +83,12 @@ COMMANDS:
 OPTIONS:
   --stdio           Use stdio transport (for Claude Code integration)
   --port <number>   Port to listen on (default: 3000, env: PORT)
+  --toolset <tier>  Select tool tier (default: default)
+                    Tiers:
+                      default  8 tools (core + sync)
+                      core     6 tools (search, index, deps, impact)
+                      memory   14 tools (core + sync + memory layer)
+                      full     20 tools (all available tools)
   --version, -v     Show version number
   --help, -h        Show this help message
 
@@ -81,6 +100,8 @@ ENVIRONMENT VARIABLES:
 
 EXAMPLES:
   kotadb --stdio                              Start in stdio mode (for Claude Code)
+  kotadb --stdio --toolset full               Start with all tools enabled
+  kotadb --stdio --toolset core               Start with minimal core tools
   kotadb                                      Start HTTP server on port 3000
   kotadb --port 4000                          Start HTTP server on port 4000
   kotadb deps --file src/db/client.ts         Query deps for a file (text)
@@ -95,6 +116,17 @@ MCP CONFIGURATION (stdio mode - RECOMMENDED):
       "kotadb": {
         "command": "bunx",
         "args": ["kotadb@next", "--stdio"]
+      }
+    }
+  }
+
+  With toolset selection:
+
+  {
+    "mcpServers": {
+      "kotadb": {
+        "command": "bunx",
+        "args": ["kotadb@next", "--stdio", "--toolset", "full"]
       }
     }
   }
@@ -126,12 +158,17 @@ function printVersion(): void {
   process.stdout.write(`kotadb v${version}\n`);
 }
 
+function isValidToolsetTier(value: string): value is ToolsetTier {
+  return VALID_TOOLSET_TIERS.includes(value as ToolsetTier);
+}
+
 function parseArgs(args: string[]): CliOptions {
   const options: CliOptions = {
     port: Number(process.env.PORT ?? 3000),
     help: false,
     version: false,
     stdio: false,
+    toolset: "default",
   };
 
   for (let i = 0; i < args.length; i++) {
@@ -158,6 +195,32 @@ function parseArgs(args: string[]): CliOptions {
         process.exit(1);
       }
       options.port = Number(portStr);
+    } else if (arg === "--toolset") {
+      const tierStr = args[++i];
+      if (!tierStr) {
+        process.stderr.write("Error: --toolset requires a tier value\n");
+        process.stderr.write("Valid tiers: default, core, memory, full\n");
+        process.exit(1);
+      }
+      if (!isValidToolsetTier(tierStr)) {
+        process.stderr.write(`Error: Invalid toolset tier '${tierStr}'\n`);
+        process.stderr.write("Valid tiers: default, core, memory, full\n");
+        process.exit(1);
+      }
+      options.toolset = tierStr;
+    } else if (arg.startsWith("--toolset=")) {
+      const tierStr = arg.split("=")[1];
+      if (tierStr === undefined || tierStr === "") {
+        process.stderr.write("Error: --toolset requires a tier value\n");
+        process.stderr.write("Valid tiers: default, core, memory, full\n");
+        process.exit(1);
+      }
+      if (!isValidToolsetTier(tierStr)) {
+        process.stderr.write(`Error: Invalid toolset tier '${tierStr}'\n`);
+        process.stderr.write("Valid tiers: default, core, memory, full\n");
+        process.exit(1);
+      }
+      options.toolset = tierStr;
     } else if (arg.startsWith("-") && arg !== "-") {
       process.stderr.write(`Unknown option: ${arg}\n`);
       process.stderr.write("Use --help for usage information\n");
@@ -168,7 +231,7 @@ function parseArgs(args: string[]): CliOptions {
   return options;
 }
 
-async function runStdioMode(): Promise<void> {
+async function runStdioMode(toolset: ToolsetTier): Promise<void> {
   // Redirect logger to stderr in stdio mode
   // This is CRITICAL - stdout is reserved for JSON-RPC protocol
   const logger = createLogger({
@@ -178,11 +241,13 @@ async function runStdioMode(): Promise<void> {
 
   logger.info("KotaDB MCP server starting in stdio mode", {
     version: getVersion(),
+    toolset,
   });
 
-  // Create MCP server with local-only context
+  // Create MCP server with local-only context and toolset
   const context: McpServerContext = {
     userId: "local", // Local-only mode uses fixed user ID
+    toolset,
   };
   const server = createMcpServer(context);
 
@@ -192,7 +257,7 @@ async function runStdioMode(): Promise<void> {
   // Connect server to transport
   await server.connect(transport);
 
-  logger.info("KotaDB MCP server connected via stdio");
+  logger.info("KotaDB MCP server connected via stdio", { toolset });
 
   // Server lifecycle is managed by the transport
   // Process will stay alive until stdin closes (when Claude Code terminates it)
@@ -234,7 +299,7 @@ async function main(): Promise<void> {
 
   // Handle stdio mode
   if (options.stdio) {
-    await runStdioMode();
+    await runStdioMode(options.toolset);
     return; // runStdioMode() keeps process alive
   }
 
@@ -247,6 +312,7 @@ async function main(): Promise<void> {
     mode: envConfig.mode,
     port: options.port,
     localDbPath: envConfig.localDbPath,
+    toolset: options.toolset,
   });
 
   const app = createExpressApp();
@@ -256,6 +322,7 @@ async function main(): Promise<void> {
       port: options.port,
       mcp_endpoint: `http://localhost:${options.port}/mcp`,
       health_endpoint: `http://localhost:${options.port}/health`,
+      toolset: options.toolset,
     });
 
     // Print user-friendly startup message
@@ -265,6 +332,7 @@ async function main(): Promise<void> {
     process.stdout.write(`  MCP Endpoint:    http://localhost:${options.port}/mcp\n`);
     process.stdout.write(`  Health Check:    http://localhost:${options.port}/health\n`);
     process.stdout.write(`  Database:        ${envConfig.localDbPath}\n`);
+    process.stdout.write(`  Toolset:         ${options.toolset}\n`);
     process.stdout.write(`\n`);
     process.stdout.write(`Press Ctrl+C to stop\n`);
     process.stdout.write(`\n`);

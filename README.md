@@ -64,6 +64,40 @@ KotaDB uses stdio (standard input/output) instead of HTTP ports:
 - **Better isolation**: Claude Code manages the process lifecycle
 - **Recommended by MCP**: Official pattern for local tools
 
+
+### Tool Tiers
+
+KotaDB supports different tool tiers via the `--toolset` flag:
+
+| Tier | Tools | Description |
+|------|-------|-----------|
+| `core` | 6 | Essential code intelligence (search, index, dependencies) |
+| `default` | 8 | Core + sync tools (kota_sync_export/import) |
+| `memory` | 14 | Default + memory layer (decisions, failures, patterns, insights) |
+| `full` | 20 | All tools including expertise validation |
+
+Example configurations:
+- `bunx kotadb@next --stdio` (default: 8 tools)
+- `bunx kotadb@next --stdio --toolset core` (minimal: 6 tools)
+- `bunx kotadb@next --stdio --toolset memory` (with memory: 14 tools)
+- `bunx kotadb@next --stdio --toolset full` (all: 20 tools)
+
+
+
+---
+
+## Learn to Build AI Dev Tools
+
+KotaDB is part of my journey building AI-powered developer tools. I share everything I learn:
+
+🎥 **YouTube** - Tutorials on Claude Code, MCP, and building tools like this  
+→ [youtube.com/@jaymin-west](https://youtube.com/@jaymin-west)
+
+👥 **Prompt to Prod Community** - Learn to ship AI apps, not just prompt  
+→ [skool.com/prompt-to-prod](https://skool.com/prompt-to-prod)
+
+Built by [Jaymin West](https://jayminwest.com)
+
 ---
 
 ## For Contributors

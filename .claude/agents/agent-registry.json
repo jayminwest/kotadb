@@ -731,6 +731,188 @@
         "mcp__kotadb-bunx__list_recent_files"
       ],
       "readOnly": true
+    },
+    "documentation-plan-agent": {
+      "name": "documentation-plan-agent",
+      "description": "Plans documentation improvements for kotadb. Expects USER_PROMPT (documentation requirement or issue)",
+      "file": "experts/documentation/documentation-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "documentation-planning",
+        "spec-generation"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": false
+    },
+    "documentation-build-agent": {
+      "name": "documentation-build-agent",
+      "description": "Implements documentation updates from specs. Expects SPEC_PATH (path to spec file)",
+      "file": "experts/documentation/documentation-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "documentation-implementation",
+        "documentation-validation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__analyze_change_impact",
+        "mcp__kotadb-bunx__search_decisions",
+        "mcp__kotadb-bunx__search_failures",
+        "mcp__kotadb-bunx__search_patterns",
+        "mcp__kotadb-bunx__record_decision",
+        "mcp__kotadb-bunx__record_failure",
+        "mcp__kotadb-bunx__record_insight"
+      ],
+      "readOnly": false
+    },
+    "documentation-question-agent": {
+      "name": "documentation-question-agent",
+      "description": "Answers questions about kotadb documentation patterns. Expects QUESTION (user query)",
+      "file": "experts/documentation/documentation-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "documentation-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": true
+    },
+    "web-plan-agent": {
+      "name": "web-plan-agent",
+      "description": "Plans web content and design system changes for kotadb",
+      "file": "experts/web/web-plan-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "web-planning",
+        "content-planning",
+        "design-planning"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "Write",
+        "Bash",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": false
+    },
+    "web-build-agent": {
+      "name": "web-build-agent",
+      "description": "Implements web content and design from specs",
+      "file": "experts/web/web-build-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "web-implementation",
+        "content-creation",
+        "design-implementation"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies"
+      ],
+      "readOnly": false
+    },
+    "web-improve-agent": {
+      "name": "web-improve-agent",
+      "description": "Web expertise evolution specialist",
+      "file": "experts/web/web-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "web-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Bash",
+        "Task",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__search_decisions",
+        "mcp__kotadb-bunx__search_failures",
+        "mcp__kotadb-bunx__search_patterns",
+        "mcp__kotadb-bunx__record_decision",
+        "mcp__kotadb-bunx__record_failure",
+        "mcp__kotadb-bunx__record_insight"
+      ],
+      "readOnly": false
+    },
+    "web-question-agent": {
+      "name": "web-question-agent",
+      "description": "Web Q&A specialist",
+      "file": "experts/web/web-question-agent.md",
+      "model": "haiku",
+      "capabilities": [
+        "web-qa"
+      ],
+      "tools": [
+        "Read",
+        "Glob",
+        "Grep",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__list_recent_files"
+      ],
+      "readOnly": true
+    },
+    "documentation-improve-agent": {
+      "name": "documentation-improve-agent",
+      "description": "Updates documentation expertise from recent changes. Expects CHANGE_DESCRIPTION (what changed)",
+      "file": "experts/documentation/documentation-improve-agent.md",
+      "model": "sonnet",
+      "capabilities": [
+        "documentation-expertise-evolution"
+      ],
+      "tools": [
+        "Read",
+        "Write",
+        "Edit",
+        "Glob",
+        "Grep",
+        "Bash",
+        "Task",
+        "mcp__kotadb-bunx__search_code",
+        "mcp__kotadb-bunx__search_dependencies",
+        "mcp__kotadb-bunx__search_decisions",
+        "mcp__kotadb-bunx__search_failures",
+        "mcp__kotadb-bunx__search_patterns",
+        "mcp__kotadb-bunx__record_decision",
+        "mcp__kotadb-bunx__record_failure",
+        "mcp__kotadb-bunx__record_insight"
+      ],
+      "readOnly": false
     }
   },
   "capabilityIndex": {
@@ -841,7 +1023,10 @@
       "indexer-plan-agent",
       "database-plan-agent",
       "testing-plan-agent",
-      "github-plan-agent"
+      "github-plan-agent",
+      "documentation-plan-agent",
+      "web-plan-agent",
+      "web-plan-agent"
     ],
     "database-planning": [
       "database-plan-agent"
@@ -911,6 +1096,45 @@
     ],
     "expertise-evolution": [
       "automation-improve-agent"
+    ],
+    "documentation-planning": [
+      "documentation-plan-agent"
+    ],
+    "documentation-implementation": [
+      "documentation-build-agent"
+    ],
+    "documentation-validation": [
+      "documentation-build-agent"
+    ],
+    "documentation-qa": [
+      "documentation-question-agent"
+    ],
+    "web-planning": [
+      "web-plan-agent"
+    ],
+    "content-planning": [
+      "web-plan-agent"
+    ],
+    "design-planning": [
+      "web-plan-agent"
+    ],
+    "web-implementation": [
+      "web-build-agent"
+    ],
+    "content-creation": [
+      "web-build-agent"
+    ],
+    "design-implementation": [
+      "web-build-agent"
+    ],
+    "web-expertise-evolution": [
+      "web-improve-agent"
+    ],
+    "web-qa": [
+      "web-question-agent"
+    ],
+    "documentation-expertise-evolution": [
+      "documentation-improve-agent"
     ]
   },
   "modelIndex": {
@@ -924,7 +1148,9 @@
       "database-question-agent",
       "testing-question-agent",
       "github-question-agent",
-      "automation-question-agent"
+      "automation-question-agent",
+      "documentation-question-agent",
+      "web-question-agent"
     ],
     "sonnet": [
       "build-agent",
@@ -952,7 +1178,13 @@
       "github-improve-agent",
       "automation-plan-agent",
       "automation-build-agent",
-      "automation-improve-agent"
+      "automation-improve-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent"
     ]
   },
   "toolMatrix": {
@@ -991,7 +1223,15 @@
       "automation-plan-agent",
       "automation-build-agent",
       "automation-improve-agent",
-      "automation-question-agent"
+      "automation-question-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "documentation-question-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "web-question-agent"
     ],
     "Grep": [
       "agent-authoring-build-agent",
@@ -1028,7 +1268,15 @@
       "automation-plan-agent",
       "automation-build-agent",
       "automation-improve-agent",
-      "automation-question-agent"
+      "automation-question-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "documentation-question-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "web-question-agent"
     ],
     "Read": [
       "agent-authoring-build-agent",
@@ -1065,7 +1313,15 @@
       "automation-plan-agent",
       "automation-build-agent",
       "automation-improve-agent",
-      "automation-question-agent"
+      "automation-question-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "documentation-question-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "web-question-agent"
     ],
     "Edit": [
       "agent-authoring-build-agent",
@@ -1085,7 +1341,11 @@
       "testing-build-agent",
       "testing-improve-agent",
       "automation-build-agent",
-      "automation-improve-agent"
+      "automation-improve-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "web-build-agent",
+      "web-improve-agent"
     ],
     "Write": [
       "agent-authoring-build-agent",
@@ -1113,7 +1373,13 @@
       "testing-plan-agent",
       "automation-plan-agent",
       "automation-build-agent",
-      "automation-improve-agent"
+      "automation-improve-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent"
     ],
     "Bash": [
       "agent-authoring-improve-agent",
@@ -1128,7 +1394,13 @@
       "testing-improve-agent",
       "automation-plan-agent",
       "automation-build-agent",
-      "automation-improve-agent"
+      "automation-improve-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent"
     ],
     "NotebookEdit": [
       "build-agent"
@@ -1138,7 +1410,9 @@
       "github-improve-agent",
       "review-agent",
       "scout-agent",
-      "automation-improve-agent"
+      "automation-improve-agent",
+      "web-improve-agent",
+      "documentation-improve-agent"
     ],
     "TodoWrite": [
       "build-agent"
@@ -1185,7 +1459,15 @@
       "automation-plan-agent",
       "automation-build-agent",
       "automation-improve-agent",
-      "automation-question-agent"
+      "automation-question-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "documentation-question-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "web-question-agent"
     ],
     "mcp__kotadb-bunx__search_dependencies": [
       "agent-authoring-build-agent",
@@ -1222,7 +1504,14 @@
       "automation-plan-agent",
       "automation-build-agent",
       "automation-improve-agent",
-      "automation-question-agent"
+      "automation-question-agent",
+      "documentation-plan-agent",
+      "documentation-build-agent",
+      "documentation-improve-agent",
+      "documentation-question-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent"
     ],
     "mcp__kotadb-bunx__list_recent_files": [
       "agent-authoring-plan-agent",
@@ -1241,7 +1530,11 @@
       "testing-plan-agent",
       "testing-question-agent",
       "automation-plan-agent",
-      "automation-question-agent"
+      "automation-question-agent",
+      "documentation-plan-agent",
+      "documentation-question-agent",
+      "web-plan-agent",
+      "web-question-agent"
     ],
     "mcp__kotadb-bunx__analyze_change_impact": [
       "agent-authoring-build-agent",
@@ -1253,7 +1546,50 @@
       "indexer-build-agent",
       "review-agent",
       "testing-build-agent",
-      "automation-build-agent"
+      "automation-build-agent",
+      "documentation-build-agent"
+    ],
+    "mcp__kotadb-bunx__search_decisions": [
+      "documentation-build-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "documentation-improve-agent"
+    ],
+    "mcp__kotadb-bunx__search_failures": [
+      "documentation-build-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "documentation-improve-agent"
+    ],
+    "mcp__kotadb-bunx__search_patterns": [
+      "documentation-build-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "documentation-improve-agent"
+    ],
+    "mcp__kotadb-bunx__record_decision": [
+      "documentation-build-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "documentation-improve-agent"
+    ],
+    "mcp__kotadb-bunx__record_failure": [
+      "documentation-build-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "documentation-improve-agent"
+    ],
+    "mcp__kotadb-bunx__record_insight": [
+      "documentation-build-agent",
+      "web-plan-agent",
+      "web-build-agent",
+      "web-improve-agent",
+      "documentation-improve-agent"
     ]
   }
 }

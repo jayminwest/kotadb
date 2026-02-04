@@ -259,6 +259,18 @@ Analyze the requirement to determine type and pattern. **Expert domains take pri
 - Indicators: GitHub workflow operations, issue management, PR creation
 - Examples: "Classify issue", "Create PR for X", "Branch naming for Y"
 
+**Documentation Expert**
+- Keywords: "docs", "README", "documentation", "API reference", "architecture docs", "CLAUDE.md", "user guide", "installation docs"
+- Locations: References to web/docs/content/, .claude/agents/, CLAUDE.md
+- Indicators: Documentation updates, README changes, API docs, user guides
+- Examples: "Update README for X", "Add API documentation", "Fix installation docs"
+
+**Web Expert**
+- Keywords: "web", "homepage", "blog", "CSS", "design system", "Liquid Glass", "kotadb.io", "marketing site", "static site"
+- Locations: References to web/, web/docs/, web/blog/
+- Indicators: Homepage updates, blog posts, CSS changes, design system work
+- Examples: "Update homepage", "Add blog post", "Fix CSS styling", "Update design system"
+
 ### Pattern Classification (After Domain Identified)
 
 Once expert domain is identified, determine which pattern:
@@ -385,6 +397,8 @@ If improve-agent fails:
 - testing
 - indexer
 - github
+- documentation
+- web
 
 ---
 
@@ -412,6 +426,8 @@ Proceed to Report.
 - testing
 - indexer
 - github
+- documentation
+- web
 
 ---
 
@@ -673,6 +689,22 @@ Use these patterns to classify requirements:
 - Pattern: GitHub workflow operations, issue management, PR creation
 - Examples: "Classify issue", "Create PR for X", "Branch naming for Y"
 
+**Documentation Expert (High Confidence):**
+- Keywords: docs, README, documentation, API reference, architecture docs, CLAUDE.md, user guide, installation docs
+- Locations: web/docs/content/, .claude/agents/, CLAUDE.md
+- Verbs: update, add, fix, write, document, sync
+- Objects: README, docs, documentation, API reference, user guide, architecture docs
+- Pattern: Documentation updates, content synchronization
+- Examples: "Update README for X", "Add API documentation", "Fix installation docs"
+
+**Web Expert (High Confidence):**
+- Keywords: web, homepage, blog, CSS, design system, Liquid Glass, kotadb.io, marketing site, static site
+- Locations: web/, web/docs/, web/blog/
+- Verbs: update, add, create, fix, style
+- Objects: homepage, blog post, CSS, design system, styling, layout
+- Pattern: Marketing site changes, blog content, design updates
+- Examples: "Update homepage", "Add blog post", "Fix CSS styling", "Update design system"
+
 **Expert Question Detection:**
 - Phrasing: "How do I...", "What is the pattern for...", "Explain...", "Why..."
 - Action: Route to `<domain>-question-agent` instead of `<domain>-plan-agent`
@@ -718,6 +750,8 @@ Once expert domain is identified, determine which pattern:
   - "Testing (tests/test strategy)"
   - "Indexer (AST/symbols/parsing)"
   - "GitHub (issues/PRs/branches)"
+  - "Documentation (docs, README, API reference, user guides)"
+  - "Web (homepage, blog, CSS, design system)"
 - Never guess when multiple patterns could apply
 
 **Empty requirement:**
@@ -983,6 +1017,8 @@ Co-Authored-By: Claude <noreply@anthropic.com>
 #     - "Testing (tests, test strategy)"
 #     - "Indexer (AST, symbols, parsing)"
 #     - "GitHub (issues, PRs, branches)"
+#     - "Documentation (docs, README, API reference, user guides)"
+#     - "Web (homepage, blog, CSS, design system)"
 # Route based on response
 ```
 
@@ -1047,7 +1083,7 @@ cat .claude/.cache/specs/claude-config/code-review-command-spec.md
 ## Implementation Notes
 
 **Current State:**
-- 7 expert domains active: claude-config, agent-authoring, database, api, testing, indexer, github
+- 9 expert domains active: claude-config, agent-authoring, database, api, testing, indexer, github, documentation, web
 - 3 orchestration patterns: Expert Implementation (A), Expert Question (B), Simple Workflow (C)
 - Expert domains use plan-build-improve cycle with user approval gates
 - Classification uses keyword matching + pattern detection with fallback to user questions
