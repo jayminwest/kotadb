@@ -66,7 +66,7 @@
               <span class="terminal-dot"></span>
               <span class="terminal-dot"></span>
               <span class="terminal-dot"></span>
-              <span class="terminal-title">terminal</span>
+              <span class="terminal-title">Claude Code</span>
             </div>
             <div class="terminal-body" id="terminal-demo">
               <div class="terminal-line">
@@ -165,14 +165,17 @@
       <div class="container">
         <h2 class="fade-in">Quick Start</h2>
         <div class="quickstart-code fade-in">
-          <pre><code><span class="comment"># Install globally</span>
-bun add -g kotadb
-
-<span class="comment"># Index your repository</span>
-kotadb index /path/to/your/repo
-
-<span class="comment"># Start the server</span>
-kotadb serve</code></pre>
+          <pre class="code-block"><code>{
+  "mcpServers": {
+    "kotadb": {
+      "command": "bunx",
+      "args": ["kotadb@next", "--stdio"]
+    }
+  }
+}</code></pre>
+          <p style="text-align: center; margin-top: 1rem; color: var(--color-text-muted); font-size: 0.875rem;">
+            Add to <code>~/.config/claude-code/.mcp.json</code> (Unix) or <code>%APPDATA%\claude-code\.mcp.json</code> (Windows)
+          </p>
         </div>
       </div>
     </section>
@@ -195,11 +198,15 @@ kotadb serve</code></pre>
     // Terminal typing animation
     const terminalDemo = document.getElementById('terminal-demo');
     const commands = [
-      { type: 'command', text: 'bunx kotadb index ./my-project' },
-      { type: 'output', text: 'Indexing repository...' },
-      { type: 'success', text: 'Indexed 1,247 files in 2.3s' },
-      { type: 'command', text: 'bunx kotadb search "useAuth"' },
-      { type: 'output', text: 'Found 12 matches in 4 files' },
+      { type: 'command', text: '> Find all files that depend on auth/context.ts' },
+      { type: 'output', text: '' },
+      { type: 'output', text: '🔍 Searching dependencies...' },
+      { type: 'output', text: '' },
+      { type: 'output', text: 'Found 8 files that import auth/context.ts:' },
+      { type: 'output', text: '  • src/components/LoginForm.tsx' },
+      { type: 'output', text: '  • src/hooks/useSession.ts' },
+      { type: 'output', text: '  • src/pages/Dashboard.tsx' },
+      { type: 'output', text: '  • tests/auth/context.test.ts' },
     ];
     
     let lineIndex = 0;
@@ -224,7 +231,7 @@ kotadb serve</code></pre>
         line.className = 'terminal-line';
         
         if (cmd.type === 'command') {
-          line.innerHTML = '<span class="terminal-prompt">$</span><span class="terminal-command"></span>';
+          line.innerHTML = '<span class="terminal-command"></span>';
           currentElement = line.querySelector('.terminal-command');
         } else if (cmd.type === 'success') {
           line.innerHTML = '<span class="terminal-output terminal-success"></span>';
@@ -245,12 +252,12 @@ kotadb serve</code></pre>
       if (charIndex < cmd.text.length) {
         currentElement.textContent += cmd.text[charIndex];
         charIndex++;
-        const delay = cmd.type === 'command' ? 50 : 15;
+        const delay = cmd.type === 'command' ? 50 : 0;
         setTimeout(typeCharacter, delay);
       } else {
         charIndex = 0;
         lineIndex++;
-        const delay = cmd.type === 'command' ? 800 : 400;
+        const delay = cmd.type === 'command' ? 800 : 300;
         setTimeout(typeCharacter, delay);
       }
     }
