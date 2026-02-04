@@ -52,11 +52,11 @@ describe("parseArgs --toolset flag", () => {
 });
 
 describe("filterToolsByTier", () => {
-	test("filterToolsByTier('core') returns exactly 6 tools", async () => {
+	test("filterToolsByTier('core') returns exactly 7 tools", async () => {
 		const { filterToolsByTier } = await import("@mcp/tools.js");
 
 		const tools = filterToolsByTier("core");
-		expect(tools).toHaveLength(6);
+		expect(tools).toHaveLength(7);
 
 		// Verify core tools are present
 		const toolNames = tools.map((t: { name: string }) => t.name);
@@ -66,13 +66,14 @@ describe("filterToolsByTier", () => {
 		expect(toolNames).toContain("search_dependencies");
 		expect(toolNames).toContain("analyze_change_impact");
 		expect(toolNames).toContain("generate_task_context");
+		expect(toolNames).toContain("get_index_statistics");
 	});
 
-	test("filterToolsByTier('default') returns exactly 8 tools", async () => {
+	test("filterToolsByTier('default') returns exactly 9 tools", async () => {
 		const { filterToolsByTier } = await import("@mcp/tools.js");
 
 		const tools = filterToolsByTier("default");
-		expect(tools).toHaveLength(8);
+		expect(tools).toHaveLength(9);
 
 		// Verify default includes core + sync tools
 		const toolNames = tools.map((t: { name: string }) => t.name);
@@ -81,11 +82,11 @@ describe("filterToolsByTier", () => {
 		expect(toolNames).toContain("kota_sync_import");
 	});
 
-	test("filterToolsByTier('memory') returns exactly 11 tools", async () => {
+	test("filterToolsByTier('memory') returns exactly 12 tools", async () => {
 		const { filterToolsByTier } = await import("@mcp/tools.js");
 
 		const tools = filterToolsByTier("memory");
-		expect(tools).toHaveLength(11);
+		expect(tools).toHaveLength(12);
 
 		// Verify memory layer tools are present
 		const toolNames = tools.map((t: { name: string }) => t.name);
@@ -94,11 +95,11 @@ describe("filterToolsByTier", () => {
 		expect(toolNames).toContain("record_insight");
 	});
 
-	test("filterToolsByTier('full') returns exactly 16 tools", async () => {
+	test("filterToolsByTier('full') returns exactly 17 tools", async () => {
 		const { filterToolsByTier } = await import("@mcp/tools.js");
 
 		const tools = filterToolsByTier("full");
-		expect(tools).toHaveLength(16);
+		expect(tools).toHaveLength(17);
 
 		// Verify expertise tools are present
 		const toolNames = tools.map((t: { name: string }) => t.name);
