@@ -15,6 +15,7 @@ const SUPPORTED_EXTENSIONS = new Set<string>([
 	".cjs",
 	".mjs",
 	".json",
+	".sql",
 ]);
 
 const IGNORED_DIRECTORIES = new Set<string>([
@@ -161,7 +162,8 @@ export async function parseSourceFile(
 		return null;
 	}
 
-	const dependencies = extractDependencies(content);
+	// Skip dependency extraction for SQL files
+	const dependencies = extname(path) === ".sql" ? [] : extractDependencies(content);
 
 	return {
 		projectRoot: resolve(projectRoot),

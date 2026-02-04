@@ -25,6 +25,7 @@ export const SUPPORTED_EXTENSIONS = [
 	".jsx",
 	".mjs",
 	".cjs",
+	".sql",
 ] as const;
 
 /**
