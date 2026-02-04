@@ -60,7 +60,7 @@ describe("filterToolsByTier", () => {
 
 		// Verify core tools are present
 		const toolNames = tools.map((t: { name: string }) => t.name);
-		expect(toolNames).toContain("search_code");
+		expect(toolNames).toContain("search");
 		expect(toolNames).toContain("index_repository");
 		expect(toolNames).toContain("list_recent_files");
 		expect(toolNames).toContain("search_dependencies");
@@ -76,32 +76,29 @@ describe("filterToolsByTier", () => {
 
 		// Verify default includes core + sync tools
 		const toolNames = tools.map((t: { name: string }) => t.name);
-		expect(toolNames).toContain("search_code");
+		expect(toolNames).toContain("search");
 		expect(toolNames).toContain("kota_sync_export");
 		expect(toolNames).toContain("kota_sync_import");
 	});
 
-	test("filterToolsByTier('memory') returns exactly 14 tools", async () => {
+	test("filterToolsByTier('memory') returns exactly 11 tools", async () => {
 		const { filterToolsByTier } = await import("@mcp/tools.js");
 
 		const tools = filterToolsByTier("memory");
-		expect(tools).toHaveLength(14);
+		expect(tools).toHaveLength(11);
 
 		// Verify memory layer tools are present
 		const toolNames = tools.map((t: { name: string }) => t.name);
-		expect(toolNames).toContain("search_decisions");
 		expect(toolNames).toContain("record_decision");
-		expect(toolNames).toContain("search_failures");
 		expect(toolNames).toContain("record_failure");
-		expect(toolNames).toContain("search_patterns");
 		expect(toolNames).toContain("record_insight");
 	});
 
-	test("filterToolsByTier('full') returns exactly 19 tools", async () => {
+	test("filterToolsByTier('full') returns exactly 16 tools", async () => {
 		const { filterToolsByTier } = await import("@mcp/tools.js");
 
 		const tools = filterToolsByTier("full");
-		expect(tools).toHaveLength(19);
+		expect(tools).toHaveLength(16);
 
 		// Verify expertise tools are present
 		const toolNames = tools.map((t: { name: string }) => t.name);

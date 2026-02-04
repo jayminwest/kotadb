@@ -99,34 +99,111 @@ export function getToolsByTier(toolset: ToolsetTier): ToolDefinition[] {
 export function isValidToolset(value: string): value is ToolsetTier {
 	return value === "default" || value === "core" || value === "memory" || value === "full";
 }
+
+// ============================================================================
+// UNIFIED SEARCH TOOL - Replaces search_code, search_symbols, search_decisions, search_patterns, search_failures  
+// Issue: #143
+// ============================================================================
+
 /**
-/**
- * Tool: search_code
+ * Tool: search (unified)
  */
-export const SEARCH_CODE_TOOL: ToolDefinition = {
+export const SEARCH_TOOL: ToolDefinition = {
 	tier: "core",
-	name: "search_code",
+	name: "search",
 	description:
-		"Search indexed code files for a specific term. Returns matching files with context snippets.",
+		"Search indexed code, symbols, decisions, patterns, and failures. Supports multiple search scopes simultaneously with scope-specific filters and output formats.",
 	inputSchema: {
 		type: "object",
 		properties: {
-			term: {
+			query: {
 				type: "string",
-				description: "The search term to find in code files",
+				description: "Search query term or phrase",
 			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter results to a specific repository ID",
+			scope: {
+				type: "array",
+				items: {
+					type: "string",
+					enum: ["code", "symbols", "decisions", "patterns", "failures"],
+				},
+				description: "Search scopes to query (default: ['code'])",
+			},
+			filters: {
+				type: "object",
+				description: "Scope-specific filters (invalid filters ignored)",
+				properties: {
+					// Code scope filters
+					glob: {
+						type: "string",
+						description: "File path glob pattern (code scope only)",
+					},
+					exclude: {
+						type: "array",
+						items: { type: "string" },
+						description: "Exclude patterns (code scope only)",
+					},
+					language: {
+						type: "string",
+						description: "Programming language filter (code scope only)",
+					},
+					// Symbol scope filters
+					symbol_kind: {
+						type: "array",
+						items: {
+							type: "string",
+							enum: [
+								"function",
+								"class",
+								"interface",
+								"type",
+								"variable",
+								"constant",
+								"method",
+								"property",
+								"module",
+								"namespace",
+								"enum",
+								"enum_member",
+							],
+						},
+						description: "Symbol kinds to include (symbols scope only)",
+					},
+					exported_only: {
+						type: "boolean",
+						description: "Only exported symbols (symbols scope only)",
+					},
+					// Decision scope filters
+					decision_scope: {
+						type: "string",
+						enum: ["architecture", "pattern", "convention", "workaround"],
+						description: "Decision category (decisions scope only)",
+					},
+					// Pattern scope filters
+					pattern_type: {
+						type: "string",
+						description: "Pattern type filter (patterns scope only)",
+					},
+					// Common filters
+					repository: {
+						type: "string",
+						description: "Repository ID or full_name filter (all scopes)",
+					},
+				},
 			},
 			limit: {
 				type: "number",
-				description: "Optional: Maximum number of results (default: 20, max: 100)",
+				description: "Max results per scope (default: 20, max: 100)",
+			},
+			output: {
+				type: "string",
+				enum: ["full", "paths", "compact"],
+				description: "Output format (default: 'full')",
 			},
 		},
-		required: ["term"],
+		required: ["query"],
 	},
 };
+
 
 /**
  * Tool: index_repository
@@ -447,39 +524,6 @@ export const GENERATE_TASK_CONTEXT_TOOL: ToolDefinition = {
 // ============================================================================
 
 /**
- * Tool: search_decisions
- */
-export const SEARCH_DECISIONS_TOOL: ToolDefinition = {
-	tier: "memory",
-	name: "search_decisions",
-	description:
-		"Search past architectural decisions using FTS5. Returns decisions with relevance scores.",
-	inputSchema: {
-		type: "object",
-		properties: {
-			query: {
-				type: "string",
-				description: "Search query for decisions",
-			},
-			scope: {
-				type: "string",
-				enum: ["architecture", "pattern", "convention", "workaround"],
-				description: "Optional: Filter by decision scope",
-			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter to a specific repository ID or full_name",
-			},
-			limit: {
-				type: "number",
-				description: "Optional: Max results (default: 20)",
-			},
-		},
-		required: ["query"],
-	},
-};
-
-/**
  * Tool: record_decision
  */
 export const RECORD_DECISION_TOOL: ToolDefinition = {
@@ -531,34 +575,6 @@ export const RECORD_DECISION_TOOL: ToolDefinition = {
 };
 
 /**
- * Tool: search_failures
- */
-export const SEARCH_FAILURES_TOOL: ToolDefinition = {
-	tier: "memory",
-	name: "search_failures",
-	description:
-		"Search failed approaches to avoid repeating mistakes. Returns failures with relevance scores.",
-	inputSchema: {
-		type: "object",
-		properties: {
-			query: {
-				type: "string",
-				description: "Search query for failures",
-			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter to a specific repository ID or full_name",
-			},
-			limit: {
-				type: "number",
-				description: "Optional: Max results (default: 20)",
-			},
-		},
-		required: ["query"],
-	},
-};
-
-/**
  * Tool: record_failure
  */
 export const RECORD_FAILURE_TOOL: ToolDefinition = {
@@ -596,41 +612,6 @@ export const RECORD_FAILURE_TOOL: ToolDefinition = {
 			},
 		},
 		required: ["title", "problem", "approach", "failure_reason"],
-	},
-};
-
-/**
- * Tool: search_patterns
- */
-export const SEARCH_PATTERNS_TOOL: ToolDefinition = {
-	tier: "memory",
-	name: "search_patterns",
-	description:
-		"Find codebase patterns by type or file. Returns discovered patterns for consistency.",
-	inputSchema: {
-		type: "object",
-		properties: {
-			query: {
-				type: "string",
-				description: "Optional: Search query for pattern name/description",
-			},
-			pattern_type: {
-				type: "string",
-				description: "Optional: Filter by pattern type (e.g., error-handling, api-call)",
-			},
-			file: {
-				type: "string",
-				description: "Optional: Filter by file path",
-			},
-			repository: {
-				type: "string",
-				description: "Optional: Filter to a specific repository ID or full_name",
-			},
-			limit: {
-				type: "number",
-				description: "Optional: Max results (default: 20)",
-			},
-		},
 	},
 };
 
@@ -784,7 +765,7 @@ export const GET_RECENT_PATTERNS_TOOL: ToolDefinition = {
  */
 export function getToolDefinitions(): ToolDefinition[] {
 	return [
-		SEARCH_CODE_TOOL,
+		SEARCH_TOOL,
 		INDEX_REPOSITORY_TOOL,
 		LIST_RECENT_FILES_TOOL,
 		SEARCH_DEPENDENCIES_TOOL,
@@ -794,11 +775,8 @@ export function getToolDefinitions(): ToolDefinition[] {
 		SYNC_IMPORT_TOOL,
 		GENERATE_TASK_CONTEXT_TOOL,
 		// Memory Layer tools
-		SEARCH_DECISIONS_TOOL,
 		RECORD_DECISION_TOOL,
-		SEARCH_FAILURES_TOOL,
 		RECORD_FAILURE_TOOL,
-		SEARCH_PATTERNS_TOOL,
 		RECORD_INSIGHT_TOOL,
 		// Dynamic Expertise tools
 		GET_DOMAIN_KEY_FILES_TOOL,
@@ -821,7 +799,361 @@ function isListRecentParams(params: unknown): params is { limit?: number; reposi
 	return true;
 }
 
+// ============================================================================
+// UNIFIED SEARCH - Helper Functions and Types
+// ============================================================================
+
+interface NormalizedFilters {
+	// Common
+	repositoryId?: string;
+	// Code
+	glob?: string;
+	exclude?: string[];
+	language?: string;
+	// Symbols
+	symbol_kind?: string[];
+	exported_only?: boolean;
+	// Decisions
+	decision_scope?: string;
+	// Patterns
+	pattern_type?: string;
+}
+
+function normalizeFilters(filters: unknown): NormalizedFilters {
+	if (!filters || typeof filters !== "object") {
+		return {};
+	}
+	
+	const f = filters as Record<string, unknown>;
+	const normalized: NormalizedFilters = {};
+	
+	// Resolve repository (UUID or full_name)
+	if (f.repository && typeof f.repository === "string") {
+		const resolved = resolveRepositoryIdentifierWithError(f.repository);
+		if (!("error" in resolved)) {
+			normalized.repositoryId = resolved.id;
+		}
+	}
+	
+	// Extract typed filters (silently ignore invalid)
+	if (f.glob && typeof f.glob === "string") {
+		normalized.glob = f.glob;
+	}
+	
+	if (Array.isArray(f.exclude)) {
+		normalized.exclude = f.exclude.filter(e => typeof e === "string");
+	}
+	
+	if (f.language && typeof f.language === "string") {
+		normalized.language = f.language;
+	}
+	
+	if (Array.isArray(f.symbol_kind)) {
+		normalized.symbol_kind = f.symbol_kind.filter(k => typeof k === "string");
+	}
+	
+	if (typeof f.exported_only === "boolean") {
+		normalized.exported_only = f.exported_only;
+	}
+	
+	if (f.decision_scope && typeof f.decision_scope === "string") {
+		normalized.decision_scope = f.decision_scope;
+	}
+	
+	if (f.pattern_type && typeof f.pattern_type === "string") {
+		normalized.pattern_type = f.pattern_type;
+	}
+	
+	return normalized;
+}
+
+interface SymbolResult {
+	id: string;
+	name: string;
+	kind: string;
+	signature: string | null;
+	documentation: string | null;
+	location: {
+		file: string;
+		line_start: number;
+		line_end: number;
+	};
+	repository_id: string;
+	is_exported: boolean;
+}
+
+async function searchSymbols(
+	query: string,
+	filters: NormalizedFilters,
+	limit: number
+): Promise<SymbolResult[]> {
+	const db = getGlobalDatabase();
+	
+	let sql = `
+		SELECT 
+			s.id,
+			s.name,
+			s.kind,
+			s.signature,
+			s.documentation,
+			s.line_start,
+			s.line_end,
+			s.metadata,
+			f.path as file_path,
+			s.repository_id
+		FROM indexed_symbols s
+		JOIN indexed_files f ON s.file_id = f.id
+		WHERE s.name LIKE ?
+	`;
+	
+	const params: (string | number)[] = [`%${query}%`];
+	
+	// Apply symbol_kind filter
+	if (filters.symbol_kind && filters.symbol_kind.length > 0) {
+		const placeholders = filters.symbol_kind.map(() => "?").join(", ");
+		sql += ` AND s.kind IN (${placeholders})`;
+		params.push(...filters.symbol_kind);
+	}
+	
+	// Apply exported_only filter
+	if (filters.exported_only) {
+		sql += ` AND json_extract(s.metadata, '$.is_exported') = 1`;
+	}
+	
+	// Apply repository filter
+	if (filters.repositoryId) {
+		sql += ` AND s.repository_id = ?`;
+		params.push(filters.repositoryId);
+	}
+	
+	sql += ` ORDER BY s.name LIMIT ?`;
+	params.push(limit);
+	
+	const rows = db.query<{
+		id: string;
+		name: string;
+		kind: string;
+		signature: string | null;
+		documentation: string | null;
+		line_start: number;
+		line_end: number;
+		metadata: string;
+		file_path: string;
+		repository_id: string;
+	}>(sql, params);
+	
+	return rows.map(row => ({
+		id: row.id,
+		name: row.name,
+		kind: row.kind,
+		signature: row.signature,
+		documentation: row.documentation,
+		location: {
+			file: row.file_path,
+			line_start: row.line_start,
+			line_end: row.line_end,
+		},
+		repository_id: row.repository_id,
+		is_exported: JSON.parse(row.metadata || '{}').is_exported || false,
+	}));
+}
+
+function formatSearchResults(
+	query: string,
+	scopes: string[],
+	scopeResults: Record<string, unknown[]>,
+	format: string
+): Record<string, unknown> {
+	const response: Record<string, unknown> = {
+		query,
+		scopes,
+		results: {} as Record<string, unknown>,
+		counts: { total: 0 } as Record<string, unknown>,
+	};
+
+	for (const scope of scopes) {
+		const items = scopeResults[scope] || [];
+		
+		if (format === "paths") {
+			// Extract file paths only
+			(response.results as Record<string, unknown>)[scope] = items.map((item: any) => {
+				if (item.path) return item.path;
+				if (item.file_path) return item.file_path;
+				if (item.location?.file) return item.location.file;
+				return "unknown";
+			});
+		} else if (format === "compact") {
+			// Summary info only
+			(response.results as Record<string, unknown>)[scope] = items.map((item: any) => {
+				if (scope === "code") {
+					return { path: item.path, match_count: 1 };
+				} else if (scope === "symbols") {
+					return { name: item.name, kind: item.kind, file: item.location.file };
+				} else if (scope === "decisions") {
+					return { title: item.title, scope: item.scope };
+				} else if (scope === "patterns") {
+					return { pattern_type: item.pattern_type, file_path: item.file_path };
+				} else if (scope === "failures") {
+					return { title: item.title, problem: item.problem };
+				}
+				return item;
+			});
+		} else {
+			// Full details
+			(response.results as Record<string, unknown>)[scope] = items;
+		}
+		
+		(response.counts as Record<string, unknown>)[scope] = items.length;
+		(response.counts as Record<string, unknown>).total = ((response.counts as Record<string, unknown>).total as number) + items.length;
+	}
+
+	return response;
+}
+
+// ============================================================================
+// UNIFIED SEARCH - Execute Function
+// ============================================================================
+
 /**
+ * Execute search tool (unified search across multiple scopes)
+ */
+export async function executeSearch(
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: query
+	if (p.query === undefined) {
+		throw new Error("Missing required parameter: query");
+	}
+	if (typeof p.query !== "string") {
+		throw new Error("Parameter 'query' must be a string");
+	}
+
+	// Validate optional parameters
+	let scopes: string[] = ["code"]; // Default scope
+	if (p.scope !== undefined) {
+		if (!Array.isArray(p.scope)) {
+			throw new Error("Parameter 'scope' must be an array");
+		}
+		const validScopes = ["code", "symbols", "decisions", "patterns", "failures"];
+		for (const s of p.scope) {
+			if (typeof s !== "string" || !validScopes.includes(s)) {
+				throw new Error(`Invalid scope: ${s}. Must be one of: ${validScopes.join(", ")}`);
+			}
+		}
+		scopes = p.scope as string[];
+	}
+
+	if (p.limit !== undefined && typeof p.limit !== "number") {
+		throw new Error("Parameter 'limit' must be a number");
+	}
+
+	if (p.output !== undefined) {
+		if (typeof p.output !== "string" || !["full", "paths", "compact"].includes(p.output)) {
+			throw new Error("Parameter 'output' must be one of: full, paths, compact");
+		}
+	}
+
+	const limit = Math.min(Math.max((p.limit as number) || 20, 1), 100);
+	const output = (p.output as string) || "full";
+	const filters = normalizeFilters(p.filters);
+
+	// Route to scope handlers in parallel
+	const results: Record<string, unknown[]> = {};
+	const searchPromises: Promise<void>[] = [];
+
+	if (scopes.includes("code")) {
+		searchPromises.push(
+			(async () => {
+				// Reuse existing searchFiles logic
+				const codeResults = searchFiles(p.query as string, {
+					repositoryId: filters.repositoryId,
+					limit,
+				});
+				results.code = codeResults;
+			})()
+		);
+	}
+
+	if (scopes.includes("symbols")) {
+		searchPromises.push(
+			(async () => {
+				const symbolResults = await searchSymbols(p.query as string, filters, limit);
+				results.symbols = symbolResults;
+			})()
+		);
+	}
+
+	if (scopes.includes("decisions")) {
+		searchPromises.push(
+			(async () => {
+				// Reuse existing executeSearchDecisions logic
+				const decisionParams = {
+					query: p.query,
+					scope: filters.decision_scope,
+					repository: filters.repositoryId,
+					limit,
+				};
+				const decisionResults = await executeSearchDecisions(decisionParams, requestId, userId);
+				results.decisions = (decisionResults as { results: unknown[] }).results;
+			})()
+		);
+	}
+
+	if (scopes.includes("patterns")) {
+		searchPromises.push(
+			(async () => {
+				// Reuse existing executeSearchPatterns logic
+				const patternParams = {
+					query: p.query,
+					pattern_type: filters.pattern_type,
+					repository: filters.repositoryId,
+					limit,
+				};
+				const patternResults = await executeSearchPatterns(patternParams, requestId, userId);
+				results.patterns = (patternResults as { results: unknown[] }).results;
+			})()
+		);
+	}
+
+	if (scopes.includes("failures")) {
+		searchPromises.push(
+			(async () => {
+				// Reuse existing executeSearchFailures logic
+				const failureParams = {
+					query: p.query,
+					repository: filters.repositoryId,
+					limit,
+				};
+				const failureResults = await executeSearchFailures(failureParams, requestId, userId);
+				results.failures = (failureResults as { results: unknown[] }).results;
+			})()
+		);
+	}
+
+	await Promise.all(searchPromises);
+
+	// Format output
+	const response = formatSearchResults(p.query as string, scopes, results, output);
+
+	logger.info("Unified search completed", {
+		query: p.query,
+		scopes,
+		total_results: (response.counts as Record<string, unknown>).total,
+		user_id: userId,
+	});
+
+	return response;
+}
+
 /**
  * Execute search_code tool
  *
@@ -2638,8 +2970,8 @@ export async function handleToolCall(
 	userId: string,
 ): Promise<unknown> {
 	switch (toolName) {
-		case "search_code":
-			return await executeSearchCode(params, requestId, userId);
+		case "search":
+			return await executeSearch(params, requestId, userId);
 		case "index_repository":
 			return await executeIndexRepository(params, requestId, userId);
 		case "list_recent_files":
@@ -2657,16 +2989,10 @@ export async function handleToolCall(
 		case "generate_task_context":
 			return await executeGenerateTaskContext(params, requestId, userId);
 		// Memory Layer tools
-		case "search_decisions":
-			return await executeSearchDecisions(params, requestId, userId);
 		case "record_decision":
 			return await executeRecordDecision(params, requestId, userId);
-		case "search_failures":
-			return await executeSearchFailures(params, requestId, userId);
 		case "record_failure":
 			return await executeRecordFailure(params, requestId, userId);
-		case "search_patterns":
-			return await executeSearchPatterns(params, requestId, userId);
 		case "record_insight":
 			return await executeRecordInsight(params, requestId, userId);
 		// Expertise Layer tools

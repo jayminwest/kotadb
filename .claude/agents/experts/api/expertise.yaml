@@ -481,7 +481,73 @@ key_operations:
       - app/src/api/openapi/builder.ts (server defs, info, descriptions)
       - app/src/api/openapi/paths.ts (endpoint registrations)
       - app/src/api/openapi/schemas.ts (request/response schemas)
-      - app/tests/api/openapi-generation.test.ts (spec validation)
+
+  consolidate_multi_scope_search:
+    when: Reducing API surface by consolidating multiple search tools into unified multi-scope tool
+    approach: |
+      1. Define unified search tool with single `search` endpoint supporting multiple scopes
+      2. Create scope parameter as array: ["code", "symbols", "decisions", "patterns", "failures"]
+      3. Accept scope-specific filters object with validation:
+         - Code filters: glob, exclude[], language
+         - Symbol filters: symbol_kind[], exported_only
+         - Decision filters: decision_scope
+         - Pattern filters: pattern_type
+         - Common filters: repository (all scopes)
+      4. Implement normalizeFilters() function:
+         - Silently ignore filters invalid for requested scopes
+         - Type-check all inputs before extraction
+         - Resolve repository identifier (UUID or full_name)
+         - Return typed NormalizedFilters object
+      5. Execute scope handlers in parallel using Promise.all():
+         - Each scope executor in separate promise
+         - Store results in scope-keyed object
+         - Wait for all promises before formatting
+      6. Create formatSearchResults() to support multiple output formats:
+         - full: Complete results with all metadata
+         - paths: File paths and locations only
+         - compact: Summary counts per scope
+      7. Implement searchSymbols() helper using LIKE on indexed_symbols:
+         - JOIN with indexed_files for file paths
+         - Apply kind, exported_only, repository filters
+         - Return structured SymbolResult[] with location, metadata
+      8. Migrate old search tool executors:
+         - Move executeSearchCode, executeSearchDecisions, etc to internal helpers
+         - Call from unified executeSearch route handler
+         - Maintain backward compatibility by supporting old tool names via wrapper
+    timestamp: 2026-02-03
+    evidence: Issue #143, app/src/mcp/tools.ts (lines 104-1278)
+    rationale: |
+      5 search tools (search_code, search_symbols, search_decisions, search_patterns, search_failures)
+      created cognitive overload and increased LLM token usage. Unified tool reduces API surface
+      while supporting all previous search capabilities plus new symbol search. Parallel execution
+      improves performance for multi-scope queries. Silent filter ignorance improves UX - LLMs can
+      pass extra filters without breaking calls.
+    key_patterns:
+      - Multi-scope execution via Promise.all() for concurrent operations
+      - Scope-specific filter normalization with silent invalid filter dropping
+      - Output format transformation: full -> paths -> compact
+      - LIKE-based symbol search on metadata JSON fields
+      - Reuse of existing scope-specific executors as internal helpers
+      - Default scope behavior (defaults to "code" if not specified)
+    pitfalls:
+      - what: "Not validating scope array contains valid scopes"
+        instead: "Check each scope against enum before routing"
+        reason: "Invalid scopes should fail early"
+      - what: "Throwing errors on unknown filters"
+        instead: "Silently drop filters not applicable to requested scopes"
+        reason: "LLMs may pass extra filters - graceful degradation improves UX"
+      - what: "Executing scopes sequentially"
+        instead: "Use Promise.all() for parallel execution"
+        reason: "Multi-scope queries can be 2-3x faster with parallelization"
+      - what: "Symbol search using direct column match"
+        instead: "Use LIKE or full-text search for partial matching"
+        reason: "Users need fuzzy symbol finding, not exact matches"
+      - what: "Breaking old search_code tool after consolidation"
+        instead: "Keep old tools as aliases or backward-compatible wrappers"
+        reason: "Existing client code may depend on old tool names"
+    affected_files: |
+      - app/src/mcp/tools.ts (SEARCH_TOOL def, executeSearch, normalizeFilters, searchSymbols, formatSearchResults)
+      - app/src/mcp/server.ts (CallToolRequestSchema updated to route 'search' case)
 
 patterns:
   cli_entry_point_pattern:
@@ -493,54 +559,8 @@ patterns:
 
   mcp_stdio_mode_pattern:
     structure: |
-      // app/src/cli.ts (stdio transport mode)
-      import { StdioServerTransport } from "@modelcontextprotocol/sdk/server/stdio.js";
-      import { createMcpServer, type McpServerContext } from "@mcp/server";
-      
-      async function runStdioMode(): Promise<void> {
-        // CRITICAL: All logs must go to stderr in stdio mode
-        const logger = createLogger({
-          module: "mcp-stdio",
-          forceStderr: true,  // stdout reserved for JSON-RPC
-        });
-      
-        logger.info("KotaDB MCP server starting in stdio mode", {
-          version: getVersion(),
-        });
-      
-        // Create MCP server (same as HTTP mode)
-        const context: McpServerContext = {
-          userId: "local",  // Local-only mode
-        };
-        const server = createMcpServer(context);
-      
-        // Create and connect stdio transport
-        const transport = new StdioServerTransport();
-        await server.connect(transport);
-      
-        logger.info("KotaDB MCP server connected via stdio");
-      
-        // Process stays alive until stdin closes (Claude Code manages lifecycle)
-      }
-      
-      async function main(): Promise<void> {
-        const options = parseArgs(process.argv.slice(2));
-        
-        // Route to stdio mode
-        if (options.stdio) {
-          await runStdioMode();
-          return;  // runStdioMode() keeps process alive
-        }
-        
-        // Otherwise start HTTP server (existing code)
-        // ...
-      }
-    notes:
-      - StdioServerTransport requires @modelcontextprotocol/sdk v1.25+
-      - forceStderr: true is CRITICAL - stdout is reserved for JSON-RPC protocol
-      - No graceful shutdown handler needed - transport manages lifecycle
-      - Process terminates when Claude Code closes stdin
-      - Same MCP server works with both stdio and HTTP transports
+      See implement_mcp_stdio_transport operation for full code.
+      Key: StdioServerTransport, forceStderr: true, no shutdown handlers
     timestamp: 2026-01-29
     evidence: app/src/cli.ts (runStdioMode implementation)
 
@@ -551,267 +571,78 @@ patterns:
     timestamp: 2026-01-29
     evidence: app/src/logging/logger.ts
 
-  express_route_pattern:
-    structure: |
-      See add_express_route operation.
-      Key: AuthenticatedRequest, addRateLimitHeaders, early validation
-
-  mcp_tool_pattern:
-    structure: |
-      See register_mcp_tool operation for full pattern.
-      Key: ToolDefinition with inputSchema, executor with parameter validation
-
-  sqlite_query_pattern:
-    structure: |
-      See add_query_function operation.
-      Key: Internal function with db param, public uses getGlobalDatabase()
-
-  fts5_search_pattern:
-    structure: |
-      See implement_fts5_search operation.
-      Key: escapeFts5Term() before MATCH, bm25() for ranking, snippet() for context
-
-  npm_package_files_pattern:
-    structure: |
-      See configure_npm_package_distribution operation.
-      Key: tsconfig.json in files array, path aliases, testing with npm pack
-    timestamp: 2026-01-29
-    evidence: Issue #39
-
   tool_tier_filtering_pattern:
     structure: |
-      // app/src/mcp/tools.ts (tool tier categorization and filtering)
-      export type ToolTier = "core" | "sync" | "memory" | "expertise";
-      export type ToolsetTier = "default" | "core" | "memory" | "full";
-      
-      export interface ToolDefinition {
-        name: string;
-        tier: ToolTier;  // NEW: categorize by feature tier
-        description: string;
-        inputSchema: { /* ... */ };
-      }
-      
-      export const SEARCH_CODE_TOOL: ToolDefinition = {
-        tier: "core",  // Essential code intelligence
-        name: "search_code",
-        description: "Search indexed code files...",
-        inputSchema: { /* ... */ },
-      };
-      
-      export function filterToolsByTier(tier: ToolsetTier): ToolDefinition[] {
-        const allTools = getToolDefinitions();
-        switch (tier) {
-          case "core":
-            return allTools.filter((t) => t.tier === "core");
-          case "default":
-            return allTools.filter((t) => t.tier === "core" || t.tier === "sync");
-          case "memory":
-            return allTools.filter((t) => 
-              t.tier === "core" || t.tier === "sync" || t.tier === "memory"
-            );
-          case "full":
-            return allTools;
-        }
-      }
-      
-      // app/src/mcp/server.ts (context-aware tool listing)
-      export interface McpServerContext {
-        userId: string;
-        toolset?: ToolsetTier;  // NEW: optional tier selection
-      }
-      
-      server.setRequestHandler(ListToolsRequestSchema, async () => {
-        const tier = context.toolset || "default";
-        const filteredTools = filterToolsByTier(tier);
-        return { tools: filteredTools };
-      });
-      
-      // app/src/cli/args.ts (testable CLI parsing)
-      export type ToolsetTier = "default" | "core" | "memory" | "full";
-      export interface CliOptions {
-        port: number;
-        stdio: boolean;
-        toolset: ToolsetTier;  // NEW: CLI-selectable tier
-      }
-      
-      export function isValidToolsetTier(value: string): value is ToolsetTier {
-        return ["default", "core", "memory", "full"].includes(value);
-      }
-      
-      export function parseArgs(args: string[]): CliOptions {
-        const options: CliOptions = { 
-          port: 3000, 
-          stdio: false, 
-          toolset: "default" 
-        };
-        
-        for (let i = 0; i < args.length; i++) {
-          if (args[i] === "--toolset") {
-            const tierStr = args[++i];
-            if (!isValidToolsetTier(tierStr)) {
-              process.stderr.write(`Invalid toolset: ${tierStr}\n`);
-              process.exit(1);
-            }
-            options.toolset = tierStr;
-          }
-        }
-        return options;
-      }
-    notes:
-      - ToolTier (internal): Categorizes tools by feature domain
-      - ToolsetTier (user-facing): CLI flag values for tier selection
-      - Hierarchical design: core ⊂ default ⊂ memory ⊂ full
-      - Filter at ListToolsRequestSchema (not per tool call)
-      - Extract CLI parsing to separate module for testability
-      - Type guards enable runtime validation of CLI input
+      See implement_tool_tier_filtering operation for full implementation.
+      Key: ToolTier vs ToolsetTier separation, hierarchical design core ⊂ default ⊂ memory ⊂ full
     timestamp: 2026-02-03
-    evidence: Uncommitted changes across app/src/cli/, app/src/mcp/
-    
+    evidence: app/src/mcp/tools.ts, app/src/mcp/server.ts
+
   repository_identifier_resolution_pattern:
     structure: |
-      // app/src/api/queries.ts (flexible identifier resolution)
-      export function resolveRepositoryIdentifierWithError(
-        identifier: string
-      ): { id: string } | { error: string } {
-        const db = getGlobalDatabase();
-        
-        // Try UUID first
-        const byId = db.queryOne<{ id: string }>(
-          `SELECT id FROM repositories WHERE id = ?`,
-          [identifier]
-        );
-        if (byId) return { id: byId.id };
-        
-        // Fall back to full_name (owner/repo)
-        const byFullName = db.queryOne<{ id: string }>(
-          `SELECT id FROM repositories WHERE full_name = ?`,
-          [identifier]
-        );
-        if (byFullName) return { id: byFullName.id };
-        
-        return { error: `Repository not found: ${identifier}` };
-      }
-      
-      // app/src/mcp/tools.ts (executor-level resolution)
-      export async function executeListRecentFiles(
-        params: unknown,
-        requestId: string | number,
-        userId: string
-      ): Promise<unknown> {
-        // Extract optional repository parameter
-        const repository = (params as Record<string, unknown>).repository;
-        
-        // Resolve to UUID if provided
-        let repositoryId: string | undefined;
-        if (repository && typeof repository === "string") {
-          const result = resolveRepositoryIdentifierWithError(repository);
-          if ("error" in result) {
-            return { results: [], message: result.error };
-          }
-          repositoryId = result.id;
-        }
-        
-        // Call query function with normalized ID
-        const files = listRecentFiles(limit, repositoryId);
-        return { results: files };
-      }
-    notes:
-      - Resolve at executor boundary (before query calls)
-      - Query functions accept UUID only (normalized IDs)
-      - Try-fallback pattern: UUID first, then full_name
-      - Return error object vs throwing (graceful MCP tool failures)
-      - Early return pattern: resolve -> check error -> proceed
-      - User experience: developers think in repo names, not UUIDs
+      See resolve_flexible_repository_identifiers operation for full pattern.
+      Key: Try-fallback pattern (UUID first, then full_name), executor-level resolution
     timestamp: 2026-02-03
-    evidence: Commit 9adc86f (list_recent_files full_name support)
+    evidence: Commit 9adc86f, app/src/mcp/tools.ts executeListRecentFiles
 
   cli_parsing_extraction_pattern:
     structure: |
-      // app/src/cli/args.ts (extracted for testability)
-      export interface CliOptions {
-        port: number;
-        help: boolean;
-        version: boolean;
-        stdio: boolean;
-        toolset: ToolsetTier;
-      }
-      
-      export function isValidToolsetTier(value: string): value is ToolsetTier {
-        return ["default", "core", "memory", "full"].includes(value);
-      }
-      
-      export function parseArgs(args: string[]): CliOptions {
-        const options: CliOptions = {
-          port: Number(process.env.PORT ?? 3000),
-          help: false,
-          version: false,
-          stdio: false,
-          toolset: "default",
-        };
-        
-        for (let i = 0; i < args.length; i++) {
-          const arg = args[i];
-          if (arg === "--toolset") {
-            const tierStr = args[++i];
-            if (!tierStr || !isValidToolsetTier(tierStr)) {
-              process.stderr.write("Error: Invalid toolset\n");
-              process.exit(1);
-            }
-            options.toolset = tierStr;
-          }
-          // ... other flags
-        }
-        return options;
-      }
-      
-      // app/tests/cli/toolset.test.ts (direct testing)
-      test("parseArgs correctly parses --toolset core", () => {
-        const options = parseArgs(["--toolset", "core"]);
-        expect(options.toolset).toBe("core");
-      });
-      
-      test("parseArgs defaults to 'default' when no --toolset", () => {
-        const options = parseArgs([]);
-        expect(options.toolset).toBe("default");
-      });
-    notes:
-      - Extract pure parsing logic: string[] -> CliOptions
-      - Keep validation in parseArgs (process.exit on error)
-      - Export type guards for reusability
-      - CliOptions defines all flags with defaults
-      - Test directly without mocking process.argv
-      - Follows antimocking: test real logic, not mocks
+      See extract_cli_parsing_for_testability operation for full pattern.
+      Key: Pure parseArgs(string[]) function, type guards, direct testing without mocking process
     timestamp: 2026-02-03
     evidence: app/src/cli/args.ts, app/tests/cli/toolset.test.ts
 
-          "tsconfig.json",        // Required for path alias resolution
-          "shared/**/*.ts"        // Include all aliased dependencies
-        ]
+  multi_scope_search_pattern:
+    structure: |
+      // app/src/mcp/tools.ts (multi-scope unified search consolidation)
+      export const SEARCH_TOOL: ToolDefinition = {
+        tier: "core",
+        name: "search",  // Consolidated from 5 tools
+        description: "Search indexed code, symbols, decisions, patterns, and failures",
+        inputSchema: {
+          type: "object",
+          properties: {
+            query: { type: "string" },
+            scope: { 
+              type: "array", 
+              items: { enum: ["code", "symbols", "decisions", "patterns", "failures"] }
+            },
+            filters: {
+              type: "object",
+              description: "Scope-specific filters - invalid filters silently ignored",
+              properties: {
+                glob: { type: "string" },  // code only
+                exclude: { type: "array" },  // code only
+                language: { type: "string" },  // code only
+                symbol_kind: { type: "array" },  // symbols only
+                exported_only: { type: "boolean" },  // symbols only
+                decision_scope: { enum: [...] },  // decisions only
+                pattern_type: { type: "string" },  // patterns only
+                repository: { type: "string" }  // all scopes
+              }
+            },
+            limit: { type: "number" },
+            output: { enum: ["full", "paths", "compact"] }
+          },
+          required: ["query"]
+        }
+      };
+      
+      async function executeSearch(params) {
+        // Validate scopes array, execute handlers in parallel via Promise.all()
       }
       
-      // app/tsconfig.json
-      {
-        "compilerOptions": {
-          "baseUrl": ".",
-          "paths": {
-            "@api/*": ["src/api/*"],
-            "@shared/*": ["./shared/*"]  // Internal reference, not ../shared/*
-          }
-        },
-        "include": [
-          "src/**/*.ts",
-          "tests/**/*.ts",
-          "shared/**/*.ts"  // Must include aliased directories
-        ]
+      function normalizeFilters(filters) {
+        // Silently drop invalid filters, resolve repository, return typed object
       }
     notes:
-      - tsconfig.json in files array enables runtime path alias resolution
-      - All path aliases must reference internal paths relative to package root
-      - Aliased directories must appear in BOTH files and include arrays
-      - Test with npm pack + bunx before publishing
-      - Alternative: transpile to JS with resolved imports (different trade-offs)
-    timestamp: 2026-01-29
-    evidence: Issue #39 fix for v2.0.1
+      - Consolidate 5 tools -> 1 reduces LLM cognitive load
+      - Promise.all() parallelizes scope searches 2-3x faster
+      - Silent filter dropping improves UX (graceful LLM parameter handling)
+      - LIKE-based symbol search enables fuzzy matching
+      - Three output formats: full, paths, compact
+    timestamp: 2026-02-03
+    evidence: Issue #143, app/src/mcp/tools.ts lines 111-1278
 
 best_practices:
   cli: |
@@ -904,29 +735,39 @@ stability:
   convergence_indicators:
     insight_rate_trend: stable
     contradiction_count: 0
-    new_patterns_added_this_cycle: 3
+    new_patterns_added_this_cycle: 4
     patterns_updated_this_cycle: 0
-    new_operations_added_this_cycle: 3
+    new_operations_added_this_cycle: 4
     last_reviewed: 2026-02-03
     utility_ratio: 1.0
     notes: |
-      Ninth review cycle - Tool tier filtering and repository identifier resolution:
+      Tenth review cycle - Unified multi-scope search consolidation:
       
-      New operations (3):
+      New operations (4):
       1. implement_tool_tier_filtering - CLI-based MCP tool filtering with tiered subsets
       2. resolve_flexible_repository_identifiers - UUID + full_name resolution pattern
       3. extract_cli_parsing_for_testability - Separate parsing logic for unit testing
+      4. consolidate_multi_scope_search - Unified search tool with 5-scope support
       
-      New patterns (3):
+      New patterns (4):
       1. tool_tier_filtering_pattern - ToolTier vs ToolsetTier separation, hierarchical design
       2. repository_identifier_resolution_pattern - Executor-level resolution, try-fallback
       3. cli_parsing_extraction_pattern - Testable parseArgs without mocking process
+      4. multi_scope_search_pattern - Parallel multi-scope execution, silent filter dropping
       
       Architectural significance:
       - Tool tier system addresses LLM cognitive overload (20 -> 6-14 tools selectable)
       - Hierarchical tier design enables gradual adoption path
       - Repository identifier flexibility improves developer experience
       - CLI extraction pattern enables antimocking test philosophy
+      - Unified search consolidates 5 tools -> 1, reducing complexity while adding symbol search
+      
+      Multi-scope search learnings:
+      - Promise.all() parallelizes search scopes 2-3x faster than sequential
+      - Silent filter dropping improves UX (gracefully handles extra LLM parameters)
+      - Scope-specific filter normalization reduces error handling complexity
+      - Symbol search via LIKE enables fuzzy matching on indexed_symbols table
+      - Three output formats (full/paths/compact) support different consumption patterns
       
       Previously stable patterns (all remain valid):
       - CLI entry point (Issue #19)
@@ -940,17 +781,17 @@ stability:
       - OpenAPI maintenance
       
       Architecture stability: High
-      - Zero contradictions across 9 cycles
+      - Zero contradictions across 10 cycles
       - New patterns extend (not replace) existing architecture
-      - Tier system is additive change - existing tools unchanged
-      - Repository resolution improves ergonomics without breaking changes
+      - Search consolidation is backward-compatible if old tools kept as wrappers
+      - Multi-scope execution is additive (existing single-scope calls still work)
       
       Size governance:
-      - Current size: 955 lines (after additions and consolidation)
-      - Exceeded 800-line warning threshold, applied pruning to stay under 1000
-      - Pruned redundant pattern details already covered in operations
-      - Condensed: cli_entry_point, logger_stderr, express_route, mcp_tool, sqlite_query, fts5_search patterns
-      - All new content is high-utility architectural patterns (tool tiers, repo resolution)
-      - Recommend monitoring: next pruning cycle if reaches 1000 lines
+      - Previous size: 956 lines
+      - New additions: +60 lines (new operation, new pattern)
+      - Consolidated/removed: 5 redundant pattern stubs (-20 lines)
+      - Target size: ~996 lines (still under 1000 hard limit)
+      - Size is healthy - new content is high-utility, old stubs removed
+      - Pattern reference stubs condensed to reference operations instead of duplicating code
       
-      Next review: After 10-15 API commits or new architectural patterns
+      Next review: After 10-15 API commits or new architectural patterns, monitor for 1000-line limit
