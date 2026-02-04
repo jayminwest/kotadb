@@ -5,6 +5,7 @@ import { dirname } from "node:path";
 import { WorkflowLogger } from "./logger.ts";
 import { ConsoleReporter } from "./reporter.ts";
 import { orchestrateWorkflow } from "./orchestrator.ts";
+import { generateWorkflowId } from "./context.ts";
 
 export interface WorkflowResult {
   success: boolean;
@@ -21,6 +22,8 @@ export interface WorkflowOptions {
   issueNumber: number;
   dryRun?: boolean;
   verbose?: boolean;
+  /** Enable context accumulation for inter-phase handoffs */
+  accumulateContext?: boolean;
   /** Working directory for SDK execution (worktree path or main repo) */
   workingDirectory?: string;
   /** Main project root for centralized logging (always the main repo root) */
@@ -38,6 +41,7 @@ export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult
     issueNumber,
     dryRun = false,
     verbose = false,
+    accumulateContext = false,
     workingDirectory,
     mainProjectRoot,
     branchName
@@ -67,12 +71,21 @@ export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult
     logDir: null,
   };
 
+  // Generate workflow ID if context accumulation enabled
+  const workflowId = accumulateContext ? generateWorkflowId(issueNumber) : null;
+
   const startTime = performance.now();
 
   try {
     logger.initialize();
     reporter.startWorkflow(dryRun);
-    logger.logEvent("WORKFLOW_START", { issue_number: issueNumber, dry_run: dryRun, verbose });
+    logger.logEvent("WORKFLOW_START", { 
+      issue_number: issueNumber, 
+      dry_run: dryRun, 
+      verbose,
+      accumulate_context: accumulateContext,
+      workflow_id: workflowId
+    });
 
     // Use orchestrator with reporter integration
     const orchResult = await orchestrateWorkflow({
@@ -82,7 +95,8 @@ export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult
       logger,
       reporter,
       dryRun,
-      verbose
+      verbose,
+      workflowId
     });
 
     const endTime = performance.now();

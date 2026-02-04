@@ -1,5 +1,5 @@
 # Automation Expert Domain Expertise
-# Last reviewed: 2026-02-03
+# Last reviewed: 2026-02-04
 # Domain: automation layer development with Claude Agent SDK
 
 overview:
@@ -26,6 +26,9 @@ overview:
       - app/src/cli/args.ts (CLI argument parsing with toolset tier support)
       - app/src/mcp/tools.ts (MCP tool definitions with tier metadata)
       - app/src/mcp/server.ts (MCP server with tool filtering)
+      - automation/src/context.ts (workflow context storage for inter-phase handoffs)
+      - automation/src/context.test.ts (context accumulation tests)
+      - app/src/db/migrations/005_workflow_contexts.sql (workflow context schema)
     
     broader_scope:
       - Claude Agent SDK patterns (query(), message streaming, hooks, stderr callback)
@@ -37,6 +40,10 @@ overview:
       - ANSI escape code formatting for console output
       - Git worktree isolation for parallel workflow execution
       - SDK hook integration (PreToolUse, PostToolUse, Notification)
+      - Workflow context accumulation patterns for multi-phase orchestration
+      - Main KotaDB database integration (.kotadb/kota.db) for workflow context
+      - Inter-phase data handoff patterns with structured context storage
+      - Workflow ID generation patterns (adw-<issue>-<timestamp>)
       
     not_covered:
       - General Claude configuration (see claude-config expert)
@@ -159,6 +166,31 @@ core_implementation:
         - Manage worktree lifecycle with graceful fallback to projectRoot
         - Preserve worktrees on failure for debugging
         - Query worktree info via git worktree list --porcelain
+
+    context_ts:
+      path: automation/src/context.ts
+      purpose: Workflow context accumulation for inter-phase handoffs
+      responsibilities:
+        - Store curated context data for workflow phases in main KotaDB database
+        - Generate workflow IDs (adw-<issue>-<timestamp> format)
+        - Retrieve phase-specific or full workflow context
+        - Clear context after successful workflow completion
+        - Validate phase consistency (data.phase must match parameter)
+        - Use upsert semantics with ON CONFLICT for idempotency
+        - Integrate with getGlobalDatabase() for main DB access
+        - Support all ADW phases (analysis, plan, build, improve)
+
+    migration_005:
+      path: app/src/db/migrations/005_workflow_contexts.sql
+      purpose: Schema for workflow context storage
+      responsibilities:
+        - Define workflow_contexts table with workflow_id, phase, context_data
+        - Enforce phase CHECK constraint (analysis, plan, build, improve)
+        - Provide UNIQUE constraint on (workflow_id, phase)
+        - Index workflow_id for primary access pattern
+        - Index created_at DESC for time-based queries
+        - Store context_data as JSON TEXT blob
+        - Record schema migration in schema_migrations table
 
 key_operations:
   suppress_sdk_stderr:
@@ -599,6 +631,67 @@ key_operations:
       - Incorrect tier categorization confuses users
       - Not updating tests when adding tier metadata
 
+  implement_context_accumulation:
+    when: Enabling inter-phase data handoff for multi-phase workflows
+    approach: |
+      Store curated context at end of each phase in main KotaDB database (.kotadb/kota.db).
+      Generate workflow ID at workflow start, pass through orchestration layers, store phase
+      context with storeWorkflowContext(), clear on successful completion. Use main DB for
+      future MCP tool integration (not metrics.db which is automation-specific).
+    patterns:
+      - Generate workflow ID generateWorkflowId(issueNumber) returns adw-<issue>-<timestamp>
+      - Pass workflowId through orchestration (nullable for backward compatibility)
+      - Store context storeWorkflowContext(workflowId, phase, data)
+      - Retrieve context getWorkflowContext(workflowId, phase?) 
+      - Clear on success clearWorkflowContext(workflowId) returns deleted count
+      - Context data structure {phase, summary, keyFindings?, filesAnalyzed?, decisionsRecorded?, timestamp, ...custom}
+      - Use main DB (getGlobalDatabase()) not metrics DB
+      - Upsert semantics with ON CONFLICT for idempotency
+      - CLI flag --accumulate-context to enable feature
+    code_example: |
+      // Generate workflow ID (workflow.ts)
+      const workflowId = accumulateContext ? generateWorkflowId(issueNumber) : null;
+      
+      // Thread through orchestration (orchestrator.ts)
+      export interface OrchestrationOptions {
+        issueNumber: number;
+        projectRoot: string;
+        workflowId: string | null;  // Add this
+        // ...
+      }
+      
+      // Store phase context (in phase completion handler)
+      if (workflowId) {
+        const contextData: WorkflowContextData = {
+          phase: 'analysis',
+          summary: 'Analyzed requirements for feature X',
+          keyFindings: ['Finding 1', 'Finding 2'],
+          filesAnalyzed: ['src/foo.ts', 'src/bar.ts'],
+          timestamp: new Date().toISOString()
+        };
+        storeWorkflowContext(workflowId, 'analysis', contextData);
+      }
+      
+      // Retrieve context in next phase
+      if (workflowId) {
+        const analysisContext = getWorkflowContext(workflowId, 'analysis');
+        // Use analysisContext to inform planning phase
+      }
+      
+      // Clear context on success (orchestrator.ts)
+      if (workflowId && improveStatus === "success") {
+        const deletedCount = clearWorkflowContext(workflowId);
+        logger.logEvent("CONTEXT_CLEANUP", { workflow_id: workflowId, deleted_count: deletedCount });
+      }
+    pitfalls:
+      - Using metrics DB instead of main DB prevents MCP tool integration
+      - Not passing workflowId through all orchestration layers breaks context flow
+      - Forgetting to clear context on success causes accumulation
+      - Phase mismatch validation data.phase must equal phase parameter
+      - Context cleanup is non-fatal catch errors and log warnings
+      - NULL workflowId requires safe navigation throughout codebase
+      - Storing unstructured data makes retrieval unpredictable
+
 
 decision_trees:
   console_output_strategy:
@@ -714,6 +807,36 @@ decision_trees:
         action: Use --toolset full (19 tools)
         rationale: All capabilities including domain validation
 
+  context_storage_database:
+    question: Which database should I use for workflow context storage?
+    branches:
+      - condition: Context for inter-phase workflow handoffs
+        action: Use main KotaDB database (.kotadb/kota.db) via getGlobalDatabase()
+        rationale: Enables future MCP tool access to workflow context, integrates with code intelligence
+        
+      - condition: Automation execution metrics (tokens, cost, duration)
+        action: Use automation metrics DB (automation/.data/metrics.db)
+        rationale: Automation-specific operational data, not code intelligence
+        
+      - condition: Code intelligence data (symbols, references, dependencies)
+        action: Use main KotaDB database (.kotadb/kota.db)
+        rationale: Core code intelligence storage
+
+  context_accumulation_enablement:
+    question: When should context accumulation be enabled?
+    branches:
+      - condition: Multi-phase workflows requiring inter-phase handoffs
+        action: Enable with --accumulate-context flag
+        rationale: Future feature for context-aware phase orchestration
+        
+      - condition: Standard single-shot workflows
+        action: Omit --accumulate-context flag (default)
+        rationale: Avoid overhead when context not needed
+        
+      - condition: Debugging context accumulation
+        action: Enable flag and inspect workflow_contexts table
+        rationale: Verify context storage and cleanup behavior
+
 
 patterns:
   console_reporter_pattern:
@@ -760,6 +883,16 @@ patterns:
     structure: Simple flag detection, positional args
     usage: --dry-run, --metrics, --no-comment, --verbose/-v
     trade_offs: Simple parsing vs rich CLI library
+
+  workflow_id_generation_pattern:
+    structure: adw-<issueNumber>-<timestamp> format with filesystem-safe timestamp
+    usage: Unique identifier for workflow runs enabling context accumulation
+    trade_offs: Timestamp precision vs readability (ISO format with punctuation removed)
+
+  context_upsert_pattern:
+    structure: INSERT ON CONFLICT UPDATE with upsert semantics
+    usage: Idempotent context storage allowing phase re-execution
+    trade_offs: Overwrite old data vs error on duplicate (chose overwrite for idempotency)
 
 best_practices:
   console_output:
@@ -838,6 +971,16 @@ best_practices:
     - Format cost with 4 decimals
     - Separate ConsoleReporter from structured logger
 
+  workflow_context:
+    - Store context in main KotaDB database for MCP tool access
+    - Generate workflow ID at workflow start, pass through all layers
+    - Use nullable workflowId for backward compatibility
+    - Validate phase consistency (data.phase === phase parameter)
+    - Clear context only on successful workflow completion
+    - Make context cleanup non-fatal (log warning, continue)
+    - Structure context data with phase, summary, timestamp, and optional fields
+    - Use upsert semantics for idempotent context storage
+
 known_issues:
   - issue: SDK query() timeout on long workflows
     impact: Workflow fails mid-execution
@@ -865,17 +1008,21 @@ potential_enhancements:
   - Tool execution timeline visualization
 
 stability:
-    insight_rate_trend: stable
-    contradiction_count: 0
-    last_reviewed: 2026-02-03
-    notes: |
-      MCP toolset tier implementation adds flexible tool filtering with --toolset flag.
-      Four tiers (core, default, memory, full) enable token-conscious tool selection.
-      Tool tier metadata (core, sync, memory, expertise) allows hierarchical filtering.
-      Context threading pattern established: CLI → McpServerContext → filterToolsByTier().
-      Type guards and validation ensure runtime safety. Comprehensive test coverage
-      confirms hierarchical inclusion and tier boundaries. Pattern successfully balances
-      capability vs token overhead.
-      
-      Prior: Issue #65 (console transparency), #64 (worktree isolation). Domain stable
-      with established SDK integration, hook patterns, and reporting infrastructure.
+  insight_rate_trend: converging
+  contradiction_count: 0
+  last_reviewed: 2026-02-04
+  notes: |
+    Issue #144 adds workflow context accumulation for inter-phase handoffs in ADW workflows.
+    Key architectural decision: Store context in main KotaDB database (.kotadb/kota.db) 
+    rather than automation metrics DB to enable future MCP tool integration. Context data
+    uses flexible JSON structure with required fields (phase, summary, timestamp) and 
+    optional fields (keyFindings, filesAnalyzed, decisionsRecorded). Workflow ID generation
+    follows adw-<issue>-<timestamp> pattern. Upsert semantics allow idempotent phase
+    re-execution. Context cleanup is non-fatal and occurs only on workflow success.
+    
+    Implementation establishes foundation for future context-aware orchestration where
+    downstream phases can access curated data from upstream phases. CLI flag 
+    --accumulate-context enables feature for backward compatibility.
+    
+    Prior: Issue #95 (toolset tiers), #65 (console transparency), #64 (worktree isolation).
+    Domain converging with comprehensive automation patterns established.

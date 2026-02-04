@@ -24,6 +24,7 @@ import {
   extractTextFromMessages 
 } from "./parser.ts";
 import { handlePRCreation, commitExpertiseChanges, type IssueType } from "./pr.ts";
+import { clearWorkflowContext } from "./context.ts";
 
 /**
  * GitHub issue data fetched via gh CLI
@@ -51,6 +52,7 @@ export interface OrchestrationOptions {
   reporter: ConsoleReporter;
   dryRun: boolean;
   verbose: boolean;
+  workflowId: string | null;
 }
 
 /**
@@ -145,7 +147,7 @@ function createNotificationHook(reporter: ConsoleReporter): HookCallback {
 export async function orchestrateWorkflow(
   opts: OrchestrationOptions
 ): Promise<OrchestrationResult> {
-  const { issueNumber, projectRoot, branchName, logger, reporter, dryRun, verbose } = opts;
+  const { issueNumber, projectRoot, branchName, logger, reporter, dryRun, verbose, workflowId } = opts;
 
   // Fetch issue title early for PR creation
   const issueData = await fetchIssueContent(issueNumber);
@@ -289,6 +291,21 @@ export async function orchestrateWorkflow(
     logger.logEvent("PHASE_SKIP", { phase: "pr", reason: "no files modified" });
   }
 
+
+  // Clean up context only on success
+  if (workflowId && improveStatus === "success") {
+    try {
+      const deletedCount = clearWorkflowContext(workflowId);
+      logger.logEvent("CONTEXT_CLEANUP", { 
+        workflow_id: workflowId, 
+        deleted_count: deletedCount 
+      });
+    } catch (error) {
+      // Non-fatal: log warning but continue
+      logger.logError("context_cleanup", error instanceof Error ? error : new Error(String(error)));
+      reporter.logWarning("Failed to cleanup workflow context (non-fatal)");
+    }
+  }
   return {
     domain,
     specPath,
