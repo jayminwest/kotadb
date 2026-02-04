@@ -462,6 +462,54 @@ BEGIN
     VALUES (new.rowid, new.content);
 END;
 
+-- ============================================================================
+-- 11. Workflow Contexts Table (Issue #144)
+-- ============================================================================
+-- Stores curated context data for each workflow phase
+
+CREATE TABLE IF NOT EXISTS workflow_contexts (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    workflow_id TEXT NOT NULL,
+    phase TEXT NOT NULL,
+    context_data TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now')),
+    
+    UNIQUE(workflow_id, phase),
+    CHECK (phase IN ('analysis', 'plan', 'build', 'improve'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_contexts_workflow_id 
+ON workflow_contexts(workflow_id);
+
+CREATE INDEX IF NOT EXISTS idx_workflow_contexts_created_at 
+ON workflow_contexts(created_at DESC);
+
+-- ============================================================================
+-- 12. Agent Sessions Table
+-- ============================================================================
+-- Tracks agent work sessions for learning and analysis
+
+CREATE TABLE IF NOT EXISTS agent_sessions (
+    id TEXT PRIMARY KEY,
+    repository_id TEXT NOT NULL,
+    agent_type TEXT,
+    task_summary TEXT,
+    outcome TEXT,
+    files_modified TEXT,
+    started_at TEXT NOT NULL DEFAULT (datetime('now')),
+    ended_at TEXT,
+    
+    FOREIGN KEY (repository_id) REFERENCES repositories(id) ON DELETE CASCADE,
+    CHECK (outcome IS NULL OR outcome IN ('success', 'failure', 'partial'))
+);
+
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_repository_id ON agent_sessions(repository_id);
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_agent_type ON agent_sessions(agent_type) WHERE agent_type IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_outcome ON agent_sessions(outcome) WHERE outcome IS NOT NULL;
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_started_at ON agent_sessions(started_at DESC);
+CREATE INDEX IF NOT EXISTS idx_agent_sessions_ongoing ON agent_sessions(repository_id) WHERE ended_at IS NULL;
+
 -- Record memory layer migration
 INSERT OR IGNORE INTO schema_migrations (name) VALUES ('002_memory_layer_tables');
 

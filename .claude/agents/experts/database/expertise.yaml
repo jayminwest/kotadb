@@ -257,6 +257,95 @@ key_operations:
     naming: "*Internal() for impl, *() for production, *Local() for tests"
     evidence: "app/src/api/queries.ts pattern throughout, 2026-02-03"
 
+
+  migration_runner_pattern:
+    when: Managing schema versioning and drift detection across database lifecycle
+    pattern: |
+      // File: app/src/db/sqlite/migration-runner.ts
+      interface Migration {
+        filename: string;
+        name: string;           // e.g., "006_add_migration_checksums"
+        number: number;
+        path: string;
+        content: string;
+        checksum: string;       // SHA-256 of file content
+      }
+      
+      // Core workflow:
+      1. scanMigrations(dir) -> find .sql files, parse {number, name}, compute SHA-256
+      2. getAppliedMigrations(db) -> query schema_migrations table with optional checksum
+      3. runMigrations(db, dir) -> apply pending, skip applied, detect drift
+      4. validateChecksum() -> compare file SHA-256 to stored value (drift detection)
+      5. applyMigration() -> execute SQL in transaction, record name + checksum
+    
+    key_operations: |
+      // Filename parsing: NNN_description.sql -> {number: NNN, name: "NNN_description"}
+      const match = filename.match(/^(\d+)_(.+)\.sql$/);
+      
+      // Drift detection: if migration file changed after being applied
+      if (migration.checksum !== applied.checksum) {
+        logger.warn("Migration checksum mismatch (DRIFT DETECTED)");
+        result.driftDetected = true;
+      }
+      
+      // Backward compatibility: old migrations may not have checksums (NULL OK)
+      if (!applied.checksum) {
+        logger.debug("No checksum stored for migration (skipping validation)");
+        return true;  // Legacy migrations pass validation
+      }
+      
+      // Transactional safety: single migration applies atomically
+      db.immediateTransaction(() => {
+        db.exec(migration.content);
+        db.run(
+          "INSERT OR REPLACE INTO schema_migrations (name, checksum, applied_at) VALUES (?, ?, datetime('now'))",
+          [migration.name, migration.checksum]
+        );
+      });
+      
+      // Column detection: handle transition from old schema (no checksum) to new
+      const columns = db.query("SELECT name FROM pragma_table_info('schema_migrations')");
+      const hasChecksum = columns.some((c) => c.name === "checksum");
+      // Conditional INSERT based on column existence
+    
+    benefits: |
+      - Filesystem as source of truth (no hardcoding version numbers)
+      - SHA-256 checksums detect accidental schema_migrations table modifications
+      - Alphabetical file sorting ensures numeric order (001, 002, ..., 010, 011)
+      - Backward compatible: old migrations without checksums skip validation
+      - Transactional: single failure rolls back entire migration
+      - Stop-on-failure: prevents cascading errors from bad migrations
+      - Idempotent: already-applied migrations skipped safely
+    
+    testing_coverage: |
+      // 28 tests in app/src/db/sqlite/__tests__/migration-runner.test.ts:
+      - parseMigrationFilename: valid/invalid formats, multi-digit numbers, underscores
+      - computeChecksum: consistency, 64-char SHA-256 hex output, content variance
+      - scanMigrations: file sorting, checksum inclusion, invalid file handling, empty dir
+      - getAppliedMigrations: with/without checksum column, empty table, missing table
+      - validateChecksum: match/mismatch, legacy NULL handling
+      - applyMigration: successful apply + record, rollback on failure
+      - runMigrations: in-order execution, skip applied, detect drift, stop on error, empty
+      - updateExistingChecksums: backfill NULL checksums, preserve existing
+    
+    schema_evolution: |
+      // Migration 006_add_migration_checksums.sql: adds checksum column retroactively
+      ALTER TABLE schema_migrations ADD COLUMN checksum TEXT;
+      
+      // Use updateExistingChecksums(db, migrationsDir) to backfill old records
+      // This bridges the gap: old migrations without checksums -> checksummed records
+      // Existing records keep their NULL checksums (legacy mode)
+      // New migrations always store checksums for drift detection
+    
+    integration: |
+      // In sqlite-client.ts:
+      - Called from createDatabase() after schema_init
+      - Runs before any user code accesses database
+      - Failures throw and prevent database use
+      - Lazy: only on database open, not on every query
+    
+    evidence: "Commit group: migration infrastructure (#166, #167); files: migration-runner.ts (336 lines), migration-runner.test.ts (493 lines), 006_add_migration_checksums.sql, 2026-02-04"
+
   memory_layer_schema:
     when: Implementing cross-session agent learning
     tables:
@@ -296,6 +385,15 @@ key_operations:
       2. CREATE TABLE/INDEX IF NOT EXISTS (idempotent)
       3. db.transaction(() => { db.exec(sql); db.setSchemaVersion(v); })
       4. Record in schema_migrations table
+    modern_approach: |
+      NEW (2026-02-04): Use migration_runner_pattern instead of manual versioning.
+      The migration-runner module handles:
+      - Filesystem-driven migration discovery (NNN_description.sql format)
+      - Automatic SHA-256 checksum computation and storage
+      - Drift detection (file modified after application)
+      - Backward compatibility (skips validation for old migrations without checksums)
+      - Transactional safety and stop-on-failure semantics
+      See: migration_runner_pattern key_operation above
 
 decision_trees:
   fts5_vs_like:
@@ -405,10 +503,16 @@ known_issues:
     resolution: "Checkpoint periodically, smaller batches"
 
 stability:
-  last_reviewed: 2026-02-03
+  last_reviewed: 2026-02-04
   insight_rate_trend: accelerating
   contradiction_count: 0
   notes: |
+    Latest update (2026-02-04) - migration infrastructure redesign:
+    - Migration Runner Pattern: filesystem-driven migrations with SHA-256 drift detection
+    - Schema Evolution: graceful column addition with backward-compatible validation
+    - Testing: 28 comprehensive tests covering filename parsing, checksums, drift detection
+    - Integration: automatic execution on database open, failure prevention
+    
     Major update (2026-02-03) - added patterns from auto-indexing and memory layer:
     - Repository resolution: UUID vs full_name flexibility with helpful errors
     - CASCADE deletion with FTS5: Single DELETE cleans up all dependencies

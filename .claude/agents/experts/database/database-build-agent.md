@@ -211,6 +211,96 @@ function queryDependencies(db: KotaDatabase, sourceId: string, maxDepth: number)
 - Test FTS5 with simple MATCH query
 - Use EXPLAIN QUERY PLAN to verify index usage
 
+### Migration Implementation (migration-runner pattern)
+
+**Create Migration File**:
+```bash
+# File: app/src/db/migrations/006_add_migration_checksums.sql
+# Naming: NNN_description.sql (numeric prefix ensures ordering)
+
+-- SQLite Migration: Add Checksum Tracking
+--
+-- Migration: 006_add_migration_checksums
+-- Issue: #166 - Migration infrastructure
+-- Date: 2026-02-04
+
+ALTER TABLE schema_migrations ADD COLUMN checksum TEXT;
+CREATE INDEX IF NOT EXISTS idx_schema_migrations_name ON schema_migrations(name);
+INSERT OR IGNORE INTO schema_migrations (name) VALUES ('006_add_migration_checksums');
+```
+
+**Integrate into Database Client**:
+```typescript
+// In app/src/db/sqlite/sqlite-client.ts
+
+import { runMigrations, updateExistingChecksums } from "./migration-runner.js";
+
+export function createDatabase(partialConfig?: Partial<DatabaseConfig>): KotaDatabase {
+    const config = { ...DEFAULT_CONFIG, ...partialConfig };
+    const db = new KotaDatabase(config);
+    
+    // Auto-initialize schema
+    if (!config.readonly && !config.skipSchemaInit) {
+        db.initializeSchema();
+        
+        // NEW: Run migrations
+        const migrationsDir = join(dirname(config.path), 'migrations');
+        const result = runMigrations(db, migrationsDir);
+        
+        if (result.errors.length > 0) {
+            throw new Error(`Migrations failed: ${result.errors.join('; ')}`);
+        }
+        if (result.driftDetected) {
+            logger.warn('Schema drift detected - investigate migration files');
+        }
+    }
+    
+    return db;
+}
+```
+
+**Testing Migration Files**:
+```typescript
+import { runMigrations, computeChecksum } from '@db/sqlite/migration-runner';
+
+describe('Custom Migration', () => {
+    it('should apply migration successfully', () => {
+        const tempDir = mkdtempSync(join(tmpdir(), 'test-migrations-'));
+        const migrationsDir = join(tempDir, 'migrations');
+        mkdirSync(migrationsDir, { recursive: true });
+        
+        // Create migration file
+        const migration = `
+            CREATE TABLE test_table (
+                id INTEGER PRIMARY KEY,
+                name TEXT NOT NULL
+            );
+            INSERT OR IGNORE INTO schema_migrations (name) VALUES ('001_create_test');
+        `;
+        writeFileSync(join(migrationsDir, '001_create_test.sql'), migration);
+        
+        // Run migrations
+        const db = createDatabase({ path: testDbPath, skipSchemaInit: true });
+        db.exec(schema_migrations_table);
+        
+        const result = runMigrations(db, migrationsDir);
+        
+        expect(result.appliedCount).toBe(1);
+        expect(result.driftDetected).toBe(false);
+        expect(db.tableExists('test_table')).toBe(true);
+    });
+});
+```
+
+**Key Implementation Points**:
+- **Filename Format**: `NNN_description.sql` where NNN is numeric (001, 002, ..., 010)
+- **Idempotent SQL**: Use `CREATE TABLE IF NOT EXISTS`, `ALTER TABLE ADD COLUMN IF NOT EXISTS`
+- **Self-Recording**: Include `INSERT OR IGNORE INTO schema_migrations (name) VALUES (?)` in migration
+- **Checksums**: Automatically computed (SHA-256), stored for drift detection
+- **Backward Compatible**: Old migrations without checksums skip validation
+- **Atomic Execution**: Each migration runs in `db.immediateTransaction()` with automatic rollback on error
+- **Stop-on-Failure**: First failure halts subsequent migrations (prevents cascading errors)
+
 ## Memory Integration
 
 Before implementing, search for relevant past context:
