@@ -6,6 +6,7 @@
  */
 
 import {
+	getIndexStatistics,
 	listRecentFiles,
 	queryDependencies,
 	queryDependents,
@@ -350,6 +351,21 @@ export const ANALYZE_CHANGE_IMPACT_TOOL: ToolDefinition = {
 			},
 		},
 		required: ["change_type", "description"],
+	},
+};
+
+/**
+ * Tool: get_index_statistics
+ */
+export const GET_INDEX_STATISTICS_TOOL: ToolDefinition = {
+	tier: "core",
+	name: "get_index_statistics",
+	description:
+		"Get statistics about indexed data (files, symbols, references, decisions, patterns, failures). Useful for understanding what data is available for search.",
+	inputSchema: {
+		type: "object",
+		properties: {},
+		required: [],
 	},
 };
 
@@ -770,6 +786,7 @@ export function getToolDefinitions(): ToolDefinition[] {
 		LIST_RECENT_FILES_TOOL,
 		SEARCH_DEPENDENCIES_TOOL,
 		ANALYZE_CHANGE_IMPACT_TOOL,
+		GET_INDEX_STATISTICS_TOOL,
 		VALIDATE_IMPLEMENTATION_SPEC_TOOL,
 		SYNC_EXPORT_TOOL,
 		SYNC_IMPORT_TOOL,
@@ -958,11 +975,121 @@ async function searchSymbols(
 	}));
 }
 
+/**
+ * Generate contextual tips based on search query and parameters.
+ * Uses static pattern matching (no NLP) to detect suboptimal usage patterns.
+ * 
+ * Tip frequency: MODERATE - show tips frequently including "nice to know" suggestions.
+ * 
+ * @param query - Search query string
+ * @param scopes - Search scopes used
+ * @param filters - Normalized filters applied
+ * @param scopeResults - Results by scope
+ * @returns Array of tip strings (empty if search is optimal)
+ */
+function generateSearchTips(
+	query: string,
+	scopes: string[],
+	filters: NormalizedFilters,
+	scopeResults: Record<string, unknown[]>
+): string[] {
+	const tips: string[] = [];
+	const queryLower = query.toLowerCase();
+	
+	// Pattern 1: Query contains structural keywords but not using symbols scope
+	const structuralKeywords = ['function', 'class', 'interface', 'type', 'method', 'component'];
+	const hasStructuralKeyword = structuralKeywords.some(kw => queryLower.includes(kw));
+	
+	if (hasStructuralKeyword && !scopes.includes('symbols')) {
+		const matchedKeyword = structuralKeywords.find(kw => queryLower.includes(kw)) || 'function';
+		tips.push(
+			`You searched for "${query}" in code. Try scope: ['symbols'] with filters: {symbol_kind: ['${matchedKeyword}']} for precise structural discovery.`
+		);
+	}
+	
+	// Pattern 2: Query looks like a file path but using code search
+	const looksLikeFilePath = /^[\w\-./]+\.(ts|tsx|js|jsx|py|rs|go|java)$/i.test(query);
+	if (looksLikeFilePath && scopes.includes('code')) {
+		tips.push(
+			`Query "${query}" looks like a file path. Consider using search_dependencies tool to find files that depend on this file or its dependencies.`
+		);
+	}
+	
+	// Pattern 3: Symbol search without exported_only filter
+	if (scopes.includes('symbols') && filters.exported_only === undefined) {
+		const symbolCount = scopeResults['symbols']?.length || 0;
+		if (symbolCount > 10) {
+			tips.push(
+				`Found ${symbolCount} symbols. Add filters: {exported_only: true} to narrow to public API only.`
+			);
+		}
+	}
+	
+	// Pattern 4: No repository filter with large result set
+	if (!filters.repositoryId) {
+		const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
+		if (totalResults > 20) {
+			tips.push(
+				`Found ${totalResults} results across all repositories. Add filters: {repository: "owner/repo"} to narrow to a specific repository.`
+			);
+		}
+	}
+	
+	// Pattern 5: Code search without glob/language filters
+	if (scopes.includes('code') && !filters.glob && !filters.language) {
+		const codeCount = scopeResults['code']?.length || 0;
+		if (codeCount > 15) {
+			tips.push(
+				`Found ${codeCount} code results. Try filters: {glob: "**/*.ts"} or {language: "typescript"} to narrow file types.`
+			);
+		}
+	}
+	
+	// Pattern 6: Suggest decisions scope for "why" questions
+	if (/\b(why|reason|decision|chose|choice)\b/i.test(query) && !scopes.includes('decisions')) {
+		tips.push(
+			`Query contains "why/reason/decision". Try scope: ['decisions'] to search architectural decisions and rationale.`
+		);
+	}
+	
+	// Pattern 7: Suggest patterns scope for "how" questions
+	if (/\b(how|pattern|best practice|convention)\b/i.test(query) && !scopes.includes('patterns')) {
+		tips.push(
+			`Query asks "how to". Try scope: ['patterns'] to search coding patterns and conventions from this codebase.`
+		);
+	}
+	
+	// Pattern 8: Suggest failures scope for error-related queries
+	if (/\b(error|bug|fail|issue|problem|fix)\b/i.test(query) && !scopes.includes('failures')) {
+		tips.push(
+			`Query mentions errors/issues. Try scope: ['failures'] to learn from past mistakes and avoid repeated failures.`
+		);
+	}
+	
+	// Pattern 9: Single scope when multi-scope could be useful
+	if (scopes.length === 1 && scopes[0] === 'code') {
+		tips.push(
+			`Tip: You can search multiple scopes simultaneously. Try scope: ['code', 'symbols'] for broader discovery.`
+		);
+	}
+	
+	// Pattern 10: Suggest compact format for large result sets
+	const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
+	if (totalResults > 30 && !tips.some(t => t.includes('output: "compact"'))) {
+		tips.push(
+			`Returning ${totalResults} full results. Use output: "compact" for summary view or output: "paths" for file paths only.`
+		);
+	}
+	
+	return tips;
+}
+
 function formatSearchResults(
 	query: string,
 	scopes: string[],
 	scopeResults: Record<string, unknown[]>,
-	format: string
+	format: string,
+	filters: NormalizedFilters
 ): Record<string, unknown> {
 	const response: Record<string, unknown> = {
 		query,
@@ -1007,6 +1134,13 @@ function formatSearchResults(
 		(response.counts as Record<string, unknown>).total = ((response.counts as Record<string, unknown>).total as number) + items.length;
 	}
 
+	
+	// Generate and add tips if applicable
+	const tips = generateSearchTips(query, scopes, filters, scopeResults);
+	if (tips.length > 0) {
+		response.tips = tips;
+	}
+	
 	return response;
 }
 
@@ -1142,7 +1276,7 @@ export async function executeSearch(
 	await Promise.all(searchPromises);
 
 	// Format output
-	const response = formatSearchResults(p.query as string, scopes, results, output);
+	const response = formatSearchResults(p.query as string, scopes, results, output, filters);
 
 	logger.info("Unified search completed", {
 		query: p.query,
@@ -1632,6 +1766,26 @@ export async function executeAnalyzeChangeImpact(
 	const result = await analyzeChangeImpact(validatedParams, userId);
 
 	return result;
+}
+
+/**
+ * Execute get_index_statistics tool
+ */
+export async function executeGetIndexStatistics(
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// No parameters to validate
+	
+	logger.info("Getting index statistics", { request_id: String(requestId), user_id: userId });
+	
+	const stats = getIndexStatistics();
+	
+	return {
+		...stats,
+		summary: `${stats.symbols.toLocaleString()} symbols, ${stats.files.toLocaleString()} files, ${stats.repositories} repositories indexed`,
+	};
 }
 
 /**
