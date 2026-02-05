@@ -25,7 +25,7 @@ import {
   extractTextFromMessages 
 } from "./parser.ts";
 import { handlePRCreation, commitExpertiseChanges, type IssueType } from "./pr.ts";
-import { clearWorkflowContext } from "./context.ts";
+import { clearWorkflowContext, getWorkflowContext } from "./context.ts";
 import { curateContext, type CuratedContext } from "./curator.ts";
 import { autoRecordSuccess, autoRecordFailure } from "./auto-record.ts";
 import { withRetry } from "./retry.ts";
@@ -348,8 +348,24 @@ export async function orchestrateWorkflow(
   } else {
     reporter.startPhase("plan");
     logger.logEvent("PHASE_START", { phase: "plan", domain });
+
+    // Retrieve curated context from analysis phase
+    let planCuratedContext: string | null = null;
+    if (workflowId) {
+      try {
+        const ctx = getWorkflowContext(workflowId, 'analysis');
+        if (ctx?.summary) {
+          planCuratedContext = ctx.summary.slice(0, 2000);
+          logger.logEvent("CONTEXT_INJECTED", { phase: "plan", source: "analysis", length: planCuratedContext.length });
+        }
+      } catch (error) {
+        logger.logError("context_retrieval_plan", error instanceof Error ? error : new Error(String(error)));
+        reporter.logWarning("Context retrieval for plan failed (non-fatal)");
+      }
+    }
+
     const retryResult = await withRetry(
-      () => executePlan(domain, requirements, issueNumber, sdkOptions, logger, dryRun)
+      () => executePlan(domain, requirements, issueNumber, sdkOptions, logger, dryRun, planCuratedContext)
     );
     logRetryStats(logger, "plan", retryResult);
     specPath = retryResult.result;
@@ -404,8 +420,24 @@ export async function orchestrateWorkflow(
   } else {
     reporter.startPhase("build");
     logger.logEvent("PHASE_START", { phase: "build", domain });
+
+    // Retrieve curated context from plan phase
+    let buildCuratedContext: string | null = null;
+    if (workflowId) {
+      try {
+        const ctx = getWorkflowContext(workflowId, 'plan');
+        if (ctx?.summary) {
+          buildCuratedContext = ctx.summary.slice(0, 2000);
+          logger.logEvent("CONTEXT_INJECTED", { phase: "build", source: "plan", length: buildCuratedContext.length });
+        }
+      } catch (error) {
+        logger.logError("context_retrieval_build", error instanceof Error ? error : new Error(String(error)));
+        reporter.logWarning("Context retrieval for build failed (non-fatal)");
+      }
+    }
+
     const retryResult = await withRetry(
-      () => executeBuild(domain, specPath, sdkOptions, logger, dryRun)
+      () => executeBuild(domain, specPath, sdkOptions, logger, dryRun, buildCuratedContext)
     );
     logRetryStats(logger, "build", retryResult);
     filesModified = retryResult.result;
@@ -460,10 +492,26 @@ export async function orchestrateWorkflow(
   } else {
     reporter.startPhase("improve");
     logger.logEvent("PHASE_START", { phase: "improve", domain });
+
+    // Retrieve curated context from build phase
+    let improveCuratedContext: string | null = null;
+    if (workflowId) {
+      try {
+        const ctx = getWorkflowContext(workflowId, 'build');
+        if (ctx?.summary) {
+          improveCuratedContext = ctx.summary.slice(0, 2000);
+          logger.logEvent("CONTEXT_INJECTED", { phase: "improve", source: "build", length: improveCuratedContext.length });
+        }
+      } catch (error) {
+        logger.logError("context_retrieval_improve", error instanceof Error ? error : new Error(String(error)));
+        reporter.logWarning("Context retrieval for improve failed (non-fatal)");
+      }
+    }
+
     try {
       if (!dryRun) {
         const retryResult = await withRetry(
-          () => executeImprove(domain, sdkOptions, logger)
+          () => executeImprove(domain, sdkOptions, logger, improveCuratedContext)
         );
         logRetryStats(logger, "improve", retryResult);
       } else {
@@ -705,8 +753,13 @@ async function executePlan(
   issueNumber: number,
   options: AutomationSDKOptions,
   logger: WorkflowLogger,
-  dryRun: boolean
+  dryRun: boolean,
+  curatedContext?: string | null
 ): Promise<string> {
+  const contextSection = curatedContext
+    ? `\n\n## KotaDB Context (from previous phase)\n${curatedContext}`
+    : '';
+
   const prompt = `
 You are the ${domain}-plan-agent.
 
@@ -722,7 +775,7 @@ Save spec to: docs/specs/${domain}/<descriptive-slug>-spec.md
 The spec should address GitHub issue #${issueNumber}.
 
 Return the absolute spec path when complete.
-`;
+${contextSection}`;
 
   const messages: SDKMessage[] = [];
   for await (const message of query({ prompt, options })) {
@@ -739,8 +792,13 @@ async function executeBuild(
   specPath: string,
   options: AutomationSDKOptions,
   logger: WorkflowLogger,
-  dryRun: boolean
+  dryRun: boolean,
+  curatedContext?: string | null
 ): Promise<string[]> {
+  const contextSection = curatedContext
+    ? `\n\n## KotaDB Context (from previous phase)\n${curatedContext}`
+    : '';
+
   const prompt = `
 You are the ${domain}-build-agent.
 
@@ -751,7 +809,7 @@ ${dryRun ? "DRY_RUN: true (validate only, no file writes)" : ""}
 
 Read the specification and implement the changes.
 Report absolute file paths for all files modified.
-`;
+${contextSection}`;
 
   const messages: SDKMessage[] = [];
   for await (const message of query({ prompt, options })) {
@@ -766,8 +824,13 @@ Report absolute file paths for all files modified.
 async function executeImprove(
   domain: string,
   options: AutomationSDKOptions,
-  logger: WorkflowLogger
+  logger: WorkflowLogger,
+  curatedContext?: string | null
 ): Promise<void> {
+  const contextSection = curatedContext
+    ? `\n\n## KotaDB Context (from previous phase)\n${curatedContext}`
+    : '';
+
   const prompt = `
 You are the ${domain}-improve-agent.
 
@@ -775,7 +838,7 @@ AUTOMATION_MODE: true
 
 Review recent ${domain} changes from git history.
 Extract learnings and update expertise.yaml with new patterns.
-`;
+${contextSection}`;
 
   const messages: SDKMessage[] = [];
   for await (const message of query({ prompt, options })) {

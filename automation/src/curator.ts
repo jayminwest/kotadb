@@ -2,9 +2,11 @@
  * Haiku-powered context curator for workflow phase transitions
  * 
  * Uses lightweight haiku model to query KotaDB memory tools (failures, patterns, decisions)
- * and produce curated ~500 token summaries for next phase injection.
+ * and code intelligence tools (dependencies, impact, task context) to produce curated
+ * ~500 token summaries for next phase injection.
  * 
  * Issue: #148 - Deep KotaDB Integration
+ * Issue: #191 - Wire up curated context injection
  */
 import { join } from "node:path";
 import { query, type SDKMessage } from "@anthropic-ai/claude-code";
@@ -51,6 +53,9 @@ export interface CuratedContext {
   /** Relevant decisions found */
   relevantDecisions: string[];
   
+  /** Code intelligence findings (dependencies, impact, task context) */
+  codeIntelligence?: string[];
+  
   /** Timestamp */
   timestamp: string;
   
@@ -63,6 +68,7 @@ interface CuratedSummary {
   failures: string[];
   patterns: string[];
   decisions: string[];
+  codeIntelligence: string[];
 }
 
 /**
@@ -117,6 +123,7 @@ export async function curateContext(options: CurationOptions): Promise<CuratedCo
     relevantFailures: curatedSummary.failures,
     relevantPatterns: curatedSummary.patterns,
     relevantDecisions: curatedSummary.decisions,
+    codeIntelligence: curatedSummary.codeIntelligence.length > 0 ? curatedSummary.codeIntelligence : undefined,
     timestamp: new Date().toISOString(),
     tokenCount: curatedSummary.summary.split(/\s+/).length
   };
@@ -127,13 +134,16 @@ export async function curateContext(options: CurationOptions): Promise<CuratedCo
     phase === 'post-plan' ? 'plan' :
     'build'; // post-build
   
+  const codeIntelFindings = (curatedContext.codeIntelligence ?? []).map(ci => `CODE_INTEL: ${ci}`);
+  
   const contextData: WorkflowContextData = {
     phase: workflowPhase,
     summary: curatedContext.summary,
     keyFindings: [
       ...curatedContext.relevantFailures.map(f => `FAILURE: ${f}`),
       ...curatedContext.relevantPatterns.map(p => `PATTERN: ${p}`),
-      ...curatedContext.relevantDecisions.map(d => `DECISION: ${d}`)
+      ...curatedContext.relevantDecisions.map(d => `DECISION: ${d}`),
+      ...codeIntelFindings
     ],
     timestamp: curatedContext.timestamp
   };
@@ -143,10 +153,38 @@ export async function curateContext(options: CurationOptions): Promise<CuratedCo
   logger.logEvent("CURATOR_COMPLETE", { 
     workflow_id: workflowId, 
     phase, 
-    token_count: curatedContext.tokenCount 
+    token_count: curatedContext.tokenCount,
+    code_intel_count: curatedContext.codeIntelligence?.length ?? 0
   });
   
   return curatedContext;
+}
+
+/**
+ * Build phase-specific code intelligence instructions
+ * 
+ * Different phases benefit from different code intelligence queries:
+ * - post-analysis: generate_task_context on key files for plan phase awareness
+ * - post-plan: search_dependencies + analyze_change_impact for build phase awareness
+ * - post-build: search_dependencies on modified files for improve phase awareness
+ */
+function buildCodeIntelligenceInstructions(phase: string, currentPhaseOutput: string): string {
+  switch (phase) {
+    case 'post-analysis':
+      return `4. Use generate_task_context on key files mentioned in the analysis output to understand file dependencies and structure. This helps the plan phase understand what it is working with.
+5. Focus on files that appear central to the requirements.`;
+
+    case 'post-plan': {
+      return `4. Use search_dependencies on files listed in the spec that will be modified, to understand their dependents and dependencies. This helps the build phase understand impact radius.
+5. Use analyze_change_impact with a brief description of the planned changes to assess risk and identify affected areas.`;
+    }
+
+    case 'post-build':
+      return `4. Use search_dependencies on the modified files to identify what other files may be affected. This helps the improve phase understand what to review and validate.`;
+
+    default:
+      return '';
+  }
 }
 
 function buildCuratorPrompt(options: {
@@ -155,6 +193,8 @@ function buildCuratorPrompt(options: {
   currentPhaseOutput: string;
 }): string {
   const { phase, domain, currentPhaseOutput } = options;
+  
+  const codeIntelInstructions = buildCodeIntelligenceInstructions(phase, currentPhaseOutput);
   
   return `You are a context curator for the ${domain} domain in an automated workflow.
 
@@ -166,6 +206,12 @@ Query KotaDB memory tools to find relevant context for the next phase:
 2. Use search tool with scope=["patterns"] to find established patterns for ${domain}
 3. Use search tool with scope=["decisions"] to find architectural decisions for ${domain}
 
+## Code Intelligence Queries
+
+${codeIntelInstructions}
+
+If any code intelligence tool returns empty results, skip it and move on.
+
 ## Current Phase Output
 
 ${currentPhaseOutput}
@@ -173,8 +219,9 @@ ${currentPhaseOutput}
 ## Instructions
 
 1. Query each scope (failures, patterns, decisions) with relevant search terms
-2. Synthesize findings into a curated ~500 token summary
-3. Return structured output:
+2. Run the code intelligence queries listed above
+3. Synthesize findings into a curated ~500 token summary
+4. Return structured output:
 
 **CURATED CONTEXT**
 
@@ -195,6 +242,11 @@ ${currentPhaseOutput}
 - [Decision 2 - one line]
 - ...
 
+**Code Intelligence**:
+- [Finding 1 - one line]
+- [Finding 2 - one line]
+- ...
+
 Be concise. Focus on actionable insights that will help the next phase avoid mistakes and follow conventions.
 `;
 }
@@ -207,10 +259,11 @@ function extractCuratedSummary(messages: SDKMessage[]): CuratedSummary {
     .join("\n");
   
   // Parse structured output (simple regex-based extraction)
-  const summaryMatch = assistantText.match(/\*\*Summary\*\*:\s*(.+?)(?=\*\*Relevant|$)/s);
+  const summaryMatch = assistantText.match(/\*\*Summary\*\*:\s*(.+?)(?=\*\*Relevant|\*\*Code Intelligence|$)/s);
   const failuresMatch = assistantText.match(/\*\*Relevant Failures\*\*:\s*((?:- .+\n?)+)/);
   const patternsMatch = assistantText.match(/\*\*Relevant Patterns\*\*:\s*((?:- .+\n?)+)/);
   const decisionsMatch = assistantText.match(/\*\*Relevant Decisions\*\*:\s*((?:- .+\n?)+)/);
+  const codeIntelMatch = assistantText.match(/\*\*Code Intelligence\*\*:\s*((?:- .+\n?)+)/);
   
   const extractItems = (match: RegExpMatchArray | null): string[] => {
     if (!match || !match[1]) return [];
@@ -224,6 +277,7 @@ function extractCuratedSummary(messages: SDKMessage[]): CuratedSummary {
     summary: summaryMatch?.[1]?.trim() || "No summary generated",
     failures: extractItems(failuresMatch),
     patterns: extractItems(patternsMatch),
-    decisions: extractItems(decisionsMatch)
+    decisions: extractItems(decisionsMatch),
+    codeIntelligence: extractItems(codeIntelMatch)
   };
 }
