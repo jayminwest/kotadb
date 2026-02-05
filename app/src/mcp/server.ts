@@ -245,6 +245,13 @@ export function createMcpServer(context: McpServerContext): Server {
 						context.userId,
 					);
 					break;
+				case "get_index_statistics":
+					result = await executeGetIndexStatistics(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
 				default:
 					const error = new Error(`Unknown tool: ${name}`);
 					logger.error("Unknown MCP tool requested", error, {
