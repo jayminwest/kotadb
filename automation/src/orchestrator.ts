@@ -2,6 +2,7 @@
  * Multi-phase workflow orchestration
  * Bypasses /do command and approval gates for headless execution
  */
+import { join } from "node:path";
 import { 
   query, 
   type SDKMessage, 
@@ -49,6 +50,7 @@ export interface OrchestrationResult {
 export interface OrchestrationOptions {
   issueNumber: number;
   projectRoot: string;
+  mainProjectRoot: string;
   branchName: string | null;
   logger: WorkflowLogger;
   reporter: ConsoleReporter;
@@ -70,7 +72,7 @@ interface AutomationSDKOptions extends Options {
       type: "stdio";
       command: string;
       args: string[];
-      env: { KOTADB_CWD: string };
+      env: { KOTADB_PATH: string };
     };
   };
 }
@@ -149,7 +151,17 @@ function createNotificationHook(reporter: ConsoleReporter): HookCallback {
 export async function orchestrateWorkflow(
   opts: OrchestrationOptions
 ): Promise<OrchestrationResult> {
-  const { issueNumber, projectRoot, branchName, logger, reporter, dryRun, verbose, workflowId } = opts;
+  const { 
+    issueNumber, 
+    projectRoot, 
+    mainProjectRoot,
+    branchName, 
+    logger, 
+    reporter, 
+    dryRun, 
+    verbose, 
+    workflowId 
+  } = opts;
 
   // Fetch issue title early for PR creation
   const issueData = await fetchIssueContent(issueNumber);
@@ -183,8 +195,8 @@ export async function orchestrateWorkflow(
       kotadb: {
         type: "stdio",
         command: "bunx",
-        args: ["--bun", "kotadb"],
-        env: { KOTADB_CWD: projectRoot }
+        args: ["--bun", "kotadb", "--stdio"],
+        env: { KOTADB_PATH: join(mainProjectRoot, ".kotadb", "kota.db") }
       }
     },
     // Suppress default stderr dots
@@ -214,7 +226,7 @@ export async function orchestrateWorkflow(
         phase: 'post-analysis',
         domain,
         currentPhaseOutput: analysisResult,
-        projectRoot,
+        projectRoot: mainProjectRoot,
         logger,
         reporter
       });
@@ -246,7 +258,7 @@ export async function orchestrateWorkflow(
         phase: 'post-plan',
         domain,
         currentPhaseOutput: planOutput,
-        projectRoot,
+        projectRoot: mainProjectRoot,
         logger,
         reporter
       });
@@ -277,7 +289,7 @@ export async function orchestrateWorkflow(
         phase: 'post-build',
         domain,
         currentPhaseOutput: buildOutput,
-        projectRoot,
+        projectRoot: mainProjectRoot,
         logger,
         reporter
       });
@@ -319,7 +331,7 @@ export async function orchestrateWorkflow(
           issueNumber,
           domain,
           filesModified,
-          projectRoot,
+          projectRoot: mainProjectRoot,
           logger,
           reporter
         });
@@ -329,7 +341,7 @@ export async function orchestrateWorkflow(
           issueNumber,
           domain,
           error: "Improve phase failed",
-          projectRoot,
+          projectRoot: mainProjectRoot,
           logger,
           reporter
         });
@@ -370,7 +382,8 @@ export async function orchestrateWorkflow(
         issueTitle,
         domain,
         filesModified,
-        dryRun
+        dryRun,
+        workflowId: workflowId ?? undefined
       });
       
       if (prResult.success && prResult.prUrl) {
