@@ -25,6 +25,7 @@ import {
 	searchFilesLocal,
 	listRecentFilesLocal,
 	resolveFilePathLocal,
+	extractLineSnippets,
 } from "@api/queries.js";
 import { storeIndexedDataLocal } from "@indexer/storage.js";
 import type { IndexedFile } from "@shared/types";
@@ -1024,5 +1025,130 @@ describe("Dependency Graph - Local Mode", () => {
 	});
 
 
+
+
+describe("extractLineSnippets()", () => {
+	test("should extract single match with default context", () => {
+		const content = [
+			"line 1",
+			"line 2",
+			"needle here",
+			"line 4",
+			"line 5"
+		].join('\n');
+		
+		const snippets = extractLineSnippets(content, "needle", 1);
+		
+		expect(snippets).toHaveLength(1);
+		expect(snippets[0]).toEqual({
+			line: 3,
+			content: "needle here",
+			context_before: ["line 2"],
+			context_after: ["line 4"]
+		});
+	});
+	
+	test("should extract multiple matches separately", () => {
+		const content = [
+			"match 1",
+			"normal line",
+			"match 2",
+			"normal line",
+			"match 3"
+		].join('\n');
+		
+		const snippets = extractLineSnippets(content, "match", 1);
+		
+		expect(snippets).toHaveLength(3);
+		expect(snippets[0]?.line).toBe(1);
+		expect(snippets[1]?.line).toBe(3);
+		expect(snippets[2]?.line).toBe(5);
+	});
+	
+	test("should handle matches at file boundaries", () => {
+		const content = [
+			"first line match",
+			"middle",
+			"last line match"
+		].join('\n');
+		
+		const snippets = extractLineSnippets(content, "match", 2);
+		
+		expect(snippets).toHaveLength(2);
+		// First match: no context before
+		expect(snippets[0]?.context_before).toEqual([]);
+		expect(snippets[0]?.context_after).toEqual(["middle", "last line match"]);
+		
+		// Last match: no context after
+		expect(snippets[1]?.context_before).toEqual(["first line match", "middle"]);
+		expect(snippets[1]?.context_after).toEqual([]);
+	});
+	
+	test("should respect max context lines", () => {
+		const content = Array(20).fill("line").join('\n') + '\nmatch here\n' + Array(20).fill("line").join('\n');
+		
+		const snippets = extractLineSnippets(content, "match", 5);
+		
+		expect(snippets[0]?.context_before).toHaveLength(5);
+		expect(snippets[0]?.context_after).toHaveLength(5);
+	});
+	
+	test("should handle empty content", () => {
+		const snippets = extractLineSnippets("", "query", 3);
+		expect(snippets).toEqual([]);
+	});
+	
+	test("should handle no matches", () => {
+		const content = "line 1\nline 2\nline 3";
+		const snippets = extractLineSnippets(content, "notfound", 3);
+		expect(snippets).toEqual([]);
+	});
+	
+	test("should perform case-insensitive matching", () => {
+		const content = "Line with NEEDLE here\nLine with needle here";
+		const snippets = extractLineSnippets(content, "needle", 0);
+		expect(snippets).toHaveLength(2);
+	});
+	
+	test("should handle context_lines=0", () => {
+		const content = "before\nmatch\nafter";
+		const snippets = extractLineSnippets(content, "match", 0);
+		
+		expect(snippets[0]).toEqual({
+			line: 2,
+			content: "match",
+			context_before: [],
+			context_after: []
+		});
+	});
+	
+	test("should handle very long lines", () => {
+		const longLine = "x".repeat(10000) + "needle" + "y".repeat(10000);
+		const snippets = extractLineSnippets(longLine, "needle", 1);
+		expect(snippets[0]?.content).toContain("needle");
+	});
+	
+	test("should handle unicode content", () => {
+		const content = "日本語\nneedle here 🎉\n中文";
+		const snippets = extractLineSnippets(content, "needle", 1);
+		expect(snippets[0]?.line).toBe(2);
+	});
+	
+	test("should handle overlapping matches (no merge)", () => {
+		const content = [
+			"line 1",
+			"match A",
+			"match B",
+			"line 4"
+		].join('\n');
+		
+		const snippets = extractLineSnippets(content, "match", 1);
+		
+		// Should return 2 separate snippets, not merged
+		expect(snippets).toHaveLength(2);
+		expect(snippets[0]?.context_after).toContain("match B");
+		expect(snippets[1]?.context_before).toContain("match A");
+	});
+});
 
 });
