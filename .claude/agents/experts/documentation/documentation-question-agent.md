@@ -11,6 +11,16 @@ tools:
 model: haiku
 color: cyan
 readOnly: true
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      required: true
+  produces:
+    memory:
+      allowed:
+        - insight
+  contextSource: prompt
 expertDomain: documentation
 ---
 

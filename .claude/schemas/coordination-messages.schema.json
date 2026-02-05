@@ -1,0 +1,163 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Coordination Messages Schema",
+  "description": "Message types for agent coordination and orchestration",
+  "definitions": {
+    "WorkerResult": {
+      "type": "object",
+      "required": ["status", "summary"],
+      "properties": {
+        "status": {
+          "enum": ["complete", "blocked", "failed"],
+          "description": "Outcome of worker task"
+        },
+        "summary": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "1-3 sentences summarizing result"
+        },
+        "filesModified": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of files created or modified (absolute paths)"
+        },
+        "filesRead": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "List of files read for context"
+        },
+        "blockedBy": {
+          "type": "string",
+          "description": "Reason for blocked status (required if status is blocked)"
+        },
+        "error": {
+          "type": "string",
+          "description": "Error message (required if status is failed)"
+        },
+        "nextSteps": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Recommended next actions"
+        }
+      }
+    },
+    "TaskAssignment": {
+      "type": "object",
+      "required": ["taskId", "agentName", "objective"],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Unique identifier for this task"
+        },
+        "agentName": {
+          "type": "string",
+          "description": "Name of agent being assigned the task"
+        },
+        "objective": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Clear, concise task objective"
+        },
+        "context": {
+          "type": "object",
+          "description": "Relevant context for the task",
+          "properties": {
+            "issue": { "type": "string" },
+            "spec": { "type": "string" },
+            "dependencies": {
+              "type": "array",
+              "items": { "type": "string" }
+            }
+          }
+        },
+        "constraints": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Specific constraints or requirements"
+        }
+      }
+    },
+    "StatusUpdate": {
+      "type": "object",
+      "required": ["taskId", "status", "progress"],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task being updated"
+        },
+        "status": {
+          "enum": ["in_progress", "complete", "blocked", "failed"],
+          "description": "Current task status"
+        },
+        "progress": {
+          "type": "string",
+          "maxLength": 200,
+          "description": "Brief progress description"
+        },
+        "blockedBy": {
+          "type": "string",
+          "description": "Blocker description if status is blocked"
+        }
+      }
+    },
+    "Question": {
+      "type": "object",
+      "required": ["taskId", "question"],
+      "properties": {
+        "taskId": {
+          "type": "string",
+          "description": "Task this question relates to"
+        },
+        "question": {
+          "type": "string",
+          "maxLength": 300,
+          "description": "Specific question needing answer"
+        },
+        "context": {
+          "type": "string",
+          "description": "Additional context for the question"
+        },
+        "options": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Potential answer options if applicable"
+        }
+      }
+    },
+    "CoordinationMessage": {
+      "type": "object",
+      "required": ["type", "from", "to", "timestamp"],
+      "properties": {
+        "type": {
+          "enum": ["task_assignment", "status_update", "question", "result"],
+          "description": "Type of coordination message"
+        },
+        "from": {
+          "type": "string",
+          "description": "Sender agent name"
+        },
+        "to": {
+          "type": "string",
+          "description": "Recipient agent name or 'orchestrator'"
+        },
+        "timestamp": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp"
+        },
+        "content": {
+          "oneOf": [
+            { "$ref": "#/definitions/TaskAssignment" },
+            { "$ref": "#/definitions/StatusUpdate" },
+            { "$ref": "#/definitions/Question" },
+            { "$ref": "#/definitions/WorkerResult" }
+          ],
+          "description": "Message payload matching the type"
+        }
+      }
+    }
+  },
+  "oneOf": [
+    { "$ref": "#/definitions/CoordinationMessage" }
+  ]
+}

@@ -1,7 +1,11 @@
 ---
 name: docs-scraper
 description: Documentation scraping specialist. Use proactively to fetch and save documentation from URLs as properly formatted markdown files.
-tools: mcp__firecrawl-mcp__firecrawl_scrape, WebFetch, Write, Edit
+tools:
+  - mcp__firecrawl-mcp__firecrawl_scrape
+  - WebFetch
+  - Write
+  - Edit
 model: sonnet
 color: blue
 ---

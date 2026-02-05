@@ -1,0 +1,163 @@
+# NEW OPERATIONS TO ADD TO key_operations section (after mcp_tool_naming_and_usage):
+
+  implement_context_contracts:
+    when: Adding declarative context requirements and scope enforcement to agents
+    approach: |
+      1. Create JSON Schemas for validation (.claude/schemas/)
+      2. Add contextContract to agent frontmatter
+      3. Implement Python validation hooks (validate-agents.py, validate-agent-edit.py)
+      4. Implement TypeScript runtime validation (scope-enforcement.ts)
+      5. Document contracts (.claude/docs/context-contracts.md)
+    contract_structure:
+      requires: List of required inputs (spec_file, expertise, memory, prompt, file, env)
+      produces: Output scope (files, tests, memory)
+      contextSource: Primary input mechanism (spec_file, prompt, inbox, hybrid)
+      validation: Pre-spawn and post-complete checks
+    validation_layers:
+      - Pre-commit: JSON Schema validation via validate-agents.py hook
+      - Pre-spawn: Requirement validation before agent spawning
+      - Runtime: Scope enforcement via PreToolUse hook
+      - Post-complete: Output validation after agent finishes
+    rationale: |
+      Declarative contracts enable orchestrators to validate requirements before spawning,
+      enforce scope boundaries during execution, and verify outputs after completion.
+      Moves coordination logic from prose to machine-readable specifications.
+    timestamp: 2026-02-05
+    evidence: Issues #175, #178
+
+  auto_generate_agent_registry:
+    when: Maintaining agent-registry.json in sync with agent files
+    approach: |
+      1. Create .claude/scripts/generate-registry.py
+      2. Scan all .md files in .claude/agents/
+      3. Parse frontmatter and extract metadata
+      4. Generate registry with agents, capabilityIndex, modelIndex, toolMatrix
+      5. Run as pre-commit hook via validate-agents.py
+    benefits:
+      - Eliminates manual registry maintenance
+      - Prevents registry/agent file divergence
+      - Includes context contract summaries
+      - Auto-builds capability and tool indexes
+    rationale: Registry is derived artifact from agent files, not manual artifact
+    timestamp: 2026-02-05
+    evidence: .claude/scripts/generate-registry.py
+
+  validate_frontmatter_with_schema:
+    when: Ensuring agent frontmatter consistency and catching errors early
+    approach: |
+      1. Create JSON Schema (.claude/schemas/agent-frontmatter.schema.json)
+      2. Create validation script (.claude/scripts/validate-frontmatter.py)
+      3. Run validation in pre-commit hook
+      4. Block commits on schema violations
+    validated_fields:
+      - name: Must match ^[a-z]+(-[a-z]+)*-agent$ pattern
+      - description: Max 200 chars, no colons
+      - tools: YAML array with enum validation
+      - contextContract: Nested contract schema validation
+    rationale: Catches frontmatter errors before they cause silent agent failures
+    timestamp: 2026-02-05
+    evidence: .claude/schemas/agent-frontmatter.schema.json
+
+  enforce_scope_with_prehook:
+    when: Preventing agents from modifying files outside their declared scope
+    approach: |
+      1. Create TypeScript hook (.claude/hooks/scope-enforcement.ts)
+      2. Trigger on PreToolUse for Write/Edit operations
+      3. Parse agent contract from frontmatter
+      4. Validate file path against produces.files.scope glob pattern
+      5. Block operation if outside scope
+    glob_patterns:
+      - "app/src/db/**" - Database domain
+      - ".claude/**" - Claude config domain
+      - "app/src/{api,mcp}/**" - Multiple directories
+    enforcement: Hard block on scope violations (returns fail result)
+    rationale: |
+      Scope enforcement prevents accidental cross-domain modifications and ensures
+      agents stay within their declared expertise boundaries.
+    timestamp: 2026-02-05
+    evidence: .claude/hooks/scope-enforcement.ts
+
+# NEW PATTERN TO ADD TO patterns section:
+
+  context_contract_standard:
+    build_agents:
+      contextSource: spec_file
+      requires: [spec_file (SPEC), expertise (domain.yaml)]
+      produces: [files (domain scope), tests (domain tests), memory (decision/failure/insight)]
+      validation: [preSpawn (file_exists SPEC)]
+    question_agents:
+      contextSource: prompt
+      requires: [prompt (USER_PROMPT), expertise (domain.yaml)]
+      produces: [memory (insight only)]
+
+  dual_language_approach:
+    pattern: |
+      Python for git hooks and CLI tools, TypeScript for runtime validation
+    rationale: |
+      Python integrates naturally with git hooks and provides excellent scripting.
+      TypeScript provides type safety for runtime contract validation.
+    files:
+      python: [validate-agents.py, validate-frontmatter.py, generate-registry.py, check-expertise-size.py]
+      typescript: [scope-enforcement.ts, contract-validator.ts]
+    conventions:
+      python: Use jsonschema library, sys.stdout.write for output, exit 0 on errors
+      typescript: Parse YAML frontmatter, glob matching for scope validation
+    trade_offs:
+      pros: [Best tool for each job, Strong validation, Git integration]
+      cons: [Two language ecosystems, Dependency management complexity]
+    timestamp: 2026-02-05
+
+# ADDITIONS TO core_implementation.directory_structure:
+
+    schemas: JSON Schema files for frontmatter and contracts
+    scripts: Python utilities for validation and registry generation
+    lib: TypeScript runtime libraries for contract validation
+    docs: Coordination and contract documentation
+
+# ADDITIONS TO core_implementation.key_files:
+
+    - path: .claude/schemas/agent-frontmatter.schema.json
+      purpose: JSON Schema for validating agent frontmatter
+    - path: .claude/schemas/context-contract.schema.json
+      purpose: JSON Schema for context contract validation
+    - path: .claude/scripts/generate-registry.py
+      purpose: Auto-generate agent-registry.json from agent files
+    - path: .claude/lib/contract-validator.ts
+      purpose: Runtime contract validation library
+    - path: .claude/docs/context-contracts.md
+      purpose: Contract specification and usage guide
+
+# ADDITIONS TO best_practices:
+
+  context_contracts:
+    - Build agents: Full contracts with file scope and validation
+    - Question agents: Minimal contracts with prompt + expertise only
+    - Use spec_file context source for implementation agents
+    - Use prompt context source for Q&A agents
+    - Declare file scopes tightly to prevent accidental modifications
+    - Include pre-spawn validation for required files
+
+  scripts_and_automation:
+    - Auto-generate derived artifacts (agent-registry.json)
+    - Run validations in pre-commit hooks
+    - Use JSON Schema for structural validation
+    - Block commits on schema violations
+    - Provide clear error messages on validation failures
+
+  dual_language:
+    - Python for git hooks, CLI tools, and pre-commit validation
+    - TypeScript for runtime validation and contract enforcement
+
+# UPDATE TO known_issues:
+
+  - issue: Agent registry out of sync with agent files
+    resolution: Auto-generate registry from agent files via generate-registry.py
+    status: RESOLVED - registry now derived artifact (2026-02-05)
+
+# ADDITIONS TO potential_enhancements:
+
+  - Context contract IDE support (JSON Schema in editors)
+  - Automated contract migration for existing agents
+  - Contract visualization (show agent dependencies and scopes)
+  - Pre-spawn memory injection based on contract requirements
+  - Template validation for agent creation

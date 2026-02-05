@@ -1,0 +1,141 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Context Contract Schema",
+  "description": "Declarative specification of agent context requirements and output scope",
+  "type": "object",
+  "properties": {
+    "requires": {
+      "type": "array",
+      "description": "List of required context inputs",
+      "items": {
+        "type": "object",
+        "required": ["type", "key"],
+        "properties": {
+          "type": {
+            "enum": ["spec_file", "expertise", "memory", "prompt", "inbox", "file", "env"],
+            "description": "Type of required context"
+          },
+          "key": {
+            "type": "string",
+            "description": "Variable name for this context (e.g., SPEC, USER_PROMPT)"
+          },
+          "description": {
+            "type": "string",
+            "description": "Human-readable description of this requirement"
+          },
+          "path": {
+            "type": "string",
+            "description": "File path for spec_file, expertise, or file types"
+          },
+          "scope": {
+            "type": "string",
+            "description": "Scope for memory searches (failures|patterns|decisions|all)"
+          },
+          "required": {
+            "type": "boolean",
+            "default": true,
+            "description": "Whether this requirement blocks spawn if missing"
+          }
+        }
+      }
+    },
+    "produces": {
+      "type": "object",
+      "description": "Declared output scope for validation",
+      "properties": {
+        "files": {
+          "type": "object",
+          "description": "File modification scope",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "description": "Glob pattern for allowed file modifications (e.g., 'app/src/db/**')"
+            },
+            "exclude": {
+              "type": "array",
+              "items": { "type": "string" },
+              "description": "Glob patterns to exclude from scope"
+            }
+          }
+        },
+        "tests": {
+          "type": "object",
+          "description": "Test file requirements",
+          "properties": {
+            "scope": {
+              "type": "string",
+              "description": "Glob pattern for test files"
+            },
+            "colocated": {
+              "type": "string",
+              "description": "Pattern for colocated tests (e.g., '**/__tests__/**')"
+            },
+            "requiresTests": {
+              "type": "boolean",
+              "description": "Whether tests are mandatory for new source files"
+            }
+          }
+        },
+        "memory": {
+          "type": "object",
+          "description": "Memory recording permissions",
+          "properties": {
+            "allowed": {
+              "type": "array",
+              "items": {
+                "enum": ["decision", "failure", "insight"]
+              },
+              "description": "Which memory types agent can record"
+            }
+          }
+        }
+      }
+    },
+    "contextSource": {
+      "enum": ["spec_file", "prompt", "inbox", "hybrid"],
+      "description": "Primary mechanism for receiving context"
+    },
+    "validation": {
+      "type": "object",
+      "description": "Validation steps to run at different lifecycle points",
+      "properties": {
+        "preSpawn": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["check"],
+            "properties": {
+              "check": {
+                "type": "string",
+                "description": "Validation type (file_exists, memory_available, etc.)"
+              },
+              "target": {
+                "type": "string",
+                "description": "Target of validation (e.g., SPEC for checking file existence)"
+              }
+            }
+          },
+          "description": "Validations to run before spawning agent"
+        },
+        "postComplete": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "required": ["check"],
+            "properties": {
+              "check": {
+                "type": "string",
+                "description": "Validation type (tests_pass, scope_valid, etc.)"
+              },
+              "command": {
+                "type": "string",
+                "description": "Shell command to run for validation"
+              }
+            }
+          },
+          "description": "Validations to run after agent completes"
+        }
+      }
+    }
+  }
+}

@@ -10,6 +10,16 @@ tools:
   - mcp__kotadb-bunx__list_recent_files
 model: haiku
 color: cyan
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      required: true
+  produces:
+    memory:
+      allowed:
+        - insight
+  contextSource: prompt
 ---
 
 # Claude Config Question Agent
