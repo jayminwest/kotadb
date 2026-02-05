@@ -13,6 +13,26 @@ tools:
 model: sonnet
 color: yellow
 expertDomain: agent-authoring
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      description: "Agent configuration requirement to plan"
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/agent-authoring/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/.cache/specs/agent-authoring/**"
+    memory:
+      allowed:
+        - decision
+  contextSource: prompt
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Agent Authoring Plan Agent

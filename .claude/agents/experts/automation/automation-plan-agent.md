@@ -13,6 +13,26 @@ tools:
 model: sonnet
 color: yellow
 expertDomain: automation
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      description: "Automation workflow requirement to plan"
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/automation/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/.cache/specs/automation/**"
+    memory:
+      allowed:
+        - decision
+  contextSource: prompt
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Automation Plan Agent

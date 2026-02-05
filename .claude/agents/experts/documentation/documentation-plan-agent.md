@@ -13,6 +13,26 @@ tools:
 model: sonnet
 color: yellow
 expertDomain: documentation
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      description: "Documentation requirement to plan"
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/documentation/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/.cache/specs/documentation/**"
+    memory:
+      allowed:
+        - decision
+  contextSource: prompt
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Documentation Plan Agent

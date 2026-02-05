@@ -12,6 +12,26 @@ tools:
   - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      description: "Claude Code configuration requirement to plan"
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/claude-config/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/.cache/specs/claude-config/**"
+    memory:
+      allowed:
+        - decision
+  contextSource: prompt
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Claude Config Plan Agent
