@@ -3,8 +3,15 @@
  * 
  * Provides structured logging of SDK message streams, agent I/O, and errors
  * for post-execution debugging and analysis.
+ * 
+ * Outputs:
+ * - workflow.log: Human-readable event timeline
+ * - events.ndjson: Machine-parseable NDJSON event stream
+ * - agent-input.json: Initial prompt and SDK options
+ * - agent-output.json: Complete SDK message stream with summary
+ * - errors.log: Error messages with stack traces
  */
-import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync } from "node:fs";
+import { mkdirSync, writeFileSync, existsSync, readFileSync, unlinkSync, appendFileSync } from "node:fs";
 import { join } from "node:path";
 import type { SDKMessage, SDKSystemMessage, SDKResultMessage } from "@anthropic-ai/claude-code";
 
@@ -20,6 +27,14 @@ export interface WorkflowLogEntry {
   data: Record<string, unknown>;
 }
 
+export interface NdjsonEvent {
+  timestamp: string;
+  event: string;
+  phase?: string;
+  data: Record<string, unknown>;
+  level: "info" | "warn" | "error";
+}
+
 /**
  * SDK message with timestamp added for logging
  */
@@ -33,6 +48,7 @@ interface TimestampedMessage {
  * 
  * Directory structure: automation/.data/logs/{issue-number}/{timestamp}/
  * - workflow.log: Human-readable event timeline
+ * - events.ndjson: Machine-parseable NDJSON event stream
  * - agent-input.json: Initial prompt and SDK options
  * - agent-output.json: Complete SDK message stream with summary
  * - errors.log: Error messages with stack traces
@@ -43,6 +59,7 @@ export class WorkflowLogger {
   private startTime: Date;
   private messages: TimestampedMessage[] = [];
   private workflowLogPath: string;
+  private ndjsonLogPath: string;
   private errorsLogPath: string;
   private totalInputTokens = 0;
   private totalOutputTokens = 0;
@@ -59,6 +76,7 @@ export class WorkflowLogger {
     this.logDir = join(baseLogDir, String(options.issueNumber), timestamp);
     
     this.workflowLogPath = join(this.logDir, "workflow.log");
+    this.ndjsonLogPath = join(this.logDir, "events.ndjson");
     this.errorsLogPath = join(this.logDir, "errors.log");
   }
 
@@ -83,6 +101,14 @@ export class WorkflowLogger {
         `Started: ${this.startTime.toISOString()}\n` +
         `${"=".repeat(80)}\n\n`
       );
+
+      // Initialize NDJSON file with workflow_start event
+      this.appendNdjson({
+        timestamp: this.startTime.toISOString(),
+        event: "workflow_start",
+        data: { issueNumber: this.issueNumber },
+        level: "info"
+      });
     } catch (error) {
       process.stderr.write(`ERROR: Cannot write to log directory ${this.logDir}: ${error}\n`);
       throw new Error("Log directory not writable");
@@ -90,7 +116,7 @@ export class WorkflowLogger {
   }
 
   /**
-   * Log workflow events to workflow.log
+   * Log workflow events to workflow.log and events.ndjson
    * Format: [ISO_TIMESTAMP] EVENT_TYPE key=value key=value
    */
   logEvent(event: string, data: Record<string, unknown>): void {
@@ -100,6 +126,21 @@ export class WorkflowLogger {
       .join(" ");
     
     this.appendToWorkflowLog(`[${timestamp}] ${event} ${dataStr}\n`);
+
+    // Also write NDJSON
+    this.appendNdjson({
+      timestamp,
+      event,
+      data,
+      level: "info"
+    });
+  }
+
+  /**
+   * Log a structured NDJSON event directly (for callers that need phase or custom level)
+   */
+  logNdjsonEvent(event: NdjsonEvent): void {
+    this.appendNdjson(event);
   }
 
   /**
@@ -182,7 +223,7 @@ export class WorkflowLogger {
   }
 
   /**
-   * Log errors to errors.log with timestamp, context, and stack trace
+   * Log errors to errors.log and events.ndjson with timestamp, context, and stack trace
    * Handles write failures gracefully by falling back to stderr
    */
   logError(context: string, error: Error): void {
@@ -203,6 +244,14 @@ export class WorkflowLogger {
       process.stderr.write(`Failed to write error log: ${writeError}\n`);
       process.stderr.write(entry);
     }
+
+    // Also write NDJSON error event
+    this.appendNdjson({
+      timestamp,
+      event: "error",
+      data: { context, message: error.message, stack: error.stack ?? null },
+      level: "error"
+    });
   }
 
   /**
@@ -242,6 +291,20 @@ export class WorkflowLogger {
     } catch (error) {
       // Log to stderr but don't throw - logging failures should not abort workflow
       process.stderr.write(`Warning: Failed to write workflow log: ${error}\n`);
+    }
+  }
+
+  /**
+   * Append a structured NDJSON event to events.ndjson
+   * Non-fatal: write failures are logged to stderr but do not abort workflow
+   */
+  private appendNdjson(event: NdjsonEvent): void {
+    try {
+      const line = this.sanitize(JSON.stringify(event)) + "\n";
+      appendFileSync(this.ndjsonLogPath, line, { encoding: "utf-8", mode: 0o600 });
+    } catch (error) {
+      // Non-fatal: NDJSON write failures should not abort workflow
+      process.stderr.write(`Warning: Failed to write NDJSON event: ${error}\n`);
     }
   }
 

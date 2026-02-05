@@ -4,7 +4,7 @@
 import { dirname } from "node:path";
 import { WorkflowLogger } from "./logger.ts";
 import { ConsoleReporter } from "./reporter.ts";
-import { orchestrateWorkflow } from "./orchestrator.ts";
+import { orchestrateWorkflow, type OrchestrationOptions } from "./orchestrator.ts";
 import { generateWorkflowId } from "./context.ts";
 
 export interface WorkflowResult {
@@ -29,6 +29,15 @@ export interface WorkflowOptions {
   /** Main project root for centralized logging (always the main repo root) */
   mainProjectRoot?: string;
   branchName?: string;
+  /** Phase to resume from (skip earlier phases using checkpoint data) */
+  resumeFromPhase?: string;
+  /** Checkpoint data for resume (domain, specPath, filesModified from previous run) */
+  checkpointData?: {
+    domain: string;
+    specPath: string | null;
+    filesModified: string[];
+    completedPhases: string[];
+  };
 }
 
 function getProjectRoot(): string {
@@ -44,7 +53,9 @@ export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult
     accumulateContext = false,
     workingDirectory,
     mainProjectRoot,
-    branchName
+    branchName,
+    resumeFromPhase,
+    checkpointData
   } = opts;
 
   const defaultProjectRoot = getProjectRoot();
@@ -84,11 +95,30 @@ export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult
       dry_run: dryRun, 
       verbose,
       accumulate_context: accumulateContext,
-      workflow_id: workflowId
+      workflow_id: workflowId,
+      resume_from_phase: resumeFromPhase ?? null
     });
 
-    // Use orchestrator with reporter integration
-    const orchResult = await orchestrateWorkflow({
+    if (resumeFromPhase) {
+      process.stderr.write(
+        `[workflow] Resuming from phase: ${resumeFromPhase}\n`
+      );
+      if (checkpointData) {
+        process.stderr.write(
+          `[workflow] Checkpoint: domain=${checkpointData.domain}, ` +
+          `completed=[${checkpointData.completedPhases.join(",")}]\n`
+        );
+      }
+    }
+
+    // Build orchestration options
+    // Resume fields (resumeFromPhase, checkpointData) are passed as extra
+    // properties — the orchestrator will accept them once checkpoint integration
+    // is merged. For now they are stored on WorkflowOptions for the CLI to pass.
+    const orchOpts: OrchestrationOptions & {
+      resumeFromPhase?: string;
+      checkpointData?: WorkflowOptions["checkpointData"];
+    } = {
       issueNumber,
       projectRoot: executionRoot,
       mainProjectRoot: logRoot,
@@ -97,8 +127,13 @@ export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult
       reporter,
       dryRun,
       verbose,
-      workflowId
-    });
+      workflowId,
+      resumeFromPhase,
+      checkpointData
+    };
+
+    // Use orchestrator with reporter integration
+    const orchResult = await orchestrateWorkflow(orchOpts as OrchestrationOptions);
 
     const endTime = performance.now();
     const durationMs = Math.round(endTime - startTime);
