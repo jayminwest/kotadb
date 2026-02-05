@@ -19,6 +19,33 @@ tools:
   - mcp__kotadb-bunx__record_insight
 model: sonnet
 color: green
+contextContract:
+  requires:
+    - type: spec_file
+      key: SPEC
+      description: Path to specification file from plan agent
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/automation/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: "automation/src/**"
+      exclude:
+        - "**/node_modules/**"
+        - "**/*.test.ts"
+    tests:
+      scope: "automation/src/**/*.test.ts"
+    memory:
+      allowed:
+        - decision
+        - failure
+        - insight
+  contextSource: spec_file
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: SPEC
 expertDomain: automation
 ---
 

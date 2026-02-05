@@ -11,6 +11,16 @@ model: haiku
 color: cyan
 expertDomain: web
 readOnly: true
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      required: true
+  produces:
+    memory:
+      allowed:
+        - insight
+  contextSource: prompt
 ---
 
 # Web Question Agent

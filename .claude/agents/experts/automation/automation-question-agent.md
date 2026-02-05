@@ -12,6 +12,16 @@ model: haiku
 color: cyan
 expertDomain: automation
 readOnly: true
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      required: true
+  produces:
+    memory:
+      allowed:
+        - insight
+  contextSource: prompt
 ---
 
 # Automation Question Agent

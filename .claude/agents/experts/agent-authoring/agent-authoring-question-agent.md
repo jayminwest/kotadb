@@ -12,6 +12,16 @@ model: haiku
 color: cyan
 expertDomain: agent-authoring
 readOnly: true
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      required: true
+  produces:
+    memory:
+      allowed:
+        - insight
+  contextSource: prompt
 ---
 
 # Agent Authoring Question Agent

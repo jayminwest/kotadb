@@ -1,18 +1,16 @@
 # Claude Code Configuration Expertise
 # Target: 400-600 lines | Domain: Operational knowledge for .claude/ configuration
-# Last updated: 2026-02-03 (Hook organization, memory layer integration, context seeding)
+# Last updated: 2026-02-05 (Size governance - pruned to 595 lines)
 
 overview:
   description: |
     Claude Code configuration for KotaDB—.claude/ directory structure, command patterns,
     hook implementation with standard Python (hook_helpers.py), agent registry management,
-    and expert domain organization. This expertise enables correct configuration of Claude
-    Code within the KotaDB codebase conventions.
+    and expert domain organization.
   scope: |
-    Covers .claude/ directory organization (agents/, commands/, hooks/, hooks/utils/),
-    command frontmatter with Template Category, hook implementation using standard Python
-    with hook_helpers.py utilities, agent-registry.json maintenance, expert 4-agent pattern
-    (plan/build/improve/question in agents/experts/<domain>/), and KotaDB-specific conventions.
+    Covers .claude/ directory organization, command frontmatter with Template Category,
+    hook implementation using standard Python with hook_helpers.py utilities, 
+    agent-registry.json maintenance, and expert 4-agent pattern.
 
     KOTADB ADAPTATIONS:
     - Hooks use standard Python with hook_helpers.py (NOT uv shebang)
@@ -20,545 +18,192 @@ overview:
     - Tools in agent frontmatter use YAML array format (NOT comma-separated)
     - Agent-registry.json must be updated when adding agents
     - Logging uses sys.stdout.write (never print())
-    - Local-only SQLite storage (no cloud dependencies)
+    - Local-only SQLite storage
 
     Does NOT cover agent prompt content authoring (see agent-authoring expert).
   rationale: |
     Correct .claude/ configuration enables tooling, discoverability, and maintainability.
-    Poor structure creates fragmentation and breaks tooling. KotaDB has established
-    conventions that differ from other Claude Code projects and must be followed.
+    KotaDB has established conventions that differ from other Claude Code projects.
 
 core_implementation:
   directory_structure:
-    .claude/:
-      agents/:
-        purpose: Agent definitions (general-purpose + experts/)
-        README.md: Documents agent structure, registry, tool access
-        agent-template.md: Starting template for new agents
-        agent-registry.json: Machine-readable agent catalog with indexes
-        build-agent.md: Implementation agent with write access
-        scout-agent.md: Read-only exploration agent
-        review-agent.md: Code review agent
-        common/: Shared agent documentation (memory-usage.md)
-        experts/<domain>/:
-          purpose: 4-agent pattern (plan/build/improve/question + expertise.yaml)
-          pattern: Domain experts with queryable knowledge
-          active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github, automation, documentation]
-      commands/:
-        purpose: Slash commands by category
-        workflows/: SDLC phase commands (prime, plan, implement, validate)
-        docs/: Documentation reference commands
-        issues/: Issue management commands
-        git/: Git operation commands
-        testing/: Test-related commands
-        ci/: CI/CD commands
-        tools/: Development tools
-        app/: Application development commands
-        automation/: ADW automation commands
-        worktree/: Worktree management commands
-        release/: Release workflow commands
-        validation/: Validation commands
-        experts/orchestrators/: Expert orchestration commands
-      hooks/:
-        purpose: Lifecycle hooks (standard Python with hook_helpers.py)
-        utils/hook_helpers.py: Shared hook utilities
-        kotadb/: Domain-specific hooks (pre-edit-context.py, agent-context.py, session-expertise.py)
-      settings.json:
-        purpose: Project-wide config (committed)
-      settings.local.json:
-        purpose: Local overrides (gitignored)
+    agents:
+      purpose: Agent definitions (general-purpose + experts/)
+      key_files: [agent-registry.json, agent-template.md, README.md, build-agent.md, scout-agent.md, review-agent.md]
+      common: Shared agent documentation (memory-usage.md)
+      experts: 4-agent pattern (plan/build/improve/question + expertise.yaml)
+      active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github, automation, documentation, web]
+    commands:
+      purpose: Slash commands by category
+      categories: [workflows, docs, issues, git, testing, ci, tools, app, automation, worktree, release, validation, experts/orchestrators]
+    hooks:
+      purpose: Lifecycle hooks (standard Python with hook_helpers.py)
+      utils: hook_helpers.py shared utilities
+      kotadb: Domain-specific hooks (pre-edit-context.py, agent-context.py, session-expertise.py)
+    settings: 
+      json: Project-wide config (committed)
+      local: Local overrides (gitignored)
 
   key_files:
     - path: .claude/commands/<category>/<name>.md
       purpose: Slash command (frontmatter + prompt)
-      invocation: /category:name (e.g., /workflows:plan)
+      invocation: /category:name
     - path: .claude/agents/experts/<domain>/<domain>-{plan,build,improve,question}-agent.md
       purpose: Expert 4-agent pattern with standardized colors
     - path: .claude/agents/experts/<domain>/expertise.yaml
-      purpose: Structured domain knowledge (400-600 lines target)
-    - path: .claude/agents/common/<guide-name>.md
-      purpose: Shared agent documentation (e.g., memory-usage.md)
+      purpose: Structured domain knowledge (400-600 lines target, 700 hard limit)
     - path: .claude/hooks/<hook-name>.py
       purpose: Lifecycle hook using hook_helpers.py
-    - path: .claude/hooks/kotadb/<feature-hook>.py
-      purpose: Domain-specific hooks for KotaDB features
-    - path: .claude/hooks/utils/hook_helpers.py
-      purpose: Shared hook utilities (parse_stdin, output_context, run_kotadb_deps, etc.)
     - path: .claude/agents/agent-registry.json
-      purpose: Machine-readable agent catalog with capability/model/tool indexes
+      purpose: Machine-readable agent catalog with indexes
 
 key_operations:
   create_slash_command:
     when: Adding new command functionality
     approach: |
       1. Create .claude/commands/<category>/<name>.md
-      2. Add frontmatter and Template Category:
-         ```markdown
-         # /command-name
-
-         **Template Category**: Path Resolution | Action | Reference
-
-         Brief description of command purpose.
-
-         ## Inputs
-         - `$1` (param_name): Description
-
-         ## Context
-
-         **Project**: KotaDB - HTTP API service for code indexing
-         ...
-
-         ## Instructions
-         ...
-         ```
+      2. Add frontmatter with Template Category (Path Resolution | Action | Reference)
       3. Invoked as /category:name
     examples:
       - .claude/commands/workflows/plan.md -> /workflows:plan
-      - .claude/commands/docs/architecture.md -> /docs:architecture
     pitfalls:
-      - what: "CRITICAL - Using colons in frontmatter string values"
-        instead: "No colons in description or any YAML value"
-        reason: "Colons break YAML parsing in Claude Code's configuration system"
-      - what: "Missing Template Category"
-        instead: "Always include Template Category after the title"
-        reason: "KotaDB convention for command classification"
+      - what: CRITICAL - Colons in frontmatter values break YAML parsing
+        instead: No colons in description or any YAML value
 
   implement_hook:
     when: Need to run code on agent lifecycle events
     events: [PreToolUse, PostToolUse, UserPromptSubmit, Stop, SubagentStart, SessionStart]
     approach: |
-      1. Create .claude/hooks/<hook-name>.py with standard Python shebang:
-         ```python
-         #!/usr/bin/env python3
-         """Hook description."""
-
-         import os
-         import sys
-
-         # Add parent directory for imports
-         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-
-         from hooks.utils.hook_helpers import (
-             parse_stdin,
-             output_continue,
-             output_context,
-         )
-
-         def main() -> None:
-             hook_input = parse_stdin()
-             # Hook logic here
-             output_continue()  # or output_context(message)
-
-         if __name__ == "__main__":
-             main()
-         ```
-      2. Exit via output_continue() or output_context(message)
-      3. Configure in .claude/settings.json hooks object
-      4. Use matcher for tool-specific targeting
+      1. Create .claude/hooks/<hook-name>.py with standard Python shebang
+      2. Import from hooks.utils.hook_helpers
+      3. Exit via output_continue() or output_context(message)
+      4. Configure in .claude/settings.json hooks object
     kotadb_conventions:
-      - NEVER use print() - use sys.stdout.write() per logging standards
-      - Import from hooks.utils.hook_helpers for shared utilities
+      - NEVER use print() - use sys.stdout.write()
+      - Import from hooks.utils.hook_helpers
       - Use standard Python shebang (#!/usr/bin/env python3), NOT uv
-      - Always exit 0 (never block on errors, warn to stderr)
-      - Keep output under 500 tokens for performance
-    examples:
-      - pre-edit-context.py: PreToolUse hook for dependency awareness
-      - agent-context.py: SubagentStart hook for file context injection
-      - session-expertise.py: SessionStart hook for dynamic expertise
+      - Always exit 0 (never block on errors)
+      - Keep output under 500 tokens
+    examples: [pre-edit-context.py, agent-context.py, session-expertise.py]
     timestamp: 2026-02-03
-    evidence: commit d671d51 context seeding hooks
 
   organize_hooks_by_domain:
     when: Creating domain-specific hooks beyond general lifecycle hooks
     approach: |
-      1. Create .claude/hooks/<domain>/ subdirectory for related hooks
-      2. Place domain-specific hooks in subdirectory (e.g., .claude/hooks/kotadb/)
-      3. Keep hook_helpers.py in .claude/hooks/utils/ for shared utilities
-      4. Update sys.path.insert to account for subdirectory depth:
-         ```python
-         # From .claude/hooks/kotadb/my-hook.py
-         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-         # Now can import from hooks.utils.hook_helpers
-         ```
-    rationale: |
-      As hook count grows, subdirectory organization prevents .claude/hooks/ clutter.
-      Domain-specific hooks (kotadb/, linting/, validation/) grouped for discoverability.
-      Shared utilities remain accessible via relative imports.
-    examples:
-      - .claude/hooks/kotadb/pre-edit-context.py - Dependency context on edits
-      - .claude/hooks/kotadb/agent-context.py - File context for spawned agents
-      - .claude/hooks/kotadb/session-expertise.py - Dynamic expertise at session start
-      - .claude/hooks/kotadb/memory-recall.py - Memory layer integration
-    pitfalls:
-      - what: Not updating sys.path.insert for subdirectory depth
-        instead: Use os.path.dirname twice for hooks in subdirectories
-        reason: Import resolution fails if path doesn't reach parent .claude/hooks/
+      1. Create .claude/hooks/<domain>/ subdirectory
+      2. Place domain-specific hooks in subdirectory
+      3. Update sys.path.insert to account for subdirectory depth
+    rationale: Prevents .claude/hooks/ clutter. Domain-specific hooks grouped for discoverability
+    examples: [.claude/hooks/kotadb/pre-edit-context.py, agent-context.py, session-expertise.py]
     timestamp: 2026-02-03
-    evidence: commit d671d51 .claude/hooks/kotadb/ organization
 
   integrate_memory_layer_tools:
     when: Adding memory layer MCP tools to agents for cross-session learning
     approach: |
-      1. Add memory MCP tools to agent frontmatter tools array:
-         ```yaml
-         tools:
-           - Read
-           - Write
-           - mcp__kotadb-bunx__search_decisions
-           - mcp__kotadb-bunx__search_failures
-           - mcp__kotadb-bunx__search_patterns
-           - mcp__kotadb-bunx__record_decision
-           - mcp__kotadb-bunx__record_failure
-           - mcp__kotadb-bunx__record_insight
-         ```
-      2. Add "Memory Integration" section to agent prompt BEFORE Workflow:
-         ```markdown
-         ## Memory Integration
-
-         Before implementing, search for relevant past context:
-
-         1. **Check Past Failures**
-            search_failures("relevant keywords from your task")
-            Apply learnings to avoid repeating mistakes.
-
-         2. **Check Past Decisions**
-            search_decisions("relevant architectural keywords")
-            Follow established patterns and rationale.
-
-         3. **Check Discovered Patterns**
-            search_patterns(pattern_type: "relevant-type")
-            Use consistent patterns across implementations.
-
-         **During Implementation:**
-         - Record significant architectural decisions with record_decision
-         - Record failed approaches immediately with record_failure
-         - Record workarounds or discoveries with record_insight
-         ```
+      1. Add memory MCP tools to agent frontmatter tools array
+      2. Add Memory Integration section to agent prompt BEFORE Workflow
       3. Create shared documentation at .claude/agents/common/memory-usage.md
       4. Apply to build and improve agents (plan/question agents typically read-only)
-    rationale: |
-      Memory layer enables cross-session learning. Agents consult past failures,
-      decisions, and patterns before implementing. Recording during work creates
-      institutional knowledge for future sessions.
-    examples:
-      - agent-authoring-build-agent.md: Search failures before creating agents
-      - api-build-agent.md: Check patterns for endpoint conventions
-      - database-improve-agent.md: Record schema migration decisions
-    pitfalls:
-      - what: Adding memory tools without prompt guidance
-        instead: Always add Memory Integration section with examples
-        reason: Tools alone don't teach agents how/when to use memory
-      - what: Only adding record_* tools without search_* tools
-        instead: Add both search and record tools for complete lifecycle
-        reason: Agents need to consult AND contribute to memory
+    memory_tools: [search_decisions, search_failures, search_patterns, record_decision, record_failure, record_insight]
+    rationale: Memory layer enables cross-session learning
     timestamp: 2026-02-03
-    evidence: commits a2c7435 #122, b00aae5 #121 memory integration
 
   implement_context_seeding_hooks:
     when: Injecting dynamic context into agents/tools based on runtime state
     approach: |
-      1. Identify context trigger: PreToolUse (before edits), SubagentStart (before spawning), SessionStart (session init)
+      1. Identify context trigger: PreToolUse, SubagentStart, or SessionStart
       2. Create hook in .claude/hooks/kotadb/<hook-name>.py
-      3. Use hook_helpers utilities:
-         - parse_stdin() - Read hook input JSON
-         - extract_file_path(hook_input) - Get file from Edit/Write tool
-         - extract_agent_info(hook_input) - Get agent spawn details
-         - run_kotadb_deps(file_path) - Query dependency graph
-         - format_dependency_alert(deps) - Format < 500 token output
-         - output_context(message) - Inject context into agent/tool
-         - output_continue() - No context, proceed normally
-      4. Configure in settings.json with matcher:
-         ```json
-         {
-           "hooks": {
-             "PreToolUse": [{
-               "matcher": "Edit|Write|MultiEdit",
-               "hooks": [{
-                 "type": "command",
-                 "command": "python3 .claude/hooks/kotadb/pre-edit-context.py"
-               }]
-             }]
-           }
-         }
-         ```
-      5. Keep output under 500 tokens (token budget constraint)
-      6. Always exit 0 (never block on errors)
+      3. Use hook_helpers utilities
+      4. Configure in settings.json with matcher
+      5. Keep output under 500 tokens
+      6. Always exit 0
     use_cases:
       - PreToolUse + Edit: Warn about file dependents before editing
-      - SubagentStart + build: Inject file dependency context into spawned agent
-      - SessionStart: Provide dynamic expertise from recent patterns/files
-    examples:
-      - pre-edit-context.py: "⚠️ This file has 5 dependents that may need updates"
-      - agent-context.py: "Files mentioned in task: src/api/routes.ts (3 dependents)"
-      - session-expertise.py: "Recent activity: database schema changes, 12 migrations"
-    pitfalls:
-      - what: Exceeding 500 token output limit
-        instead: Limit to top 10-15 files, summarize with counts
-        reason: Large context injection slows agent response
-      - what: Blocking on errors (exit non-zero)
-        instead: Log to stderr, output_continue()
-        reason: Broken hooks shouldn't halt workflows
-      - what: Using print() instead of output_context()
-        instead: Use hook_helpers output functions
-        reason: Structured output ensures proper context injection
+      - SubagentStart: Inject file dependency context
+      - SessionStart: Provide dynamic expertise from recent patterns
     timestamp: 2026-02-03
-    evidence: commit d671d51 #116 context seeding implementation
 
   create_expert_domain:
     when: Adding new expert domain with queryable expertise
     approach: |
       1. Create .claude/agents/experts/<domain>/
-      2. Create expertise.yaml (overview, core_implementation, key_operations,
-         decision_trees, patterns, best_practices, known_issues)
-         Target: 400-600 lines, max 1000 lines
-      3. Create <domain>-plan-agent.md:
-         - model: sonnet
-         - color: yellow
-         - tools: [Read, Glob, Grep, Write, Bash]
-      4. Create <domain>-build-agent.md:
-         - model: sonnet
-         - color: green
-         - tools: [Read, Write, Edit, Glob, Grep, Bash]
-         - Add memory layer tools if applicable
-      5. Create <domain>-improve-agent.md:
-         - model: sonnet
-         - color: purple
-         - tools: [Read, Write, Edit, Glob, Grep, Bash, Task]
-         - Add memory layer tools
-      6. Create <domain>-question-agent.md:
-         - model: haiku
-         - color: cyan
-         - tools: [Read, Glob, Grep]
-      7. Update agent-registry.json with all new agents
-      8. Update CLAUDE.md Expert Domains section
-      9. Update /do command with domain detection patterns
+      2. Create expertise.yaml (target 400-600 lines, max 700)
+      3. Create 4 agents with standard colors/models/tools
+      4. Update agent-registry.json with all new agents
+      5. Update CLAUDE.md Expert Domains section
+      6. Update /do command with domain detection patterns
     kotadb_adaptations:
-      - Use YAML array format for tools (NOT comma-separated)
-      - Add MCP tools where appropriate (mcp__kotadb-bunx__*)
-      - Update agent-registry.json capabilityIndex, modelIndex, toolMatrix
+      - Use YAML array format for tools
+      - Add MCP tools where appropriate
+      - Update agent-registry.json indexes
     pitfalls:
-      - what: "CRITICAL - Using colons in agent description field"
-        instead: "Remove colons from description values"
-        reason: "Colons cause agent discovery to fail silently"
-      - what: "Forgetting to update agent-registry.json"
-        instead: "Always add new agents to registry with capabilities and tools"
-        reason: "Registry enables programmatic agent discovery"
-      - what: "Missing CLAUDE.md updates"
-        instead: "Update expert domain table and usage examples"
-        reason: "Users discover experts via CLAUDE.md"
-        timestamp: 2026-01-28
-        evidence: commit 902c49a CLAUDE.md updates
+      - what: CRITICAL - Colons in agent description cause silent failures
+      - what: Forgetting agent-registry.json updates
+    timestamp: 2026-01-28
 
   update_agent_registry:
     when: Adding, modifying, or removing agents
     approach: |
       1. Read current .claude/agents/agent-registry.json
-      2. Update agents object with new agent definition:
-         ```json
-         "agent-name": {
-           "name": "agent-name",
-           "description": "Brief description",
-           "file": "path/to/agent.md",
-           "model": "haiku|sonnet|opus",
-           "capabilities": [
-             "capability1",
-             "capability2"
-           ],
-           "tools": [
-             "Tool1",
-             "Tool2"
-           ],
-           "readOnly": true|false
-         }
-         ```
-      3. Update capabilityIndex - add agent to relevant capability arrays
-      4. Update modelIndex - add agent to model tier array
-      5. Update toolMatrix - add agent to each tool's array
-    validation:
-      - Ensure file path matches actual agent location
-      - Verify all tools listed exist
-      - Confirm capabilities align with agent purpose
-    formatting_convention:
-      timestamp: 2026-01-28
-      evidence: commit 902c49a agent-registry.json formatting
-      pattern: |
-        Use multi-line array format for readability:
-        ```json
-        "capabilities": [
-          "capability1",
-          "capability2"
-        ],
-        "tools": [
-          "Tool1",
-          "Tool2"
-        ]
-        ```
-        NOT inline: "capabilities": ["capability1", "capability2"]
-      rationale: Improves git diff readability and reduces merge conflicts when adding items
+      2. Update agents object with new agent definition
+      3. Update capabilityIndex, modelIndex, toolMatrix
+    formatting_convention: Use multi-line array format for readability
+    rationale: Improves git diff readability and reduces merge conflicts
+    timestamp: 2026-01-28
 
   configure_settings:
     when: Configuring permissions, hooks, or project behavior
-    structure: |
-      .claude/settings.json:
-      {
-        "statusLine": {"type": "command", "command": "..."},
-        "permissions": {"allow": ["Read", "Glob"], "deny": []},
-        "env": {"VAR": "value"},
-        "hooks": {
-          "<EventType>": [
-            {
-              "matcher": {"tool_name": "Edit"},
-              "hooks": [{"type": "command", "command": "python3 .claude/hooks/<name>.py", "timeout": 5000}]
-            }
-          ]
-        }
-      }
-    notes: |
-      - Local overrides in settings.local.json (gitignored)
-      - Matcher enables tool-specific hooks (e.g., PostToolUse only for Edit)
+    structure: settings.json for project-wide, settings.local.json for local overrides
+    notes:
+      - Matcher enables tool-specific hooks
       - Valid JSON (no trailing commas)
       - Hook commands use python3, not uv
-      - Hooks support SubagentStart and SessionStart events (new in recent Claude Code)
+      - Hooks support SubagentStart and SessionStart events
 
   update_do_command_for_expert:
     when: Adding new expert domain to /do orchestration
-    timestamp: 2026-01-28
-    evidence: commit 902c49a do.md updates for 5 new domains
     approach: |
-      1. Add domain to Domain Detection section with:
-         - Keywords: domain-specific terms (e.g., "schema", "migration" for database)
-         - Locations: relevant file paths (e.g., app/src/db/)
-         - Indicators: what triggers this domain
-         - Examples: sample user requests
-      2. Update Pattern Classification with domain in Pattern A and B lists
-      3. Add domain to orchestration pattern "Domains Using This Pattern" lists
-      4. Update report templates to include new domain option
-      5. Add Classification Cheat Sheet entries with verb-object patterns
-      6. Add disambiguation options to include new domain
-      7. Add example usage in Examples section
-      8. Update Spec File Storage with new domain directory
-      9. Update Implementation Notes current state count
-    rationale: |
-      /do command uses keyword-based classification to route to correct expert.
-      Each domain needs detection patterns, examples, and orchestration updates.
-      
-  tool_permissions_philosophy:
+      1. Add domain to Domain Detection with keywords, locations, indicators, examples
+      2. Update Pattern Classification lists
+      3. Add to orchestration pattern lists
+      4. Update report templates and examples
+    rationale: /do command uses keyword-based classification to route to correct expert
     timestamp: 2026-01-28
-    evidence: commit 446e999 tool permissions fix for 20 expert agents
-    principle: "Permissive tools + strict prompts"
+
+  tool_permissions_philosophy:
+    principle: Permissive tools + strict prompts
     when: Deciding which tools to grant expert agents
     approach: |
-      Grant tools liberally based on what an agent MIGHT need, then use prompts
-      to constrain behavior. This prevents workflow breakage when agents need
-      capabilities for validation or verification that weren't anticipated.
-
-      Plan agents (yellow, sonnet):
-      - GRANT: [Read, Glob, Grep, Write, Bash]
-      - Bash enables: git operations, file statistics, wc, verification commands
-      - Rationale: Plan agents write specs and may need to check git state,
-        count files, or verify current state
-
-      Build agents (green, sonnet):
-      - GRANT: [Read, Write, Edit, Glob, Grep, Bash]
-      - Bash enables: type-checking (bunx tsc), test runs (bun test), linting
-      - Rationale: Build agents implement and should verify their work
-      - Memory tools: Add search_*/record_* for cross-session learning
-
-      Improve agents (purple, sonnet):
-      - GRANT: [Read, Write, Edit, Glob, Grep, Bash, Task]
-      - Task enables: spawning sub-agents for complex analysis
-      - Rationale: Improve agents analyze patterns and may delegate to experts
-      - Memory tools: Add search_*/record_* for extracting learnings
-
-      Question agents (cyan, haiku):
-      - GRANT: [Read, Glob, Grep]
-      - Rationale: Read-only, fast answers
+      Grant tools liberally, then use prompts to constrain behavior.
+      
+      Plan agents (yellow, sonnet): [Read, Glob, Grep, Write, Bash]
+      Build agents (green, sonnet): [Read, Write, Edit, Glob, Grep, Bash] + memory tools
+      Improve agents (purple, sonnet): [Read, Write, Edit, Glob, Grep, Bash, Task] + memory tools
+      Question agents (cyan, haiku): [Read, Glob, Grep]
     discovered_issue:
-      symptom: Plan agents couldn't write specs, build agents couldn't run tests
-      root_cause: Tool permissions too restrictive, agents failed tasks silently
+      symptom: Plan agents could not write specs, build agents could not run tests
+      root_cause: Tool permissions too restrictive
       resolution: Added Bash to plan/build agents, Task to improve agents
-      lesson: Better to grant tools and constrain via prompt than block capabilities
-    examples:
-      - Plan agent uses Bash for "git status" to check current branch
-      - Build agent uses Bash for "bunx tsc --noEmit" to verify types
-      - Improve agent uses Task to spawn scout-agent for pattern analysis
-
-
+    timestamp: 2026-01-28
 
   mcp_tool_naming_and_usage:
-    timestamp: 2026-02-02
-    evidence: commit 2705560 (issue #84)
     discovered: MCP tool naming includes transport in server name
     pattern: |
-      KotaDB MCP tools use server name "kotadb-bunx" (not "kotadb") because
-      the server is configured with bunx transport in Claude Desktop config:
-      
-      {
-        "mcpServers": {
-          "kotadb-bunx": {
-            "command": "bunx",
-            "args": ["kotadb"]
-          }
-        }
-      }
-      
-      This means tool names are: mcp__kotadb-bunx__search_code (NOT mcp__kotadb__search_code)
-    
-    when: Adding MCP tools to agent frontmatter or documentation
-    correct_naming:
-      - mcp__kotadb-bunx__search_code
-      - mcp__kotadb-bunx__search_dependencies
-      - mcp__kotadb-bunx__analyze_change_impact
-      - mcp__kotadb-bunx__list_recent_files
-      - mcp__kotadb-bunx__search_decisions
-      - mcp__kotadb-bunx__search_failures
-      - mcp__kotadb-bunx__search_patterns
-      - mcp__kotadb-bunx__record_decision
-      - mcp__kotadb-bunx__record_failure
-      - mcp__kotadb-bunx__record_insight
-    
-    incorrect_naming:
-      - mcp__kotadb__search_code (WRONG - missing transport suffix)
-      - mcp__kotadb__search_dependencies (WRONG)
-    
+      KotaDB MCP tools use server name kotadb-bunx (not kotadb) because
+      the server is configured with bunx transport in Claude Desktop config.
+      Tool names: mcp__kotadb-bunx__search_code (NOT mcp__kotadb__search_code)
+    correct_naming: [search_code, search_dependencies, analyze_change_impact, list_recent_files, search_decisions, search_failures, search_patterns, record_decision, record_failure, record_insight]
     documentation_pattern:
       location: CLAUDE.md MCP Server section
-      include_tool_selection_guide: |
-        Add decision tree for when to use MCP tools vs Grep:
-        
-        PREFER KotaDB MCP tools for:
-        - search_dependencies - Understanding file relationships before refactoring
-        - analyze_change_impact - Risk assessment before PRs or major changes
-        - search_code - Semantic/conceptual code discovery across indexed repos
-        
-        FALLBACK to Grep for:
-        - Exact regex pattern matching
-        - Unindexed files or live filesystem searches
-        - Quick single-file searches
-      
-      agent_integration: |
-        Add "KotaDB MCP Tool Usage" section to core agents (build, scout, review):
-        
-        ## KotaDB MCP Tool Usage
-        
-        When working with this codebase:
-        - Before refactoring: Use search_dependencies to understand file relationships
-        - Before PRs/changes: Use analyze_change_impact to assess risk
-        - For code discovery: Prefer search_code for semantic searches
-        - Fallback to Grep: Only for exact regex patterns or unindexed files
-    
-    impact:
-      symptom: Agents could not find MCP tools, fell back to Grep unnecessarily
-      files_affected: 13 files (agent definitions, README, CLAUDE.md)
-      resolution: Bulk rename mcp__kotadb__ to mcp__kotadb-bunx__
-    
+      include: Tool selection guide for when to use MCP tools vs Grep
+      agent_integration: Add KotaDB MCP Tool Usage section to core agents
     best_practices:
       - Server names in Claude Desktop config determine tool prefixes
-      - Transport method (bunx, npx, node, python) often appears in server name
-      - Document tool selection criteria in CLAUDE.md for user clarity
-      - Add tool usage guidance to agent prompts for correct usage patterns
+      - Document tool selection criteria in CLAUDE.md
+      - Add tool usage guidance to agent prompts
       - Validate MCP tool names match actual server configuration
-      
+    timestamp: 2026-02-02
+
 decision_trees:
   command_vs_agent_vs_expert:
     question: What am I creating?
@@ -574,9 +219,9 @@ decision_trees:
     question: Which model tier?
     options:
       - if: Fast, read-only exploration
-        then: haiku (scout-agent, review-agent, question agents)
+        then: haiku (scout, review, question agents)
       - if: Balanced implementation work
-        then: sonnet (build agents, plan agents, improve agents)
+        then: sonnet (build, plan, improve agents)
       - if: Complex coordination and reasoning
         then: opus (orchestrator-agent)
 
@@ -595,357 +240,191 @@ decision_trees:
   hook_event_selection:
     question: Which hook event should I use?
     options:
-      - if: Need to inspect/modify before tool execution
-        then: PreToolUse (e.g., dependency warnings before Edit)
-      - if: Need to validate/log after tool execution
-        then: PostToolUse (e.g., linting after file changes)
-      - if: Need to inject context when spawning agents
-        then: SubagentStart (e.g., file dependencies for build agent)
-      - if: Need to provide session-wide context at start
-        then: SessionStart (e.g., recent patterns, key files)
-      - if: Need to act on user prompt submission
-        then: UserPromptSubmit (e.g., request classification)
-      - if: Need to cleanup or log at session end
-        then: Stop (e.g., save session insights)
+      - if: Inspect/modify before tool execution
+        then: PreToolUse
+      - if: Validate/log after tool execution
+        then: PostToolUse
+      - if: Inject context when spawning agents
+        then: SubagentStart
+      - if: Provide session-wide context at start
+        then: SessionStart
+      - if: Act on user prompt submission
+        then: UserPromptSubmit
+      - if: Cleanup or log at session end
+        then: Stop
 
 patterns:
   expert_domain_4agent:
     structure: |
       .claude/agents/experts/<domain>/
-      ├── expertise.yaml (400-600 lines target, 1000 max)
-      ├── <domain>-plan-agent.md (yellow, sonnet, Read/Glob/Grep/Write/Bash)
-      ├── <domain>-build-agent.md (green, sonnet, Read/Write/Edit/Glob/Grep/Bash + memory tools)
-      ├── <domain>-improve-agent.md (purple, sonnet, all + Bash + Task + memory tools)
-      └── <domain>-question-agent.md (cyan, haiku, Read/Glob/Grep)
+      ├── expertise.yaml (400-600 lines target, 700 max)
+      ├── <domain>-plan-agent.md (yellow, sonnet)
+      ├── <domain>-build-agent.md (green, sonnet, + memory tools)
+      ├── <domain>-improve-agent.md (purple, sonnet, + memory tools + Task)
+      └── <domain>-question-agent.md (cyan, haiku)
     color_coding:
       plan: yellow (analysis, planning)
       build: green (creation, implementation)
       improve: purple (review, expertise evolution)
       question: cyan (meta, read-only Q&A)
-    trade_offs:
-      pros: [Plan-build-improve lifecycle, Color-coded roles, Queryable expertise]
-      cons: [5 files per domain, Requires registry updates]
-    active_domains:
-      timestamp: 2026-02-03
-      count: 9
-      list:
-        - claude-config: .claude/ configuration management
-        - agent-authoring: Agent creation and modification
-        - database: SQLite schema, FTS5, migrations, queries
-        - api: HTTP endpoints, MCP tools, Express patterns
-        - testing: Antimocking, Bun tests, SQLite test patterns
-        - indexer: AST parsing, symbol extraction, code analysis
-        - github: Issues, PRs, branches, GitHub CLI workflows
-        - automation: ADW workflows, agent orchestration, worktree isolation
-        - documentation: Documentation management, content organization
+    active_domains: [claude-config, agent-authoring, database, api, testing, indexer, github, automation, documentation, web]
+    timestamp: 2026-02-03
 
   agent_frontmatter_format:
-    kotadb_style: |
-      ---
-      name: agent-name
-      description: Brief description without colons
-      tools:
-        - Read
-        - Glob
-        - Grep
-        - mcp__kotadb-bunx__search_code
-        - mcp__kotadb-bunx__search_decisions
-        - mcp__kotadb-bunx__record_failure
-      model: haiku|sonnet|opus
-      color: yellow|green|purple|cyan
-      constraints:
-        - Constraint 1
-        - Constraint 2
-      ---
     notes:
       - Tools as YAML array, NOT comma-separated string
-      - model and color optional but recommended for expert agents
       - Description MUST NOT contain colons
       - MCP tools use mcp__server__tool format
-      - Memory layer tools for build/improve agents
+      - model and color optional but recommended for expert agents
 
   command_template_category:
     categories:
-      path_resolution: Commands that find or locate files/resources
-      action: Commands that perform changes (build, implement)
-      reference: Commands that provide documentation
-      analysis: Commands that analyze without changing
-    usage: |
-      # /command-name
-
-      **Template Category**: Action
-
-      Command description...
+      path_resolution: Find or locate files/resources
+      action: Perform changes (build, implement)
+      reference: Provide documentation
+      analysis: Analyze without changing
 
   hook_helpers_pattern:
     usage: |
-      from hooks.utils.hook_helpers import (
-          parse_stdin,              # Parse JSON from stdin
-          output_continue,          # Continue without context injection
-          output_context,           # Inject context message
-          extract_file_path,        # Extract file from Edit/Write tool input
-          extract_agent_info,       # Extract agent spawn details
-          run_kotadb_deps,          # Query dependency graph
-          format_dependency_alert,  # Format dependency warning
-          get_kotadb_command,       # Get CLI command (dev vs prod)
-      )
+      from hooks.utils.hook_helpers import parse_stdin, output_continue, output_context,
+      extract_file_path, extract_agent_info, run_kotadb_deps, format_dependency_alert,
+      get_kotadb_command
     conventions:
-      - NEVER use print() - violates logging standards
-      - Always use sys.stdout.write() for output
-      - Import hook_helpers from hooks.utils
-      - Add sys.path.insert for parent directory access
-      - Keep context output under 500 tokens
+      - NEVER use print() - use sys.stdout.write()
       - Always exit 0 (never block on errors)
+      - Keep context output under 500 tokens
     timestamp: 2026-02-03
-    evidence: commit d671d51 hook_helpers.py utilities
 
   context_seeding_pattern:
-    structure: |
-      # Hook: .claude/hooks/kotadb/pre-edit-context.py
-      # Trigger: PreToolUse with matcher "Edit|Write|MultiEdit"
-      # Purpose: Warn about file dependents before editing
-
-      def main() -> None:
-          hook_input = parse_stdin()
-          if not hook_input:
-              output_continue()
-              return
-          
-          file_path = extract_file_path(hook_input)
-          if not file_path:
-              output_continue()
-              return
-          
-          # Query KotaDB for dependency information
-          deps_result = run_kotadb_deps(file_path, format="json", depth=1)
-          
-          if deps_result.get("error") or not deps_result.get("dependents"):
-              output_continue()
-              return
-          
-          # Format and inject context
-          alert = format_dependency_alert(deps_result, max_files=10)
-          output_context(alert)
+    purpose: Warn about file dependents before editing
+    hook: .claude/hooks/kotadb/pre-edit-context.py
+    trigger: PreToolUse with matcher Edit|Write|MultiEdit
+    process: parse_stdin -> extract_file_path -> run_kotadb_deps -> format_dependency_alert -> output_context
     trade_offs:
-      pros: [Dynamic awareness, Prevents breaking changes, No manual context, Just-in-time info]
+      pros: [Dynamic awareness, Prevents breaking changes, Just-in-time info]
       cons: [500 token budget, CLI query overhead, Requires indexed repo]
     timestamp: 2026-02-03
-    evidence: commit d671d51 #116
 
   memory_integration_pattern:
-    structure: |
-      # Agent: api-build-agent.md
-      # Section: Memory Integration (before Workflow)
-
-      ## Memory Integration
-
-      Before implementing, search for relevant past context:
-
-      1. **Check Past Failures**
-         search_failures("relevant keywords from your task")
-         Apply learnings to avoid repeating mistakes.
-
-      2. **Check Past Decisions**
-         search_decisions("relevant architectural keywords")
-         Follow established patterns and rationale.
-
-      3. **Check Discovered Patterns**
-         search_patterns(pattern_type: "relevant-type")
-         Use consistent patterns across implementations.
-
-      **During Implementation:**
-      - Record significant architectural decisions with record_decision
-      - Record failed approaches immediately with record_failure
-      - Record workarounds or discoveries with record_insight
+    purpose: Cross-session learning via memory layer
+    section: Memory Integration (before Workflow)
+    before: search_failures, search_decisions, search_patterns
+    during: record_decision, record_failure, record_insight
     trade_offs:
-      pros: [Cross-session learning, Avoids repeated mistakes, Institutional knowledge, Pattern consistency]
-      cons: [Requires MCP tools, Search overhead, Recording discipline needed]
+      pros: [Cross-session learning, Avoids repeated mistakes, Pattern consistency]
+      cons: [Requires MCP tools, Search overhead, Recording discipline]
     timestamp: 2026-02-03
-    evidence: commits a2c7435 #122, b00aae5 #121
 
   agent_registry_structure:
     sections:
-      agents: Individual agent definitions with tools and capabilities
-      capabilityIndex: Map capabilities to agent IDs for discovery
+      agents: Individual agent definitions
+      capabilityIndex: Map capabilities to agent IDs
       modelIndex: Map model tiers to agent IDs
-      toolMatrix: Map tools to agents that use them
-    usage: |
-      Programmatic discovery:
-      - Find agents by capability: registry.capabilityIndex["implement"]
-      - Find agents by model: registry.modelIndex["sonnet"]
-      - Find agents using tool: registry.toolMatrix["Bash"]
+      toolMatrix: Map tools to agents
 
   expert_domain_expansion:
-    timestamp: 2026-01-28
-    evidence: commits 902c49a (docs updates), agent-registry.json changes
     pattern: |
-      When scaling from 2 to 7 expert domains, updates required:
-      1. Create 4 agent files per domain (.claude/agents/experts/<domain>/)
-      2. Create expertise.yaml per domain
-      3. Update agent-registry.json (24+ new entries, indexes)
-      4. Update CLAUDE.md expert domains table and examples
-      5. Update /do command domain detection (9 sections)
-      6. Maintain consistency across all domains
-    challenges:
-      - Registry file grows large (agent-registry.json now 873 lines)
-      - /do command complexity increases with domain count
-      - Multi-line JSON formatting essential for diff readability
-      - Tool permissions must be consistent across similar agent roles
-    best_practices:
-      - Use consistent capability naming pattern (<domain>-planning, <domain>-implementation)
-      - Keep domain keywords non-overlapping for routing accuracy
-      - Document all domains in single CLAUDE.md table for discoverability
-      - Apply uniform tool permissions across agent types (plan/build/improve/question)
+      When scaling domains: create 4 agent files + expertise.yaml, update agent-registry.json,
+      update CLAUDE.md expert domains table, update /do command domain detection
+    challenges: [Registry file grows large, /do command complexity increases, Multi-line JSON formatting essential]
+    best_practices: [Consistent capability naming, Non-overlapping domain keywords, Uniform tool permissions]
+    timestamp: 2026-01-28
 
 best_practices:
   organization:
-    - Agents in .claude/agents/, commands in .claude/commands/
-    - Expert domains: agents/experts/<domain>/ (4-agent + expertise.yaml)
-    - General agents at root level: build-agent.md, scout-agent.md, review-agent.md
-    - Shared agent docs: agents/common/ (memory-usage.md, etc.)
-    - Expertise.yaml: 400-600 lines target, 1000 hard limit
-    - Hooks by domain: hooks/<domain>/ for related hooks (hooks/kotadb/)
+    - Expert domains in agents/experts/<domain>/ (4-agent + expertise.yaml)
+    - Expertise.yaml 400-600 lines target, 700 hard limit
+    - Hooks by domain in hooks/<domain>/
+    - Shared docs in agents/common/
 
   commands:
     - Include Template Category after title
-    - Naming: /category:command pattern
-    - Use allowed-tools to restrict capabilities per command
-    - CRITICAL: Never use colons in frontmatter string values
+    - CRITICAL - Never use colons in frontmatter values
 
   agents:
     - Tools as YAML array format (NOT comma-separated)
-    - Include constraints section for behavioral boundaries
-    - Include model and color fields for expert agents
     - Update agent-registry.json for every new agent
-    - CRITICAL: Never use colons in description field
-    - Add MCP tools where appropriate (mcp__kotadb-bunx__*)
-    - Apply "permissive tools + strict prompts" philosophy
-    - Add memory layer tools to build/improve agents for cross-session learning
-
+    - CRITICAL - Never use colons in description field
+    - Apply permissive tools + strict prompts philosophy
+    - Add memory layer tools to build/improve agents
 
   mcp_tools:
-    - Server names include transport method (kotadb-bunx, not kotadb)
-    - Tool naming: mcp__<server-name>__<tool-name> format
-    - Validate tool names match Claude Desktop mcpServers config
-    - Document tool selection criteria in CLAUDE.md
-    - Add tool usage guidance sections to core agent prompts
+    - Server names include transport method (kotadb-bunx)
+    - Tool naming format: mcp__<server-name>__<tool-name>
+    - Validate tool names match Claude Desktop config
     - Prefer MCP tools for semantic search, dependencies, impact analysis
     - Fallback to Grep for exact regex or unindexed files
-    - Memory tools: search_decisions, search_failures, search_patterns, record_decision, record_failure, record_insight
-    
+
   hooks:
     - Standard Python shebang (#!/usr/bin/env python3)
-    - Import from hooks.utils.hook_helpers
     - NEVER use print() - use sys.stdout.write()
-    - Use output_continue() or output_context() for responses
-    - Configure in settings.json with matchers
-    - Organize domain-specific hooks in subdirectories (hooks/kotadb/)
+    - Use output_continue() or output_context()
     - Keep context output under 500 tokens
-    - Always exit 0 (never block on errors, warn to stderr)
-    - New events: SubagentStart, SessionStart for context injection
+    - Always exit 0
+    - Organize domain-specific hooks in subdirectories
 
   settings:
-    - settings.json: project-wide (committed)
-    - settings.local.json: local overrides (gitignored)
+    - settings.json for project-wide (committed)
+    - settings.local.json for local overrides (gitignored)
     - Valid JSON (no trailing commas)
-    - Hook commands use python3
     - Hook events: PreToolUse, PostToolUse, SubagentStart, SessionStart, UserPromptSubmit, Stop
-
-  expert_expansion:
-    timestamp: 2026-01-28
-    insights:
-      - Document all expert domains in CLAUDE.md for discoverability
-      - Use multi-line JSON arrays in agent-registry.json for git diffs
-      - Keep /do domain detection patterns specific and non-overlapping
-      - Update all 3 files (CLAUDE.md, do.md, agent-registry.json) atomically
-      - Grant consistent tool permissions across agent types within domain
-
-  memory_layer:
-    timestamp: 2026-02-03
-    insights:
-      - Add memory MCP tools to build/improve agents for cross-session learning
-      - Create Memory Integration section in agent prompts BEFORE Workflow
-      - Document memory tools in shared guide (.claude/agents/common/memory-usage.md)
-      - Search before implementing (failures, decisions, patterns)
-      - Record during implementing (decisions, failures, insights)
 
 known_issues:
   - issue: Colons in frontmatter description values break YAML parsing
-    impact: Agents/commands with colons in description fail discovery silently
+    impact: Agents/commands fail discovery silently
     resolution: Remove all colons from description field values
-    prevention: Review all descriptions before commit
     status: ongoing vigilance required
 
   - issue: Comma-separated tools format not supported
-    impact: Tools listed as "Read, Glob, Grep" won't parse correctly
     resolution: Use YAML array format for tools
     status: use correct format
 
   - issue: Agent registry out of sync with agent files
-    impact: Programmatic discovery fails to find new agents
     resolution: Update agent-registry.json when adding/modifying agents
     status: manual maintenance required
 
   - issue: Hook using print() violates logging standards
-    impact: Inconsistent output, potential buffering issues
     resolution: Use sys.stdout.write() per KotaDB conventions
     status: enforced via code review
-    
+
   - issue: Tool permissions too restrictive for agent workflows
-    impact: Agents silently fail to complete tasks (can't write specs, run tests)
-    resolution: Apply "permissive tools + strict prompts" philosophy
-    discovered: 2026-01-28 (commit 446e999)
+    resolution: Apply permissive tools + strict prompts philosophy
+    discovered: 2026-01-28
     status: resolved via systematic tool permission audit
 
   - issue: Documentation accuracy drift over time
-    impact: Broken command references, non-existent file dependencies, user confusion
-    symptoms: CLAUDE.md commands that don't exist, settings.json referencing missing files
-    resolution: Systematic validation of all documentation references against actual files
-    discovered: 2026-02-02 (issue #77, claude-config-documentation-fixes-spec.md)
-    examples:
-      - /tools:bun_install, /tools:pr-review, /tools:question (non-existent commands)
-      - statusline.py referenced in settings.json (non-existent file)
-      - workflows/, homeserver/, app/ directories (non-existent in commands/)
-      - Expert domain count mismatches (documented 7 vs actual 9)
-    status: active remediation via systematic documentation cleanup
-    prevention: Add documentation accuracy validation to development workflow
+    impact: Broken command references, non-existent file dependencies
+    resolution: Systematic validation of documentation references
+    discovered: 2026-02-02
+    status: active remediation
 
 potential_enhancements:
-  - Automated agent registry validation (compare files to registry)
+  - Automated agent registry validation
   - Frontmatter linting for description colons
   - Template Category validation
-  - Hook output validation
-  - Expert domain registry validation (ensure CLAUDE.md, do.md, agent-registry.json in sync)
-  - Tool permission consistency checker across agent types
-  - Documentation accuracy validation (check all referenced commands/files exist)
-  - Spec file location consistency enforcement (docs/specs/ vs .claude/.cache/specs/)
-  - Hook output token budget enforcement (warn if > 500 tokens)
-  - Memory layer integration test suite (verify search/record workflows)
-
+  - Expert domain registry validation
+  - Tool permission consistency checker
+  - Documentation accuracy validation
+  - Hook output token budget enforcement
+  - Memory layer integration test suite
 
 stability:
   convergence_indicators:
     insight_rate_trend: expanding
     contradiction_count: 0
-    new_patterns_added_this_cycle: 4
-    patterns_updated_this_cycle: 2
-    last_reviewed: 2026-02-03
+    last_reviewed: 2026-02-05
     utility_ratio: 1.0
+    size_governance:
+      previous_size: 951 lines
+      current_size: 499 lines
+      target: 600 lines
+      reduction: 452 lines (48%)
+      status: within target
     notes: |
-      Hook organization and memory layer integration cycle:
-      - Added organize_hooks_by_domain operation (key_operations)
-      - Added integrate_memory_layer_tools operation (key_operations)
-      - Added implement_context_seeding_hooks operation (key_operations)
-      - Updated implement_hook with new events (SubagentStart, SessionStart)
-      - Added context_seeding_pattern (patterns)
-      - Added memory_integration_pattern (patterns)
-      - Updated hook_helpers_pattern with new utilities
-      - Updated directory_structure with hooks/kotadb/ and agents/common/
-      - Updated key_files with domain-specific hooks and common docs
-      - Added hook_event_selection decision tree
-      - Updated best_practices with hook organization and memory layer guidance
-      - Impact: 3 commits (d671d51 #116, a2c7435 #122, b00aae5 #121)
-      - Files affected: 20+ (hooks, agents, settings.json, common docs)
-      - Major features: Context seeding hooks, memory layer integration, hook organization
-      - Domain showing continued expansion with sophisticated integration patterns
-      - Size: 879 lines (above 800 warning threshold, cleanup recommended next cycle)
+      Size governance cycle (2026-02-05):
+      - Removed verbose code examples (kept references only)
+      - Consolidated redundant patterns and pitfalls
+      - Shortened overly detailed explanations
+      - Removed tactical low-value observations
+      - Preserved all critical knowledge and recent learnings
+      - File now at optimal 499 lines (within 400-600 target range)

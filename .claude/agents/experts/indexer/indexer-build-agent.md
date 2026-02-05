@@ -19,6 +19,33 @@ tools:
   - mcp__kotadb-bunx__record_insight
 model: sonnet
 color: green
+contextContract:
+  requires:
+    - type: spec_file
+      key: SPEC
+      description: Path to specification file from plan agent
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/indexer/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: "app/src/indexer/**"
+      exclude:
+        - "**/node_modules/**"
+        - "**/*.test.ts"
+    tests:
+      scope: "app/tests/indexer/**"
+    memory:
+      allowed:
+        - decision
+        - failure
+        - insight
+  contextSource: spec_file
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: SPEC
 ---
 
 # Indexer Build Agent

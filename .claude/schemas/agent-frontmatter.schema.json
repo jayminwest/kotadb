@@ -1,0 +1,204 @@
+{
+  "$schema": "https://json-schema.org/draft-07/schema#",
+  "title": "Agent Frontmatter Schema",
+  "description": "Validation for agent frontmatter including context contracts",
+  "type": "object",
+  "required": ["name", "description", "tools"],
+  "properties": {
+    "name": {
+      "type": "string",
+      "pattern": "^[a-z]+(-[a-z]+)*-agent$",
+      "description": "Agent identifier in kebab-case ending with -agent"
+    },
+    "description": {
+      "type": "string",
+      "maxLength": 200,
+      "pattern": "^[^:]+$",
+      "description": "Action-oriented description without colons"
+    },
+    "tools": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "enum": [
+          "Read",
+          "Write",
+          "Edit",
+          "Glob",
+          "Grep",
+          "Bash",
+          "Task",
+          "TodoWrite",
+          "NotebookEdit",
+          "WebFetch",
+          "mcp__kotadb-bunx__search_code",
+          "mcp__kotadb-bunx__unified_search",
+          "mcp__kotadb-bunx__index_repository",
+          "mcp__kotadb-bunx__search_dependencies",
+          "mcp__kotadb-bunx__analyze_change_impact",
+          "mcp__kotadb-bunx__record_decision",
+          "mcp__kotadb-bunx__search_decisions",
+          "mcp__kotadb-bunx__record_failure",
+          "mcp__kotadb-bunx__search_failures",
+          "mcp__kotadb-bunx__record_insight",
+          "mcp__kotadb-bunx__search_patterns",
+          "mcp__kotadb-bunx__list_recent_files",
+          "mcp__kotadb-bunx__search",
+          "mcp__firecrawl-mcp__firecrawl_scrape"
+        ]
+      },
+      "minItems": 1,
+      "uniqueItems": true,
+      "description": "List of tools the agent can use"
+    },
+    "model": {
+      "enum": ["haiku", "sonnet", "opus"],
+      "description": "Model to use (haiku for questions, sonnet for build/improve, opus for complex planning)"
+    },
+    "color": {
+      "enum": ["red", "blue", "green", "yellow", "purple", "orange", "pink", "cyan"],
+      "description": "Visual identifier (yellow=plan, green=build, purple=improve, cyan=question)"
+    },
+    "constraints": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Behavioral boundaries"
+    },
+    "readOnly": {
+      "type": "boolean",
+      "description": "Flag for read-only agents (questions, audits)"
+    },
+    "expertDomain": {
+      "type": "string",
+      "pattern": "^[a-z]+(-[a-z]+)*$",
+      "description": "Domain name for expert agents (kebab-case)"
+    },
+    "contextContract": {
+      "$ref": "#/definitions/contextContract"
+    }
+  },
+  "additionalProperties": false,
+  "definitions": {
+    "contextContract": {
+      "type": "object",
+      "description": "Declarative specification of agent context requirements and output scope",
+      "properties": {
+        "requires": {
+          "type": "array",
+          "description": "List of required context inputs",
+          "items": {
+            "type": "object",
+            "required": ["type", "key"],
+            "properties": {
+              "type": {
+                "enum": ["spec_file", "expertise", "memory", "prompt", "inbox", "file", "env"],
+                "description": "Type of required context"
+              },
+              "key": {
+                "type": "string",
+                "description": "Variable name for this context"
+              },
+              "description": {
+                "type": "string",
+                "description": "Human-readable description of requirement"
+              },
+              "path": {
+                "type": "string",
+                "description": "File path for spec_file, expertise, or file types"
+              },
+              "scope": {
+                "type": "string",
+                "description": "Scope for memory searches (failures|patterns|decisions)"
+              },
+              "required": {
+                "type": "boolean",
+                "default": true,
+                "description": "Whether this requirement blocks spawn if missing"
+              }
+            }
+          }
+        },
+        "produces": {
+          "type": "object",
+          "description": "Declared output scope for validation",
+          "properties": {
+            "files": {
+              "type": "object",
+              "description": "File modification scope",
+              "properties": {
+                "scope": {
+                  "type": "string",
+                  "description": "Glob pattern for allowed file modifications"
+                },
+                "exclude": {
+                  "type": "array",
+                  "items": { "type": "string" },
+                  "description": "Glob patterns to exclude from scope"
+                }
+              }
+            },
+            "tests": {
+              "type": "object",
+              "description": "Test file requirements",
+              "properties": {
+                "scope": {
+                  "type": "string",
+                  "description": "Glob pattern for test files"
+                },
+                "colocated": {
+                  "type": "string",
+                  "description": "Pattern for colocated tests (e.g., __tests__/)"
+                }
+              }
+            },
+            "memory": {
+              "type": "object",
+              "description": "Memory recording permissions",
+              "properties": {
+                "allowed": {
+                  "type": "array",
+                  "items": {
+                    "enum": ["decision", "failure", "insight"]
+                  },
+                  "description": "Which memory types agent can record"
+                }
+              }
+            }
+          }
+        },
+        "contextSource": {
+          "enum": ["spec_file", "prompt", "inbox", "hybrid"],
+          "description": "Primary mechanism for receiving context"
+        },
+        "validation": {
+          "type": "object",
+          "description": "Validation steps to run",
+          "properties": {
+            "preSpawn": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check": { "type": "string" },
+                  "target": { "type": "string" }
+                }
+              },
+              "description": "Validations to run before spawning agent"
+            },
+            "postComplete": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "check": { "type": "string" },
+                  "command": { "type": "string" }
+                }
+              },
+              "description": "Validations to run after agent completes"
+            }
+          }
+        }
+      }
+    }
+  }
+}
