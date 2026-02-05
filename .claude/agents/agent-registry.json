@@ -563,7 +563,12 @@
       "capabilities": [
         "general"
       ],
-      "tools": "mcp__firecrawl-mcp__firecrawl_scrape, WebFetch, Write, Edit",
+      "tools": [
+        "mcp__firecrawl-mcp__firecrawl_scrape",
+        "WebFetch",
+        "Write",
+        "Edit"
+      ],
       "readOnly": false
     },
     "documentation-build-agent": {
@@ -1420,19 +1425,6 @@
     ]
   },
   "toolMatrix": {
-    " ": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    ",": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "-": [
-      "docs-scraper"
-    ],
     "Bash": [
       "agent-authoring-build-agent",
       "agent-authoring-improve-agent",
@@ -1469,9 +1461,6 @@
       "web-improve-agent",
       "web-plan-agent"
     ],
-    "E": [
-      "docs-scraper"
-    ],
     "Edit": [
       "agent-authoring-build-agent",
       "agent-authoring-improve-agent",
@@ -1484,6 +1473,7 @@
       "claude-config-improve-agent",
       "database-build-agent",
       "database-improve-agent",
+      "docs-scraper",
       "documentation-build-agent",
       "documentation-improve-agent",
       "domain-build-agent",
@@ -1496,9 +1486,6 @@
       "testing-improve-agent",
       "web-build-agent",
       "web-improve-agent"
-    ],
-    "F": [
-      "docs-scraper"
     ],
     "Glob": [
       "agent-authoring-build-agent",
@@ -1671,11 +1658,8 @@
     "TodoWrite": [
       "build-agent"
     ],
-    "W": [
-      "docs-scraper",
-      "docs-scraper"
-    ],
     "WebFetch": [
+      "docs-scraper",
       "review-agent"
     ],
     "Write": [
@@ -1695,6 +1679,7 @@
       "database-build-agent",
       "database-improve-agent",
       "database-plan-agent",
+      "docs-scraper",
       "documentation-build-agent",
       "documentation-improve-agent",
       "documentation-plan-agent",
@@ -1713,59 +1698,7 @@
       "web-improve-agent",
       "web-plan-agent"
     ],
-    "_": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "a": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "b": [
-      "docs-scraper"
-    ],
-    "c": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "d": [
-      "docs-scraper"
-    ],
-    "e": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "f": [
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "h": [
-      "docs-scraper"
-    ],
-    "i": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "l": [
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "m": [
-      "docs-scraper",
+    "mcp__firecrawl-mcp__firecrawl_scrape": [
       "docs-scraper"
     ],
     "mcp__kotadb-bunx__analyze_change_impact": [
@@ -2037,31 +1970,6 @@
       "testing-build-agent",
       "testing-improve-agent",
       "web-improve-agent"
-    ],
-    "p": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "r": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "s": [
-      "docs-scraper"
-    ],
-    "t": [
-      "docs-scraper",
-      "docs-scraper",
-      "docs-scraper"
-    ],
-    "w": [
-      "docs-scraper",
-      "docs-scraper"
     ]
   }
 }
