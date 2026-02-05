@@ -28,6 +28,8 @@ import { handlePRCreation, commitExpertiseChanges, type IssueType } from "./pr.t
 import { clearWorkflowContext } from "./context.ts";
 import { curateContext, type CuratedContext } from "./curator.ts";
 import { autoRecordSuccess, autoRecordFailure } from "./auto-record.ts";
+import { withRetry } from "./retry.ts";
+import { writeCheckpoint, clearCheckpoint } from "./checkpoint.ts";
 
 /**
  * GitHub issue data fetched via gh CLI
@@ -57,6 +59,13 @@ export interface OrchestrationOptions {
   dryRun: boolean;
   verbose: boolean;
   workflowId: string | null;
+  resumeFromPhase?: string;
+  checkpointData?: {
+    domain: string;
+    specPath: string | null;
+    filesModified: string[];
+    completedPhases: string[];
+  };
 }
 
 /**
@@ -75,6 +84,33 @@ interface AutomationSDKOptions extends Options {
       env: { KOTADB_PATH: string };
     };
   };
+}
+
+/** Ordered list of workflow phases for resume logic */
+const PHASE_ORDER = ["analysis", "plan", "build", "improve"] as const;
+
+/**
+ * Check whether a phase should be skipped based on completed phases
+ */
+function shouldSkipPhase(phase: string, completedPhases: string[]): boolean {
+  return completedPhases.includes(phase);
+}
+
+/**
+ * Log retry stats for a phase when retries occurred
+ */
+function logRetryStats(
+  logger: WorkflowLogger,
+  phase: string,
+  retryResult: { attempts: number; totalRetryDelayMs: number }
+): void {
+  if (retryResult.attempts > 1) {
+    logger.logEvent("RETRY_STATS", {
+      phase,
+      attempts: retryResult.attempts,
+      total_retry_delay_ms: retryResult.totalRetryDelayMs
+    });
+  }
 }
 
 /**
@@ -160,8 +196,37 @@ export async function orchestrateWorkflow(
     reporter, 
     dryRun, 
     verbose, 
-    workflowId 
+    workflowId,
+    resumeFromPhase,
+    checkpointData
   } = opts;
+
+  // Determine which phases to skip based on resume support
+  let completedPhases: string[] = [];
+  let resumedDomain = "";
+  let resumedSpecPath: string | null = null;
+  let resumedFilesModified: string[] = [];
+
+  if (resumeFromPhase && checkpointData) {
+    completedPhases = [...checkpointData.completedPhases];
+    resumedDomain = checkpointData.domain;
+    resumedSpecPath = checkpointData.specPath;
+    resumedFilesModified = checkpointData.filesModified;
+    logger.logEvent("RESUME_FROM_PHASE", { 
+      phase: resumeFromPhase, 
+      skipped: completedPhases,
+      domain: resumedDomain
+    });
+  } else if (resumeFromPhase) {
+    // Resume requested but no checkpoint data -- skip phases by order
+    for (const phase of PHASE_ORDER) {
+      if (phase === resumeFromPhase) break;
+      completedPhases.push(phase);
+    }
+    logger.logEvent("RESUME_FROM_PHASE", { phase: resumeFromPhase, skipped: completedPhases });
+  }
+
+  const startedAt = new Date().toISOString();
 
   // Fetch issue title early for PR creation
   const issueData = await fetchIssueContent(issueNumber);
@@ -211,116 +276,221 @@ export async function orchestrateWorkflow(
   };
 
   // Phase 1: Analyze Issue
-  reporter.startPhase("analysis");
-  logger.logEvent("PHASE_START", { phase: "analysis" });
-  const analysisResult = await analyzeIssue(issueNumber, sdkOptions, logger);
-  const { domain, requirements, issueType } = parseAnalysis(analysisResult);
-  logger.logEvent("PHASE_COMPLETE", { phase: "analysis", domain });
-  reporter.completePhase("analysis", { domain });
+  let domain: string;
+  let requirements: string;
+  let issueType: string;
 
-  // CURATION: Post-Analysis
-  if (workflowId) {
-    try {
-      const curatedContext = await curateContext({
-        workflowId,
-        phase: 'post-analysis',
-        domain,
-        currentPhaseOutput: analysisResult,
-        projectRoot: mainProjectRoot,
-        logger,
-        reporter
-      });
-      logger.logEvent("CONTEXT_CURATED", { 
-        workflow_id: workflowId, 
-        phase: 'post-analysis',
-        token_count: curatedContext.tokenCount
-      });
-    } catch (error) {
-      // Non-fatal: log warning and continue
-      logger.logError("curation_post_analysis", error instanceof Error ? error : new Error(String(error)));
-      reporter.logWarning("Context curation failed (non-fatal)");
+  if (shouldSkipPhase("analysis", completedPhases)) {
+    domain = resumedDomain;
+    requirements = "";
+    issueType = "unknown";
+    logger.logEvent("PHASE_SKIP", { phase: "analysis", reason: "resumed" });
+  } else {
+    reporter.startPhase("analysis");
+    logger.logEvent("PHASE_START", { phase: "analysis" });
+    const retryResult = await withRetry(
+      () => analyzeIssue(issueNumber, sdkOptions, logger)
+    );
+    logRetryStats(logger, "analysis", retryResult);
+    const analysisResult = retryResult.result;
+    const parsed = parseAnalysis(analysisResult);
+    domain = parsed.domain;
+    requirements = parsed.requirements;
+    issueType = parsed.issueType;
+    logger.logEvent("PHASE_COMPLETE", { phase: "analysis", domain });
+    reporter.completePhase("analysis", { domain });
+
+    // Write checkpoint after analysis
+    writeCheckpoint({
+      issueNumber,
+      workflowId,
+      completedPhases: ["analysis"],
+      domain,
+      specPath: null,
+      filesModified: [],
+      worktreePath: projectRoot,
+      branchName,
+      createdAt: startedAt,
+      updatedAt: new Date().toISOString()
+    });
+
+    // CURATION: Post-Analysis
+    if (workflowId) {
+      try {
+        const curatedContext = await curateContext({
+          workflowId,
+          phase: 'post-analysis',
+          domain,
+          currentPhaseOutput: analysisResult,
+          projectRoot: mainProjectRoot,
+          logger,
+          reporter
+        });
+        logger.logEvent("CONTEXT_CURATED", { 
+          workflow_id: workflowId, 
+          phase: 'post-analysis',
+          token_count: curatedContext.tokenCount
+        });
+      } catch (error) {
+        // Non-fatal: log warning and continue
+        logger.logError("curation_post_analysis", error instanceof Error ? error : new Error(String(error)));
+        reporter.logWarning("Context curation failed (non-fatal)");
+      }
     }
   }
 
   // Phase 2: Plan
-  reporter.startPhase("plan");
-  logger.logEvent("PHASE_START", { phase: "plan", domain });
-  const specPath = await executePlan(domain, requirements, issueNumber, sdkOptions, logger, dryRun);
-  logger.logEvent("PHASE_COMPLETE", { phase: "plan", spec_path: specPath });
-  reporter.completePhase("plan", { spec_path: specPath });
+  let specPath: string;
 
-  // CURATION: Post-Plan
-  if (workflowId) {
-    try {
-      const planOutput = `Spec created at: ${specPath}\nDomain: ${domain}\nRequirements: ${requirements}`;
-      const curatedContext = await curateContext({
-        workflowId,
-        phase: 'post-plan',
-        domain,
-        currentPhaseOutput: planOutput,
-        projectRoot: mainProjectRoot,
-        logger,
-        reporter
-      });
-      logger.logEvent("CONTEXT_CURATED", { 
-        workflow_id: workflowId, 
-        phase: 'post-plan',
-        token_count: curatedContext.tokenCount
-      });
-    } catch (error) {
-      logger.logError("curation_post_plan", error instanceof Error ? error : new Error(String(error)));
-      reporter.logWarning("Context curation failed (non-fatal)");
+  if (shouldSkipPhase("plan", completedPhases)) {
+    specPath = resumedSpecPath ?? "";
+    logger.logEvent("PHASE_SKIP", { phase: "plan", reason: "resumed" });
+  } else {
+    reporter.startPhase("plan");
+    logger.logEvent("PHASE_START", { phase: "plan", domain });
+    const retryResult = await withRetry(
+      () => executePlan(domain, requirements, issueNumber, sdkOptions, logger, dryRun)
+    );
+    logRetryStats(logger, "plan", retryResult);
+    specPath = retryResult.result;
+    logger.logEvent("PHASE_COMPLETE", { phase: "plan", spec_path: specPath });
+    reporter.completePhase("plan", { spec_path: specPath });
+
+    // Write checkpoint after plan
+    writeCheckpoint({
+      issueNumber,
+      workflowId,
+      completedPhases: ["analysis", "plan"],
+      domain,
+      specPath,
+      filesModified: [],
+      worktreePath: projectRoot,
+      branchName,
+      createdAt: startedAt,
+      updatedAt: new Date().toISOString()
+    });
+
+    // CURATION: Post-Plan
+    if (workflowId) {
+      try {
+        const planOutput = `Spec created at: ${specPath}\nDomain: ${domain}\nRequirements: ${requirements}`;
+        const curatedContext = await curateContext({
+          workflowId,
+          phase: 'post-plan',
+          domain,
+          currentPhaseOutput: planOutput,
+          projectRoot: mainProjectRoot,
+          logger,
+          reporter
+        });
+        logger.logEvent("CONTEXT_CURATED", { 
+          workflow_id: workflowId, 
+          phase: 'post-plan',
+          token_count: curatedContext.tokenCount
+        });
+      } catch (error) {
+        logger.logError("curation_post_plan", error instanceof Error ? error : new Error(String(error)));
+        reporter.logWarning("Context curation failed (non-fatal)");
+      }
     }
   }
 
   // Phase 3: Build
-  reporter.startPhase("build");
-  logger.logEvent("PHASE_START", { phase: "build", domain });
-  const filesModified = await executeBuild(domain, specPath, sdkOptions, logger, dryRun);
-  logger.logEvent("PHASE_COMPLETE", { phase: "build", files_count: filesModified.length });
-  reporter.completePhase("build", { files_count: filesModified.length });
+  let filesModified: string[];
 
-  // CURATION: Post-Build
-  if (workflowId) {
-    try {
-      const buildOutput = `Files modified: ${filesModified.join(', ')}\nDomain: ${domain}`;
-      const curatedContext = await curateContext({
-        workflowId,
-        phase: 'post-build',
-        domain,
-        currentPhaseOutput: buildOutput,
-        projectRoot: mainProjectRoot,
-        logger,
-        reporter
-      });
-      logger.logEvent("CONTEXT_CURATED", { 
-        workflow_id: workflowId, 
-        phase: 'post-build',
-        token_count: curatedContext.tokenCount
-      });
-    } catch (error) {
-      logger.logError("curation_post_build", error instanceof Error ? error : new Error(String(error)));
-      reporter.logWarning("Context curation failed (non-fatal)");
+  if (shouldSkipPhase("build", completedPhases)) {
+    filesModified = resumedFilesModified;
+    logger.logEvent("PHASE_SKIP", { phase: "build", reason: "resumed" });
+  } else {
+    reporter.startPhase("build");
+    logger.logEvent("PHASE_START", { phase: "build", domain });
+    const retryResult = await withRetry(
+      () => executeBuild(domain, specPath, sdkOptions, logger, dryRun)
+    );
+    logRetryStats(logger, "build", retryResult);
+    filesModified = retryResult.result;
+    logger.logEvent("PHASE_COMPLETE", { phase: "build", files_count: filesModified.length });
+    reporter.completePhase("build", { files_count: filesModified.length });
+
+    // Write checkpoint after build
+    writeCheckpoint({
+      issueNumber,
+      workflowId,
+      completedPhases: ["analysis", "plan", "build"],
+      domain,
+      specPath,
+      filesModified,
+      worktreePath: projectRoot,
+      branchName,
+      createdAt: startedAt,
+      updatedAt: new Date().toISOString()
+    });
+
+    // CURATION: Post-Build
+    if (workflowId) {
+      try {
+        const buildOutput = `Files modified: ${filesModified.join(', ')}\nDomain: ${domain}`;
+        const curatedContext = await curateContext({
+          workflowId,
+          phase: 'post-build',
+          domain,
+          currentPhaseOutput: buildOutput,
+          projectRoot: mainProjectRoot,
+          logger,
+          reporter
+        });
+        logger.logEvent("CONTEXT_CURATED", { 
+          workflow_id: workflowId, 
+          phase: 'post-build',
+          token_count: curatedContext.tokenCount
+        });
+      } catch (error) {
+        logger.logError("curation_post_build", error instanceof Error ? error : new Error(String(error)));
+        reporter.logWarning("Context curation failed (non-fatal)");
+      }
     }
   }
 
   // Phase 4: Improve (optional)
-  reporter.startPhase("improve");
-  logger.logEvent("PHASE_START", { phase: "improve", domain });
   let improveStatus: "success" | "failed" | "skipped" = "success";
-  try {
-    if (!dryRun) {
-      await executeImprove(domain, sdkOptions, logger);
-    } else {
-      improveStatus = "skipped";
+
+  if (shouldSkipPhase("improve", completedPhases)) {
+    improveStatus = "skipped";
+    logger.logEvent("PHASE_SKIP", { phase: "improve", reason: "resumed" });
+  } else {
+    reporter.startPhase("improve");
+    logger.logEvent("PHASE_START", { phase: "improve", domain });
+    try {
+      if (!dryRun) {
+        const retryResult = await withRetry(
+          () => executeImprove(domain, sdkOptions, logger)
+        );
+        logRetryStats(logger, "improve", retryResult);
+      } else {
+        improveStatus = "skipped";
+      }
+    } catch (error) {
+      logger.logError("improve_phase", error instanceof Error ? error : new Error(String(error)));
+      reporter.logError("Improve phase failed", error instanceof Error ? error : undefined);
+      improveStatus = "failed";
     }
-  } catch (error) {
-    logger.logError("improve_phase", error instanceof Error ? error : new Error(String(error)));
-    reporter.logError("Improve phase failed", error instanceof Error ? error : undefined);
-    improveStatus = "failed";
+    logger.logEvent("PHASE_COMPLETE", { phase: "improve", status: improveStatus });
+    reporter.completePhase("improve", { status: improveStatus });
+
+    // Write checkpoint after improve
+    writeCheckpoint({
+      issueNumber,
+      workflowId,
+      completedPhases: ["analysis", "plan", "build", "improve"],
+      domain,
+      specPath,
+      filesModified,
+      worktreePath: projectRoot,
+      branchName,
+      createdAt: startedAt,
+      updatedAt: new Date().toISOString()
+    });
   }
-  logger.logEvent("PHASE_COMPLETE", { phase: "improve", status: improveStatus });
-  reporter.completePhase("improve", { status: improveStatus });
 
   // Auto-record workflow outcome
   if (!dryRun && workflowId) {
@@ -424,6 +594,10 @@ export async function orchestrateWorkflow(
       reporter.logWarning("Failed to cleanup workflow context (non-fatal)");
     }
   }
+
+  // Clear checkpoint on workflow completion (success or terminal failure)
+  clearCheckpoint(issueNumber);
+
   return {
     domain,
     specPath,
