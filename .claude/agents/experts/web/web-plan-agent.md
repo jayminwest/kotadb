@@ -13,6 +13,26 @@ tools:
 model: sonnet
 color: yellow
 expertDomain: web
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      description: "Web content or design requirement to plan"
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/web/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/.cache/specs/web/**"
+    memory:
+      allowed:
+        - decision
+  contextSource: prompt
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Web Plan Agent

@@ -20,6 +20,28 @@ tools:
 model: sonnet
 color: purple
 expertDomain: web
+contextContract:
+  requires:
+    - type: prompt
+      key: FOCUS_AREA
+      description: "Optional area to focus web improvement analysis on"
+      required: false
+    - type: expertise
+      path: .claude/agents/experts/web/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/agents/experts/web/**"
+    memory:
+      allowed:
+        - decision
+        - failure
+        - insight
+  contextSource: hybrid
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Web Improve Agent

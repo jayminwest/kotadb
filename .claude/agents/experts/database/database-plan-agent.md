@@ -12,6 +12,26 @@ tools:
   - mcp__kotadb-bunx__list_recent_files
 model: sonnet
 color: yellow
+contextContract:
+  requires:
+    - type: prompt
+      key: USER_PROMPT
+      description: "Database schema or query requirement to plan"
+      required: true
+    - type: expertise
+      path: .claude/agents/experts/database/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/.cache/specs/database/**"
+    memory:
+      allowed:
+        - decision
+  contextSource: prompt
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Database Plan Agent

@@ -17,25 +17,60 @@
     ]
   },
   "hooks": {
-    "PreToolUse": [{
-      "matcher": "Edit|Write|MultiEdit",
-      "hooks": [{
-        "type": "command",
-        "command": "python3 .claude/hooks/kotadb/pre-edit-context.py"
-      }]
-    }],
-    "SubagentStart": [{
-      "matcher": "build|Explore",
-      "hooks": [{
-        "type": "command",
-        "command": "python3 .claude/hooks/kotadb/agent-context.py"
-      }]
-    }],
-    "SessionStart": [{
-      "hooks": [{
-        "type": "command",
-        "command": "python3 .claude/hooks/kotadb/session-expertise.py"
-      }]
-    }]
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write|MultiEdit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/kotadb/pre-edit-context.py"
+          }
+        ]
+      },
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "bun run .claude/hooks/scope-enforcement.ts"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "build|Explore",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/kotadb/agent-context.py"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/kotadb/session-expertise.py"
+          }
+        ]
+      }
+    ],
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "python3 .claude/hooks/kotadb/validate-agent-edit.py"
+          }
+        ]
+      }
+    ]
+  },
+  "env": {
+    "CLAUDE_CODE_EXPERIMENTAL_AGENT_TEAMS": "1"
   }
 }

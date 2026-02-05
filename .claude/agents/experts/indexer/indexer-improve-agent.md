@@ -19,6 +19,28 @@ tools:
   - mcp__kotadb-bunx__record_insight
 model: sonnet
 color: purple
+contextContract:
+  requires:
+    - type: prompt
+      key: FOCUS_AREA
+      description: "Optional area to focus indexer improvement analysis on"
+      required: false
+    - type: expertise
+      path: .claude/agents/experts/indexer/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/agents/experts/indexer/**"
+    memory:
+      allowed:
+        - decision
+        - failure
+        - insight
+  contextSource: hybrid
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Indexer Improve Agent

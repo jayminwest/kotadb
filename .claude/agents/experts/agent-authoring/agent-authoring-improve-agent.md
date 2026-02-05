@@ -20,6 +20,28 @@ tools:
 model: sonnet
 color: purple
 expertDomain: agent-authoring
+contextContract:
+  requires:
+    - type: prompt
+      key: FOCUS_AREA
+      description: "Optional area to focus agent authoring improvement analysis on"
+      required: false
+    - type: expertise
+      path: .claude/agents/experts/agent-authoring/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/agents/experts/agent-authoring/**"
+    memory:
+      allowed:
+        - decision
+        - failure
+        - insight
+  contextSource: hybrid
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # Agent Authoring Improve Agent

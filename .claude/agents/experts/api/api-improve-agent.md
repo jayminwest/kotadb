@@ -19,6 +19,28 @@ tools:
   - mcp__kotadb-bunx__record_insight
 model: sonnet
 color: purple
+contextContract:
+  requires:
+    - type: prompt
+      key: FOCUS_AREA
+      description: "Optional area to focus API improvement analysis on"
+      required: false
+    - type: expertise
+      path: .claude/agents/experts/api/expertise.yaml
+      required: true
+  produces:
+    files:
+      scope: ".claude/agents/experts/api/**"
+    memory:
+      allowed:
+        - decision
+        - failure
+        - insight
+  contextSource: hybrid
+  validation:
+    preSpawn:
+      - check: file_exists
+        target: expertise
 ---
 
 # API Improve Agent
