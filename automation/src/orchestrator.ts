@@ -30,6 +30,8 @@ import { curateContext, type CuratedContext } from "./curator.ts";
 import { autoRecordSuccess, autoRecordFailure } from "./auto-record.ts";
 import { withRetry } from "./retry.ts";
 import { writeCheckpoint, clearCheckpoint } from "./checkpoint.ts";
+import { loadAgentPrompt, loadExpertiseConventions, buildPhasePrompt } from "./prompt-loader.ts";
+import { validateBuildOutput, formatValidationErrors, type ValidationResult } from "./validator.ts";
 
 /**
  * GitHub issue data fetched via gh CLI
@@ -87,7 +89,9 @@ interface AutomationSDKOptions extends Options {
 }
 
 /** Ordered list of workflow phases for resume logic */
-const PHASE_ORDER = ["analysis", "plan", "build", "improve"] as const;
+const PHASE_ORDER = ["analysis", "plan", "build", "validate", "improve"] as const;
+
+const MAX_BUILD_FIX_RETRIES = 2;
 
 /**
  * Check whether a phase should be skipped based on completed phases
@@ -365,7 +369,7 @@ export async function orchestrateWorkflow(
     }
 
     const retryResult = await withRetry(
-      () => executePlan(domain, requirements, issueNumber, sdkOptions, logger, dryRun, planCuratedContext)
+      () => executePlan(domain, requirements, issueNumber, sdkOptions, logger, dryRun, planCuratedContext, mainProjectRoot)
     );
     logRetryStats(logger, "plan", retryResult);
     specPath = retryResult.result;
@@ -437,7 +441,7 @@ export async function orchestrateWorkflow(
     }
 
     const retryResult = await withRetry(
-      () => executeBuild(domain, specPath, sdkOptions, logger, dryRun, buildCuratedContext)
+      () => executeBuild(domain, specPath, sdkOptions, logger, dryRun, buildCuratedContext, mainProjectRoot)
     );
     logRetryStats(logger, "build", retryResult);
     filesModified = retryResult.result;
@@ -483,6 +487,80 @@ export async function orchestrateWorkflow(
     }
   }
 
+  // Phase 3.5: Validate build output (build-fix loop)
+  if (!shouldSkipPhase("validate", completedPhases) && !dryRun && filesModified.length > 0) {
+    reporter.startPhase("validate" as any); // validate is new phase
+    logger.logEvent("PHASE_START", { phase: "validate" });
+    
+    let buildAttempt = 0;
+    let validationResult: ValidationResult | null = null;
+    
+    while (buildAttempt <= MAX_BUILD_FIX_RETRIES) {
+      validationResult = await validateBuildOutput({
+        projectRoot,
+        filesModified
+      });
+      
+      if (validationResult.passed) {
+        logger.logEvent("VALIDATION_PASSED", { attempt: buildAttempt });
+        break;
+      }
+      
+      buildAttempt++;
+      
+      if (buildAttempt > MAX_BUILD_FIX_RETRIES) {
+        logger.logEvent("VALIDATION_FAILED_FINAL", { 
+          attempt: buildAttempt,
+          summary: validationResult.summary
+        });
+        reporter.logWarning(`Validation failed after ${MAX_BUILD_FIX_RETRIES} fix attempts: ${validationResult.summary}`);
+        break;
+      }
+      
+      // Build-fix loop: re-invoke build with error context
+      logger.logEvent("BUILD_FIX_RETRY", { attempt: buildAttempt, errors: validationResult.summary });
+      reporter.logWarning(`Validation failed (attempt ${buildAttempt}/${MAX_BUILD_FIX_RETRIES}), retrying build with error context...`);
+      
+      const errorContext = formatValidationErrors(validationResult);
+      
+      // Retrieve curated context again for the retry
+      let retryCuratedContext: string | null = null;
+      if (workflowId) {
+        try {
+          const ctx = getWorkflowContext(workflowId, 'plan');
+          if (ctx?.summary) {
+            retryCuratedContext = ctx.summary.slice(0, 2000);
+          }
+        } catch { /* non-fatal */ }
+      }
+      
+      const retryResult = await withRetry(
+        () => executeBuild(domain, specPath, sdkOptions, logger, dryRun, retryCuratedContext, mainProjectRoot, errorContext)
+      );
+      logRetryStats(logger, "build-fix", retryResult);
+      filesModified = retryResult.result;
+    }
+    
+    logger.logEvent("PHASE_COMPLETE", { phase: "validate", passed: validationResult?.passed ?? false });
+    reporter.completePhase("validate" as any, { passed: validationResult?.passed ?? false });
+    
+    // Write checkpoint after validation
+    writeCheckpoint({
+      issueNumber,
+      workflowId,
+      completedPhases: ["analysis", "plan", "build", "validate"],
+      domain,
+      specPath,
+      filesModified,
+      worktreePath: projectRoot,
+      branchName,
+      createdAt: startedAt,
+      updatedAt: new Date().toISOString()
+    });
+  } else if (shouldSkipPhase("validate", completedPhases)) {
+    logger.logEvent("PHASE_SKIP", { phase: "validate", reason: "resumed" });
+  }
+
   // Phase 4: Improve (optional)
   let improveStatus: "success" | "failed" | "skipped" = "success";
 
@@ -511,7 +589,7 @@ export async function orchestrateWorkflow(
     try {
       if (!dryRun) {
         const retryResult = await withRetry(
-          () => executeImprove(domain, sdkOptions, logger, improveCuratedContext)
+          () => executeImprove(domain, sdkOptions, logger, improveCuratedContext, mainProjectRoot)
         );
         logRetryStats(logger, "improve", retryResult);
       } else {
@@ -529,7 +607,7 @@ export async function orchestrateWorkflow(
     writeCheckpoint({
       issueNumber,
       workflowId,
-      completedPhases: ["analysis", "plan", "build", "improve"],
+      completedPhases: ["analysis", "plan", "build", "validate", "improve"],
       domain,
       specPath,
       filesModified,
@@ -754,28 +832,20 @@ async function executePlan(
   options: AutomationSDKOptions,
   logger: WorkflowLogger,
   dryRun: boolean,
-  curatedContext?: string | null
+  curatedContext?: string | null,
+  mainProjectRoot?: string
 ): Promise<string> {
-  const contextSection = curatedContext
-    ? `\n\n## KotaDB Context (from previous phase)\n${curatedContext}`
-    : '';
-
-  const prompt = `
-You are the ${domain}-plan-agent.
-
-USER_PROMPT: ${requirements}
-
-AUTOMATION_MODE: true
-HUMAN_IN_LOOP: false
-${dryRun ? "DRY_RUN: true" : ""}
-
-Create a detailed specification following ${domain} domain standards.
-Save spec to: docs/specs/${domain}/<descriptive-slug>-spec.md
-
-The spec should address GitHub issue #${issueNumber}.
-
-Return the absolute spec path when complete.
-${contextSection}`;
+  const basePath = mainProjectRoot || options.cwd;
+  const agentBody = await loadAgentPrompt(domain, 'plan', basePath);
+  const prompt = buildPhasePrompt(agentBody, {
+    USER_PROMPT: requirements,
+    AUTOMATION_MODE: 'true',
+    HUMAN_IN_LOOP: 'false',
+    DRY_RUN: dryRun ? 'true' : undefined,
+    ISSUE_NUMBER: String(issueNumber),
+    SPEC_OUTPUT_DIR: `docs/specs/${domain}/`,
+    CURATED_CONTEXT: curatedContext ?? undefined
+  });
 
   const messages: SDKMessage[] = [];
   for await (const message of query({ prompt, options })) {
@@ -793,23 +863,31 @@ async function executeBuild(
   options: AutomationSDKOptions,
   logger: WorkflowLogger,
   dryRun: boolean,
-  curatedContext?: string | null
+  curatedContext?: string | null,
+  mainProjectRoot?: string,
+  validationErrors?: string
 ): Promise<string[]> {
-  const contextSection = curatedContext
-    ? `\n\n## KotaDB Context (from previous phase)\n${curatedContext}`
-    : '';
-
-  const prompt = `
-You are the ${domain}-build-agent.
-
-PATH_TO_SPEC: ${specPath}
-
-AUTOMATION_MODE: true
-${dryRun ? "DRY_RUN: true (validate only, no file writes)" : ""}
-
-Read the specification and implement the changes.
-Report absolute file paths for all files modified.
-${contextSection}`;
+  const basePath = mainProjectRoot || options.cwd;
+  const agentBody = await loadAgentPrompt(domain, 'build', basePath);
+  
+  // Load expertise conventions for pre-build discovery (Gap 3)
+  let expertiseContext: string | undefined;
+  try {
+    expertiseContext = await loadExpertiseConventions(domain, basePath);
+  } catch {
+    // Non-fatal: continue without expertise context
+  }
+  
+  const variables: Record<string, string | undefined> = {
+    SPEC: specPath,
+    AUTOMATION_MODE: 'true',
+    DRY_RUN: dryRun ? 'true (validate only, no file writes)' : undefined,
+    CURATED_CONTEXT: curatedContext ?? undefined,
+    EXPERTISE_CONVENTIONS: expertiseContext,
+    VALIDATION_ERRORS: validationErrors
+  };
+  
+  const prompt = buildPhasePrompt(agentBody, variables);
 
   const messages: SDKMessage[] = [];
   for await (const message of query({ prompt, options })) {
@@ -825,20 +903,15 @@ async function executeImprove(
   domain: string,
   options: AutomationSDKOptions,
   logger: WorkflowLogger,
-  curatedContext?: string | null
+  curatedContext?: string | null,
+  mainProjectRoot?: string
 ): Promise<void> {
-  const contextSection = curatedContext
-    ? `\n\n## KotaDB Context (from previous phase)\n${curatedContext}`
-    : '';
-
-  const prompt = `
-You are the ${domain}-improve-agent.
-
-AUTOMATION_MODE: true
-
-Review recent ${domain} changes from git history.
-Extract learnings and update expertise.yaml with new patterns.
-${contextSection}`;
+  const basePath = mainProjectRoot || options.cwd;
+  const agentBody = await loadAgentPrompt(domain, 'improve', basePath);
+  const prompt = buildPhasePrompt(agentBody, {
+    AUTOMATION_MODE: 'true',
+    CURATED_CONTEXT: curatedContext ?? undefined
+  });
 
   const messages: SDKMessage[] = [];
   for await (const message of query({ prompt, options })) {
