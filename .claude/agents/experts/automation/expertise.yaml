@@ -22,6 +22,7 @@ overview:
       - automation/src/context.ts
       - automation/src/curator.ts
       - automation/src/auto-record.ts
+      - automation/src/pr.ts
       - app/src/cli/args.ts
       - app/src/mcp/tools.ts
       - app/src/mcp/server.ts
@@ -39,6 +40,7 @@ overview:
       - Main KotaDB database integration
       - Haiku-powered context curation
       - Automated workflow outcome recording
+      - PR creation with validation evidence
       
     not_covered:
       - General Claude configuration (see claude-config expert)
@@ -94,6 +96,10 @@ core_implementation:
       path: automation/src/auto-record.ts
       purpose: Automated workflow outcome recording
 
+    pr_ts:
+      path: automation/src/pr.ts
+      purpose: PR creation with validation, git status parsing, and GitHub integration
+
     migration_005:
       path: app/src/db/migrations/005_workflow_contexts.sql
       purpose: Schema for workflow context storage
@@ -121,8 +127,21 @@ key_operations:
       
   configure_mcp_server:
     when: Enabling kotadb MCP tools in SDK workflow
-    approach: Configure mcpServers object with stdio transport for kotadb code intelligence tools
-    code_example: See examples/mcp-server-config.ts
+    approach: Configure mcpServers object with stdio transport, --stdio flag, and KOTADB_PATH env var
+    code_example: |
+      mcpServers: {
+        kotadb: {
+          type: "stdio",
+          command: "bunx",
+          args: ["--bun", "kotadb", "--stdio"],  // MUST include --stdio flag
+          env: { KOTADB_PATH: join(mainProjectRoot, ".kotadb", "kota.db") }  // NOT KOTADB_CWD
+        }
+      }
+    pitfalls:
+      - Missing --stdio flag causes MCP connection failures
+      - Using KOTADB_CWD instead of KOTADB_PATH (deprecated pattern)
+      - Not providing absolute path to kota.db in worktree contexts
+      - Pointing to worktree DB instead of main repo DB
 
   validate_anthropic_model_names:
     when: Configuring SDK queries with specific model versions
@@ -156,6 +175,47 @@ key_operations:
     when: Workflow completes (success or failure)
     approach: Automatically record outcomes using haiku (success -> record_decision, failure -> record_failure)
     code_example: See examples/auto-record.ts
+
+  parse_git_status:
+    when: Extracting filenames from git status --porcelain output
+    approach: Use regex to handle all status codes robustly
+    code_example: |
+      const match = line.match(/^..\s+(.+)$/);
+      const filename = match?.[1]?.trim() ?? line.trim();
+    pitfalls:
+      - Using substring(3) breaks with single-char status codes or varying spacing
+      - Not handling edge cases (renamed files, merge conflicts)
+      - Assuming consistent spacing between status and filename
+
+  create_pr_with_validation:
+    when: Creating PR after automated workflow completion
+    approach: Run validation commands (typecheck, test), build structured PR body with evidence
+    structure: |
+      ## Summary
+      [Automated implementation details]
+      
+      ## Validation Evidence
+      ### Validation Level: 1|2|3
+      **Justification**: [Level rationale]
+      **Commands Run**:
+      - ✅/❌ `command` - output
+      
+      ## Anti-Mock Compliance
+      [Anti-mock statement]
+      
+      ## Plan
+      [Plan reference]
+      
+      ## Metrics (if available)
+      [Token/cost table]
+      
+      Closes #N
+      ADW ID: workflow-id
+    pitfalls:
+      - Not running validation before PR creation
+      - Missing anti-mock statement
+      - Wrong PR title format (should match /git:pull_request)
+      - Not removing redundant prefixes from issue titles
 
 decision_trees:
   console_output_strategy:
@@ -210,6 +270,16 @@ decision_trees:
       - condition: Curator fails
         action: Log warning, continue workflow
 
+  worktree_database_path:
+    question: Which database path should MCP use in worktree context?
+    branches:
+      - condition: Running in worktree for isolated workflow
+        action: Use mainProjectRoot for KOTADB_PATH (main repo DB)
+        rationale: Worktrees share database with main repo
+      - condition: Running in main repo
+        action: Use projectRoot for KOTADB_PATH
+        rationale: Standard single-location setup
+
 patterns:
   console_reporter_pattern:
     structure: Class with ANSI constants, verbosity-aware methods, phase tracking
@@ -234,6 +304,29 @@ patterns:
   context_upsert_pattern:
     structure: INSERT ON CONFLICT UPDATE with upsert semantics
     usage: Idempotent context storage allowing phase re-execution
+
+  git_status_regex_pattern:
+    structure: /^..\s+(.+)$/ to extract filename from porcelain format
+    usage: Robust parsing of git status output for any status code combination
+    rationale: Handles " M ", "??", "MM", "A ", "D ", renamed files, etc.
+
+  mcp_stdio_configuration_pattern:
+    structure: args array with explicit --stdio flag after kotadb command
+    usage: MCP server configuration for SDK integration
+    example: |
+      ["--bun", "kotadb", "--stdio"] or
+      ["--bun", "kotadb", "--stdio", "--toolset", "memory"]
+    rationale: Explicit stdio mode declaration for SDK MCP protocol
+
+  database_path_threading_pattern:
+    structure: Pass mainProjectRoot separately from projectRoot through all layers
+    usage: Enable MCP to use main DB even when executing in worktree
+    rationale: Worktrees don't have their own .kotadb directory
+
+  pr_validation_evidence_pattern:
+    structure: Run validation commands, capture results, include in PR body
+    usage: Transparent quality gates in automated PRs
+    rationale: Matches /git:pull_request template standards
 
 best_practices:
   console_output:
@@ -263,6 +356,14 @@ best_practices:
     - Thread toolset through McpServerContext
     - Test hierarchical inclusion
   
+  mcp_server_configuration:
+    - Always include --stdio flag in args array
+    - Use KOTADB_PATH env var (not KOTADB_CWD)
+    - Provide absolute path to kota.db via join()
+    - Thread mainProjectRoot for worktree contexts
+    - Point to main repo DB, not worktree copy
+    - Consistent arg order: ["--bun", "kotadb", "--stdio", ...]
+    
   sdk_integration:
     - Always validate ANTHROPIC_API_KEY before query()
     - Use type guards for message handling
@@ -314,6 +415,25 @@ best_practices:
     - Skip recording in dry-run mode
     - Make recording failures non-fatal
 
+  git_status_parsing:
+    - Use regex pattern /^..\s+(.+)$/ for filename extraction
+    - Provide fallback to line.trim() if regex fails
+    - Never use substring() with hardcoded positions
+    - Test with all status codes (M, A, D, ??, MM, etc.)
+    - Handle renamed files (R status with arrow notation)
+
+  pr_creation:
+    - Run validation before creating PR
+    - Capture validation results (passed/failed)
+    - Build PR body with Validation Evidence section
+    - Include Anti-Mock Compliance statement
+    - Remove redundant prefixes from issue titles
+    - "Format title: issueType(domain): cleanTitle (#issueNumber)"
+    - Truncate titles exceeding 70 chars
+    - Include ADW workflow ID when available
+    - Show validation commands with ✅/❌ status
+    - Structure matches /git:pull_request template
+
 known_issues:
   - issue: Invalid Anthropic model name causes HTTP 404 errors
     impact: SDK query() fails with confusing error
@@ -330,6 +450,21 @@ known_issues:
     resolution: Consider environment detection or flag
     status: Known limitation
 
+  - issue: Git status substring(3) parsing fragile
+    impact: Breaks with status codes not exactly 3 chars
+    resolution: Use regex pattern /^..\s+(.+)$/ instead
+    status: Fixed in #184
+
+  - issue: MCP server missing --stdio flag in worktrees
+    impact: MCP connection fails in SDK workflows
+    resolution: Add --stdio flag to args array
+    status: Fixed in #184
+
+  - issue: KOTADB_CWD env var deprecated
+    impact: Incorrect database path resolution
+    resolution: Use KOTADB_PATH with absolute join() path
+    status: Fixed in #184
+
 potential_enhancements:
   - TTY detection for conditional ANSI usage
   - Workflow pause/resume capability
@@ -337,6 +472,8 @@ potential_enhancements:
   - Retry logic for transient failures
   - Workflow visualization UI
   - Metrics aggregation and reporting
+  - PR template customization per domain
+  - Validation level auto-detection from file changes
 
 stability:
   insight_rate_trend: converging
@@ -344,6 +481,7 @@ stability:
   last_reviewed: 2026-02-05
   notes: |
     Domain converging with comprehensive automation patterns established. Key milestones:
+    - #184: Git status regex parsing, MCP --stdio flag, PR validation evidence
     - #148: Deep KotaDB integration with haiku-powered curation and auto-recording
     - #144: Workflow context accumulation infrastructure
     - #163: Model naming fix (claude-haiku-4-5-20251001)
@@ -352,5 +490,5 @@ stability:
     - #64: Worktree isolation for parallel execution
     
     Current architecture enables intelligent multi-phase workflows with curated context,
-    automated learning from outcomes, and systematic knowledge accumulation across all
-    expert domains.
+    automated learning from outcomes, systematic knowledge accumulation, robust PR creation
+    with validation evidence, and reliable MCP integration in all execution contexts.

@@ -6,6 +6,7 @@
  * 
  * Issue: #148 - Deep KotaDB Integration
  */
+import { join } from "node:path";
 import { query, type SDKMessage } from "@anthropic-ai/claude-code";
 import type { WorkflowLogger } from "./logger.ts";
 import type { ConsoleReporter } from "./reporter.ts";
@@ -70,8 +71,8 @@ Use record_decision tool with:
       kotadb: {
         type: "stdio" as const,
         command: "bunx",
-        args: ["--bun", "kotadb", "--toolset", "memory"],
-        env: { KOTADB_CWD: projectRoot }
+        args: ["--bun", "kotadb", "--stdio", "--toolset", "memory"],
+        env: { KOTADB_PATH: join(projectRoot, ".kotadb", "kota.db") }
       }
     },
     stderr: (data: string) => {
@@ -127,8 +128,8 @@ Use record_failure tool with:
       kotadb: {
         type: "stdio" as const,
         command: "bunx",
-        args: ["--bun", "kotadb", "--toolset", "memory"],
-        env: { KOTADB_CWD: projectRoot }
+        args: ["--bun", "kotadb", "--stdio", "--toolset", "memory"],
+        env: { KOTADB_PATH: join(projectRoot, ".kotadb", "kota.db") }
       }
     },
     stderr: (data: string) => {

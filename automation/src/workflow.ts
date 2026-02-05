@@ -90,7 +90,8 @@ export async function runWorkflow(opts: WorkflowOptions): Promise<WorkflowResult
     // Use orchestrator with reporter integration
     const orchResult = await orchestrateWorkflow({
       issueNumber,
-      projectRoot: executionRoot,  // Use executionRoot for SDK work
+      projectRoot: executionRoot,
+      mainProjectRoot: logRoot,
       branchName: branchName ?? null,
       logger,
       reporter,

@@ -6,6 +6,7 @@
  * 
  * Issue: #148 - Deep KotaDB Integration
  */
+import { join } from "node:path";
 import { query, type SDKMessage } from "@anthropic-ai/claude-code";
 import { storeWorkflowContext, type WorkflowContextData } from "./context.ts";
 import type { WorkflowLogger } from "./logger.ts";
@@ -89,8 +90,8 @@ export async function curateContext(options: CurationOptions): Promise<CuratedCo
       kotadb: {
         type: "stdio" as const,
         command: "bunx",
-        args: ["--bun", "kotadb", "--toolset", "memory"], // Memory tier for search tools
-        env: { KOTADB_CWD: projectRoot }
+        args: ["--bun", "kotadb", "--stdio", "--toolset", "memory"], // Memory tier for search tools
+        env: { KOTADB_PATH: join(projectRoot, ".kotadb", "kota.db") }
       }
     },
     stderr: (data: string) => {
