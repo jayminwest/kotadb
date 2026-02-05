@@ -187,6 +187,22 @@ key_operations:
       - Try-fallback pattern (UUID first, then full_name)
       - Resolution at executor boundary (not query layer)
 
+
+  implement_mcp_tool:
+    when: Adding a new MCP tool to the server
+    approach: |
+      1. Define tool in tools.ts: Create TOOL_NAME_TOOL constant with ToolDefinition
+      2. Implement executor: Create executeTOOLNAME() function with parameter validation
+      3. Export both: Add tool to getToolDefinitions() array
+      4. Add routing: CRITICAL - Add case handler in server.ts switch statement
+      5. Verify routing: Tool must be in CallToolRequestSchema handler's switch
+    timestamp: 2026-02-05
+    evidence: Issue #170, Commit 5b0611b, app/src/mcp/server.ts lines 197-203
+    key_patterns:
+      - Three-layer implementation: definition + executor + routing
+      - Routing omission causes "Unknown tool" runtime error despite full implementation
+      - Tests cover executor but not routing layer (architectural gap)
+      - Case name must exactly match tool definition name field
 patterns:
   contextual_search_tips_pattern:
     structure: |
@@ -276,6 +292,39 @@ patterns:
     timestamp: 2026-02-03
     evidence: app/src/mcp/tools.ts lines 111-1278
 
+  mcp_tool_routing_pattern:
+    structure: |
+      // tools.ts - Tool definitions array
+      export function getToolDefinitions(): ToolDefinition[] {
+        return [
+          SEARCH_TOOL,
+          GET_INDEX_STATISTICS_TOOL,  // Tool definition must be exported here
+          // ... other tools
+        ];
+      }
+      
+      // tools.ts - Executor function
+      export async function executeGetIndexStatistics(args, requestId, userId) {
+        // Implementation
+      }
+      
+      // server.ts - CRITICAL: Routing layer (often forgotten)
+      switch (name) {
+        case "search":
+          result = await executeSearch(toolArgs, "", context.userId);
+          break;
+        case "get_index_statistics":  // Must match tool definition name exactly
+          result = await executeGetIndexStatistics(toolArgs, "", context.userId);
+          break;
+        default:
+          throw new Error(`Unknown tool: ${name}`);
+      }
+    timestamp: 2026-02-05
+    evidence: Issue #170, app/src/mcp/server.ts lines 141-260
+    failure_mode: |
+      Tool fully implemented but missing case handler -> runtime "Unknown tool" error
+      Tests cover executor (works) but not routing (fails in production)
+
 best_practices:
   cli: |
     - Shebang: #!/usr/bin/env bun (first line, no BOM)
@@ -288,6 +337,8 @@ best_practices:
     - Add contextual tips for education
     - forceStderr: true in stdio mode
     - Document output modes with size guidance
+    - CRITICAL: Always add case handler in server.ts switch when adding tools
+    - Verify tool name in case matches tool definition name exactly
 
   queries: |
     - Internal functions: db param (testable)
@@ -324,32 +375,40 @@ known_issues:
     status: resolved (2026-02-02)
     resolution: Audit during refactors, implement-first pattern
 
+  - issue: MCP tool routing omission (get_index_statistics missing case handler)
+    status: resolved (2026-02-05)
+    resolution: Added case handler in server.ts switch statement
+    evidence: Issue #170, Commit 5b0611b
+    learning: |
+      Tool was fully implemented (definition + executor + exported) but missing
+      from server.ts routing switch. Caused "Unknown tool" error at runtime.
+      Tests covered executor but not routing layer. Added implement_mcp_tool
+      operation and mcp_tool_routing_pattern to prevent recurrence.
 stability:
   convergence_indicators:
     insight_rate_trend: stable_to_increasing
     contradiction_count: 0
-    new_patterns_added_this_cycle: 5
-    new_operations_added_this_cycle: 5
-    last_reviewed: 2026-02-04
+    new_patterns_added_this_cycle: 1
+    new_operations_added_this_cycle: 1
+    last_reviewed: 2026-02-05
     utility_ratio: 1.0
     notes: |
-      Twelfth cycle - Snippet output mode and scope-aware defaults (uncommitted):
+      Thirteenth cycle - MCP tool routing pattern from issue #170:
       
-      New operations: implement_snippet_output_mode, scope_specific_output_defaults
-      New patterns: snippet_extraction_pattern, output_mode_size_guidance_pattern
+      New operations: implement_mcp_tool
+      New patterns: mcp_tool_routing_pattern
       
       Key learnings:
-      - Line-based snippet extraction with configurable context (0-10 lines)
-      - Output mode hierarchy based on payload size: paths < compact < snippet < full
-      - Scope-specific defaults prevent large responses (code defaults to 'compact')
-      - Graceful degradation: non-code scopes fall back to compact in snippet mode
-      - Clear size guidance in tool descriptions improves LLM decision-making
+      - Three-layer MCP tool implementation: definition + executor + routing
+      - Routing omission causes "Unknown tool" runtime error despite full implementation
+      - Test coverage gap: executors tested, routing layer not tested
+      - Prevention: Added critical reminder to best_practices.mcp
       
       Size governance:
-      - Previous: 280 lines
-      - After update: ~365 lines
-      - Status: Well within 600-800 line target, room for growth
+      - Previous: 355 lines
+      - After update: ~400 lines
+      - Status: Well within 600-800 line target, healthy growth
       
-      Architecture: High stability, zero contradictions across 12 cycles
-      Pattern evolution: MCP tool UX continues to mature (tips + statistics + snippets)
-      Next review: After next significant API pattern emerges
+      Architecture: High stability, zero contradictions across 13 cycles
+      Pattern evolution: Identified architectural test gap (routing layer)
+      Next review: After next significant API pattern emerges or when approaching 600 lines

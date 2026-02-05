@@ -194,6 +194,13 @@ export function createMcpServer(context: McpServerContext): Server {
 						context.userId,
 					);
 					break;
+				case "get_index_statistics":
+					result = await executeGetIndexStatistics(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
 				// Memory Layer tools
 				case "record_decision":
 					result = await executeRecordDecision(
