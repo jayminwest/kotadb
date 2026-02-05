@@ -855,6 +855,88 @@ interface NormalizedFilters {
 	pattern_type?: string;
 }
 
+// Enhanced Search Tips System
+type TipCategory = 'scope' | 'filter' | 'format' | 'tool';
+type TipPriority = 'high' | 'medium' | 'low';
+
+interface Tip {
+	id: string;
+	category: TipCategory;
+	message: string;
+	priority: TipPriority;
+	score?: number;
+}
+
+interface TipTracker {
+	seen: Set<string>;
+	maxSize: number;
+	lastCleanup: number;
+	ttl: number;
+}
+
+class TipDeduplicationService {
+	private trackers: Map<string, TipTracker> = new Map();
+	private readonly DEFAULT_MAX_SIZE = 100;
+	private readonly DEFAULT_TTL = 15 * 60 * 1000; // 15 minutes
+
+	hasSeen(userId: string, tipId: string): boolean {
+		this.ensureTracker(userId);
+		const tracker = this.trackers.get(userId)!;
+		this.cleanupIfNeeded(tracker);
+		return tracker.seen.has(tipId);
+	}
+
+	markAsSeen(userId: string, tipId: string): void {
+		this.ensureTracker(userId);
+		const tracker = this.trackers.get(userId)!;
+		this.cleanupIfNeeded(tracker);
+
+		if (tracker.seen.size >= tracker.maxSize) {
+			// Remove oldest entries (simplified LRU)
+			const entries = Array.from(tracker.seen);
+			const toRemove = Math.floor(tracker.maxSize * 0.2);
+			for (let i = 0; i < toRemove && i < entries.length; i++) {
+				const entry = entries[i];
+				if (entry !== undefined) {
+					tracker.seen.delete(entry);
+				}
+			}
+		}
+
+		tracker.seen.add(tipId);
+	}
+
+	private ensureTracker(userId: string): void {
+		if (!this.trackers.has(userId)) {
+			this.trackers.set(userId, {
+				seen: new Set(),
+				maxSize: this.DEFAULT_MAX_SIZE,
+				lastCleanup: Date.now(),
+				ttl: this.DEFAULT_TTL
+			});
+		}
+	}
+
+	private cleanupIfNeeded(tracker: TipTracker): void {
+		const now = Date.now();
+		if (now - tracker.lastCleanup > tracker.ttl) {
+			tracker.seen.clear();
+			tracker.lastCleanup = now;
+		}
+	}
+
+	cleanup(): void {
+		const now = Date.now();
+		for (const [userId, tracker] of this.trackers.entries()) {
+			if (now - tracker.lastCleanup > tracker.ttl) {
+				this.trackers.delete(userId);
+			}
+		}
+	}
+}
+
+const tipDeduplicationService = new TipDeduplicationService();
+
 function normalizeFilters(filters: unknown): NormalizedFilters {
 	if (!filters || typeof filters !== "object") {
 		return {};
@@ -994,113 +1076,290 @@ async function searchSymbols(
 	}));
 }
 
+// Helper functions for enhanced search tips
+
+function hasEmptyResults(scopeResults: Record<string, unknown[]>): boolean {
+	const totalResults = Object.values(scopeResults)
+		.reduce((sum, results) => sum + results.length, 0);
+	return totalResults === 0;
+}
+
+function generateEmptyResultTips(query: string, scopes: string[], filters: NormalizedFilters): Tip[] {
+	const tips: Tip[] = [];
+
+	tips.push({
+		id: 'empty-result-broader',
+		category: 'scope',
+		message: `No results found for "${query}". Try broader search terms or remove specific qualifiers.`,
+		priority: 'high'
+	});
+
+	if (scopes.length === 1) {
+		tips.push({
+			id: 'empty-result-multiple-scopes',
+			category: 'scope',
+			message: `Try searching in multiple scopes: ['code', 'symbols'] for broader discovery.`,
+			priority: 'high'
+		});
+	}
+
+	if (!filters.repositoryId) {
+		tips.push({
+			id: 'empty-result-repository',
+			category: 'filter',
+			message: `No indexed files match. Verify the repository is indexed with index_repository tool.`,
+			priority: 'medium'
+		});
+	}
+
+	return tips;
+}
+
+function shouldSuppressTip(tipId: string, scopes: string[], filters: NormalizedFilters, scopeResults: Record<string, unknown[]>): boolean {
+	// Context-aware suppression logic
+	switch (tipId) {
+		case 'narrow-file-types':
+			return !!(filters.glob || filters.language);
+		case 'narrow-repository':
+			return !!filters.repositoryId;
+		case 'multiple-scopes':
+			return scopes.length > 1;
+		case 'narrow-symbols':
+			return !!(filters.exported_only || filters.symbol_kind?.length);
+		case 'compact-format':
+			// Don't suggest compact format if results are already small
+			const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
+			return totalResults <= 15;
+		default:
+			return false;
+	}
+}
+
+function calculateTipScore(tip: Tip, query: string, scopes: string[], scopeResults: Record<string, unknown[]>): number {
+	let score = 0;
+
+	// Impact score based on category
+	switch (tip.category) {
+		case 'scope': score += 3; break;
+		case 'filter': score += 2; break;
+		case 'format': score += 1; break;
+		case 'tool': score += 2; break;
+	}
+
+	// Priority weight
+	switch (tip.priority) {
+		case 'high': score *= 3; break;
+		case 'medium': score *= 2; break;
+		case 'low': score *= 1; break;
+	}
+
+	// Context-based bonuses
+	const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
+
+	if (hasEmptyResults(scopeResults)) {
+		score += 2; // Boost empty result tips
+	}
+
+	if (scopes.length === 1) {
+		score += 1; // Single scope suggestions get priority
+	}
+
+	if (totalResults > 30) {
+		score += 1; // Large result sets need filtering suggestions
+	}
+
+	// Special boost for pattern-based scope suggestions
+	if (tip.id.includes('-scope') && tip.priority === 'high') {
+		score += 3; // Pattern-based scope suggestions get higher priority
+	}
+
+	return score;
+}
+
+function convertTipsForResponse(tips: Tip[]): string[] {
+	return tips.map(tip => tip.message);
+}
+
 /**
  * Generate contextual tips based on search query and parameters.
  * Uses static pattern matching (no NLP) to detect suboptimal usage patterns.
- * 
+ *
+ * Enhanced with deduplication, empty result handling, relevance ranking, and context-aware suppression.
+ *
  * Tip frequency: MODERATE - show tips frequently including "nice to know" suggestions.
- * 
+ *
  * @param query - Search query string
  * @param scopes - Search scopes used
  * @param filters - Normalized filters applied
  * @param scopeResults - Results by scope
+ * @param userId - User identifier for deduplication (optional)
  * @returns Array of tip strings (empty if search is optimal)
  */
 function generateSearchTips(
 	query: string,
 	scopes: string[],
 	filters: NormalizedFilters,
-	scopeResults: Record<string, unknown[]>
+	scopeResults: Record<string, unknown[]>,
+	userId?: string
 ): string[] {
-	const tips: string[] = [];
+	const candidateTips: Tip[] = [];
 	const queryLower = query.toLowerCase();
-	
+
+	// Handle empty results with priority tips
+	if (hasEmptyResults(scopeResults)) {
+		candidateTips.push(...generateEmptyResultTips(query, scopes, filters));
+	}
+
+	// Always check pattern-based scope suggestions (regardless of empty results)
+
 	// Pattern 1: Query contains structural keywords but not using symbols scope
 	const structuralKeywords = ['function', 'class', 'interface', 'type', 'method', 'component'];
 	const hasStructuralKeyword = structuralKeywords.some(kw => queryLower.includes(kw));
-	
+
 	if (hasStructuralKeyword && !scopes.includes('symbols')) {
 		const matchedKeyword = structuralKeywords.find(kw => queryLower.includes(kw)) || 'function';
-		tips.push(
-			`You searched for "${query}" in code. Try scope: ['symbols'] with filters: {symbol_kind: ['${matchedKeyword}']} for precise structural discovery.`
-		);
+		candidateTips.push({
+			id: 'structural-symbols-scope',
+			category: 'scope',
+			message: `You searched for "${query}" in code. Try scope: ['symbols'] with filters: {symbol_kind: ['${matchedKeyword}']} for precise structural discovery.`,
+			priority: 'medium'
+		});
 	}
-	
+
 	// Pattern 2: Query looks like a file path but using code search
 	const looksLikeFilePath = /^[\w\-./]+\.(ts|tsx|js|jsx|py|rs|go|java)$/i.test(query);
 	if (looksLikeFilePath && scopes.includes('code')) {
-		tips.push(
-			`Query "${query}" looks like a file path. Consider using search_dependencies tool to find files that depend on this file or its dependencies.`
-		);
+		candidateTips.push({
+			id: 'filepath-dependencies',
+			category: 'tool',
+			message: `Query "${query}" looks like a file path. Consider using search_dependencies tool to find files that depend on this file or its dependencies.`,
+			priority: 'medium'
+		});
 	}
-	
-	// Pattern 3: Symbol search without exported_only filter
-	if (scopes.includes('symbols') && filters.exported_only === undefined) {
-		const symbolCount = scopeResults['symbols']?.length || 0;
-		if (symbolCount > 10) {
-			tips.push(
-				`Found ${symbolCount} symbols. Add filters: {exported_only: true} to narrow to public API only.`
-			);
-		}
-	}
-	
-	// Pattern 4: No repository filter with large result set
-	if (!filters.repositoryId) {
-		const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
-		if (totalResults > 20) {
-			tips.push(
-				`Found ${totalResults} results across all repositories. Add filters: {repository: "owner/repo"} to narrow to a specific repository.`
-			);
-		}
-	}
-	
-	// Pattern 5: Code search without glob/language filters
-	if (scopes.includes('code') && !filters.glob && !filters.language) {
-		const codeCount = scopeResults['code']?.length || 0;
-		if (codeCount > 15) {
-			tips.push(
-				`Found ${codeCount} code results. Try filters: {glob: "**/*.ts"} or {language: "typescript"} to narrow file types.`
-			);
-		}
-	}
-	
+
 	// Pattern 6: Suggest decisions scope for "why" questions
 	if (/\b(why|reason|decision|chose|choice)\b/i.test(query) && !scopes.includes('decisions')) {
-		tips.push(
-			`Query contains "why/reason/decision". Try scope: ['decisions'] to search architectural decisions and rationale.`
-		);
+		candidateTips.push({
+			id: 'decisions-scope',
+			category: 'scope',
+			message: `Query contains "why/reason/decision". Try scope: ['decisions'] to search architectural decisions and rationale.`,
+			priority: 'high' // High priority for pattern-based scope suggestions
+		});
 	}
-	
+
 	// Pattern 7: Suggest patterns scope for "how" questions
 	if (/\b(how|pattern|best practice|convention)\b/i.test(query) && !scopes.includes('patterns')) {
-		tips.push(
-			`Query asks "how to". Try scope: ['patterns'] to search coding patterns and conventions from this codebase.`
-		);
+		candidateTips.push({
+			id: 'patterns-scope',
+			category: 'scope',
+			message: `Query asks "how to". Try scope: ['patterns'] to search coding patterns and conventions from this codebase.`,
+			priority: 'high' // High priority for pattern-based scope suggestions
+		});
 	}
-	
+
 	// Pattern 8: Suggest failures scope for error-related queries
 	if (/\b(error|bug|fail|issue|problem|fix)\b/i.test(query) && !scopes.includes('failures')) {
-		tips.push(
-			`Query mentions errors/issues. Try scope: ['failures'] to learn from past mistakes and avoid repeated failures.`
-		);
+		candidateTips.push({
+			id: 'failures-scope',
+			category: 'scope',
+			message: `Query mentions errors/issues. Try scope: ['failures'] to learn from past mistakes and avoid repeated failures.`,
+			priority: 'high' // High priority for pattern-based scope suggestions
+		});
 	}
-	
-	// Pattern 9: Single scope when multi-scope could be useful
-	if (scopes.length === 1 && scopes[0] === 'code') {
-		tips.push(
-			`Tip: You can search multiple scopes simultaneously. Try scope: ['code', 'symbols'] for broader discovery.`
-		);
+
+	// Non-empty result specific patterns
+	if (!hasEmptyResults(scopeResults)) {
+		// Pattern 3: Symbol search without exported_only filter
+		if (scopes.includes('symbols') && filters.exported_only === undefined && !shouldSuppressTip('narrow-symbols', scopes, filters, scopeResults)) {
+			const symbolCount = scopeResults['symbols']?.length || 0;
+			if (symbolCount > 10) {
+				candidateTips.push({
+					id: 'narrow-symbols',
+					category: 'filter',
+					message: `Found ${symbolCount} symbols. Add filters: {exported_only: true} to narrow to public API only.`,
+					priority: 'medium'
+				});
+			}
+		}
+
+		// Pattern 4: No repository filter with large result set
+		if (!shouldSuppressTip('narrow-repository', scopes, filters, scopeResults)) {
+			const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
+			if (totalResults > 20) {
+				candidateTips.push({
+					id: 'narrow-repository',
+					category: 'filter',
+					message: `Found ${totalResults} results across all repositories. Add filters: {repository: "owner/repo"} to narrow to a specific repository.`,
+					priority: 'medium'
+				});
+			}
+		}
+
+		// Pattern 5: Code search without glob/language filters
+		if (scopes.includes('code') && !shouldSuppressTip('narrow-file-types', scopes, filters, scopeResults)) {
+			const codeCount = scopeResults['code']?.length || 0;
+			if (codeCount > 15) {
+				candidateTips.push({
+					id: 'narrow-file-types',
+					category: 'filter',
+					message: `Found ${codeCount} code results. Try filters: {glob: "**/*.ts"} or {language: "typescript"} to narrow file types.`,
+					priority: 'medium'
+				});
+			}
+		}
+
+		// Pattern 9: Single scope when multi-scope could be useful
+		if (!shouldSuppressTip('multiple-scopes', scopes, filters, scopeResults) && scopes.length === 1 && scopes[0] === 'code') {
+			candidateTips.push({
+				id: 'multiple-scopes',
+				category: 'scope',
+				message: `Tip: You can search multiple scopes simultaneously. Try scope: ['code', 'symbols'] for broader discovery.`,
+				priority: 'low'
+			});
+		}
+
+		// Pattern 10: Suggest compact format for large result sets
+		const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
+		if (!shouldSuppressTip('compact-format', scopes, filters, scopeResults) && totalResults > 30) {
+			candidateTips.push({
+				id: 'compact-format',
+				category: 'format',
+				message: `Returning ${totalResults} full results. Use output: "compact" for summary view or output: "paths" for file paths only.`,
+				priority: 'low'
+			});
+		}
 	}
-	
-	// Pattern 10: Suggest compact format for large result sets
-	const totalResults = Object.values(scopeResults).reduce((sum, arr) => sum + arr.length, 0);
-	if (totalResults > 30 && !tips.some(t => t.includes('output: "compact"'))) {
-		tips.push(
-			`Returning ${totalResults} full results. Use output: "compact" for summary view or output: "paths" for file paths only.`
-		);
+
+	// Apply deduplication if userId is provided
+	let filteredTips = candidateTips;
+	if (userId) {
+		filteredTips = candidateTips.filter(tip => {
+			if (tipDeduplicationService.hasSeen(userId, tip.id)) {
+				return false;
+			}
+			tipDeduplicationService.markAsSeen(userId, tip.id);
+			return true;
+		});
 	}
-	
-	return tips;
+
+	// Calculate scores for remaining tips
+	filteredTips.forEach(tip => {
+		tip.score = calculateTipScore(tip, query, scopes, scopeResults);
+	});
+
+
+	// Sort by score (descending) and priority, then limit to top 2
+	filteredTips.sort((a, b) => {
+		if (a.score !== b.score) {
+			return (b.score || 0) - (a.score || 0);
+		}
+		// Secondary sort by priority
+		const priorityOrder = { high: 3, medium: 2, low: 1 };
+		return priorityOrder[b.priority] - priorityOrder[a.priority];
+	});
+
+	const selectedTips = filteredTips.slice(0, 2);
+	return convertTipsForResponse(selectedTips);
 }
 
 function formatSearchResults(
@@ -1109,6 +1368,7 @@ function formatSearchResults(
 	scopeResults: Record<string, unknown[]>,
 	format: string,
 	filters: NormalizedFilters,
+	userId: string,
 	contextLines?: number
 ): Record<string, unknown> {
 	const response: Record<string, unknown> = {
@@ -1186,7 +1446,7 @@ function formatSearchResults(
 
 	
 	// Generate and add tips if applicable
-	const tips = generateSearchTips(query, scopes, filters, scopeResults);
+	const tips = generateSearchTips(query, scopes, filters, scopeResults, userId);
 	if (tips.length > 0) {
 		response.tips = tips;
 	}
@@ -1343,7 +1603,7 @@ export async function executeSearch(
 	await Promise.all(searchPromises);
 
 	// Format output
-	const response = formatSearchResults(p.query as string, scopes, results, output, filters, contextLines);
+	const response = formatSearchResults(p.query as string, scopes, results, output, filters, userId, contextLines);
 
 	logger.info("Unified search completed", {
 		query: p.query,
