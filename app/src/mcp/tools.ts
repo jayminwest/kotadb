@@ -13,6 +13,7 @@ import {
 	resolveFilePath,
 	runIndexingWorkflow,
 	searchFiles,
+	extractLineSnippets,
 } from "@api/queries";
 import { getDomainKeyFiles } from "@api/expertise-queries.js";
 import { getGlobalDatabase } from "@db/sqlite/index.js";
@@ -112,8 +113,20 @@ export function isValidToolset(value: string): value is ToolsetTier {
 export const SEARCH_TOOL: ToolDefinition = {
 	tier: "core",
 	name: "search",
-	description:
-		"Search indexed code, symbols, decisions, patterns, and failures. Supports multiple search scopes simultaneously with scope-specific filters and output formats.",
+	description: `Search indexed code, symbols, decisions, patterns, and failures.
+
+OUTPUT MODES:
+- 'paths': File paths only (~100 bytes/result)
+- 'compact': Summary info (~200 bytes/result) - DEFAULT for code scope
+- 'snippet': Matching lines with context (~2KB/result)
+- 'full': Complete content (~100KB/result) - Use with caution for code scope
+
+TIPS:
+- Use 'snippet' for code exploration (shows matches in context)
+- Use 'compact' for quick file discovery
+- Use 'full' only for small result sets (symbols, decisions, etc.)
+
+Supports multiple search scopes simultaneously with scope-specific filters.`,
 	inputSchema: {
 		type: "object",
 		properties: {
@@ -197,8 +210,14 @@ export const SEARCH_TOOL: ToolDefinition = {
 			},
 			output: {
 				type: "string",
-				enum: ["full", "paths", "compact"],
-				description: "Output format (default: 'full')",
+				enum: ["full", "paths", "compact", "snippet"],
+				description: "Output format: 'paths' (file paths only), 'compact' (summary), 'snippet' (matches with context), 'full' (complete content). Default varies by scope: code='compact', others='full'. WARNING: 'full' + code scope = large results.",
+			},
+			context_lines: {
+				type: "number",
+				description: "Lines of context before/after matches (snippet mode only, default: 3, max: 10)",
+				minimum: 0,
+				maximum: 10,
 			},
 		},
 		required: ["query"],
@@ -1089,7 +1108,8 @@ function formatSearchResults(
 	scopes: string[],
 	scopeResults: Record<string, unknown[]>,
 	format: string,
-	filters: NormalizedFilters
+	filters: NormalizedFilters,
+	contextLines?: number
 ): Record<string, unknown> {
 	const response: Record<string, unknown> = {
 		query,
@@ -1125,6 +1145,36 @@ function formatSearchResults(
 				}
 				return item;
 			});
+		} else if (format === "snippet") {
+			// Snippet extraction with context
+			if (scope === "code") {
+				(response.results as Record<string, unknown>)[scope] = items.map((item: any) => {
+					const matches = extractLineSnippets(
+						item.content || "",
+						query,
+						contextLines || 3
+					);
+					return {
+						path: item.path,
+						matches: matches
+					};
+				});
+			} else {
+				// For non-code scopes, fall back to compact format
+				// (snippets only meaningful for code files)
+				(response.results as Record<string, unknown>)[scope] = items.map((item: any) => {
+					if (scope === "symbols") {
+						return { name: item.name, kind: item.kind, file: item.location.file };
+					} else if (scope === "decisions") {
+						return { title: item.title, scope: item.scope };
+					} else if (scope === "patterns") {
+						return { pattern_type: item.pattern_type, file_path: item.file_path };
+					} else if (scope === "failures") {
+						return { title: item.title, problem: item.problem };
+					}
+					return item;
+				});
+			}
 		} else {
 			// Full details
 			(response.results as Record<string, unknown>)[scope] = items;
@@ -1191,13 +1241,30 @@ export async function executeSearch(
 	}
 
 	if (p.output !== undefined) {
-		if (typeof p.output !== "string" || !["full", "paths", "compact"].includes(p.output)) {
-			throw new Error("Parameter 'output' must be one of: full, paths, compact");
+		if (typeof p.output !== "string" || !["full", "paths", "compact", "snippet"].includes(p.output)) {
+			throw new Error("Parameter 'output' must be one of: full, paths, compact, snippet");
 		}
 	}
 
+	if (p.context_lines !== undefined && typeof p.context_lines !== "number") {
+		throw new Error("Parameter 'context_lines' must be a number");
+	}
+
+	if (p.context_lines !== undefined && (p.context_lines < 0 || p.context_lines > 10)) {
+		throw new Error("Parameter 'context_lines' must be between 0 and 10");
+	}
+
 	const limit = Math.min(Math.max((p.limit as number) || 20, 1), 100);
-	const output = (p.output as string) || "full";
+	// Determine default output based on scopes
+	let defaultOutput = "full";
+	if (scopes.length === 1 && scopes[0] === "code") {
+		defaultOutput = "compact";  // Code-only searches default to compact
+	} else if (scopes.includes("code") && scopes.length > 1) {
+		defaultOutput = "compact";  // Multi-scope including code defaults to compact
+	}
+
+	const output = (p.output as string) || defaultOutput;
+	const contextLines = Math.min(Math.max((p.context_lines as number) || 3, 0), 10);
 	const filters = normalizeFilters(p.filters);
 
 	// Route to scope handlers in parallel
@@ -1276,7 +1343,7 @@ export async function executeSearch(
 	await Promise.all(searchPromises);
 
 	// Format output
-	const response = formatSearchResults(p.query as string, scopes, results, output, filters);
+	const response = formatSearchResults(p.query as string, scopes, results, output, filters, contextLines);
 
 	logger.info("Unified search completed", {
 		query: p.query,
