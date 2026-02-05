@@ -2,52 +2,31 @@
 """
 SubagentStart hook for injecting context into spawned agents.
 
-This hook is triggered when Claude Code spawns build or Explore agents.
-It queries KotaDB for dependency information based on files mentioned
-in the task description and injects context about those dependencies.
+Performance:
+- Total budget: 10 seconds
+- MCP health check: 0.5s
+- Parallel dependency queries: Up to 9.5s
 
-Also provides KotaDB capability context at startup to help agents
-understand when to use KotaDB over Grep.
-
-Hook Configuration (in .claude/settings.json):
-{
-  "hooks": {
-    "SubagentStart": [{
-      "matcher": "build|Explore",
-      "hooks": [{
-        "type": "command",
-        "command": "python3 .claude/hooks/kotadb/agent-context.py"
-      }]
-    }]
-  }
-}
-
-Input (stdin JSON):
-{
-  "agent_type": "build",
-  "prompt": "Implement feature X in src/api/routes.ts...",
-  "cwd": "/path/to/project"
-}
-
-Output (stdout):
-Dependency context for files mentioned in the task + KotaDB capability hints.
-
-Exit codes:
-- 0: Success (continue with agent spawn)
-- Non-zero exits would block the agent (we always exit 0)
+Graceful degradation:
+- MCP unavailable: Completes in <1s
+- Budget exhausted: Returns partial results
+- Always exits 0 (never blocks)
 """
 
+import asyncio
 import os
 import re
 import sys
 
-# Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.hook_helpers import (
+    HookLogger,
+    TimeoutBudget,
     parse_stdin,
     extract_agent_info,
-    run_kotadb_deps,
+    check_mcp_server_health,
+    query_multiple_files,
     format_agent_context,
     output_continue,
     output_context,
@@ -69,7 +48,7 @@ def get_kotadb_capabilities_context() -> str:
     import json
     
     try:
-        # Call kotadb MCP server to get statistics
+        # Call kotadb MCP server to get statistics (with short timeout)
         result = subprocess.run(
             ['bunx', 'kotadb', '--stdio'],
             input=json.dumps({
@@ -83,7 +62,7 @@ def get_kotadb_capabilities_context() -> str:
             }),
             capture_output=True,
             text=True,
-            timeout=5
+            timeout=2
         )
         
         if result.returncode != 0:
@@ -178,66 +157,116 @@ def extract_file_paths(text: str) -> list[str]:
 
 def main() -> None:
     """Main hook entry point."""
-    # Parse input from Claude Code
-    hook_input = parse_stdin()
+    logger = HookLogger("agent-context")
+    logger.start()
     
-    # Always provide capability context
-    capability_context = get_kotadb_capabilities_context()
-    
-    if not hook_input:
-        # No input, provide capability context only
+    try:
+        # Create 10-second budget for this hook
+        budget = TimeoutBudget(10.0)
+        
+        # Parse input
+        hook_input = parse_stdin()
+        
+        # Always provide capability context
+        capability_context = get_kotadb_capabilities_context()
+        
+        if not hook_input:
+            logger.log("NO_INPUT", "No hook input received")
+            if capability_context:
+                logger.context_provided("Capability context only")
+                logger.end()
+                output_context(capability_context)
+            else:
+                logger.end()
+                output_continue()
+            return
+        
+        # Extract agent info
+        agent_info = extract_agent_info(hook_input)
+        prompt = agent_info.get("prompt", "")
+        
+        if not prompt:
+            logger.log("NO_PROMPT", "No prompt in input")
+            if capability_context:
+                logger.context_provided("Capability context only")
+                logger.end()
+                output_context(capability_context)
+            else:
+                logger.end()
+                output_continue()
+            return
+        
+        # Quick MCP health check (0.5s max)
+        mcp_available = check_mcp_server_health(timeout=0.5)
+        if not mcp_available:
+            logger.mcp_unavailable()
+            if capability_context:
+                logger.context_provided("Capability context only (MCP down)")
+                logger.end()
+                output_context(capability_context)
+            else:
+                logger.end()
+                output_continue()
+            return
+        
+        # Extract file paths from the task description
+        file_paths = extract_file_paths(prompt)
+        
+        if not file_paths:
+            logger.log("NO_FILES", "No file paths found in prompt")
+            if capability_context:
+                logger.context_provided("Capability context only")
+                logger.end()
+                output_context(capability_context)
+            else:
+                logger.end()
+                output_continue()
+            return
+        
+        logger.log("FILES", f"Found {len(file_paths)} files to query")
+        
+        # Check remaining budget
+        if budget.is_exhausted():
+            logger.budget_exhausted()
+            if capability_context:
+                logger.context_provided("Capability context only (budget exhausted)")
+                logger.end()
+                output_context(capability_context)
+            else:
+                logger.end()
+                output_continue()
+            return
+        
+        # Query dependencies for all files in parallel
+        logger.log("QUERY", f"Querying deps for {len(file_paths)} files in parallel")
+        deps_results = asyncio.run(query_multiple_files(file_paths, budget))
+        
+        # Combine capability context with dependency context
+        final_context = []
+        
         if capability_context:
-            output_context(capability_context)
+            final_context.append(capability_context)
+        
+        # Check if any file has dependents
+        has_dependents = any(r.get("dependents") for r in deps_results)
+        if has_dependents:
+            dep_context = format_agent_context(deps_results, max_files=15)
+            final_context.append(dep_context)
+            logger.context_provided(f"Capabilities + {len(deps_results)} files with deps")
         else:
-            output_continue()
-        return
-    
-    # Extract agent info
-    agent_info = extract_agent_info(hook_input)
-    prompt = agent_info.get("prompt", "")
-    
-    if not prompt:
-        # No prompt, provide capability context only
-        if capability_context:
-            output_context(capability_context)
+            logger.context_provided("Capability context only (no deps)")
+        
+        if final_context:
+            logger.end()
+            output_context("\n\n".join(final_context))
         else:
+            logger.end()
             output_continue()
-        return
-    
-    # Extract file paths from the task description
-    file_paths = extract_file_paths(prompt)
-    
-    if not file_paths:
-        # No files mentioned, provide capability context only
-        if capability_context:
-            output_context(capability_context)
-        else:
-            output_continue()
-        return
-    
-    # Query KotaDB for each file
-    deps_results = []
-    for file_path in file_paths:
-        result = run_kotadb_deps(file_path, format="json", depth=1)
-        if not result.get("error"):
-            deps_results.append(result)
-    
-    # Combine capability context with dependency context
-    final_context = []
-    
-    if capability_context:
-        final_context.append(capability_context)
-    
-    # Check if any file has dependents
-    has_dependents = any(r.get("dependents") for r in deps_results)
-    if has_dependents:
-        dep_context = format_agent_context(deps_results, max_files=15)
-        final_context.append(dep_context)
-    
-    if final_context:
-        output_context("\n\n".join(final_context))
-    else:
-        output_continue()
+        
+    except Exception as e:
+        logger.error(f"Unhandled exception: {str(e)}")
+        logger.end(status="ERROR")
+        output_continue()  # Always exit 0
 
 
 if __name__ == "__main__":

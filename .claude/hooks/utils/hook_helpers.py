@@ -4,20 +4,287 @@ Hook helper utilities for KotaDB Claude Code hooks.
 
 Provides shared functions for:
 - Parsing stdin JSON (tool_input from Claude Code)
-- Running CLI commands
+- Running CLI commands with timeout budgets
+- Async/parallel execution for multi-file operations
+- MCP server health checks
+- Structured logging for observability
 - Formatting output (under 500 tokens)
 - Error handling (exit 0, warn on stderr)
 
 Usage:
-    from hook_helpers import parse_stdin, run_kotadb_deps, format_output
+    from hook_helpers import (
+        TimeoutBudget,
+        HookLogger,
+        parse_stdin,
+        run_kotadb_deps,
+        check_mcp_server_health,
+    )
 """
 
+import asyncio
 import json
 import os
 import subprocess
 import sys
+import time
+import urllib.error
+import urllib.request
+from concurrent.futures import ThreadPoolExecutor
+from pathlib import Path
 from typing import Any, Optional
 
+
+# ============================================================================
+# Timeout Budget and Logging Infrastructure
+# ============================================================================
+
+class TimeoutBudget:
+    """Manages total time budget for hook execution."""
+    
+    def __init__(self, total_seconds: float):
+        self.total_seconds = total_seconds
+        self.start_time = time.time()
+        
+    def remaining(self) -> float:
+        """Get remaining budget in seconds."""
+        elapsed = time.time() - self.start_time
+        return max(0, self.total_seconds - elapsed)
+    
+    def is_exhausted(self) -> bool:
+        """Check if budget is exhausted."""
+        return self.remaining() <= 0
+    
+    def timeout_for_operation(self, max_timeout: float = 5.0) -> float:
+        """Get timeout for next operation (min of remaining or max)."""
+        return min(self.remaining(), max_timeout)
+
+
+class HookLogger:
+    """Structured logging for hook execution."""
+    
+    def __init__(self, hook_name: str):
+        self.hook_name = hook_name
+        self.start_time = time.time()
+    
+    def log(self, event: str, details: str = "", level: str = "INFO"):
+        """
+        Log hook event to stderr.
+        
+        Format: [kotadb-hook:{hook_name}] {timestamp} +{elapsed}ms {level} {event}: {details}
+        """
+        elapsed_ms = int((time.time() - self.start_time) * 1000)
+        timestamp = time.strftime("%Y-%m-%d %H:%M:%S")
+        
+        message = f"[kotadb-hook:{self.hook_name}] {timestamp} +{elapsed_ms}ms {level} {event}"
+        if details:
+            message += f": {details}"
+        message += "\n"
+        
+        sys.stderr.write(message)
+    
+    def start(self):
+        """Log hook start."""
+        self.log("START", "Hook execution started")
+    
+    def end(self, status: str = "SUCCESS"):
+        """Log hook end with total duration."""
+        elapsed_ms = int((time.time() - self.start_time) * 1000)
+        self.log("END", f"Hook execution completed in {elapsed_ms}ms", level=status)
+    
+    def timeout(self, operation: str):
+        """Log timeout occurrence."""
+        self.log("TIMEOUT", f"Operation timed out: {operation}", level="WARN")
+    
+    def error(self, error_msg: str):
+        """Log error."""
+        self.log("ERROR", error_msg, level="ERROR")
+    
+    def mcp_unavailable(self):
+        """Log MCP server unavailability."""
+        self.log("MCP_UNAVAILABLE", "MCP server health check failed", level="WARN")
+    
+    def context_provided(self, summary: str):
+        """Log context injection."""
+        self.log("CONTEXT", summary)
+    
+    def budget_exhausted(self):
+        """Log budget exhaustion."""
+        self.log("BUDGET_EXHAUSTED", "Time budget exhausted", level="WARN")
+
+
+# ============================================================================
+# MCP Health Check Functions
+# ============================================================================
+
+def check_mcp_server_health(timeout: float = 0.5) -> bool:
+    """
+    Quick health check for KotaDB MCP server.
+    
+    Args:
+        timeout: Maximum time to wait (default 0.5s)
+        
+    Returns:
+        True if server is available, False otherwise
+    """
+    mcp_url = os.environ.get("KOTADB_MCP_URL", "http://localhost:3000/mcp")
+    
+    try:
+        # Simple ping with minimal timeout
+        req = urllib.request.Request(
+            mcp_url,
+            data=json.dumps({
+                "jsonrpc": "2.0",
+                "method": "ping",
+                "id": 1,
+            }).encode("utf-8"),
+            headers={"Content-Type": "application/json"},
+            method="POST",
+        )
+        
+        with urllib.request.urlopen(req, timeout=timeout) as response:
+            return response.status == 200
+    except (urllib.error.URLError, urllib.error.HTTPError, Exception):
+        return False
+
+
+def call_mcp_tool_with_health_check(
+    tool_name: str,
+    params: dict[str, Any],
+    timeout: float = 5.0,
+) -> dict[str, Any]:
+    """
+    Call MCP tool with preliminary health check.
+    
+    Args:
+        tool_name: Name of the MCP tool
+        params: Tool parameters
+        timeout: Request timeout
+        
+    Returns:
+        Tool result or error dict
+    """
+    # Quick health check first (0.5s)
+    if not check_mcp_server_health(timeout=0.5):
+        return {"error": "MCP server not available (health check failed)"}
+    
+    # Proceed with actual call
+    return call_mcp_tool(tool_name, params, timeout)
+
+
+# ============================================================================
+# Async Execution Functions
+# ============================================================================
+
+async def run_kotadb_deps_async(
+    file_path: str,
+    timeout: float = 5.0,
+) -> dict[str, Any]:
+    """Run kotadb deps command asynchronously."""
+    loop = asyncio.get_event_loop()
+    
+    cmd = get_kotadb_command()
+    cmd.extend(["deps", "--file", file_path, "--format", "json", "--depth", "1"])
+    
+    def run_in_thread():
+        try:
+            result = subprocess.run(
+                cmd,
+                capture_output=True,
+                text=True,
+                timeout=timeout,
+                cwd=os.getcwd(),
+            )
+            if result.returncode != 0:
+                try:
+                    return json.loads(result.stdout)
+                except json.JSONDecodeError:
+                    return {"file": file_path, "dependents": [], "error": "Command failed"}
+            return json.loads(result.stdout)
+        except Exception as e:
+            return {"file": file_path, "dependents": [], "error": str(e)}
+    
+    with ThreadPoolExecutor(max_workers=1) as executor:
+        future = loop.run_in_executor(executor, run_in_thread)
+        return await future
+
+
+async def query_multiple_files(
+    file_paths: list[str],
+    budget: TimeoutBudget,
+) -> list[dict[str, Any]]:
+    """Query dependency info for multiple files in parallel with budget."""
+    if budget.is_exhausted():
+        return []
+    
+    # Create tasks with remaining budget
+    timeout = budget.timeout_for_operation(max_timeout=5.0)
+    tasks = [run_kotadb_deps_async(fp, timeout) for fp in file_paths]
+    
+    try:
+        # Run all tasks in parallel with overall timeout
+        results = await asyncio.wait_for(
+            asyncio.gather(*tasks, return_exceptions=True),
+            timeout=budget.remaining(),
+        )
+        
+        # Filter out exceptions
+        return [r for r in results if isinstance(r, dict)]
+    except asyncio.TimeoutError:
+        sys.stderr.write("[kotadb-hook] Budget exhausted during parallel queries\n")
+        return []
+
+
+# ============================================================================
+# Validation Hook Compatibility Functions
+# ============================================================================
+
+def read_hook_input() -> dict[str, Any]:
+    """Alias for parse_stdin() for backward compatibility."""
+    return parse_stdin()
+
+
+def get_file_path_from_input(hook_input: dict[str, Any]) -> Optional[str]:
+    """Alias for extract_file_path() for backward compatibility."""
+    return extract_file_path(hook_input)
+
+
+def get_project_root() -> Path:
+    """
+    Get project root directory.
+    
+    Returns:
+        Path to project root (where .git directory exists)
+    """
+    current = Path.cwd()
+    while current != current.parent:
+        if (current / ".git").exists():
+            return current
+        current = current.parent
+    
+    return Path.cwd()
+
+
+def output_result(status: str, message: str = ""):
+    """
+    Output hook result with status.
+    
+    Args:
+        status: "continue" or "fail"
+        message: Optional message to display
+    """
+    if status == "continue":
+        if message:
+            sys.stdout.write(message + "\n")
+        sys.exit(0)
+    else:  # fail
+        if message:
+            sys.stderr.write(message + "\n")
+        sys.exit(0)  # Still exit 0 to not block
+
+
+# ============================================================================
+# Input Parsing Functions
+# ============================================================================
 
 def parse_stdin() -> dict[str, Any]:
     """
@@ -81,6 +348,10 @@ def extract_agent_info(hook_input: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+# ============================================================================
+# KotaDB CLI Functions
+# ============================================================================
+
 def get_kotadb_command() -> list[str]:
     """
     Get the command to run kotadb.
@@ -98,7 +369,7 @@ def get_kotadb_command() -> list[str]:
         return ["bunx", "kotadb"]
 
 
-def run_kotadb_deps(file_path: str, format: str = "json", depth: int = 1) -> dict[str, Any]:
+def run_kotadb_deps(file_path: str, format: str = "json", depth: int = 1, timeout: float = 10) -> dict[str, Any]:
     """
     Run kotadb deps command and return parsed result.
     
@@ -106,6 +377,7 @@ def run_kotadb_deps(file_path: str, format: str = "json", depth: int = 1) -> dic
         file_path: Path to the file to analyze
         format: Output format ("json" or "text")
         depth: Dependency traversal depth (1-5)
+        timeout: Command timeout in seconds
     
     Returns:
         Dict with deps result or error
@@ -118,7 +390,7 @@ def run_kotadb_deps(file_path: str, format: str = "json", depth: int = 1) -> dic
             cmd,
             capture_output=True,
             text=True,
-            timeout=10,  # 10 second timeout for performance
+            timeout=timeout,
             cwd=os.getcwd(),
         )
         
@@ -172,6 +444,10 @@ def run_kotadb_deps(file_path: str, format: str = "json", depth: int = 1) -> dic
             "error": str(e),
         }
 
+
+# ============================================================================
+# Formatting Functions
+# ============================================================================
 
 def format_dependency_alert(deps_result: dict[str, Any], max_files: int = 10) -> str:
     """
@@ -265,6 +541,10 @@ def format_agent_context(deps_results: list[dict[str, Any]], max_files: int = 15
     return "\n".join(lines)
 
 
+# ============================================================================
+# Output Functions
+# ============================================================================
+
 def output_continue() -> None:
     """Output empty to continue without blocking."""
     sys.exit(0)
@@ -293,9 +573,6 @@ def call_mcp_tool(tool_name: str, params: dict[str, Any], timeout: int = 5) -> d
     Returns:
         Dict with tool result or error
     """
-    import urllib.request
-    import urllib.error
-    
     # MCP endpoint
     mcp_url = os.environ.get("KOTADB_MCP_URL", "http://localhost:3000/mcp")
     
@@ -345,32 +622,34 @@ def call_mcp_tool(tool_name: str, params: dict[str, Any], timeout: int = 5) -> d
         return {"error": str(e)}
 
 
-def run_kotadb_search_failures(query: str, limit: int = 5) -> dict[str, Any]:
+def run_kotadb_search_failures(query: str, limit: int = 5, timeout: float = 5.0) -> dict[str, Any]:
     """
     Search for past failures using KotaDB MCP tool.
     
     Args:
         query: Search query for failures
         limit: Maximum number of results
+        timeout: Request timeout
     
     Returns:
         Dict with results array or error
     """
-    return call_mcp_tool("search_failures", {"query": query, "limit": limit})
+    return call_mcp_tool("search_failures", {"query": query, "limit": limit}, timeout)
 
 
-def run_kotadb_search_decisions(query: str, limit: int = 5) -> dict[str, Any]:
+def run_kotadb_search_decisions(query: str, limit: int = 5, timeout: float = 5.0) -> dict[str, Any]:
     """
     Search for past decisions using KotaDB MCP tool.
     
     Args:
         query: Search query for decisions
         limit: Maximum number of results
+        timeout: Request timeout
     
     Returns:
         Dict with results array or error
     """
-    return call_mcp_tool("search_decisions", {"query": query, "limit": limit})
+    return call_mcp_tool("search_decisions", {"query": query, "limit": limit}, timeout)
 
 
 def extract_search_terms_from_path(file_path: str) -> list[str]:

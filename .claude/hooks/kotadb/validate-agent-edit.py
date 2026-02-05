@@ -13,7 +13,8 @@ from pathlib import Path
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-from hooks.utils.hook_helpers import (
+from utils.hook_helpers import (
+    HookLogger,
     read_hook_input,
     output_result,
     get_file_path_from_input,
@@ -72,21 +73,29 @@ def validate_frontmatter(file_path: Path) -> list[str]:
 
 def main() -> None:
     """Validate agent edit."""
-    hook_input = read_hook_input()
-    file_path = get_file_path_from_input(hook_input)
-    
-    if not file_path:
-        output_result("continue")
-        return
-    
-    # Only validate agent files
-    if not is_agent_file(file_path):
-        output_result("continue")
-        return
+    logger = HookLogger("validate-agent-edit")
+    logger.start()
     
     try:
+        hook_input = read_hook_input()
+        file_path = get_file_path_from_input(hook_input)
+        
+        if not file_path:
+            logger.log("NO_FILE", "No file path in input")
+            output_result("continue")
+            return
+        
+        # Only validate agent files
+        if not is_agent_file(file_path):
+            logger.log("SKIP", f"Not an agent file: {file_path}")
+            output_result("continue")
+            return
+        
+        logger.log("FILE", f"Validating {file_path}")
+        
         path_obj = Path(file_path)
         if not path_obj.exists():
+            logger.log("NO_FILE", "File does not exist")
             output_result("continue")
             return
         
@@ -94,13 +103,19 @@ def main() -> None:
         
         if errors:
             message = f"Agent validation failed for {path_obj.name}:\n" + "\n".join(f"  • {e}" for e in errors)
+            logger.error(message)
+            logger.end(status="ERROR")
             output_result("fail", message)
         else:
             sys.stdout.write(f"Agent validated: {path_obj.name}\n")
             sys.stdout.write("Note: Run generate-registry.py to update agent-registry.json\n")
+            logger.log("VALIDATED", f"Agent {path_obj.name} is valid")
+            logger.end()
             output_result("continue")
             
     except Exception as e:
+        logger.error(f"Unhandled exception: {str(e)}")
+        logger.end(status="ERROR")
         output_result("fail", f"Validation error: {e}")
 
 

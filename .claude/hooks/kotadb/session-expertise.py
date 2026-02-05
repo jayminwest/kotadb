@@ -2,29 +2,19 @@
 """
 SessionStart hook for injecting dynamic expertise context at session start.
 
-This hook is triggered when a Claude Code session begins. It queries KotaDB
-for recent patterns and key files to provide domain-aware context that helps
-the agent understand the codebase state and recent activity.
+Performance:
+- Total budget: 15 seconds
+- MCP health check: 0.5s
+- Pattern search: Up to 2s
+- Parallel dependency queries: Up to 12.5s
 
-Hook Configuration (in .claude/settings.json):
-{
-  "hooks": {
-    "SessionStart": [{
-      "hooks": [{
-        "type": "command",
-        "command": "python3 .claude/hooks/kotadb/session-expertise.py"
-      }]
-    }]
-  }
-}
-
-Output (stdout):
-Dynamic expertise context including recent patterns and key files by domain.
-
-Exit codes:
-- 0: Success (always - don't block session start)
+Graceful degradation:
+- MCP unavailable: Completes in <1s
+- Budget exhausted: Returns partial results
+- Always exits 0 (never blocks)
 """
 
+import asyncio
 import json
 import os
 import subprocess
@@ -32,13 +22,17 @@ import sys
 from datetime import datetime, timedelta
 from typing import Any
 
-# Add parent directory to path for imports
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 from utils.hook_helpers import (
+    HookLogger,
+    TimeoutBudget,
+    check_mcp_server_health,
+    call_mcp_tool,
+    query_multiple_files,
+    get_kotadb_command,
     output_continue,
     output_context,
-    get_kotadb_command,
 )
 
 
@@ -62,60 +56,21 @@ DOMAIN_PREFIXES = {
 }
 
 
-def run_kotadb_search_patterns(limit: int = 10) -> dict[str, Any]:
+def run_kotadb_search_patterns(limit: int = 10, timeout: float = 5.0) -> dict[str, Any]:
     """
     Query KotaDB for recent patterns via MCP HTTP endpoint.
     
     Args:
         limit: Maximum number of patterns to retrieve
+        timeout: Request timeout
     
     Returns:
         Dict with results or error
     """
-    try:
-        import urllib.request
-        import urllib.error
-        
-        mcp_url = os.environ.get("KOTADB_MCP_URL", "http://localhost:3000/mcp")
-        
-        request_data = {
-            "jsonrpc": "2.0",
-            "method": "tools/call",
-            "params": {
-                "name": "search_patterns",
-                "arguments": {"limit": limit},
-            },
-            "id": 1,
-        }
-        
-        req = urllib.request.Request(
-            mcp_url,
-            data=json.dumps(request_data).encode("utf-8"),
-            headers={
-                "Content-Type": "application/json",
-                "Accept": "application/json",
-            },
-            method="POST",
-        )
-        
-        with urllib.request.urlopen(req, timeout=5) as response:
-            result = json.loads(response.read().decode("utf-8"))
-            
-            if "error" in result:
-                return {"error": result["error"].get("message", "Unknown error")}
-            
-            content = result.get("result", {}).get("content", [])
-            if content and isinstance(content, list) and len(content) > 0:
-                text = content[0].get("text", "{}")
-                return json.loads(text)
-            
-            return {"results": []}
-    
-    except Exception as e:
-        return {"error": str(e)}
+    return call_mcp_tool("search_patterns", {"limit": limit}, timeout)
 
 
-def get_recent_git_files(days: int = 7, limit: int = 20) -> list[str]:
+def get_recent_git_files(days: int = 7, limit: int = 30) -> list[str]:
     """
     Get files changed in git within the last N days.
     
@@ -133,7 +88,7 @@ def get_recent_git_files(days: int = 7, limit: int = 20) -> list[str]:
             ["git", "log", f"--since={since_date}", "--name-only", "--pretty=format:", "--diff-filter=AM"],
             capture_output=True,
             text=True,
-            timeout=10,
+            timeout=5,
             cwd=os.getcwd(),
         )
         
@@ -153,9 +108,15 @@ def get_recent_git_files(days: int = 7, limit: int = 20) -> list[str]:
         return []
 
 
-def get_key_files_by_domain() -> dict[str, list[dict[str, Any]]]:
+async def get_key_files_by_domain(budget: TimeoutBudget, logger: Any) -> dict[str, list[dict[str, Any]]]:
     """
     Get key files organized by domain using KotaDB dependency data.
+    
+    Uses async parallel execution to query multiple files quickly.
+    
+    Args:
+        budget: Timeout budget for queries
+        logger: Hook logger for tracing
     
     Returns:
         Dict mapping domain names to list of {file, dependents_count}
@@ -166,6 +127,7 @@ def get_key_files_by_domain() -> dict[str, list[dict[str, Any]]]:
     recent_files = get_recent_git_files(days=7, limit=30)
     
     if not recent_files:
+        logger.log("NO_GIT_FILES", "No recent git files, using fallback")
         # Fall back to common entry points
         recent_files = [
             "app/src/db/sqlite/index.ts",
@@ -173,9 +135,31 @@ def get_key_files_by_domain() -> dict[str, list[dict[str, Any]]]:
             "app/src/mcp/server.ts",
             "app/src/indexer/bun-indexer.ts",
         ]
+    else:
+        logger.log("GIT_FILES", f"Found {len(recent_files)} recent files")
     
-    # Query dependencies for each file and categorize by domain
+    # Filter to known domain files
+    domain_file_paths = []
     for file_path in recent_files:
+        for prefix in DOMAIN_PREFIXES.keys():
+            if file_path.startswith(prefix):
+                domain_file_paths.append(file_path)
+                break
+    
+    if not domain_file_paths:
+        logger.log("NO_DOMAIN_FILES", "No files in known domains")
+        return {}
+    
+    logger.log("DOMAIN_FILES", f"Querying {len(domain_file_paths)} domain files in parallel")
+    
+    # Query all files in parallel with budget
+    deps_results = await query_multiple_files(domain_file_paths, budget)
+    
+    # Organize results by domain
+    for result in deps_results:
+        file_path = result.get("file", "")
+        dependents_count = len(result.get("dependents", []))
+        
         # Determine domain
         domain = "other"
         for prefix, domain_name in DOMAIN_PREFIXES.items():
@@ -184,17 +168,14 @@ def get_key_files_by_domain() -> dict[str, list[dict[str, Any]]]:
                 break
         
         if domain == "other":
-            continue  # Skip files outside known domains
-        
-        # Query KotaDB for dependents count
-        deps_result = run_kotadb_deps_count(file_path)
+            continue
         
         if domain not in domain_files:
             domain_files[domain] = []
         
         domain_files[domain].append({
             "file": file_path,
-            "dependents_count": deps_result.get("dependents_count", 0),
+            "dependents_count": dependents_count,
         })
     
     # Sort each domain by dependents count and limit
@@ -206,40 +187,6 @@ def get_key_files_by_domain() -> dict[str, list[dict[str, Any]]]:
         )[:5]
     
     return domain_files
-
-
-def run_kotadb_deps_count(file_path: str) -> dict[str, Any]:
-    """
-    Get dependency count for a file via KotaDB CLI.
-    
-    Args:
-        file_path: Path to the file
-    
-    Returns:
-        Dict with dependents_count or error
-    """
-    try:
-        cmd = get_kotadb_command()
-        cmd.extend(["deps", "--file", file_path, "--format", "json", "--depth", "1"])
-        
-        result = subprocess.run(
-            cmd,
-            capture_output=True,
-            text=True,
-            timeout=5,
-            cwd=os.getcwd(),
-        )
-        
-        if result.returncode != 0:
-            return {"dependents_count": 0}
-        
-        data = json.loads(result.stdout)
-        dependents = data.get("dependents", [])
-        
-        return {"dependents_count": len(dependents)}
-    
-    except Exception:
-        return {"dependents_count": 0}
 
 
 def format_session_context(
@@ -300,24 +247,70 @@ def format_session_context(
 
 def main() -> None:
     """Main hook entry point."""
-    # Query for recent patterns
-    patterns_result = run_kotadb_search_patterns(limit=10)
-    patterns = patterns_result.get("results", [])
+    logger = HookLogger("session-expertise")
+    logger.start()
     
-    # Log warning if pattern search failed but continue
-    if patterns_result.get("error"):
-        sys.stderr.write(f"[kotadb-session] Warning: Pattern search failed: {patterns_result['error']}\n")
-    
-    # Get key files by domain
-    domain_files = get_key_files_by_domain()
-    
-    # Format and output context
-    context = format_session_context(patterns, domain_files)
-    
-    if context:
-        output_context(context)
-    else:
-        output_continue()
+    try:
+        # Create 15-second budget for this hook
+        budget = TimeoutBudget(15.0)
+        
+        # Quick MCP health check (0.5s max)
+        mcp_available = check_mcp_server_health(timeout=0.5)
+        if not mcp_available:
+            logger.mcp_unavailable()
+            logger.end()
+            output_continue()
+            return
+        
+        # Check remaining budget
+        if budget.is_exhausted():
+            logger.budget_exhausted()
+            logger.end()
+            output_continue()
+            return
+        
+        # Query for recent patterns with timeout
+        pattern_timeout = budget.timeout_for_operation(max_timeout=2.0)
+        logger.log("QUERY", f"Querying patterns with {pattern_timeout:.1f}s timeout")
+        patterns_result = run_kotadb_search_patterns(limit=10, timeout=pattern_timeout)
+        patterns = patterns_result.get("results", [])
+        
+        # Log warning if pattern search failed but continue
+        if patterns_result.get("error"):
+            logger.log("WARN", f"Pattern search failed: {patterns_result['error']}", level="WARN")
+        else:
+            logger.log("PATTERNS", f"Found {len(patterns)} patterns")
+        
+        # Check remaining budget
+        if budget.is_exhausted():
+            logger.budget_exhausted()
+            logger.end()
+            output_continue()
+            return
+        
+        # Get key files by domain using async execution
+        logger.log("DOMAIN_QUERY", "Querying domain files in parallel")
+        domain_files = asyncio.run(get_key_files_by_domain(budget, logger))
+        
+        total_domain_files = sum(len(files) for files in domain_files.values())
+        logger.log("DOMAIN_RESULTS", f"Found {total_domain_files} files across {len(domain_files)} domains")
+        
+        # Format and output context
+        context = format_session_context(patterns, domain_files)
+        
+        if context:
+            logger.context_provided(f"{len(patterns)} patterns, {total_domain_files} domain files")
+            logger.end()
+            output_context(context)
+        else:
+            logger.log("NO_CONTEXT", "No context to inject")
+            logger.end()
+            output_continue()
+        
+    except Exception as e:
+        logger.error(f"Unhandled exception: {str(e)}")
+        logger.end(status="ERROR")
+        output_continue()  # Always exit 0
 
 
 if __name__ == "__main__":
