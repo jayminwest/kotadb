@@ -7,6 +7,7 @@
  * - Path aliases (@api/*, @db/*, etc.) via tsconfig.json
  * - Index file resolution (./dir → ./dir/index.ts)
  * - Extension variants (.ts, .tsx, .js, .jsx, .mjs, .cjs)
+ * - Extension substitution (.js → .ts for TypeScript source resolution)
  * - Missing files (returns null)
  *
  * Non-goals (deferred or out of scope):
@@ -28,6 +29,20 @@ import { SUPPORTED_EXTENSIONS, INDEX_FILES } from "./constants.js";
 const logger = createLogger({ module: "indexer-import-resolver" });
 
 /**
+ * Extension substitution map for .js → .ts resolution.
+ *
+ * When source files use .js extensions in imports (common with TypeScript's
+ * moduleResolution: "node16" or "nodenext"), we try the corresponding
+ * TypeScript extension.
+ */
+const EXTENSION_MAP: Record<string, string> = {
+	".js": ".ts",
+	".jsx": ".tsx",
+	".mjs": ".mts",
+	".cjs": ".cts",
+};
+
+/**
  * Resolve an import path to an absolute file path.
  *
  * Main entry point for import resolution. Enhanced with path alias support.
@@ -42,13 +57,15 @@ const logger = createLogger({ module: "indexer-import-resolver" });
  * - Directory imports: "./dir" → "./dir/index.ts"
  * - Parent directory imports: "../bar/baz"
  * - Path aliases: "@api/routes" → "src/api/routes.ts"
+ * - Extension substitution: "./foo.js" → "./foo.ts"
  *
  * Returns null if the import cannot be resolved to an existing file.
  *
  * @param importSource - Import path from source code (e.g., "./foo", "@api/routes")
  * @param fromFilePath - Absolute path of file containing the import
  * @param files - Array of indexed files for existence checks
- * @param pathMappings - Optional path mappings from tsconfig (NEW)
+ * @param pathMappings - Optional path mappings from tsconfig
+ * @param repoRoot - Optional explicit repo root (avoids heuristic detection)
  * @returns Absolute file path or null if not found
  *
  * @example
@@ -63,7 +80,7 @@ const logger = createLogger({ module: "indexer-import-resolver" });
  * // => '/repo/src/utils.ts'
  * 
  * // Path alias
- * const mappings = { baseUrl: ".", paths: { "@api/*": ["src/api/*"] } };
+ * const mappings = { baseUrl: ".", paths: { "@api/*": ["src/api/*"] }, tsconfigDir: "" };
  * resolveImport('@api/routes', '/repo/src/index.ts', files, mappings);
  * // => '/repo/src/api/routes.ts'
  * ```
@@ -73,6 +90,7 @@ export function resolveImport(
 	fromFilePath: string,
 	files: Array<{ path: string }>,
 	pathMappings?: PathMappings | null,
+	repoRoot?: string,
 ): string | null {
 	// Relative imports - existing logic unchanged
 	if (importSource.startsWith(".")) {
@@ -82,7 +100,19 @@ export function resolveImport(
 
 		// If import already has an extension, check if file exists
 		if (SUPPORTED_EXTENSIONS.some((ext) => resolvedPath.endsWith(ext))) {
-			return filePaths.has(resolvedPath) ? resolvedPath : null;
+			if (filePaths.has(resolvedPath)) return resolvedPath;
+
+			// Try extension substitution (.js → .ts, .jsx → .tsx, etc.)
+			const ext = SUPPORTED_EXTENSIONS.find((e) => resolvedPath.endsWith(e));
+			if (ext) {
+				const mapped = EXTENSION_MAP[ext];
+				if (mapped) {
+					const substituted = resolvedPath.slice(0, -ext.length) + mapped;
+					if (filePaths.has(substituted)) return substituted;
+				}
+			}
+
+			return null;
 		}
 
 		// Try adding extensions
@@ -100,13 +130,13 @@ export function resolveImport(
 		return null;
 	}
 
-	// NEW: Path alias resolution
+	// Path alias resolution
 	if (pathMappings) {
-		const projectRoot = determineProjectRoot(fromFilePath);
+		const root = repoRoot || determineProjectRoot(fromFilePath);
 		const filePaths = new Set(files.map((f) => f.path));
 		const resolved = resolvePathAlias(
 			importSource,
-			projectRoot,
+			root,
 			filePaths,
 			pathMappings,
 		);

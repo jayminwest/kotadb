@@ -234,6 +234,7 @@ function storeReferencesInternal(
   references: Reference[],
   allFiles: Array<{ path: string }>,
   pathMappings?: PathMappings | null,
+  repoRoot?: string,
 ): number {
   if (references.length === 0) {
     return 0;
@@ -268,6 +269,7 @@ function storeReferencesInternal(
           filePath,
           allFiles,
           pathMappings,
+          repoRoot,
         );
 
         // Normalize path if resolved
@@ -538,6 +540,7 @@ export function storeReferences(
   references: Reference[],
   allFiles: Array<{ path: string }>,
   pathMappings?: PathMappings | null,
+  repoRoot?: string,
 ): number {
   const db = getGlobalDatabase();
 
@@ -559,6 +562,7 @@ export function storeReferences(
     references,
     allFiles,
     pathMappings,
+    repoRoot,
   );
 }
 
@@ -897,11 +901,190 @@ function processDepthResults(
   return { direct, indirect, cycles };
 }
 
+// ============================================================================
+// Symbol Usage Lookup
+// ============================================================================
+
+export interface FindUsagesOptions {
+  symbolName: string;
+  filePath?: string;
+  repositoryId: string;
+  includeDefinitions?: boolean;
+  includeTests?: boolean;
+}
+
+export interface SymbolUsage {
+  file: string;
+  line: number;
+  column: number;
+  usage_type: string;
+  context: string;
+}
+
+export interface FindUsagesResult {
+  symbol: string;
+  defined_in: string;
+  kind: string;
+  usages: SymbolUsage[];
+  total_usages: number;
+  files_with_usages: number;
+}
+
+const REFERENCE_TYPE_MAP: Record<string, string> = {
+  import: "import",
+  call: "call",
+  re_export: "re_export",
+  export_all: "re_export",
+  type_reference: "type_reference",
+  extends: "type_reference",
+  implements: "type_reference",
+  property_access: "property_access",
+  variable_reference: "variable_reference",
+  dynamic_import: "import",
+};
+
+function findSymbolUsagesInternal(
+  db: KotaDatabase,
+  options: FindUsagesOptions,
+): FindUsagesResult {
+  const {
+    symbolName,
+    filePath,
+    repositoryId,
+    includeDefinitions = false,
+    includeTests = true,
+  } = options;
+
+  // Step 1: Find the symbol definition
+  const symbolSql = filePath
+    ? `SELECT s.id, s.name, s.kind, s.line_start, s.line_end, s.file_id, f.path AS file_path
+       FROM indexed_symbols s
+       JOIN indexed_files f ON s.file_id = f.id
+       WHERE s.name = ? AND s.repository_id = ? AND f.path = ?
+       LIMIT 1`
+    : `SELECT s.id, s.name, s.kind, s.line_start, s.line_end, s.file_id, f.path AS file_path
+       FROM indexed_symbols s
+       JOIN indexed_files f ON s.file_id = f.id
+       WHERE s.name = ? AND s.repository_id = ?
+       LIMIT 1`;
+
+  const symbolParams = filePath
+    ? [symbolName, repositoryId, filePath]
+    : [symbolName, repositoryId];
+
+  const symbolRow = db.queryOne<{
+    id: string;
+    name: string;
+    kind: string;
+    line_start: number;
+    line_end: number;
+    file_id: string;
+    file_path: string;
+  }>(symbolSql, symbolParams);
+
+  if (!symbolRow) {
+    logger.debug("Symbol not found for find_usages", { symbolName, repositoryId, filePath });
+    return {
+      symbol: symbolName,
+      defined_in: "unknown",
+      kind: "unknown",
+      usages: [],
+      total_usages: 0,
+      files_with_usages: 0,
+    };
+  }
+
+  const definedIn = `${symbolRow.file_path}:${symbolRow.line_start}`;
+
+  // Step 2: Find all references (union of symbol_name match and target_symbol_id match)
+  const referencesSql = `
+    SELECT r.line_number, r.column_number, r.reference_type,
+           f.path AS file_path, f.content AS file_content
+    FROM indexed_references r
+    JOIN indexed_files f ON r.file_id = f.id
+    WHERE r.repository_id = ?
+      AND (r.symbol_name = ? OR r.target_symbol_id = ?)
+    ORDER BY f.path, r.line_number
+  `;
+
+  const referenceRows = db.query<{
+    line_number: number;
+    column_number: number;
+    reference_type: string;
+    file_path: string;
+    file_content: string;
+  }>(referencesSql, [repositoryId, symbolName, symbolRow.id]);
+
+  // Step 3: Process results
+  const usages: SymbolUsage[] = [];
+  const filesWithUsages = new Set<string>();
+
+  for (const ref of referenceRows) {
+    // Filter test files if requested
+    if (
+      !includeTests &&
+      (ref.file_path.includes("test") ||
+        ref.file_path.includes("spec") ||
+        ref.file_path.includes("__tests__"))
+    ) {
+      continue;
+    }
+
+    // Filter out the definition location itself unless includeDefinitions is true
+    if (
+      !includeDefinitions &&
+      ref.file_path === symbolRow.file_path &&
+      ref.line_number >= symbolRow.line_start &&
+      ref.line_number <= symbolRow.line_end
+    ) {
+      continue;
+    }
+
+    // Extract context line from file content
+    const lines = ref.file_content.split("\n");
+    const lineIndex = ref.line_number - 1; // Convert 1-indexed to 0-indexed
+    const context =
+      lineIndex >= 0 && lineIndex < lines.length
+        ? (lines[lineIndex] ?? "").trim()
+        : "";
+
+    const usageType = REFERENCE_TYPE_MAP[ref.reference_type] || ref.reference_type;
+
+    usages.push({
+      file: ref.file_path,
+      line: ref.line_number,
+      column: ref.column_number,
+      usage_type: usageType,
+      context,
+    });
+
+    filesWithUsages.add(ref.file_path);
+  }
+
+  return {
+    symbol: symbolRow.name,
+    defined_in: definedIn,
+    kind: symbolRow.kind,
+    usages,
+    total_usages: usages.length,
+    files_with_usages: filesWithUsages.size,
+  };
+}
+
 /**
- * Query dependents (reverse lookup): files/symbols that depend on the target
+ * Find all usages of a named symbol across the indexed codebase.
  *
- * @internal - Use queryDependents() for the wrapped version
+ * Looks up the symbol definition in indexed_symbols, then finds all
+ * references in indexed_references by both symbol_name and target_symbol_id.
+ * Returns usage locations with line context, filtered by test inclusion
+ * and definition exclusion options.
+ *
+ * @param options - Search options including symbolName and repositoryId
+ * @returns Result with definition location, usage list, and counts
  */
+export function findSymbolUsages(options: FindUsagesOptions): FindUsagesResult {
+  return findSymbolUsagesInternal(getGlobalDatabase(), options);
+}
 
 /**
  * Ensure repository exists in SQLite, create if not.
@@ -1078,6 +1261,7 @@ export async function runIndexingWorkflow(request: IndexRequest): Promise<{
       fileWithRefs.references,
       allIndexedFiles, // Use complete file list instead of incremental array
       pathMappings,
+      localPath,
     );
     totalReferences += referenceCount;
   }
@@ -1371,6 +1555,7 @@ export function storeReferencesLocal(
   references: Reference[],
   allFiles: Array<{ path: string }>,
   pathMappings?: PathMappings | null,
+  repoRoot?: string,
 ): number {
   const repositoryId = db.queryOne<{ repository_id: string }>(
     "SELECT repository_id FROM indexed_files WHERE id = ?",
@@ -1389,6 +1574,7 @@ export function storeReferencesLocal(
     references,
     allFiles,
     pathMappings,
+    repoRoot,
   );
 }
 
