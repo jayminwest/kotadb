@@ -332,7 +332,7 @@ async function indexChangedFilesInternal(
 					// Store references
 					if (references.length > 0) {
 						const updatedFiles = [...allIndexedFiles, { id: fileId, path: normalizedPath }];
-						const refCount = storeReferencesForFile(db, fileId, repositoryId, normalizedPath, references, updatedFiles, pathMappings);
+						const refCount = storeReferencesForFile(db, fileId, repositoryId, normalizedPath, references, updatedFiles, pathMappings, absoluteRoot);
 						result.referencesExtracted += refCount;
 					}
 				}
@@ -373,6 +373,7 @@ function storeReferencesForFile(
 	references: Reference[],
 	allFiles: Array<{ path: string }>,
 	pathMappings: PathMappings | null,
+	repoRoot?: string,
 ): number {
 	let count = 0;
 
@@ -386,7 +387,7 @@ function storeReferencesForFile(
 
 		let targetFilePath: string | null = null;
 		if (ref.referenceType === "import" && ref.metadata?.importSource) {
-			const resolved = resolveImport(ref.metadata.importSource, filePath, allFiles, pathMappings);
+			const resolved = resolveImport(ref.metadata.importSource, filePath, allFiles, pathMappings, repoRoot);
 			if (resolved) {
 				targetFilePath = normalizePath(resolved);
 			}

@@ -8,13 +8,15 @@
  * - Parse tsconfig.json with compilerOptions.paths and baseUrl
  * - Support extends inheritance (recursive with depth limit)
  * - Fallback to jsconfig.json for JavaScript projects
+ * - Discover tsconfig.json in subdirectories (monorepo support)
+ * - .js → .ts extension substitution for TypeScript source resolution
  * - First-match-wins for multi-path mappings
  * - Graceful error handling for missing/malformed configs
  *
  * @see app/src/indexer/import-resolver.ts - Consumer of path mappings
  */
 
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, readdirSync, statSync } from "node:fs";
 import { dirname, join, normalize, isAbsolute } from "node:path";
 
 import { Sentry } from "../instrument.js";
@@ -22,6 +24,20 @@ import { createLogger } from "@logging/logger.js";
 import { SUPPORTED_EXTENSIONS, INDEX_FILES } from "./constants.js";
 
 const logger = createLogger({ module: "indexer-path-resolver" });
+
+/**
+ * Extension substitution map for .js → .ts resolution.
+ *
+ * When source files use .js extensions in imports (common with TypeScript's
+ * moduleResolution: "node16" or "nodenext"), we try the corresponding
+ * TypeScript extension.
+ */
+const EXTENSION_MAP: Record<string, string> = {
+	".js": ".ts",
+	".jsx": ".tsx",
+	".mjs": ".mts",
+	".cjs": ".cts",
+};
 
 /**
  * Parsed TypeScript path mappings from tsconfig.json.
@@ -36,7 +52,8 @@ const logger = createLogger({ module: "indexer-path-resolver" });
  *   paths: {
  *     "@api/*": ["src/api/*"],
  *     "@shared/*": ["./shared/*", "../shared/*"]
- *   }
+ *   },
+ *   tsconfigDir: "app"
  * }
  * ```
  */
@@ -45,6 +62,8 @@ export interface PathMappings {
 	baseUrl: string;
 	/** Path alias mappings (key: alias pattern, value: resolution paths) */
 	paths: Record<string, string[]>;
+	/** Directory containing tsconfig.json, relative to repo root. Empty string if at root. */
+	tsconfigDir: string;
 }
 
 /**
@@ -66,52 +85,141 @@ interface TsConfig {
 const MAX_EXTENDS_DEPTH = 10;
 
 /**
- * Parse tsconfig.json from a directory.
+ * Maximum directory depth to search for tsconfig.json in subdirectories.
+ */
+const MAX_DISCOVERY_DEPTH = 3;
+
+/**
+ * Parse tsconfig.json from a directory, with subdirectory discovery.
  *
  * Resolution logic:
- * 1. Look for tsconfig.json in projectRoot
- * 2. Look for jsconfig.json as fallback
- * 3. Parse extends recursively (up to 10 levels)
- * 4. Merge paths and baseUrl (child overrides parent)
- * 5. Return null on parse error (graceful failure)
+ * 1. Look for tsconfig.json in projectRoot (fast path)
+ * 2. Look for jsconfig.json in projectRoot
+ * 3. Search subdirectories (up to 3 levels deep) for tsconfig.json/jsconfig.json
+ * 4. Parse extends recursively (up to 10 levels)
+ * 5. Merge paths and baseUrl (child overrides parent)
+ * 6. Return null on parse error (graceful failure)
  *
  * @param projectRoot - Absolute path to project root directory
  * @returns PathMappings or null if no config found
  *
  * @example
  * ```typescript
- * const mappings = parseTsConfig("/repo/app");
+ * const mappings = parseTsConfig("/repo");
+ * // Finds /repo/app/tsconfig.json, returns tsconfigDir: "app"
  * if (mappings) {
  *   // Use mappings in resolveImport()
  * }
  * ```
  */
 export function parseTsConfig(projectRoot: string): PathMappings | null {
+	// Fast path: check projectRoot directly
+	const rootResult = tryParseConfigInDir(projectRoot, "");
+	if (rootResult) return rootResult;
+
+	// Search subdirectories for tsconfig.json
+	const found = discoverTsConfig(projectRoot, "", 1, MAX_DISCOVERY_DEPTH);
+	if (found) return found;
+
+	logger.debug("No tsconfig.json or jsconfig.json found", { projectRoot });
+	return null;
+}
+
+/**
+ * Try parsing tsconfig.json or jsconfig.json in a specific directory.
+ *
+ * @internal - Used by parseTsConfig() and discoverTsConfig()
+ * @param dir - Absolute path to directory to check
+ * @param tsconfigDir - Relative path from repo root to this directory
+ * @returns PathMappings or null if no config found
+ */
+function tryParseConfigInDir(dir: string, tsconfigDir: string): PathMappings | null {
 	// Try tsconfig.json first
-	const tsconfigPath = join(projectRoot, "tsconfig.json");
+	const tsconfigPath = join(dir, "tsconfig.json");
 	if (existsSync(tsconfigPath)) {
 		const config = parseTsConfigWithExtends(tsconfigPath, 0, MAX_EXTENDS_DEPTH);
 		if (config?.compilerOptions?.paths) {
 			return {
 				baseUrl: config.compilerOptions.baseUrl || ".",
 				paths: config.compilerOptions.paths,
+				tsconfigDir,
 			};
 		}
 	}
 
 	// Fallback to jsconfig.json
-	const jsconfigPath = join(projectRoot, "jsconfig.json");
+	const jsconfigPath = join(dir, "jsconfig.json");
 	if (existsSync(jsconfigPath)) {
 		const config = parseTsConfigWithExtends(jsconfigPath, 0, MAX_EXTENDS_DEPTH);
 		if (config?.compilerOptions?.paths) {
 			return {
 				baseUrl: config.compilerOptions.baseUrl || ".",
 				paths: config.compilerOptions.paths,
+				tsconfigDir,
 			};
 		}
 	}
 
-	logger.debug("No tsconfig.json or jsconfig.json found", { projectRoot });
+	return null;
+}
+
+/**
+ * Recursively discover tsconfig.json in subdirectories.
+ *
+ * @internal - Used by parseTsConfig()
+ * @param rootDir - Absolute path to repo root
+ * @param currentRelative - Current relative path from root
+ * @param currentDepth - Current search depth
+ * @param maxDepth - Maximum search depth
+ * @returns PathMappings or null if not found
+ */
+function discoverTsConfig(
+	rootDir: string,
+	currentRelative: string,
+	currentDepth: number,
+	maxDepth: number,
+): PathMappings | null {
+	if (currentDepth > maxDepth) return null;
+
+	const currentDir = currentRelative ? join(rootDir, currentRelative) : rootDir;
+
+	let entries: string[];
+	try {
+		entries = readdirSync(currentDir);
+	} catch {
+		return null;
+	}
+
+	// Check immediate subdirectories first (breadth-first at this level)
+	const subdirs: string[] = [];
+	for (const entry of entries) {
+		// Skip common non-project directories
+		if (entry === "node_modules" || entry === ".git" || entry === "dist" || entry === "build" || entry === ".next") {
+			continue;
+		}
+
+		const entryPath = join(currentDir, entry);
+		try {
+			if (!statSync(entryPath).isDirectory()) continue;
+		} catch {
+			continue;
+		}
+
+		const entryRelative = currentRelative ? join(currentRelative, entry) : entry;
+
+		// Try parsing config in this subdirectory
+		const result = tryParseConfigInDir(entryPath, entryRelative);
+		if (result) return result;
+
+		subdirs.push(entryRelative);
+	}
+
+	// Recurse into subdirectories
+	for (const subdir of subdirs) {
+		const result = discoverTsConfig(rootDir, subdir, currentDepth + 1, maxDepth);
+		if (result) return result;
+	}
+
 	return null;
 }
 
@@ -226,29 +334,33 @@ function mergeTsConfigs(child: TsConfig, parent: TsConfig): TsConfig {
  * 1. Match import against each alias pattern
  * 2. For matching alias, try each resolution path
  * 3. Replace glob wildcard (*) with matched suffix
- * 4. Resolve relative to baseUrl
- * 5. Check if resolved file exists in files Set
+ * 4. Resolve relative to tsconfig directory + baseUrl
+ * 5. Convert to repo-root-relative path for files Set lookup
  * 6. Return first match, null if none found
  *
  * @param importSource - Import string (e.g., "@api/routes")
- * @param projectRoot - Project root directory (for baseUrl resolution)
- * @param files - Set of indexed file paths
+ * @param repoRoot - Repository root directory (absolute path)
+ * @param files - Set of indexed file paths (repo-root-relative)
  * @param mappings - Parsed path mappings from tsconfig
- * @returns Resolved absolute path or null
+ * @returns Resolved repo-root-relative path or null
  *
  * @example
  * ```typescript
  * resolvePathAlias("@api/routes", "/repo", files, mappings)
- * // Tries: /repo/src/api/routes.ts, /repo/src/api/routes.tsx, etc.
- * // Returns: "/repo/src/api/routes.ts" (if exists)
+ * // With tsconfigDir: "app", resolves to "app/src/api/routes.ts"
  * ```
  */
 export function resolvePathAlias(
 	importSource: string,
-	projectRoot: string,
+	repoRoot: string,
 	files: Set<string>,
 	mappings: PathMappings,
 ): string | null {
+	// Compute absolute path to tsconfig directory
+	const tsconfigAbsDir = mappings.tsconfigDir
+		? join(repoRoot, mappings.tsconfigDir)
+		: repoRoot;
+
 	// Try each path alias pattern
 	for (const [pattern, resolutionPaths] of Object.entries(mappings.paths)) {
 		const suffix = matchesPattern(importSource, pattern);
@@ -259,12 +371,12 @@ export function resolvePathAlias(
 		// Try each resolution path for this pattern
 		for (const resolutionPath of resolutionPaths) {
 			const substituted = substitutePath(resolutionPath, suffix);
-			const basePath = join(projectRoot, mappings.baseUrl, substituted);
+			const basePath = join(tsconfigAbsDir, mappings.baseUrl, substituted);
 			const resolved = normalize(basePath);
 
-			// Convert absolute path to relative path for files Set lookup
-			const relativePath = resolved.startsWith(projectRoot) 
-				? resolved.slice(projectRoot.length + 1) 
+			// Convert absolute path to repo-root-relative for files Set lookup
+			const relativePath = resolved.startsWith(repoRoot)
+				? resolved.slice(repoRoot.length + 1)
 				: resolved;
 
 			// Try with extension variants
@@ -375,12 +487,27 @@ function substitutePath(pathTemplate: string, suffix: string): string {
 /**
  * Try adding supported extensions to a path.
  *
+ * Handles extension substitution (.js → .ts, etc.) for TypeScript projects
+ * that use .js extensions in imports.
+ *
  * @internal - Used by resolvePathAlias()
  */
 function tryExtensions(basePath: string, files: Set<string>): string | null {
-	// If path already has extension, check as-is
+	// If path already has extension, check as-is first
 	if (SUPPORTED_EXTENSIONS.some((ext) => basePath.endsWith(ext))) {
-		return files.has(basePath) ? basePath : null;
+		if (files.has(basePath)) return basePath;
+
+		// Try extension substitution (.js → .ts, .jsx → .tsx, etc.)
+		const ext = SUPPORTED_EXTENSIONS.find((e) => basePath.endsWith(e));
+		if (ext) {
+			const mapped = EXTENSION_MAP[ext];
+			if (mapped) {
+				const substituted = basePath.slice(0, -ext.length) + mapped;
+				if (files.has(substituted)) return substituted;
+			}
+		}
+
+		return null;
 	}
 
 	// Try each extension

@@ -363,8 +363,8 @@ A Model Context Protocol (MCP) server that provides tools for car customization 
 ## Testing Artifacts
 
 All test scripts and results are available in:
-- `/Users/jayminwest/Projects/kota-db-ts/test-mcp-tools.ts` - Comprehensive MCP tool testing
-- `/Users/jayminwest/Projects/kota-db-ts/test-dependencies.ts` - Targeted dependency analysis testing
+- `test-mcp-tools.ts` - Comprehensive MCP tool testing
+- `test-dependencies.ts` - Targeted dependency analysis testing
 
 ## Conclusion
 

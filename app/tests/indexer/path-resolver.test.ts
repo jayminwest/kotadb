@@ -248,6 +248,7 @@ describe("path-resolver", () => {
 			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 
@@ -260,6 +261,7 @@ describe("path-resolver", () => {
 			const files = new Set(["packages/shared/utils.ts"]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@shared/*": ["src/shared/*", "packages/shared/*"] },
 			};
 
@@ -272,6 +274,7 @@ describe("path-resolver", () => {
 			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 
@@ -284,6 +287,7 @@ describe("path-resolver", () => {
 			const files = new Set(["src/db/schema.ts"]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@db/*": ["src/db/*"] },
 			};
 
@@ -296,6 +300,7 @@ describe("path-resolver", () => {
 			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 
@@ -308,6 +313,7 @@ describe("path-resolver", () => {
 			const files = new Set(["src/api/routes.ts"]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 
@@ -320,6 +326,7 @@ describe("path-resolver", () => {
 			const files = new Set<string>([]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 
@@ -334,6 +341,7 @@ describe("path-resolver", () => {
 			]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@api": ["src/api/index.ts"] },
 			};
 			
@@ -349,6 +357,7 @@ describe("path-resolver", () => {
 			]);
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { "@api/*": ["src/api/*"] },
 			};
 			
@@ -365,6 +374,7 @@ describe("path-resolver", () => {
 			]);
 			const mappings = {
 				baseUrl: "src",
+				tsconfigDir: "",
 				paths: { "@api/*": ["api/*"] },
 			};
 			
@@ -386,6 +396,7 @@ describe("path-resolver", () => {
 			
 			const mappings = {
 				baseUrl: ".",
+				tsconfigDir: "",
 				paths: { 
 					"@api/*": ["src/api/*"],
 					"@db/*": ["src/db/*"],

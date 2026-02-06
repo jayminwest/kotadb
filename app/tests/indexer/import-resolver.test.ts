@@ -150,6 +150,7 @@ describe("resolveImport with path aliases", () => {
 
 		const pathMappings = {
 			baseUrl: ".",
+			tsconfigDir: "",
 			paths: { "@api/*": ["src/api/*"] },
 		};
 
@@ -164,6 +165,7 @@ describe("resolveImport with path aliases", () => {
 
 		const pathMappings = {
 			baseUrl: ".",
+			tsconfigDir: "",
 			paths: { "@api/*": ["src/api/*"] },
 		};
 
@@ -179,6 +181,7 @@ describe("resolveImport with path aliases", () => {
 
 		const pathMappings = {
 			baseUrl: ".",
+			tsconfigDir: "",
 			paths: { "@api/*": ["src/api/*"] },
 		};
 
@@ -195,6 +198,7 @@ describe("resolveImport with path aliases", () => {
 
 		const pathMappings = {
 			baseUrl: ".",
+			tsconfigDir: "",
 			paths: { "@db/*": ["src/db/*"] },
 		};
 
@@ -209,6 +213,7 @@ describe("resolveImport with path aliases", () => {
 
 		const pathMappings = {
 			baseUrl: ".",
+			tsconfigDir: "",
 			paths: { "@api/*": ["src/api/*"] },
 		};
 
@@ -233,6 +238,7 @@ describe("resolveImport with path aliases", () => {
 
 		const pathMappings = {
 			baseUrl: ".",
+			tsconfigDir: "",
 			paths: { "@shared/*": ["src/shared/*", "packages/shared/*"] },
 		};
 
