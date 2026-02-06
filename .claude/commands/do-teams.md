@@ -113,7 +113,7 @@ Task(
 
     ## CONTEXT
     EXPERTISE: Load expertise per your agent's context contract.
-    Path: /Users/jayminwest/Projects/kotadb/.claude/agents/experts/{domain}/expertise.yaml
+    Path: .claude/agents/experts/{domain}/expertise.yaml
     TEAM: {team-name}
 
     Read the expertise file before starting work.
@@ -167,7 +167,7 @@ Task(
 
     ## CONTEXT
     EXPERTISE: Load expertise per your agent's context contract.
-    Path: /Users/jayminwest/Projects/kotadb/.claude/agents/experts/{domain}/expertise.yaml
+    Path: .claude/agents/experts/{domain}/expertise.yaml
     TEAM: {team-name}
 
     Read the expertise file. Apply {domain} lens to analysis.
@@ -340,8 +340,8 @@ Teammates should format SendMessage content as JSON matching the coordination me
   "status": "complete",
   "summary": "Created preferences table with user_id FK and indexes",
   "filesModified": [
-    "/Users/jayminwest/Projects/kotadb/app/src/db/migrations/003_preferences.ts",
-    "/Users/jayminwest/Projects/kotadb/app/src/db/schema.ts"
+    "app/src/db/migrations/003_preferences.ts",
+    "app/src/db/schema.ts"
   ],
   "nextSteps": ["Run migration", "Add API handler"]
 }
@@ -424,7 +424,7 @@ Teammates load expertise through their agent's context contract rather than raw 
 
 **Pass the expertise path in the prompt as a fallback:**
 ```
-EXPERTISE: /Users/jayminwest/Projects/kotadb/.claude/agents/experts/{domain}/expertise.yaml
+EXPERTISE: .claude/agents/experts/{domain}/expertise.yaml
 Read this file before starting work.
 ```
 
