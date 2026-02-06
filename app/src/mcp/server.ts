@@ -21,6 +21,7 @@ import {
 	LIST_RECENT_FILES_TOOL,
 	SEARCH_TOOL,
 	SEARCH_DEPENDENCIES_TOOL,
+	FIND_USAGES_TOOL,
 	SYNC_EXPORT_TOOL,
 	SYNC_IMPORT_TOOL,
 	VALIDATE_IMPLEMENTATION_SPEC_TOOL,
@@ -41,6 +42,7 @@ import {
 	executeListRecentFiles,
 	executeSearch,
 	executeSearchDependencies,
+	executeFindUsages,
 	executeSyncExport,
 	executeSyncImport,
 	executeValidateImplementationSpec,
@@ -86,6 +88,7 @@ export interface McpServerContext {
  * - index_repository: Index a local repository
  * - list_recent_files: List recently indexed files
  * - search_dependencies: Query dependency graph
+ * - find_usages: Find all usages of a symbol across the codebase
  * - analyze_change_impact: Analyze impact of changes
  * - validate_implementation_spec: Validate implementation specs
  * - kota_sync_export: Export SQLite to JSONL
@@ -162,6 +165,13 @@ export function createMcpServer(context: McpServerContext): Server {
 					break;
 				case "search_dependencies":
 					result = await executeSearchDependencies(
+						toolArgs,
+						"", // requestId not used
+						context.userId,
+					);
+					break;
+				case "find_usages":
+					result = await executeFindUsages(
 						toolArgs,
 						"", // requestId not used
 						context.userId,
