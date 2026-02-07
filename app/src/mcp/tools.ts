@@ -14,6 +14,7 @@ import {
 	runIndexingWorkflow,
 	searchFiles,
 	extractLineSnippets,
+	findSymbolUsages,
 } from "@api/queries";
 import { getDomainKeyFiles } from "@api/expertise-queries.js";
 import { getGlobalDatabase } from "@db/sqlite/index.js";
@@ -324,6 +325,43 @@ export const SEARCH_DEPENDENCIES_TOOL: ToolDefinition = {
 		required: ["file_path"],
 	},
 };
+
+/**
+ * Tool: find_usages
+ */
+export const FIND_USAGES_TOOL: ToolDefinition = {
+	tier: "core",
+	name: "find_usages",
+	description:
+		"Find all usages of a specific symbol (function, class, type, etc.) across the indexed codebase. Returns call sites, imports, re-exports, and type references with file locations and context snippets. Essential for safe refactoring - operates at the symbol level unlike search_dependencies which is file-level.",
+	inputSchema: {
+		type: "object",
+		properties: {
+			symbol: {
+				type: "string",
+				description: "Symbol name to find usages for (e.g., 'createDatabase', 'KotaDatabase')",
+			},
+			file: {
+				type: "string",
+				description: "Optional: file path to disambiguate if the symbol exists in multiple files (e.g., 'src/db/sqlite-client.ts')",
+			},
+			include_definitions: {
+				type: "boolean",
+				description: "Whether to include the symbol's own definition in results (default: false)",
+			},
+			include_tests: {
+				type: "boolean",
+				description: "Whether to include usages in test files (default: true)",
+			},
+			repository: {
+				type: "string",
+				description: "Repository ID or full_name to search within (optional, auto-detected if single repo)",
+			},
+		},
+		required: ["symbol"],
+	},
+};
+
 
 /**
  * Tool: analyze_change_impact
@@ -804,6 +842,7 @@ export function getToolDefinitions(): ToolDefinition[] {
 		INDEX_REPOSITORY_TOOL,
 		LIST_RECENT_FILES_TOOL,
 		SEARCH_DEPENDENCIES_TOOL,
+		FIND_USAGES_TOOL,
 		ANALYZE_CHANGE_IMPACT_TOOL,
 		GET_INDEX_STATISTICS_TOOL,
 		VALIDATE_IMPLEMENTATION_SPEC_TOOL,
@@ -1822,6 +1861,99 @@ export async function executeSearchDependencies(
 		[fileId],
 	);
 	result.unresolved_imports = unresolvedRows.map((r) => r.source);
+
+	return result;
+}
+
+/**
+ * Execute find_usages tool
+ */
+export async function executeFindUsages(
+	params: unknown,
+	requestId: string | number,
+	userId: string,
+): Promise<unknown> {
+	// Validate params structure
+	if (typeof params !== "object" || params === null) {
+		throw new Error("Parameters must be an object");
+	}
+
+	const p = params as Record<string, unknown>;
+
+	// Check required parameter: symbol
+	if (p.symbol === undefined) {
+		throw new Error("Missing required parameter: symbol");
+	}
+	if (typeof p.symbol !== "string") {
+		throw new Error("Parameter 'symbol' must be a string");
+	}
+
+	// Validate optional parameters
+	if (p.file !== undefined && typeof p.file !== "string") {
+		throw new Error("Parameter 'file' must be a string");
+	}
+
+	if (p.include_definitions !== undefined && typeof p.include_definitions !== "boolean") {
+		throw new Error("Parameter 'include_definitions' must be a boolean");
+	}
+
+	if (p.include_tests !== undefined && typeof p.include_tests !== "boolean") {
+		throw new Error("Parameter 'include_tests' must be a boolean");
+	}
+
+	if (p.repository !== undefined && typeof p.repository !== "string") {
+		throw new Error("Parameter 'repository' must be a string");
+	}
+
+	const validatedParams = {
+		symbolName: p.symbol as string,
+		filePath: p.file as string | undefined,
+		includeDefinitions: (p.include_definitions as boolean | undefined) ?? false,
+		includeTests: (p.include_tests as boolean | undefined) ?? true,
+		repository: p.repository as string | undefined,
+	};
+
+	// AUTO-INDEX: Ensure repository is indexed before find_usages
+	let autoIndexResult: AutoIndexResult | null = null;
+	try {
+		autoIndexResult = await ensureRepositoryIndexed(validatedParams.repository);
+		if (autoIndexResult.wasIndexed) {
+			logger.info("Auto-indexed repository before find_usages", {
+				repositoryId: autoIndexResult.repositoryId,
+				filesIndexed: autoIndexResult.stats?.filesIndexed,
+			});
+		}
+		// Override repository param with resolved ID
+		validatedParams.repository = autoIndexResult.repositoryId;
+	} catch (error) {
+		logger.warn("Auto-index check failed, proceeding with find_usages", {
+			error: error instanceof Error ? error.message : String(error),
+		});
+	}
+
+	// Resolve repository ID (supports UUID or full_name)
+	const repoResult = resolveRepositoryIdentifierWithError(validatedParams.repository);
+	if ("error" in repoResult) {
+		return {
+			symbol: validatedParams.symbolName,
+			message: repoResult.error,
+			defined_in: "",
+			kind: "",
+			usages: [],
+			total_usages: 0,
+			files_with_usages: 0,
+		};
+	}
+	const repositoryId = repoResult.id;
+
+	// Call findSymbolUsages from @api/queries
+	const result = findSymbolUsages({
+		symbolName: validatedParams.symbolName,
+		filePath: validatedParams.filePath,
+		repositoryId,
+		includeDefinitions: validatedParams.includeDefinitions,
+		includeTests: validatedParams.includeTests,
+	});
 
 	return result;
 }
@@ -3275,6 +3407,8 @@ export async function handleToolCall(
 			return await executeListRecentFiles(params, requestId, userId);
 		case "search_dependencies":
 			return await executeSearchDependencies(params, requestId, userId);
+		case "find_usages":
+			return await executeFindUsages(params, requestId, userId);
 		case "analyze_change_impact":
 			return await executeAnalyzeChangeImpact(params, requestId, userId);
 		case "validate_implementation_spec":
