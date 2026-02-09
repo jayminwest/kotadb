@@ -52,7 +52,7 @@
   },
   "dependencies": {
     "@asteasolutions/zod-to-openapi": "^8.4.0",
-    "@modelcontextprotocol/sdk": "^1.25.0",
+    "@modelcontextprotocol/sdk": "^1.26.0",
     "@sentry/node": "^10.25.0",
     "@typescript-eslint/parser": "8.54.0",
     "@typescript-eslint/types": "8.54.0",
