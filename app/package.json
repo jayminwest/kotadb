@@ -51,7 +51,7 @@
     "prepublishOnly": "bun run typecheck && bun run lint"
   },
   "dependencies": {
-    "@asteasolutions/zod-to-openapi": "^8.4.0",
+    "@asteasolutions/zod-to-openapi": "^8.4.2",
     "@modelcontextprotocol/sdk": "^1.26.0",
     "@sentry/node": "^10.38.0",
     "@typescript-eslint/parser": "8.54.0",
